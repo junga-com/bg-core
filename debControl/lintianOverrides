@@ -1,0 +1,3 @@
+# this file lets you suppress lintian warnings for this package
+#bg-core [binary | source]: tag-from-lintian-warning
+#bg-core binary: manpage-has-errors-from-man

@@ -1,0 +1,365 @@
+#!/bin/bash
+
+# Library bg_coreImport.sh bg_core.sh
+# this is the core library script in the bg-core system. It implements the import function and uses it
+# to import a standard set of bg-core libraries for the script sourcing it to use.
+#
+# Typically scripts so not source this library directly. Instead they do 'source /usr/lib/bg_core.sh'
+# hard coding the path where to find bg_core.sh. bg_core.sh is a minimal stub that only knows how
+# to search the $bgLibPath and source this bg_coreImport.sh library. The idea is that being a minimal file
+# means bg_core.sh will hardly ever change so its not important for it to be sourced from vinstalled
+# project folders. This library is more complex and may require ocassional improvements, bug fixs and
+# debugging so it benefits being found dynamically if the bg-core's source project is virtually installed
+# in the terminal.
+#
+# This library (or bg_core.sh) must be sourced the traditional way. But after that, all additional
+# libraries should be sourced with the import statement. See man(3) import.
+#
+# Full and Minimal Library Sets:
+# If sourced with no options passed in, bg_coreImport.sh will source most all of the libraries packaged with
+# the bg-core project. This is convenient for the script author since they do not need to import a Library
+# before using any function in the bg-core project but it costs about 250 ms (at the time of this writing)
+# to source all the libraries at once. If the script author wants to reduce the startup time of the script
+# they can pass in --minimal like
+#     source /usr/lib/bg_core.sh --minimal
+# This causes this library to source far fewer libraries and the author can import exactly the libraries
+# with the functions that they need.
+#
+# Force Reloads:
+# The import statement provided by this library will detect if a library has already been sourced and
+# skip sourcing it again by default. In special occassions like debugging in a terminal by directly
+# sourcing bg_core.sh into the terminal, it might be required to actually re-source all the libraries
+# again. This can be acheived by passing the -f option like
+#     source /usr/lib/bg_core.sh -f
+# This will clear the _importedLibraries array so that all libraries will load again the next time they
+# are  imported. Programatically, this and other things can be accomplished with the importCntr function.
+
+
+#######################################################################################################################################
+### Import/Sourcing and System Path Functions
+
+
+# when bgImportProfilerOn is true, write library profile data to bgtrace destination
+# we manually create the ImportProfiler array so that we can record the earliest start time before we have the bgtimerStart function defined
+#bgImportProfilerOn="1"
+if [ "$bgImportProfilerOn" ]; then
+	ImportProfiler[0]="$(date +"%s%N")"
+	ImportProfiler[1]="${ImportProfiler[0]}"
+	ImportProfiler[2]="${_forkCnt:-0}"
+	ImportProfiler[3]="${ImportProfiler[2]}"
+fi
+
+
+# usage: importCntr traceOn
+# usage: importCntr traceOff
+# usage: importCntr getRevNumber|getCount  [<retVar>]
+# usage: importCntr bumpRevNumber
+# usage: importCntr clearLoadedList
+# usage: importCntr reloadAll
+# Subcommands:
+#   traceOn  : turn tracing on. each import will write a bgtrace line with the load time and the number of forks
+#   traceOff : turn off tracing
+#   getRevNumber <retVar> : return the number of libraries loaded.
+#   bumpRevNumber : increment the context revision so that things that track library loads will know that
+#               something has changed. This is done automatically if any import call results in a library
+#               being sourced
+#   clearLoadedList : remove all the <scriptName> entries from the imported libraries list so that
+#               they will be sourced again by the next call to 'import <scriptName>'
+#   reloadAll [--init] : reload (aka source again) each library that has been previously importted and whose
+#               source file has changed. For efficiency and minimalism, we do not create the temp file
+#               that records when the reload is relative to by default. A long lived script application
+#               can call this with the --init option at its start. If --init is not called, then the
+#               first time reloadAll is called will reload reguardless of whether the sources changed
+#               but then subsequent reloadAll calls will only reload changed librares
+#   list        print a list of imported Libraries
+function importCntr()
+{
+	declare -gA _importedLibraries
+	declare -g  _importedLibrariesBumpAdj
+	local cmd="$1"; shift
+	L1=""
+	case $cmd in
+		traceOn)   _importedLibraries[_tracingOn]=1 ;;
+		traceOff)  _importedLibraries[_tracingOn]="" ;;
+		getRevNumber)  returnValue "$((${#_importedLibraries[@]} + _importedLibrariesBumpAdj))" "$1" ;;
+		bumpRevNumber) ((_importedLibrariesBumpAdj++)) ;;
+		clearLoadedList)
+			local i; for i in "${!_importedLibraries[@]}"; do
+				if [[ "$i" =~ ^lib: ]]; then
+					unset _importedLibraries[$i]
+					((_importedLibrariesBumpAdj++))
+				fi
+			done
+			[ ${_importedLibrariesBumpAdj:-0} -gt 1 ] && L1="source $(findInclude bg_coreImport.sh)"
+			;;
+		reloadAll)
+			declare -g _importedLibrariesTimeRefTmpFile
+			local verboseFlag initFlag
+			while [[ "$1" =~ ^- ]]; do case $1 in
+				-v) verboseFlag="-v" ;;
+				--init) initFlag="--init" ;;
+			esac; shift; done
+			local i; [ ! "$initFlag" ] && for i in "${!_importedLibraries[@]}"; do
+				if [[ "$i" =~ ^lib: ]] && { [ ! "$_importedLibrariesTimeRefTmpFile" ] || [ "${_importedLibraries[$i]}" -nt "$_importedLibrariesTimeRefTmpFile" ]; }; then
+					[ "$verboseFlag" ] && echo "reloading '${i#lib:}'"
+					source "${_importedLibraries[$i]}"
+					((_importedLibrariesBumpAdj++))
+				fi
+			done
+			[ ! "$_importedLibrariesTimeRefTmpFile" ] && bgmktemp --will-not-release _importedLibrariesTimeRefTmpFile
+			[ "$_importedLibrariesTimeRefTmpFile" ] && touch "$_importedLibrariesTimeRefTmpFile"
+			;;
+		list)
+			declare -g _importedLibrariesTimeRefTmpFile
+			local i; for i in "${!_importedLibraries[@]}"; do
+				printf "%s\n" "${_importedLibraries[$i]}"
+			done
+			;;
+		*) (assertError -v cmd "unknown command")
+	esac
+}
+
+# usage: 'import [-f] <scriptName> ;$L1;$L2'
+# Source a bash library. Similar to "source <scriptName>" or ". <scriptName>"
+#
+# Note the unusual usage syntax. The ;$L at the end of the line is needed to allow <scriptName> to be sourced in the global context.
+# Sourcing from the context of inside a function is not quite the same for some things (a declare -g <varname> wont be truely global )
+#
+# The advantage of import over direct sourcing is that you do not need to know the path of the script because it finds installed
+# verions and honours virtually installed projects. It is also idempotent by default, meaning that it will not source the same
+# script multple times. This allows library scripts to declare their dependancies on other libraries without having to take into
+# account whether the script or another library has already sourced that dependency.
+#
+# Libraries sourced with this function automatically work with system development features that will detect when a library file has
+# changed during the run of a script and selectively re-source those changed libraries.
+#
+# Params:
+#    <scriptName> : the simple filename without path. The name is taken relative to system paths so
+#                   it will only be found if <scriptName> is found under one of the system paths. It
+#                   can contain a relative path under a system path.
+#    ;L1;$L2      : these are not parameters but are a part of the required syntax. They are needed
+#                   in order to provide features and have the script sourced in the global context
+# Options:
+#    -f : force sourcing. Even if the script has already been sourced into the environment, do it again.
+#    -q : if the library is not found, set the exit code to 202 instead of ending the script with an assert.
+# See Also:
+#    importCntr  : change settings and get the current state of imported libraries
+#    findInclude : this uses the same algorithm as import but just returns the path where its found
+#    findInPaths : this is a much more flexible algorithm for finding various types of installed files
+function import()
+{
+	declare -gA _importedLibraries
+	local forceFlag quietFlag
+	while [[ "$1" =~ ^- ]]; do case $1 in
+		-f) forceFlag="-f" ;;
+		-q) quietFlag="-q" ;;
+	esac; shift; done
+	local scriptName=$1
+
+	### return quickly if we dont have to load the library
+	if ! [ "$forceFlag" ] && [ "${_importedLibraries[lib:$scriptName]}" ]; then
+		L1=""
+		L2=""
+	fi
+
+	### look up the library in the system paths
+
+	# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
+	# searched in non-develoment mode
+	if [ "$bgSourceOnlyUnchangable" ]; then
+		local includePaths="$scriptFolder:/usr/lib"
+	else
+		local includePaths="$scriptFolder:${bgLibPath}:/usr/lib"
+	fi
+
+	local foundScriptPath incPath
+	local saveIFS=$IFS
+	IFS=":"
+	for incPath in ${includePaths}; do
+		incPath="${incPath%/}"
+		if [ -f "$incPath${incPath:+/}$scriptName" ]; then
+			foundScriptPath="$incPath${incPath:+/}$scriptName"
+			break
+		fi
+		if [ -f "$incPath${incPath:+/}lib/$scriptName" ]; then
+			foundScriptPath="$incPath${incPath:+/}lib/$scriptName"
+			break
+		fi
+		if [ -f "$incPath${incPath:+/}creqs/$scriptName" ]; then
+			foundScriptPath="$incPath${incPath:+/}creqs/$scriptName"
+			break
+		fi
+	done
+	IFS=$saveIFS
+
+	### success path
+	if [ "$foundScriptPath" ]; then
+
+		if [ "$bgSourceOnlyUnchangable" ] && [ -w "$foundScriptPath" ]; then
+			echo "error: can not source a writable library in a script that is not writeable by the user" >&2
+			echo "   if the script that was launched by the user is not writable by the user we consider it not eligible for any" >&2
+			echo "   action that would down grade its security because it may be an installed script in a system library" >&2
+			echo "   script path  = '$0'" >&2
+			echo "   library path = '$foundScriptPath'" >&2
+			exit 2
+		fi
+
+		if [ "${_importedLibraries[_tracingOn]}" ]; then
+			L1="source $foundScriptPath"
+			L2="bgtimerLapTrace -T ImportProfiler $scriptName"
+		else
+			# put the real source statement in L@ so that the return code from the library is set for the overall import line
+			# this allows 'import <library> ;$L1;$L2 || ...'
+			L1=""
+			L2="source $foundScriptPath"
+		fi
+
+		# if we are reloading a lib that had already been sourced, then insert a unique row to
+		# increment the load count. Whether or not the size of the _importedLibraries associative array
+		# changes is how things know whether any libraries have been sourced since the last time they
+		# checked for functions. This is useful for bg_objects that maintains a cache of sourced functions
+		# that match the naming convention to be considered a method of a Class. this allows the method
+		# definitions to be provided by multiple library files which is typical for Class hierarchies
+		[ "${_importedLibraries[lib:$scriptName]}" ] && ((_importedLibrariesBumpAdj++))
+		_importedLibraries[lib:$scriptName]=$foundScriptPath
+		return 0
+	fi
+
+
+	### library not found path
+
+	# if we are being called early in the initialization process, the real assertError might not be loaded yet so make a simple version
+	type -f assertError &>/dev/null || function assertError() { printf "simpleErrorReporter: 'import $scriptName ;\$L1;\$L2' $*\n" >&2; exit; }
+
+	# if $quietFlag is specified, we only return the 202 exit code, otherwise we assert an error
+	# because of the unusual ;$L1;$L2 pattern, we cant just return the exit code from this function
+	if [ "$quietFlag" ]; then
+		L1=""
+		L2='(exit 202)'
+	else
+		assertError -v bgLibPath "bash library not found by in any system path. Default system path is '/usr/lib'"
+	fi
+}
+
+
+
+#######################################################################################################################################
+### Init the very early environment. This code stands alone and does not use any library functions
+
+
+# process the cmd line arguments that are meant for us (source /usr/lib/bg_core.sh -f|--<bgLibDefaultLibrarySet>)
+# -f means force reload of already loaded libraries
+# <bgLibDefaultLibrarySet> identifies a set of libraries that will be initially sourced
+bgLibDefaultLibrarySet="all"
+while [ $# -gt 0 ]; do case $1 in
+	-f|--force) importCntr clearLoadedList ;;
+	--minimal)  bgLibDefaultLibrarySet="${1#--}" ;;
+	*) break ; esac; shift
+	#*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+done
+
+
+
+
+# TODO: make a man(7) page to document all the global vars set by the bg-core environment that scripts and libraries can reference
+# bgLibExecMode records if we are being sourced in a terminal or in a script
+#      script   : normal case of a script file including source /usr/lib/bg_core.sh
+#      terminal : a user typed '$ source /usr/lib/bg_core.sh'
+function __getScriptExecType() { bgBASH_scriptType="${FUNCNAME[@]: -1}"; }; __getScriptExecType
+case "$bgBASH_scriptType:$BASH_SUBSHELL" in
+	# normal case of being sourced inside a script
+	main:0)
+		if [ ! "${bgLibExecMode+exists}" ]; then
+			declare -rg bgLibExecMode="script"
+
+			# record the execution cmd. This assumes that the script's 'source /usr/lib/bg_core.sh' either does not specify any parameters or
+			# adds "$@" after the parameters so that the $@ of the top level scripts are preserved here
+			declare -g bgLibExecCmd=("${0##*/}" "$@")
+
+			declare -g scriptFolder="${0%/*}"
+		fi
+		;;
+
+	# case where we are being sourced in a terminal directly by the user
+	# this is typically done for debugging and development so we setups up some things to make that
+	# a better experience.
+	source:0)
+		if [ ! "${bgLibExecMode+exists}" ]; then
+			declare -rg bgLibExecMode="terminal"
+
+			declare -g bgLibExecCmd=("${0##*/}" "$@")
+			declare -g scriptFolder="$PWD"
+		fi
+		;;
+
+	# case where a script that sources us is being sourced in a terminal directly by the user
+	# this is the case that "source bg-debugCntr" trips
+	source:*)
+		if [ ! "${bgLibExecMode+exists}" ]; then
+			declare -rg bgLibExecMode="terminal"
+
+			scrdFile="${BASH_SOURCE[@]: -1}"
+			declare -g bgLibExecCmd=("source:${scrdFile##*/}" "$@")
+			declare -g scriptFolder="${scrdFile%/*}"
+			unset scrdFile
+		fi
+		;;
+esac
+
+#######################################################################################################################################
+### Include the mandatory libraries that define the minimum environment that code can rely on
+
+# bg_libCore.sh contains the core functions from other libraries that should be present even if the whole library is not.
+# Also, any function that is used in other bg_core* libraries can be moved to this library so that these functions are available
+# regardless of what order the rest of the bg_core* librares are sourced
+import bg_coreLibsMisc.sh ;$L1;$L2
+
+# bg_libSysRuntime.sh works with the OS system paths to allow discovery of other installed components (plugins, templates, etc..)
+import bg_coreSysRuntime.sh ;$L1;$L2
+
+# bg_coreDebug.sh conditionally includes the bg_debugTracing.sh and bg_debugger.sh libraries based on if the terminal is
+# configured to activate them and if not it creates stubs for bgtrace* commands that turn them into noops.
+import bg_coreDebug.sh ;$L1;$L2
+
+# we could probably drop bg_coreProcCntrl.sh from the required libraries with some light organization
+import bg_coreProcCntrl.sh ;$L1;$L2
+
+# bg_coreAssertError.sh is some general purpose assert* functions. The core error handling functions are donated to bg_libCore.sh
+import bg_coreAssertError.sh ;$L1;$L2
+
+# we could probably drop bg_coreFiles.sh from the required libraries with some light organization
+import bg_coreFiles.sh ;$L1;$L2
+
+# work with semmantic versions so that we can support conditional code on the versions of deps in the envoronment
+import bg_coreSemVer.sh ;$L1;$L2
+import bg_coreLSBVersions.sh ;$L1;$L2
+
+# these functions should probably be somewhere else but its not yet clear where. Some could be pruned from the required runtime
+import bg_coreMisc.sh ;$L1;$L2
+
+
+
+# if we are being sourced in a terminal, tell importCntr to record the timestamp used to tell if libraries are newer
+# and also import the bgtrace functions assuming that we are being sourced to debug stuff
+if [ "$bgLibExecMode" == "terminal" ]; then
+	import bg_debugTrace.sh ;$L1;$L2
+	importCntr reloadAll --init
+fi
+
+
+#######################################################################################################################################
+### End of sourcing essential code. The script may continue to source optional libraries. Typically, when the script calls
+#   invokeOutOfBandSystem, it signals that its initialization is over. If import profiling is called for, we start it here and
+#   end it in invokeOutOfBandSystem.
+
+# Typically each library will take from 0.004 to 0.040 to load with the average being around 0.012
+if [ "$bgImportProfilerOn" ]; then
+	import bg_debugTrace.sh ;$L1;$L2
+	importCntr traceOn
+	bgtimerLapTrace -T ImportProfiler "bg-core loaded mandatory core libraries"
+fi
+
+# This block moved to the invokeOutOfBandSystem function
+# if [ "$bgImportProfilerOn" ]; then
+# 	bgtimerTrace -T ImportProfiler "bg-core finished includes"
+# fi

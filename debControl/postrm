@@ -1,0 +1,5 @@
+#!/bin/bash -e
+
+[ -f /usr/lib/bg_core.sh ] && source /usr/lib/bg_core.sh
+type -t pkgOnPostRemove &>/dev/null && pkgOnPostRemove bg-core "$@"
+true

@@ -1,0 +1,17 @@
+Source: bg-core
+Section: admin
+Priority: optional
+Maintainer: Robert E. Griffith <bobg@junga.com>
+Vcs-Browser: https://github.com/junga-com/bg-core
+Vcs-git: git@github.com/junga-com/bg-core
+
+Package: bg-core
+Architecture: all
+Depends: coreutils (>=1), grep (>=2),  bash (>=3), gawk, sed (>=4), git, debconf-utils, ipcalc, host
+Description: bash script coding library
+ bg-core provides an environment for writing secure scripts by sysadmins and devops and anyone interested in scripting their linux
+ environment.
+ To use this library in your script include this at the top
+   source /usr/lib/bg_core.sh
+   import <libname.sh> ;$L1;$L2  # (optional) to include additional script libraries, use import syntax instead of 'source' or '.'
+ See man bg-core after installing.
