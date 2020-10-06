@@ -1,5 +1,8 @@
 #!/bin/bash
 
+import bg_strings.sh ;$L1;$L2
+
+
 # Library bg_coreLibsMisc.sh
 # This library contains functions that are unconditionally included by anything that sources /usr/lib/bg_core.sh
 # Unlike all other libraries, this library does not group functions that are related in any way other then the fact
@@ -12,7 +15,7 @@
 
 
 #######################################################################################################################################
-### From bg_libOutOfBand.sh
+### From bg_outOfBandScriptFeatures.sh
 
 # usage: bgOptionsEndLoop [--firstParam <firstParamVar>] [--eatUnknown] "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"
 # usage: see example code below. This is part of an argument parsing pattern
@@ -320,7 +323,7 @@ function invokeOutOfBandSystem()
 
 
 	if [[ "$1" =~ ^-h ]]; then
-		import bg_libOutOfBand.sh ;$L1;$L2
+		import bg_outOfBandScriptFeatures.sh ;$L1;$L2
 
 		local cmd="$(basename $0)"
 		local cmdFolder="$(dirname $0)"

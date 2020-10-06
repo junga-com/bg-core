@@ -66,6 +66,18 @@ function earlyAssert()
 	exit "${exitCode:-1}"
 }
 
+# usage: setSecureEnv <varNameN> <value>
+# this script will set a number of readonly variables that the rest of the script that called it can rely on. Its ok if they are
+# already set to the right value but it they are already set to a different value, we error out
+function setSecureEnv()
+{
+	local varName="$1"
+	local value="$2"
+	declare -grx $varName="$value" &>/dev/null || [ "${!varName}" == "$value" ] || earlyAssert -e 3 "can not run an installed script with $varName='${!varName}'. It is expected to be '$value' in this environment. Is $varName set readonly in this shell ENV?"
+}
+
+
+
 ### Set the bgProductionMode variable
 # This security only protects scripts that are installed in a hosts system folder via a package management from a trusted repository
 # that enforces security review of content accepted into the repository. The whole point of this mechanism is to ensure that officially
@@ -89,6 +101,25 @@ function earlyAssert()
 #
 
 
+# check that the /etc/bgHostProductionMode file has reasonable permissions if it exists. The default is the most restrictive setting
+# so its ok for it not to exist as long at privilege would be required to create it
+[ "$(stat --printf="%a%u%g%F" /etc)" == "75500directory" ] || earlyAssert "The /etc folder has unexpected security. Expecting UID==0, GID==0, ugo==755, type=directory. Refusing to run system scripts"
+[ ! -e /etc/bgHostProductionMode ] || [ "$(stat --printf="%a%u%g" /etc/bgHostProductionMode)" == "64400" ] || earlyAssert "The /etc/bgHostProductionMode file has unexpected security. Expecting UID==0, GID==0, ugo==755. Refusing to run system scripts"
+
+
+
+# if /etc/bgHostProductionMode does not contain "mode=development" then this host is considered to be in production. We make this
+# default to production so that its more fragile to be considered a less secure development environment. i.e. anything done to disrupt
+# this test should result in it defaulting to the more restricted production mode.
+declare bgHostProductionModeTemp=$([ ! -f /etc/bgHostProductionMode ] || awk '/^[[:space:]]*mode[[:space:]]*[:=][[:space:]]*development/ {print "development"; exit}' /etc/bgHostProductionMode) || earlyAssert -e 4 "error setting bgHostProductionModeTemp variable"
+if [ "$bgHostProductionModeTemp" != "development" ]; then
+	setSecureEnv bgHostProductionMode  "production"
+else
+	setSecureEnv bgHostProductionMode  "development"
+fi
+unset bgHostProductionModeTemp
+
+
 # this block distinguishes scripts that the user can modify and those that they can not. Installed system scripts can not be modified
 # by non-root users. The important thing is that those scripts can not be ran in a way tricks this code into the last, default case.
 # Any other script can trick this code how ever they want.
@@ -105,49 +136,49 @@ function earlyAssert()
 # This, like the lowest security default case below, does not enforce any constraints but thats because the root-equivalent user
 # can modify commands  in /usr/bin and do anything that they want anyway.
 # SECURITY: we need to make sure that this block only hits for real root-equivalent users. We can also add logging to this case supported by an auditd mechanism to make sure that the script is not tampered with by root
-if [ -w "/usr/bin" ] && [ "$SUDO_USER" ]; then
+if [ -w "/usr/bin" ] && [ "$SUDO_USER" ] && [ "$bgHostProductionMode" != "development" ]; then
 	# sudo takes care of resetting all the ENV variables for root (we dont need to confirm that sudo locked down becasue this user can change system scripts anyway)
 
 	# CRITICALTODO: distinguish production (SETENV) and development mode (NOSETENV). Push dev down to the default case and enforce are script constraints for root. Force root to edit this file to defeat them which can be trapped with auditd
-	declare -rx bgProductionMode="production-rootEquiv" || earlyAssert -e 3 "can not run an installed script with bgProductionMode='$bgProductionMode'. Is bgProductionMode readonly in this shell ENV?"
+	setSecureEnv bgProductionMode          "production-rootEquiv"
 
 	# root can change all the files so we have to turn this off for root (users that have file permissions to change system folders)
-	declare -rx bgSourceOnlyUnchangable=""
+	setSecureEnv bgSourceOnlyUnchangable   ""
 
-	declare -rx bgDevModeUnsecureAllowed="" || earlyAssert -e 3 "can not run an installed script with bgDevModeUnsecureAllowed='$bgDevModeUnsecureAllowed'. Is bgDevModeUnsecureAllowed readonly in this shell ENV?"
+	setSecureEnv bgDevModeUnsecureAllowed  ""
 
 
 
 # using sudo to be a different non-root user. This will be more common as a domain becomes more mature in its security
 # a developer can spoof into elevating security into this block by setting SUDO_USER in the env
-elif [ ! -w "/usr/bin" ] && [ "$SUDO_USER" ]; then
+elif [ ! -w "/usr/bin" ] && [ "$SUDO_USER" ] && [ "$bgHostProductionMode" != "development" ]; then
 	# sudo takes care of resetting all the ENV variables but we need to confirm that they did
 	# CRITICALTODO: figure out how to 1) securely determine if we are running in sudo and if sudo allows us to keep environ (a dev workstation config thing)
-	declare -rx bgProductionMode="production-elevatated" || earlyAssert -e 3 "can not run an installed script with bgProductionMode='$bgProductionMode'. Is bgProductionMode readonly in this shell ENV?"
+	setSecureEnv bgProductionMode          "production-elevatated"
 
-	declare -rx bgSourceOnlyUnchangable="1" || earlyAssert -e 3 "can not run an installed script with bgSourceOnlyUnchangable='$bgSourceOnlyUnchangable'. Is bgSourceOnlyUnchangable readonly in this shell ENV?"
-	declare -rx bgDevModeUnsecureAllowed="" || earlyAssert -e 3 "can not run an installed script with bgDevModeUnsecureAllowed='$bgDevModeUnsecureAllowed'. Is bgDevModeUnsecureAllowed readonly in this shell ENV?"
+	setSecureEnv bgSourceOnlyUnchangable   "1"
+	setSecureEnv bgDevModeUnsecureAllowed  ""
 
 
 
 # non-sudo, non-privileged user running system scripts
-# this is the typicall case of running a script script without sudo
-# a developer can spoof into elevating security into this block by changing ownership of their script to another non-root user
+# this is the typicall case of running a script without sudo
+# a developer can spoof into increasing security into this block by changing ownership of their script to another non-root user but they can't spoof it the other way to lessen security
 # the [ "$0" != "bash" ] check is to allow sourcing bg_core directly like bg-debugCntr does. The bash env is under user control just like a script they can modify is under their control
-elif [ ! -w "$0" ] && [ "$0" != "bash" ]; then
+elif [ ! -w "$0" ] && [ "$0" != "bash" ] && [ "$bgHostProductionMode" != "development" ]; then
 	# note that a non-root user can also do any of these declarations so code in other libraries can not use anything that we put here
 	# to ensure that the script is ok. Thats OK because we only need to protect scripts that are used to give elevated sudo permissions
 	# and those are installed in system folder where non-root users can not modify them
-	declare -rx bgProductionMode="production-nonPriv" || earlyAssert -e 3 "can not run an installed script with bgProductionMode='$bgProductionMode'. Is bgProductionMode readonly in this shell ENV?"
+	setSecureEnv bgProductionMode        "production-nonPriv"
 
 	[ "$bgLibPath" ] && echo "** WARNING ** scripts in system paths can not use bg-debugCntr vinstalled projects" >&2
-	declare -r bgLibPath="" || earlyAssert -e 3 "can not run an installed script with bgLibPath='$bgLibPath'. Is bgLibPath readonly in this shell ENV?"
+	setSecureEnv bgLibPath ""
 
 	# its ok to turn tracing on for system installed scripts but not the debugger
 	# declare -r bgTracingOn=""
 
-	declare -rx bgSourceOnlyUnchangable="1" || earlyAssert -e 3 "can not run an installed script with bgSourceOnlyUnchangable='$bgSourceOnlyUnchangable'. Is bgSourceOnlyUnchangable readonly in this shell ENV?"
-	declare -rx bgDevModeUnsecureAllowed="" || earlyAssert -e 3 "can not run an installed script with bgDevModeUnsecureAllowed='$bgDevModeUnsecureAllowed'. Is bgDevModeUnsecureAllowed readonly in this shell ENV?"
+	setSecureEnv bgSourceOnlyUnchangable   "1"
+	setSecureEnv bgDevModeUnsecureAllowed  ""
 
 	# if we detect an invalid security constraint here, we can end the script with an error...
 	# TODO: check to see that the host's validation is signed correctly or write a warning message
@@ -157,12 +188,13 @@ elif [ ! -w "$0" ] && [ "$0" != "bash" ]; then
 # default case is when user is running scripts that they wrote. Typically, this is developing on a workstation but on a production
 # server this could be a sysadmin trying stuff, either benign or malicious. We do not need to impose any security because the user
 # is constrained by the core linux file permission and other security
-# This is the lowest security case that a hacker would like to get a system installed script to hit
+# This is the lowest security case that a hacker would like to get a system installed script to hit so the above conditions need to
+# identify all cases of running system code so that they do not reach here.
 # SECURITY: The key security point is that an installed script can not pass through this code and hit this default case.
 else
-	declare -rx bgProductionMode="development" || echo "*** WARNING *** In dev mode, bgProductionMode is typically set to 'development' but it is readonly set to '$bgProductionMode'" >&2
-	declare -rx bgSourceOnlyUnchangable=""     || echo "*** WARNING *** In dev mode, bgSourceOnlyUnchangable is typically set to '' but it is readonly set to '$bgSourceOnlyUnchangable'" >&2
-	declare -rx bgDevModeUnsecureAllowed="1"   || echo "*** WARNING *** In dev mode, bgDevModeUnsecureAllowed is typically set to '1' but it is readonly set to '$bgDevModeUnsecureAllowed'" >&2
+	setSecureEnv bgProductionMode          "development"
+	setSecureEnv bgSourceOnlyUnchangable   ""
+	setSecureEnv bgDevModeUnsecureAllowed  "1"
 fi
 
 
@@ -172,72 +204,77 @@ if [[ "$1" =~ ^-h ]]; then
 fi
 
 
+unset setSecureEnv
 
-# if bgtrace is turned on, manually start the default timer as soon as possible so that we can time
-# from the start of the script before bgtimerStart is sourced.
-if [ "$bgTracingOn" ]; then
-	bgtimerGlobalTimer[0]="$(date +"%s%N")"
-	bgtimerGlobalTimer[1]="${bgtimerGlobalTimer[0]}"
+if [ "$1" != "--queryMode" ]; then
+
+
+	# if bgtrace is turned on, manually start the default timer as soon as possible so that we can time
+	# from the start of the script before bgtimerStart is sourced.
+	if [ "$bgTracingOn" ]; then
+		bgtimerGlobalTimer[0]="$(date +"%s%N")"
+		bgtimerGlobalTimer[1]="${bgtimerGlobalTimer[0]}"
+	fi
+
+	# This first time we are sourced, we need to create the findInclude function so that we can find bg_coreImport.sh to load
+	if [ "$1" == "-f" ] || [ "$(type -t findInclude)" != "function" ]; then
+
+		# usage: findInclude scriptName
+		# this function will be redefined in bg_coreImport.sh
+		function findInclude()
+		{
+			local filename=$1
+
+			local includePaths="$scriptFolder:${bgLibPath}:/usr/lib"
+
+			local found incPath
+			local saveIFS=$IFS
+			IFS=":"
+			for incPath in ${includePaths}; do
+				incPath="${incPath%/}"
+				if [ -f "$incPath${incPath:+/}$filename" ]; then
+					found="$incPath${incPath:+/}$filename"
+					break
+				fi
+				if [ -f "$incPath${incPath:+/}lib/$filename" ]; then
+					found="$incPath${incPath:+/}lib/$filename"
+					break
+				fi
+			done
+			IFS=$saveIFS
+
+			bg_coreImport_path="$found"
+		}
+	fi
+
+	# this sets the bg_coreImport_path global var
+	findInclude bg_coreImport.sh
+
+	# end with error if not found
+	if [ ! "$bg_coreImport_path" ]; then
+		echo "error: 'import $filename ;\$L1;\$L2'" >&2
+		echo "   bash library not found by in any of these paths" >&2
+		echo $includePaths | tr ":" "\n" | awk '{print "      "$0}'  >&2
+		exit 1
+	fi
+
+	# this is a double check. The real prevention is that bgLibPath is cleared so that bg_coreImport_path will only be found in /usr/lib/
+	if [ "$bgSourceOnlyUnchangable" ] && [ -w "$bg_coreImport_path" ]; then
+		echo "error: can not source a writable library in a script that is not writeable by the user" >&2
+		echo "   script path  = '$0'" >&2
+		echo "   library path = '$bg_coreImport_path'" >&2
+		exit 2
+	fi
+
+	# we have to load bg_coreImport.sh before 'import bg_coreImport.sh ;$L1;$L2' is available but we can predefine its
+	# entry in the _importedLibraries associative array to record the path that we used. This allows
+	# importCntr reloadAll to reload bg_coreImport.sh also if it changes.
+	declare -gA _importedLibraries
+	_importedLibraries[lib:bg_coreImport.sh]="$bg_coreImport_path"
+	source "${_importedLibraries[lib:bg_coreImport.sh]}"
+
+
+	# bgtrace "in common.sh"
+	# printfVars _bgtraceFile bgTracingOn bgTracingOnState  >>/tmp/bgtrace.out
+	# printfVars bgProductionMode bgSourceOnlyUnchangable bgDevModeUnsecureAllowed bgLibPath  >>/tmp/bgtrace.out
 fi
-
-# This first time we are sourced, we need to create the findInclude function so that we can find bg_coreImport.sh to load
-if [ "$1" == "-f" ] || [ "$(type -t findInclude)" != "function" ]; then
-
-	# usage: findInclude scriptName
-	# this function will be redefined in bg_coreImport.sh
-	function findInclude()
-	{
-		local filename=$1
-
-		local includePaths="$scriptFolder:${bgLibPath}:/usr/lib"
-
-		local found incPath
-		local saveIFS=$IFS
-		IFS=":"
-		for incPath in ${includePaths}; do
-			incPath="${incPath%/}"
-			if [ -f "$incPath${incPath:+/}$filename" ]; then
-				found="$incPath${incPath:+/}$filename"
-				break
-			fi
-			if [ -f "$incPath${incPath:+/}lib/$filename" ]; then
-				found="$incPath${incPath:+/}lib/$filename"
-				break
-			fi
-		done
-		IFS=$saveIFS
-
-		bg_coreImport_path="$found"
-	}
-fi
-
-# this sets the bg_coreImport_path global var
-findInclude bg_coreImport.sh
-
-# end with error if not found
-if [ ! "$bg_coreImport_path" ]; then
-	echo "error: 'import $filename ;\$L1;\$L2'" >&2
-	echo "   bash library not found by in any of these paths" >&2
-	echo $includePaths | tr ":" "\n" | awk '{print "      "$0}'  >&2
-	exit 1
-fi
-
-# this is a double check. The real prevention is that bgLibPath is cleared so that bg_coreImport_path will only be found in /usr/lib/
-if [ "$bgSourceOnlyUnchangable" ] && [ -w "$bg_coreImport_path" ]; then
-	echo "error: can not source a writable library in a script that is not writeable by the user" >&2
-	echo "   script path  = '$0'" >&2
-	echo "   library path = '$bg_coreImport_path'" >&2
-	exit 2
-fi
-
-# we have to load bg_coreImport.sh before 'import bg_coreImport.sh ;$L1;$L2' is available but we can predefine its
-# entry in the _importedLibraries associative array to record the path that we used. This allows
-# importCntr reloadAll to reload bg_coreImport.sh also if it changes.
-declare -gA _importedLibraries
-_importedLibraries[lib:bg_coreImport.sh]="$bg_coreImport_path"
-source "${_importedLibraries[lib:bg_coreImport.sh]}"
-
-
-# bgtrace "in common.sh"
-# printfVars _bgtraceFile bgTracingOn bgTracingOnState  >>/tmp/bgtrace.out
-# printfVars bgProductionMode bgSourceOnlyUnchangable bgDevModeUnsecureAllowed bgLibPath  >>/tmp/bgtrace.out

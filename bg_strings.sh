@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-# Library bg_string.sh
+# Library bg_strings.sh
 ####################################################################################################################
 ### String Parsing Functions
 # Summary:
