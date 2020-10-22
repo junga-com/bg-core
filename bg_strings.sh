@@ -1380,7 +1380,7 @@ function stringRemoveLeadingIndents()
 # Replaces all strings of <delimSet> with the prefered delim which is the first character in <delimSet>
 # and removes any strings of <delimSet> at the start and end of the set
 # This function is the same as strSetEscape except the default <delimSet> is reorded to have the space first
-# preserves order (works with ordered sets)
+# This function preserves order (works with ordered sets)
 # Options:
 #     -d <delimSet> : the delimSet  used to break <set> into elements. [ ,: \t] by defualt.
 #                     Note that the first character is the prefered delim
@@ -1403,7 +1403,7 @@ function strSetNormalize()
 # Replaces all strings of <delimSet> with the prefered delim which is the first character in <delimSet>
 # and removes any strings of <delimSet> at the start and end of the set
 # This function is the same as strSetNormalize except the default <delimSet> is reorded to have the comma first
-# preserves order (works with ordered sets)
+# This function preserves order (works with ordered sets)
 # Options:
 #     -d <delimSet> : the delimSet  used to break <set> into elements. [,: \t] by defualt.
 #                     Note that the first character is the prefered delim
@@ -1424,7 +1424,7 @@ function strSetEscape()
 
 # usage: count="$(strSetCount "set")"
 # return the number of elements in the set.
-# preserves order (works with ordered sets)
+# This function preserves order (works with ordered sets)
 # Options:
 #     -d <delimSet> : the delimSet  used to break <set> into elements. [,: \t] by defualt.
 #                     Note that the first character is the prefered delim
@@ -1527,15 +1527,16 @@ function strSetAdd()
 	[ "$setVar" == "_ssa_set" ] && echo "${!setVar}"
 }
 
-# usage: newSet="$(strSetRemove "set" oneElement)"
-# removes 'oneElement' from the set. If 'oneElement' does not exist, the set will be returned unchanged
-# 'oneElement' can be a regex to remove potentially multiple elements. The regex must match the entire
-# element -- i.e. there is an implied ^ $ surrounding the oneElement
-# preserves order (works with ordered sets)
+# usage: newSet="$(strSetDelete "set" key)"
+# removes 'key' from the set. If 'key' does not exist, the set will be returned unchanged
+# 'key' can be a regex to remove potentially multiple elements. The regex must match the entire
+# element -- i.e. there is an implied ^ $ surrounding the key
+# This function preserves order (works with ordered sets)
 # Options:
 #     -d <delimSet> : the delimSet  used to break <set> into elements. [,: \t] by defualt.
 #                     Note that the first character is the prefered delim
-function strSetRemove()
+function strSetRemove() { strSetDelete "$@"; }
+function strSetDelete()
 {
 	local delims=",: \t"
 	while [[ "$1" =~ ^- ]]; do case $1 in
@@ -1551,7 +1552,7 @@ function strSetRemove()
 # usage: newSet="$(strSetFilter "set" filterRegEx)"
 # returns a set with only elements from "set" that match filterRegEx. Unlike strSetRemove, the filterRegex
 # does not have an implicit anchors -- ^ $
-# preserves order (works with ordered sets)
+# This function preserves order (works with ordered sets)
 # Options:
 #     -d <delimSet> : the delimSet  used to break <set> into elements. [,: \t] by defualt.
 #                     Note that the first character is the prefered delim
@@ -1568,11 +1569,16 @@ function strSetFilter()
 	echo "${1}" | sed -e 's/['"$delims"']['"$delims"']*/\n/g' | grep  "$2" | tr "\n" " " | sed -e 's/ *$//'
 }
 
-# usage: if strSetIsMember "set" oneElement; then ...
-# preserves order (works with ordered sets)
+# usage: strSetHas <set> <key>
+# usage: if strSetIsMember <set> <key>; then ...
+# This function preserves order (works with ordered sets)
 # Options:
 #     -d <delimSet> : the delimSet  used to break <set> into elements. [,: \t] by defualt.
 #                     Note that the first character is the prefered delim
+# Return Value:
+#    0(true)  : the set contains <key>
+#    1(false) : the set does not contain <key>
+function strSetHas() { strSetIsMember "$@"; }
 function strSetIsMember()
 {
 	local delims=",: \t"
@@ -1588,7 +1594,7 @@ function strSetIsMember()
 
 # usage: strSetGetIndex "set" <element>
 # returns the 1 based index of oneElement in the the set. 0 if the specified element is not in the set
-# preserves order (works with ordered sets)
+# This function preserves order (works with ordered sets)
 function strSetGetIndex()
 {
 	local set="$1"
@@ -1637,7 +1643,7 @@ function strSetGetIndex()
 #     "name,mac"     : use just "name" and "mac" in the result set
 #     "name"         : just "name"
 #     ""             : make the result set empty -- no elements
-# preserves order (works with ordered sets)
+# This function preserves order (works with ordered sets)
 function strSetExpandRelative()
 {
 	local fullSet="${1//$'\n'/ }"

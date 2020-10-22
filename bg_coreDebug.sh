@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Library bg_coreDebug.sh
-# sourcing /usr/lib/bg-bootstrap.sh provides several debugging facilities for scripts that will be optionally activated depending on
+# sourcing /usr/lib/bg-core.sh provides several debugging facilities for scripts that will be optionally activated depending on
 # the environment that the script is ran in.
 #
 # This library is unconditionally sourced by bg_coreImport.sh. When debug features are not allowed or not asked for by the
@@ -60,6 +60,7 @@
 #    man(1) bg-debugCntr debugger on:[<dbgID>]
 #
 
+
 ##################################################################################################################
 ### Init bgtracing to be on or off.
 # If bgtracing is not enabled, we provide stubs to make bgtrace* statements into noops.
@@ -87,7 +88,7 @@ else
 	# where its kind of hidden from sight.
 
 	# install a cntr-c signal handler to invoke the debugger.
-	[ "$bgDevModeUnsecureAllowed" ] && bgtrap '
+	[ "$bgDevModeUnsecureAllowed" ] && [ "$bgLibExecMode" == "script" ] && bgtrap '
 		if debuggerIsInBreak; then
 			# if we are already stopped in the debugger, interpret cntr-c normally and end the script
 			bgtrace "cntr-c caught in bgtrace mode. Already stopped in debugger so interrupting script."
@@ -106,8 +107,7 @@ else
 
 	##################################################################################################################
 	### recognize debugger environment var maintianed by bg-debugCntr to activate the debugger when a script runs
-	function __inExternalScript() { [ "${FUNCNAME[@]: -1}" == "main" ]; }
-	if [ "$bgDevModeUnsecureAllowed" ] &&  __inExternalScript && [ "${bgDebuggerOn}" ]; then
+	if [ "$bgDevModeUnsecureAllowed" ] &&  [ "$bgLibExecMode" == "script" ] && [ "${bgDebuggerOn}" ]; then
 		import bg_debugger.sh ;$L1;$L2
 		bgtrace "bgDebuggerOn is on : ${bgDebuggerOn}"
 

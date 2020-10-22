@@ -7,7 +7,7 @@ Vcs-git: git@github.com/junga-com/bg-core
 
 Package: bg-core
 Architecture: all
-Depends: coreutils (>=1), grep (>=2),  bash (>=3), gawk, sed (>=4), git, debconf-utils, ipcalc, host
+Depends: coreutils (>=1), grep (>=2),  bash (>=3), gawk, sed (>=4), git, ipcalc, host
 Description: bash script coding library
  bg-core provides an environment for writing secure scripts by sysadmins and devops and anyone interested in scripting their linux
  environment.

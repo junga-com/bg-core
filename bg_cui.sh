@@ -1069,11 +1069,11 @@ function cuiPrintColorTable()
 	    do
 	        color=$(( $row * 16 + $col))
 	        BG="${esc}[48;5;${color}m"
-	        rowtext=${rowtext}$BG\
+	        rowtext=${rowtext}$BG\   # note at leat two spaces after the \
 	        if [[ $color -lt 100 ]]; then rowtext=${rowtext}$BG\   ;fi
 	        if [[ $color -lt 10 ]]; then rowtext=${rowtext}$BG\   ;fi
 	        rowtext=${rowtext}$BG${color}
-	        rowtext=${rowtext}$BG\
+	        rowtext=${rowtext}$BG\   # note at leat two spaces after the \
 	    done
 	    echo "${rowtext}${esc}[00m "
 	done

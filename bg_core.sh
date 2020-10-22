@@ -66,6 +66,14 @@ function earlyAssert()
 	exit "${exitCode:-1}"
 }
 
+# provide a stand-alone implemntation of bgtrace so that bootstrap code can be debugged
+function earlyTrace()
+{
+	if [ -w /tmp/bgtrace.out ]; then
+		echo "$*" >> /tmp/bgtrace.out
+	fi
+}
+
 # usage: setSecureEnv <varNameN> <value>
 # this script will set a number of readonly variables that the rest of the script that called it can rely on. Its ok if they are
 # already set to the right value but it they are already set to a different value, we error out
@@ -206,8 +214,9 @@ fi
 
 unset setSecureEnv
 
+# --queryMode is used by bg-debugCntr to have this file setup the script run environment and exit before going on to load bg_coreImport
+# this allow bg-debugCntr or other tools to query the environment that a script will run under this host without actuall running anything
 if [ "$1" != "--queryMode" ]; then
-
 
 	# if bgtrace is turned on, manually start the default timer as soon as possible so that we can time
 	# from the start of the script before bgtimerStart is sourced.

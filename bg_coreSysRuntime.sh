@@ -259,10 +259,10 @@ function bgGetDataFolder()
 if [ "$projectName" ]; then
 	dataFolder="$(bgGetDataFolder $projectName)"
 	confFile="/etc/$projectName"
-	// 2020-10 - created new naming standard to group the paths related to the package running the code
+	# 2020-10 - created new naming standard to group the paths related to the package running the code
 	pkgDataFolder="$dataFolder"
 	pkgConfFile="$confFile"
-	pkgManifest="/var/lib/bg-bootstrap/$projectName"
+	pkgManifest="/var/lib/bg-dev/$projectName"
 fi
 
 

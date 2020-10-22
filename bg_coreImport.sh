@@ -146,6 +146,7 @@ function importCntr()
 #    importCntr  : change settings and get the current state of imported libraries
 #    findInclude : this uses the same algorithm as import but just returns the path where its found
 #    findInPaths : this is a much more flexible algorithm for finding various types of installed files
+function _import() { import "$@"; }
 function import()
 {
 	declare -gA _importedLibraries
@@ -160,6 +161,7 @@ function import()
 	if ! [ "$forceFlag" ] && [ "${_importedLibraries[lib:$scriptName]}" ]; then
 		L1=""
 		L2=""
+		return
 	fi
 
 	### look up the library in the system paths
@@ -208,7 +210,7 @@ function import()
 			L1="source $foundScriptPath"
 			L2="bgtimerLapTrace -T ImportProfiler $scriptName"
 		else
-			# put the real source statement in L@ so that the return code from the library is set for the overall import line
+			# put the real source statement in L2 so that the return code from the library is set for the overall import line
 			# this allows 'import <library> ;$L1;$L2 || ...'
 			L1=""
 			L2="source $foundScriptPath"
@@ -304,10 +306,30 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 			unset scrdFile
 		fi
 		;;
+
+	# case where the user invokes bg-debugCntre sourceCore as a shortcut to source the libraries into the debug terminal.
+	bg-debugCntr:0)
+		if [ ! "${bgLibExecMode+exists}" ]; then
+			declare -rg bgLibExecMode="terminal"
+
+			scrdFile="${BASH_SOURCE[@]: -1}"
+			declare -g bgLibExecCmd=("source:${scrdFile##*/}" "$@")
+			declare -g scriptFolder="${scrdFile%/*}"
+			unset scrdFile
+		fi
+		;;
+
 esac
+
 
 #######################################################################################################################################
 ### Include the mandatory libraries that define the minimum environment that code can rely on
+
+# bg_coreBashVars.sh provides functions that support patterns of variable use in bash
+import bg_coreBashVars.sh ;$L1;$L2
+
+# string manipulation functions
+import bg_strings.sh ;$L1;$L2
 
 # bg_libCore.sh contains the core functions from other libraries that should be present even if the whole library is not.
 # Also, any function that is used in other bg_core* libraries can be moved to this library so that these functions are available

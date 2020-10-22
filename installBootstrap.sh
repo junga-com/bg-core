@@ -21,6 +21,7 @@ uninstScript="${sysLibPath}/bg-uninstall-${pkgName}"
 sudo bash -c 'cat >"'"${uninstScript}"'"  <<EOS
 #!/usr/bin/env bash
 sysLibPath="/usr/lib"
+sysBinPath="/usr/bin"
 preCmd=""; [ ! -w "$sysLibPath" ] && preCmd="sudo "
 EOS'
 $preCmd chmod a+x "${uninstScript}"

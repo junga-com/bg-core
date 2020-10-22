@@ -1,18 +1,22 @@
 #!/bin/bash
 
-import bg_strings.sh ;$L1;$L2
-
 
 # Library bg_coreLibsMisc.sh
-# This library contains functions that are unconditionally included by anything that sources /usr/lib/bg_core.sh
-# Unlike all other libraries, this library does not group functions that are related in any way other then the fact
-# that they are part of the mandaory environment for any bg-lib script.
+# All the libraries that start with bg_core* are mandatory and are sourced by 'source /usr/lib/bg_core.sh'. Other libraries can be
+# optionally sourced by scripts with the 'import <libname> ;$L1;$L2' syntax as needed.
+#
+# This library contains functions that are logically a part of optional libraries but are moved here because they should be available
+# unconditionally even when the rest of their logically grouped library has not been sourced. Each library can be thought of as having
+# mandatory and optional parts. The mandatory parts go here and the optional parts live in the library file.
+#
+# In addition to mandatory/optional consideration, this file resolves issues of sourcing order. If two mandatory libraries have
+# global initialization code that use functions from each other, those functions can be placed in this file so that they all will
+# be available to the initialization code regaurdless of which library is sourced first.
 #
 # This library is organized in sections named after the libraries where the functions in that section are logically
-# associated. If it were not for the fact that these functions are mandatory and the other functions from each library
-# are optional, these functions would reside in that library.
+# associated. If it were not for the fact that these functions are mandatory and possibly used by library initialization code,
+# these functions would reside in that library.
 #
-
 
 #######################################################################################################################################
 ### From bg_outOfBandScriptFeatures.sh
@@ -454,527 +458,12 @@ function invokeOutOfBandSystem()
 
 	# if this is a daemon script there are certain subcmds that we can handle instead of making each daemon script handle them
 	if [ "${daemonDefaultStartLevels+isset}" ]; then
-		import bg_procDaemon.sh ;$L1;$L2
+		import bg_coreDaemon.sh ;$L1;$L2
 		daemonInvokeOutOfBandSystem "$@" || bgExit
 	fi
 }
 
 
-
-#######################################################################################################################################
-### From bg_libVar.sh
-
-# usage: varExists <varName> [.. <varNameN>]
-# returns true(0) if all the vars listed on the cmd line exits
-# returns false(1) if any do not exist
-function varExists()
-{
-	# the -p option prints the declaration of the variables named in "$@".
-	# we throw away all output but its return value will indicate whether it succeeded in finding all the variables
-	declare -p "$@" &>/dev/null
-}
-
-# usage: varIsA <type1> [.. <typeN>] <varName>
-# returns true(0) if the var specified on the cmd line exits as a variable with the specified attributes
-# Note that if a variable is declared without assignment, (like local -A foo) this function
-# will report false until something is assigned to it.
-# Options:
-#    mapArray : (default) test if <varName> is an associative array
-#    numArray : test if <varName> is a numeric array
-#    array    : test if <varName> is either type of array
-#    anyOfThese=<attribs> : example anyOfThese=Aa to test if <varName> is either an associative or numeric array
-#    allOfThese=<attribs> : example allOfThese=rx to test if <varName> is both readonly and exported
-function varIsAMapArray() { varIsA mapArray "$@"; }
-function varIsA()
-{
-	local anyAttribs mustAttribs
-	while [ $# -gt 1 ]; do case $1 in
-		mapArray|-A) anyAttribs+="A" ;;
-		numArray|-a) anyAttribs+="a" ;;
-		array)       anyAttribs+="Aa" ;;
-		anyOfThese*) bgOptionGetOpt val: anyAttribs  "--$1" "$2" && shift ;;
-		allOfThese*) bgOptionGetOpt val: mustAttribs "--$1" "$2" && shift ;;
-	esac; shift; done
-
-	[ ! "$1" ] && return 1
-
-	# the -p option prints the declaration of the variable named in "$1".
-	# if the output matches "declare -A" then its an associative array
-	local vima_typeDef="$(declare -p "$1" 2>/dev/null)"
-
-	# if its a referenece (-n) var, get the reference of the var that it points to
-	if [[ "$vima_typeDef" =~ -n\ [^=]*=\"(.*)\" ]]; then
-		local vima_refVar="${BASH_REMATCH[1]}"
-		[[ "$anyAttribs" =~ n ]] && return 0
-		vima_typeDef="$(declare -p "$vima_refVar" 2>/dev/null)"
-	else
-		[[ "$mustAttribs" =~ n ]] && return 1
-	fi
-
-	[[ "$vima_typeDef" =~ declare\ -[^\ ]*[$anyAttribs] ]] || return 1
-
-	local i; for ((i=0; i<${#mustAttribs}; i++)); do
-		[[ "$vima_typeDef" =~ declare\ -[^\ ]*${mustAttribs:$i:1} ]] || return 1
-	done
-	return 0
-}
-
-# usage: varMarshal <varName> [<retVar>]
-# Marshelling means converting the variable to a plain string blob in a way that it can be passed to another process and then un-marshalled
-# Format Of Marshalled Data:
-# The returned string will not have any $'\n' so it can be written using a line oriented protocol
-# The string consists of three fields.
-#   T<varName> <contents>
-#   |  |       |  '---------------- any characters of arbitrary length. $'\n' are escaped to \n
-#   |  |       '------------------- one space separates <varName> and <contents>
-#   |  '-------------------------- varName is any bash variable name
-#   '------------------------------ T (type) is one of A (associative array) a (num array) i (int) # (default)
-function varMarshal()
-{
-	local vima_typeDef="$(declare -p "$1" 2>/dev/null)"
-	# if its a referenece (-n) var, get the reference of the var that it points to
-	if [[ "$vima_typeDef" =~ -n\ [^=]*=\"(.*)\" ]]; then
-		local vima_refVar="${BASH_REMATCH[1]}"
-		vima_typeDef="$(declare -p "$vima_refVar" 2>/dev/null)"
-	fi
-
-	if [[ "$vima_typeDef" =~ declare\ -[^\ ]*A ]]; then
-		arrayToString "$1" vima_contents
-		local vima_contents="A$1 $vima_contents"
-	elif [[ "$vima_typeDef" =~ declare\ -[^\ ]*a ]]; then
-		arrayToString "$1" vima_contents
-		local vima_contents="a$1 $vima_contents"
-	elif [[ "$vima_typeDef" =~ declare\ -[^\ ]*i ]]; then
-		local vima_contents="i$1 ${!1}"
-	else
-		local vima_contents="#$1 ${!1}"
-	fi
-	returnValue "${vima_contents//$'\n'/\\n}" "$2"
-}
-
-# usage: varUnMarshalToGlobal <marshalledData>
-# to unmarshall to a local var we need to do two steps so the caller can declare the names local
-function varUnMarshalToGlobal()
-{
-	local vima_marshalledData="$*"
-	local vima_type="${vima_marshalledData:0:1}"; vima_marshalledData="${vima_marshalledData:1}"
-	local vima_varName="${vima_marshalledData%% *}"; vima_marshalledData="${vima_marshalledData#* }"
-
-	case $vima_type in
-		A) declare -gA $vima_varName; arrayFromString "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
-		a) declare -ga $vima_varName; arrayFromString "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
-		i) declare -gi $vima_varName; setRef "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
-		\#) declare -g $vima_varName; setRef "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
-		*) assertError -v data:"$1" -v type:vima_type -v varName:vima_varName "unknown type in marshalled data. The first character should be one on 'Aai-', followed immediately by the <varName> then a single space then arbitrary data" ;;
-	esac
-}
-
-
-# usage: returnValue [<opt>] <value> [<varRef>]
-# usage: returnValue [<opt>] <value> [<varRef>] && return
-# return a value from a function. If <varRef> is provided it is returned by assigning to it otherwise <value> is written to stdout.
-#
-# See discussion of naming conflicts and -n support in man(3) setReturnValue
-#
-# This facilitates a common pattern for returning a value from a function and letting the caller decide whether to return the
-# data by passing in a variable to receive the returned value or by writing it to std out. Typically, <varRef> would be passed
-# in an option or the last positional param that the caller could choose to leave blank
-# Note that this is meant to mimic the builtin return command but allow specifying data to be returned, but unlike the builtin
-# 'return' statement, calling this can not end the function execution so it is either the last statement in the function or
-# should be immediately followed by 'return'
-# Examples:
-#    returnValue "$data" "$2"
-#    returnValue --array "$data" "$2"; return
-# Params:
-#    <value> : this is the value being returned. By default it is treated as a simple string but that can be changed via options.
-#    <varRef> : this is the name of the variable to return the value in. If its empty, <value> is written to stdout
-# Options:
-#    --string : (default) treat <value> as a literal string
-#    --array  : treat <value> as a name of an array variable. If <value> is an associative array then <varRef> must be one too
-#    --strset : treat <value> as a string containing space separated array elements
-# See Also:
-#   setReturnValue -- similar but the order of the var and value are reversed and the value is ignored
-#                     instead of written to stdout if var name is not passed in
-#   local -n <variable> (for ubuntu 14.04 and beyond, bash supports reference variables)
-#   arrayCopy  -- does a similar thing for returning arrays
-function returnValue()
-{
-	local _rv_inType="string" _rv_outType="stdout"
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		--array)  _rv_inType="array"  ;;
-		--string) _rv_inType="string" ;;
-		--strset) _rv_inType="strset" ;;
-		*) break ;;
-	esac; shift; done
-	[ "$2" ] && _rv_outType="var"
-
-	case $_rv_inType:$_rv_outType in
-		array:var)     arrayCopy "$1" "$2" ;;
-		array:stdout)
-			printfVars "$1"
-			#local _rv_refName="$1[*]"
-			#printf         "%s\n" "${!_rv_refName}"
-			;;
-		string:var)    printf -v "$2" "%s"   "$1" ;;
-		string:stdout) printf         "%s\n" "$1" ;;
-		strset:var)    eval $2'=($1)' ;;
-		strset:stdout) printf         "%s\n" "$1" ;;
-	esac
-	true
-}
-
-# usage: setReturnValue <varRef> <value>
-# Assign a value to an output variable that was passed into a function. If the variable name is empty,
-# do nothing.
-#
-# The name of this function is meant to make functions easier to read. Other functions might do
-# the same thing but this one should be used when a function has multiple output params that it
-# sets the values of. It replaces the cryptic [ "$varRef" ] && printf -v "$varRef" "%s" "$value"
-# Note that after Ubuntu 12.04 support is dropped, consider local -n <varRef> instead
-# Naming Conflicts:
-# Note that bash does not have a notion of passing local scoped variables by reference so this technique
-# is it literally pass the name of the variable in the callers scope and have the function set that variable.
-# If the function declares the same variable name local, then this function will not work.
-# A popular alternative to this technique is the upvar pattern but that requires some ugly syntax to use.
-# In practice, I find that avoiding conflicting names is not that hard. Variable names tend to conflict
-# because they resprent some common idea in both the calling scope and the called scope. The convention used
-# in these libraries is that when a reference var is passed in, the local variable that holds that return
-# var is suffixed with *Var and the local working variable for its value is suffixed with *Value. This eliminates
-# most conflicts except for nested calls where the same variable is passed through multiple levels. When
-# calling a function with a reference *Var,  the caller should be aware that if they use a variable that ends
-# in *Var or *Value, it could be a problem. To further aid in the caller avoiding a conflict, the usage
-# line of the function is visible in the man(3) page and function authors should use the actual *Var name
-# in the usage description as is declared local in the function.
-#
-# For very general functions where the name of the passed in variable could really be anything and the
-# caller should never have to worry about it, the convention is for the function to prefix all local
-# variables with _<initials>_* where initials are the initials or other abreviation of the function name.
-#
-# No solution is ideal, but I find that this technique provides a good compromise of readable scripts
-# and reliable scripts.
-#
-# Options:
-#    -a|--append : appendFlag. append the string or array value
-#    --array     : arrayFlag. assign the remaining cmdline params into <varRef>[N] as array elements.
-#                  W/o -a it replaces existing elements.
-# See Also:
-#   returnValue -- similar to this function but input order is reversed and if the return var is not set
-#                  it writes it to stdout. i.e. returnValue mimics a function that always returns one value
-#   local -n <variable> (for ubuntu 14.04 and beyond) allows direct manipulation of the varName
-#   arrayCopy  -- does a similar thing for arrays (=)
-#   arraryAdd  -- does a similar thing for array (+=)
-#   stringJoin -- -a mode does similar but appends to the varName (+=)
-#   varSetRef (aka setRef)
-function setReturnValue()
-{
-	varSetRef "$@"
-}
-
-# usage: setExitCode <exitCode>
-# set the exit code at the end of a code block -- particularly useful in trap code blocks
-# typically you would use 'return <exitCode>' in a function and 'exit <exitCode>' in the main script
-# but in a debug trap, you need to set the exit code to 0,1, or 2 but return is not valid in a trap
-# and exit will exit the shell
-function setExitCode()
-{
-	return $1
-}
-
-
-# usage: varSetRef [-a] [--array] <varRef> <value...>
-# This sets the <varRef> with <value> only if it is not empty.
-# Note that support for Ubuntu 12.04 or prior not needed, consider local -n varName instead of this function
-# Equivalent Statements:
-#    default                   : <varRef>=<remainder of cmdline>
-#    with --array              : <varRef>=(<remainder of cmdline>)
-#    with --append             : <varRef>+=<remainder of cmdline>
-#    with --append and --array : <varRef>+=(<remainder of cmdline>)
-# Options:
-#    -a|--append : appendFlag. append the string or array value
-#    --array     : arrayFlag. assign the remaining cmdline params into <varRef>[N] as array elements.
-#                  W/o -a it replaces existing elements.
-#    --set       : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
-# See Also:
-#   returnValue -- does a similar thing with semantics of a return <val> statement
-#   local -n <variable>=<varRef> (for ubuntu 14.04 and beyond) allows direct manipulation of the varRef
-#   arrayCopy  -- does a similar thing for two arrays (<varRef>=(<varRef2>))
-#   arraryAdd  -- does a similar thing for two arrays (<varRef>+=(<varRef2>))
-#   stringJoin -- -a mode does similar but also adds a separator
-function setRef() { varSetRef "$@"; }
-function varSetRef()
-{
-	local sr_appendFlag _sr_arrayFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		--array)     _sr_arrayFlag="--array" ;;
-		--set)       _sr_arrayFlag="--set" ;;
-		-a|--append) sr_appendFlag="--append" ;;
-	esac; shift; done
-	local sr_varRef="$1"; shift
-
-	[ ! "$sr_varRef" ] && return 0
-
-	# in development mode, check for for common errors
-	if bgtraceIsActive; then
-		if [[ "$sr_varRef" =~ [[][^-0-9] ]]; then
-			local sr_arrayName="${sr_varRef%%[[]*}"
-			varIsAMapArray $sr_arrayName || assertError -v $sr_arrayName -v varRef:sr_varRef -V "valueBeingSet:$*" "'$sr_arrayName' is being used as an associative array (or Object) when it is not one. Maybe it went out of scope"
-		fi
-	fi
-
-	case $_sr_arrayFlag:$sr_appendFlag in
-		--set:)
-			while [ $# -gt 0 ]; do
-				printf -v "$sr_varRef[$1]" "%s" ""
-				shift
-			done
-			;;
-		--array:)         eval $sr_varRef'=("$@")' ;;
-		--array:--append) eval $sr_varRef'+=("$@")' ;;
-		       :)         printf -v "$sr_varRef" "%s" "$*" ;;
-			   :--append) printf -v "$sr_varRef" "%s%s" "${!sr_varRef}" "$*" ;;
-	esac || assertError
-	true
-}
-
-# usage: varDeRef <variableReference> [<retVar>]
-# This returns the value contained in the variable refered to by <variableReference>
-# The ${!var} syntax is generally used for this but that can not be used for arrays
-# This is usefull for arrays where the the array name and index are typically separate. To use the
-# ${!name} syntax, the variable name must have both the array and subscript (name="$arrayRef[indexVal]")
-# The local -n ary=$arrayRef feature is better so this function is only usefull for code that still
-# supports BASH without -n (ubuntu 12.04)
-function deRef() { varDeRef "$@"; }
-function varDeRef()
-{
-	# the _dr_value assignment step is needed in case $1 contains [@] to prevent returnValue from seeing it as multiple params
-	local _dr_value="${!1}"
-	returnValue "$_dr_value" "$2"
-}
-
-# usage: varToggle <variable> <value1> <value2>
-# This returns <value1> or <value2> on stdout depending on the current value in <varToggle>
-function varToggle()
-{
-	local vtr_variable="$1"
-	local vtr_value1="$2"
-	local vtr_value2="$3"
-	if [ "${vtr_variable}" != "$vtr_value1" ]; then
-		echo "$vtr_value1"
-	else
-		echo "$vtr_value2"
-	fi
-}
-
-# usage: varToggleRef <variableRef> <value1> <value2>
-# This sets the <optVariableRef> with <value1> or <value2> depending on if the current value is not <value1>
-# Each time it is called, the value will toggle/alternate between the two values
-function varToggleRef()
-{
-	local vtr_variableRef="$1"
-	local vtr_value1="$2"
-	local vtr_value2="$3"
-	if [ "${!vtr_variableRef}" != "$vtr_value1" ]; then
-		printf -v "$vtr_variableRef" "%s" "$vtr_value1"
-	else
-		printf -v "$vtr_variableRef" "%s" "$vtr_value2"
-	fi
-}
-
-
-
-# usage: varGenVarname <idVarName> [<length>] [<charClass>]
-# Create a random id (aka name) quickly. The first character will always be 'a' so that using
-# the alnum ch class the result is valid for names that can not start with a number
-# Params:
-#    <idVarName>  : the name of the variable that the result will be returned in. if "", the result is written to stdout
-#    <length>     : default=9 : the number of characters to make the name
-#    <charClass>  : valid characters to use. default="0-9a-zA-Z". specify chars and charRanges w/o brackes like "4-6" and
-#                  char classes with one bracket like "[:xdigit:]"
-function genRandomIDRef() { varGenVarname "$@"; }
-function genRandomID() { varGenVarname "$@"; }
-function varGenVarname()
-{
-	local resultVarName="$1"
-	local length="${2:-9}"
-	# note the character classes like :alnum: are faster but alnum was sometimes returning chars that are not valid bash variable names
-	# the LC_ALL=C should fix that but not sure if it does so to be conservative, we make the default "0-9a-zA-Z"
-	local charClass="${3:-0-9a-zA-Z}"
-	local chunk rNum="a"
-	while [ ${#rNum} -lt $length ]; do
-		read -t1 -N20 chunk </dev/urandom
-		LC_ALL=C rNum="${rNum}${chunk//[^$charClass]}"
-	done
-	returnValue "${rNum:0:$length}" "$resultVarName"
-}
-
-
-# usage: printfVars [ <varSpec1> ... <varSpecN> ]
-# print a list of variable specifications to stdout
-# This is used by the bgtraceVars debug command but its also useful for various formatted text output
-# Unlike most function, options can appear anywhere and options with a value can not have a space between opt and value.
-# options only effect the variables after it
-# Params:
-#   <varSpecN> : a variable name to print or an option. It formats differently based on what it is
-#        not a variable  : simply prints the content of <dataN>. prefix it with -l to make make its not interpretted as a var name
-#        simple variable : prints <varName>='<value>'
-#        array variable  : prints <varName>[]
-#                                 <varName>[idx1]='<value>'
-#                                 ...
-#                                 <varName>[idxN]='<value>'
-#        object ref      : calls the bgtrace -m -s method on the object
-#        "" or "\n"      : write a blank line. this is used to make vertical whitespace. with -1 you
-#                          can use this to specify where line breaks happen in a list
-#        "  "            : a string only whitespace sets the indent prefix used on all output to follow.
-#        <option>        : options begin with '-'. see below.
-# Options:
-#   -l<string> : literal string. print <string> without any interpretation
-#   -wN : set the width of the variable name field. this can be used to align a group of variables.
-#   -1  : display vars on one line. this suppresses the \n after each <varSpecN> output
-#   +1  : display vars on multiple lines. this is the default. it undoes the -1 effect so that a \n is output after each <varSpecN>
-function printfVars()
-{
-	local pv_nameColWidth pv_inlineFieldWidth="0" pv_indexColWidth oneLineMode pv_lineEnding="\n"
-	local pv_prefix
-
-	function _printfVars_printValue()
-	{
-		local name="$1"; shift
-		local value="$*"
-		case ${oneLineMode:-multiline}:${name:+nameExits} in
-			# common processing for all oneline:* -- note the ;;&
-			oneline:*)
-				if [[ "$value" =~ $'\n' ]]; then
-					value="${value//$'\n'*/ ...}"
-				fi
-				;;&
-			oneline:nameExits)
-				printf "%s=%-*s " "$name" ${pv_inlineFieldWidth:-0} "'${value}'"
-				;;
-			oneline:)
-				printf "%-*s " ${pv_inlineFieldWidth:-0} "${value}"
-				;;
-			multiline:nameExits)
-				local nameColWidth=$(( (${pv_nameColWidth:-0} > ${#name}) ? ${pv_nameColWidth:-0} : ${#name}  ))
-				printf "${pv_prefix}%-*s='%s'${pv_lineEnding}" ${nameColWidth:-0} "$name" "${value}" \
-					| awk '
-						NR>1 {printf("'"${pv_prefix}"'%-*s  ", '"${nameColWidth:-0}"', "")}
-						{print $0}
-					'
-				;;
-			multiline:)
-				printf "${pv_prefix}%-*s${pv_lineEnding}" ${pv_nameColWidth:-0} "${value}" \
-					| awk '
-						NR>1 {printf("'"${pv_prefix}"'  ")}
-						{print $0}
-					'
-				;;
-		esac
-	}
-
-	local pv_term pv_varname pv_tmpRef pv_label
-	for pv_term in "$@"; do
-
-		if [[ "$pv_term" =~ ^-w ]]; then
-			if [ "$oneLineMode" ]; then
-				pv_inlineFieldWidth="${pv_term#-w}"
-			else
-				pv_nameColWidth="${pv_term#-w}"
-			fi
-			continue
-		fi
-		if [[ "$pv_term" =~ ^-l ]]; then
-			_printfVars_printValue "" "${pv_term#-l}"
-			continue
-		fi
-		if [ "$pv_term" == "-1" ]; then
-			oneLineMode="oneline"
-			pv_lineEnding=" "
-			continue
-		fi
-		if [ "$pv_term" == "+1" ]; then
-			oneLineMode=""
-			pv_lineEnding="\n"
-			printf "\n"
-			continue
-		fi
-
-		# "" or "\n" means output a newline
-		if [ ! "$pv_term" ] || [ "$pv_term" == "\n" ] ; then
-			printf "\n"
-			continue
-		fi
-
-		# "   "  means set the indent for new lines
-		if [[ "$pv_term" =~ ^[[:space:]]*$ ]]; then
-			pv_prefix="$pv_term"
-			[ "$oneLineMode" ] && printf "$pv_term"
-			continue
-		fi
-
-
-		# "<objRef>.bgtrace [<opts]"  means to call the object's bgtrace method
-		if [[ "$pv_term" =~ [.]bgtrace([\ ]|$) ]]; then
-			local pv_namePart="${pv_term%%.bgtrace*}"
-			printf "${pv_prefix}%s " "$pv_namePart"
-			ObjEval  $pv_term | awk '{print '"${pv_prefix}"'$0}'
-			continue
-		fi
-
-		# this separates myLabel:myVarname taking care not to mistake myArrayVar[lib:bg_lib.sh] for it
-		pv_varname="$pv_term"
-		pv_label="$pv_term"
-		if [[ "$pv_term" =~ ^[^[]*: ]]; then
-			pv_varname="${pv_varname##*:}"
-			pv_label="${pv_label%:*}"
-		fi
-
-		# assume its a variable name and get its declaration. Should be "" if its not a var name
-		# if its a referenece (-n) var, get the reference of the var that it points to
-		local pv_type="$(declare -p "$pv_varname" 2>/dev/null)"
-		[[ "$pv_type" =~ -n\ [^=]*=\"(.*)\" ]] && pv_type="$(declare -p "${BASH_REMATCH[1]}" 2>/dev/null)"
-		if [ ! "$pv_type" ]; then
-			{ varIsA array ${pv_varname%%[[]*} || [[ "$pv_varname" =~ [[][@*][]]$ ]]; } && pv_type="arrayElement"
-		fi
-
-		# if its not a var name, just print it as an empty var.
-		if [ ! "$pv_type" ]; then
-			if [ "$pv_label" == "$pv_varname" ]; then
-				_printfVars_printValue "$pv_varname" ""
-			else
-				_printfVars_printValue "$pv_label" "$pv_varname"
-			fi
-
-		# it its an object reference, invoke its .bgtrace method
-		elif [[ ! "$pv_varname" =~ [[] ]] && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
-			objEval "$pv_varname.toString"
-
-		# if its an array, iterate its content
-		elif [[ "$pv_type" =~ ^declare\ -[gilnrtux]*[aA] ]]; then
-			pv_nameColWidth="${pv_nameColWidth:-${#pv_label}}"
-			printf "${pv_prefix}%-*s[]${pv_lineEnding}" ${pv_nameColWidth:-0} "$pv_label"
-			eval local indexes='("${!'"$pv_varname"'[@]}")'
-			pv_indexColWidth=0; for index in "${indexes[@]}"; do
-				[ "${pv_lineEnding}" == "\n" ] && [ ${pv_indexColWidth:-0} -lt ${#index} ] && pv_indexColWidth=${#index}
-			done
-			for index in "${indexes[@]}"; do
-				pv_tmpRef="$pv_varname[$index]"
-				printf "${pv_prefix}%-*s[%-*s]='%s'${pv_lineEnding}" ${pv_nameColWidth:-0} "" "${pv_indexColWidth:-0}"  "$index"   "${!pv_tmpRef}" \
-					| awk '
-						NR>1 {printf("'"${pv_prefix}"'%-*s[%-*s] +"), '"${pv_nameColWidth:-0}"', "",  '"${pv_indexColWidth:-0}"', ""}
-						{print $0}
-					'
-			done
-
-		# default case is to treat it as a variable name
-		else
-			_printfVars_printValue "$pv_label" "${!pv_varname}"
-		fi
-		pv_inlineFieldWidth="0"
-	done
-	if [ "$pv_lineEnding" != "\n" ]; then
-		printf "\n"
-	fi
-}
 
 # usage: match <str> <regex> [<rematch>]
 # match is an alias for the [[ <str> =~ <regex> ]] condition syntax that returns BASH_REMATCH in the named <rematch> variable
@@ -3441,48 +2930,56 @@ function fsExists()
 }
 
 
-# usage: fsExpandFiles [-f] [-d|-e] [-A <retArrayVar>] [-S <setName>] [-b] [-B <prefix>] <fileSpec1> ... <fileSpecN>
-# usage: fsExpandFiles [<fsExpandFilesOptions>] --find|-R [findOptions] [starting-point...] [expression]
+# usage: fsExpandFiles|bgfind [<options>] <fileSpec1> ... <fileSpecN> [<findTestExpression>]
+# usage:    where <options> are [-f] [-F|-D] [-R|+R] [-A <retArrayVar>] [-S <setName>] [-b] [-B <prefix>]
 # usage: awk '...' $(fsExpandFiles -f path/*.ext)
 # usage: local -A fileList; fsExpandFiles -A fileList path/*.ext; for file in "${fileList[@]}"; do echo $file; done
-# returns a list of only files that exist that match the fileSpecs.
-# * The list is suitable for iteration without having to check if each element exists before operating on it
-#   wildcards in the fileSpecs are expanded. fileSpecs that do not match any files are silently ignored
-# * If -f is used, the output is suitable to use as the file list for awk and other utils without further checks
+# returns a list of files in the filesystem that match the <fileSpec> and the optional match criteria. This solves a problem that
+# simple patterns for operating on a set of files often have edge cases that fail but go undetected. You can use this command to
+# obtain a list of files to use on a commandline of another command like awk or use it to populate an Array or Set with the filenames
+# that you can then iterate in a script without creating a subshell.
 #
-# Positional Arguments:
-# Note that the --find|-R option changes the meaning of the positional arguments. Without it, all the
-# positional arguments are <fileSpec> that the shell will expand into a list of files. With --find|-R
-# the positional arguments are passed to the /bin/find utility so any syntax supportted by find including
-# find options are allowed.
+# It has these properties.
+# * The list is suitable for iteration without having to check if each element exists because non matching wildcards are removed
+# * If -f is used, /dev/null will be returned if no other files match. This supports invoking commands like awk with the the results
+#   without the command reading from stdin or issuing an error.
+# * If -S or -A is specified the list of files can be iterated in a script without the common pitfalls of the file processing
+#   being done in a subshell or failing when a filename contains whitespace
 #
-# Recursive Mode:
-# The --find|-R option triggers the recursive mode. This mode is just like calling find except that
-# the -A and -S options are available to return special character safe results in associative arrays
-# and the other fsExpandFiles options are available to effect the results.
+# Working Directory:
+# The <fileSpecN> and output names will all be relative to the current working directory if they are not absolute. You can change
+# where the output names are relative to by using the -b or -B <prefix> options to remove some prefix of the names in the output
+# but that does not affect the <fileSpecN> nor -wholename tests. Often, it is helpful to change to a base folder before invoking this
+# command so that the <fileSpecN>, tests and output are all relative to that base folder. This command can not build in that feature
+# because it relies on the <fileSpecN> parameters being expanded by bash before the command starts.
 #
-# Notice that none of the fsExpandFiles options conflict with native find options (except BSD find
-# uses -d as a synonym for --depth) but it is OK if they do in the future because it is not ambiguous.
-# Any option that appears before the --find|-R will be interpreted as a fsExpandFiles option and any
-# that appear after --find|-R will be interpretted as a native find option.
+# Recursive (-R) vs Non-recursive (+R) Mode:
+# The <fileSpecN> parameters on the commandline are always processed by bash to expand them into a list of matching filesystem objects.
+# In non-recursive mode only those filesystem objects are considered. In recursive mode, each of those filesystem objects that are
+# a directory will be traversed so that its contents are also considered. The test expressions at the end of the commandline are
+# applied to the considered list so that any non-matching (and non-existing) entries are removed.
+#
+# The difference between recursive and non-recusrive mode has a profound impact on how the command is used. Resursive mode works
+# like an enhanced version of the gnu find utility and non-recursive mode works more like bash glob expansion. Often when recursive
+# mode is used, only a single directory path is specified in <fileSpecN>. When non-recursive mode is used, the <fileSpecN> produce
+# the entire list and <findTestExpression> is optionally used to filter the list down.
+#
+# When this command is invoked via its alias 'bgfind', recusive mode is the default.
+# When this command is invoked via its alias 'fsExpandFiles', non-recusive mode is the default.
 #
 # Calling as bgfind / find:
-# This function is available as the alias bgfind. The notion is that it can be used anywhere that find
-# would be used, being backward compatible with the full find cmdline syntax. It is thought that eventually
-# this library will make an alias called 'find' so that this implementation will be the default for
-# any use of find in a script that sources this library.
+# This function is available as the alias bgfind which changes the default to -R from +R. The command line is compatible with the
+# gnu find utility syntax plus some optional enhancements so its expected that eventually this library will make an alias called 'find'
+# so that this implementation will be the default for any use of find in a script that sources this library.
 #
-# When called via the bgfind or find alias, the syntax changes slighly such that --find|-R is the
-# default mode and --fsExpand|+R is an option that triggers the native fsExpandFiles positional argument
-# interpretation. In the bgfind syntax the extended options of fsExpandFiles still come first and the first
-# argument that is not a native fsExpandFiles option will signify that argument on will interpretted
-# as find arguments.
-#
+# Example -- Invoke awk on any file matching a glob:
+#    awk '<script>...' $(fsExpandFiles -f *.myext)
+#    awk '<script>...' *.myext # if there are no matching files you get "*.myext" not found error. If you suppress it, awk reads from stdin
 # Example Compare Two Folders:
 #    local newPages=() removedPages=() updatedPages=() unchangedPages=()
 #    local -A allPages=()
-#    fsExpandFiles -b -F -S allPages $outputFolder/*.3
-#    fsExpandFiles -b -F -S allPages $tmpFolder/*.3
+#    bgfind -B $outputFolder/ -F -S allPages $outputFolder/
+#    bgfind -B $tmpFolder/    -F -S allPages $tmpFolder/
 #    for manpage in "${!allPages[@]}"; do
 #       if [ ! -f "$outputFolder/$manpage" ]; then
 #          newPages+=("$manpage")
@@ -3496,8 +2993,30 @@ function fsExists()
 #    done
 #    printfVars "allPages:${#allPages[@]}" "newPages:${#newPages[@]}" "removedPages:${#removedPages[@]}" "updatedPages:${#updatedPages[@]}" "unchangedPages:${#unchangedPages[@]}" updatedPages
 #
+# Test Expressions:
+# Just like the gnu find command, the path list on the command line ends when a parameter starting with '-' is encountered.
+# See 'man find' for details of the test expresssions. This man page will only discuss the the changes in context that this command
+# introduces.
+#
+# Most find 'Action' expressions (e.g. -print, -exec, etc...) are not allowed. The action of this command is hard coded to return a list
+# of found filesystem objects.
+#
+# -prune and -exit can be used to limit the results eficciently
+#
+# In non-resursive mode (+R, default when invoked as fsExpandFiles) find is invoked with -maxdepth 0 so that the test expressions
+# will only serve to limit the list of files that <fileSpecN> expanded to after glob expansion. This means that
+#
+# Params:
+#    <fileSpecN> : a file spec that bash will expand to 0 or more filesystem object names before the function is invoked. These can
+#            be absolute (starting at the filsystem root) or relative to the current working directory.
 # Options:
+# These options affect which file obects are in the outputted list
 #    -f : force. return at least one fs object which will be "/dev/null" if none other match
+#    -F : files only. match only file objects. Note: upper case F b/c -f is force.
+#    -D : directories only. match only folder(aka directory) objects. Note upper case for consistency with -F
+#    -R : recursive     (default for bgfind alias)        treat each matching <fileSpec> as a startig point to potentially descend
+#    +R : not recursive (default for fsExpandFiles alias) only consider the file objects matching <fileSpec>, not there decendents
+# These options determine how the list of files is returned. Default is standard out, one per line
 #    -A <arrayName> : return in Array. instead of writing the matching file system objects to stdout,
 #             one per line, add them to the caller's array. This avoids the sub process and also works
 #             with names with spaces. <arrayName> is not truncated. the files found by this function
@@ -3505,121 +3024,136 @@ function fsExists()
 #    -S <setName> : return in Set. return the results in the indexes of the associative array var
 #             passed in. This has the effect of eliminating duplicates. <setName> is not truncated.
 #             the files found by this function are added to the existing elements
+# These options affect the paths returned. Default is relative to <fileSpec> so that each name can be used to access that file
 #    -b    : base names. remove the path part of the filename before returning
 #    -B <prefix> : remove <prefix>. remove <prefix> from the pathname before returning. This is similar to
-#            -b but allows more control. Example: fsExpandFiles -S myset -r "$tmpFolder/"  $tmpFolder/man3/*
-#       -F : files only. (default). match only file objects. Note: upper case F b/c -f is force.
-#    -d|-D : directories only. match only folder(directory) objects. Note upper case alias is for consistency with -F
-#    -a|-E : any type. match any type of filesystem objects. -E alias corresponds to the -e (exists) test and is upper case for consistency with -F
-#    -R|--find     : (default for bgfind alias)        interpret the remaining arguments as native gnu find arguments
-#    +R|--fsExpand : (default for fsExpandFiles alias) interpret the remaining arguments as extended arguments
+#            -b but allows more control. Example: fsExpandFiles -B "$tmpFolder/"  $tmpFolder/man3/* returns "man3/*" names
+#    -H|-L|-P    : gnu find's symbolic link options. -H(follow only links in <fileSpec>) -L(follow all descendant links) -P(never follow)
+#    -D*         : gnu find's debug options. See 'man find'
+#    -O*         : gnu find's optimization options. See 'man find'
 # See Also:
 #     find (the GNU utility)
-function bgfind() { fsExpandFiles --findCmdLineCompat "$@"; }
+function bgfind() { fsExpandFiles --findCmdLineCompat -R "$@"; }
 function fsExpandFiles()
 {
-	local found i forceFlag fsef_prefixToRemove fsef_arrayName fsef_setName ftype
-	local findMode findCmdLineCompat findOpts findStartingPoints findExpressions
+	local outputOpts=(--echo "")
+	local recursiveOpt=("-maxdepth" "0")
+	local forceFlag fsef_prefixToRemove fsef_outputVarName fTypeOpt=() findCmdLineCompat findOpts=()
+	local findStartingPoints=()
 	while [ $# -gt 0 ]; do case $1 in
-		--findCmdLineCompat) findMode="1"; findCmdLineCompat="1" ;;
-		-R|--find) findMode="1"; [ ! "$findCmdLineCompat" ] && break ;;
-		+R|--fsExpand) findMode="" ;;
-		-F) ftype="-f" ;;
-		-D|-d) ftype="-d" ;;
-		-E|-a|-e) ftype="-e" ;;
+		# If any options conflict arise, findCmdLineCompat==true means use the find meaning and findCmdLineCompat==false means use our meaning
+		--findCmdLineCompat) findCmdLineCompat="--findCmdLineCompat" ;;
+
 		-f) forceFlag="-f" ;;
+
+		# aliases for -type d|f
+		-F) fTypeOpt=(-type f) ;;
+		-D|-d) fTypeOpt=(-type d) ;;
+
+		# -R means recurse (dont limit the depth) and +R means dont recurse (apply the find criteria only to the supplied paths)
+		-R) recursiveOpt=() ;;
+		+R) recursiveOpt=("-maxdepth" "0") ;;
+
+		# how to return the results
+		-A*) bgOptionGetOpt  val: fsef_outputVarName "$@" && shift; outputOpts=(--array --append "$fsef_outputVarName") ;;
+		-S*) bgOptionGetOpt  val: fsef_outputVarName "$@" && shift; outputOpts=(--set "$fsef_outputVarName") ;;
+
+		# modify the output
 		-b|--baseNames) fsef_prefixToRemove="*/" ;;
 		-B*) bgOptionGetOpt  val: fsef_prefixToRemove "$@" && shift ;;
-		-A*) bgOptionGetOpt  val: fsef_arrayName "$@" && shift ;;
-		-S*) bgOptionGetOpt  val: fsef_setName   "$@" && shift ;;
+
+		# native find (GNU utility) 'real' options
 		-H|-L|-P) bgOptionGetOpt  opt  findOpts  "$@" && shift ;;
 		-D*|-O*)  bgOptionGetOpt  opt: findOpts  "$@" && shift ;;
-		#-*) [ "$findCmdLineCompat" ] && break ;;&
 		 *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	if [ "$findMode" ]; then
-		# parse out the three sections of the find cmdline os that we can make changes to the sections as needed
-		# /bin/find options cmdline section
-		while [ $# -gt 0 ]; do case $1 in
-			-H|-L|-P) bgOptionGetOpt  opt  findOpts  "$@" && shift ;;
-			-D*|-O*)  bgOptionGetOpt  opt: findOpts  "$@" && shift ;;
-			 *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-		done
-		# /bin/find starting point files and folders cmdline section
-		while [ $# -gt 0 ]; do case $1 in
-			-*) break ;;
-			*)  findStartingPoints+=("$1") ;;
-		esac; shift; done
-		# /bin/find expression cmdline section
-		# TODO: iterate the expression section and sanitize it. for example, assert no actions
-		findExpressions=("$@")
-		if [[ "$ftype" =~ ^(-f|-d|-D)$ ]]; then
-			ftype="${ftype#-}"; ftype="${ftype,,}"
-			findExpressions=(-type $ftype '(' "$@" ')')
-		fi
+	# This cmd, like the gnu find util, has 3 sections of parameters instead of the normal 2 (options + positional)
 
-		if [ "$fsef_arrayName" ]; then
-			local _file; while IFS="" read -r -d$'\b' _file; do
-				varSetRef --array --append "$fsef_arrayName" "$_file"
-			done < <(find "${findOpts[@]}" "${findStartingPoints[@]}" "${findExpressions[@]}" -print0 | tr "\0" "\b")
-		elif [ "$fsef_setName" ]; then
-			local _file; while IFS="" read -r -d$'\b' _file; do
-				varSetRef --set "$fsef_setName" "$_file"
-			done < <(find "${findOpts[@]}" "${findStartingPoints[@]}" "${findExpressions[@]}" -print0 | tr "\0" "\b")
-		else
-			find "${findOpts[@]}" "${findStartingPoints[@]}" "${findExpressions[@]}"
-		fi
-	else
-		fsef_prefixToRemove="#${fsef_prefixToRemove#'#'}"
-		local i; for i in "$@"; do
-			if [ ${ftype:--f} "$i" ]; then
-				[ "$fsef_prefixToRemove" ] && i="${i/$fsef_prefixToRemove}"
-				if [ "$fsef_arrayName" ]; then
-					eval $fsef_arrayName+='("$i")'
-				elif [ "$fsef_setName" ]; then
-					eval $fsef_setName['$i']=1
-				else
-					echo "$i"
-				fi
-				found="1"
-			fi
-		done
-		if [ "$forceFlag" ] && [ ! "$found" ]; then
-			if [ "$fsef_arrayName" ]; then
-				eval $fsef_arrayName+='("/dev/null")'
-			elif [ "$fsef_setName" ]; then
-				eval $fsef_setName[/dev/null]=1
-			else
-				echo "/dev/null"
-			fi
-		fi
+	# Section1: was the real options parsed by the standard options section above
+
+	# Section2: these are the <fileSpec> positional parameters. Bash will expand any wild cards if they match any paths but will
+	# leave them in if they dont match any. We cant pass any non existing paths to find or it will fail with an error. find will
+	# interpret each of these as a starting point but if -R is not specified, we will give find the -maxdepth 0 global option that
+	# will cause it to only apply the test expressions to the starting points and do no directory traversal.
+	while [ $# -gt 0 ]; do case $1 in
+		-*) break ;;
+		'(') break ;;
+		 *)  [ -e "$1" ] && findStartingPoints+=("$1") ;;
+	esac; shift; done
+
+	# Section3: /bin/find expressions section. The rest of the command line is interpretted as the find expression
+	local findGlobalExpressions=() findExpressions=()
+	while [ $# -gt 0 ]; do case $1 in
+		# 'global options'
+		-maxdepth|-mindepth)
+			recursiveOpt=()
+			findGlobalExpressions+=("$1" "$2"); shift
+			;;
+		-depth|-d|-ignore_readdir_race|-noignore_readdir_race|-mount|-xdev|-noleaf)
+			findGlobalExpressions+=("$1") ;;
+		-help|-version)
+			assertError "This global find expression is not allowed ($1)" ;;
+
+		# actions (-quit is alright)
+		-delete|-exec|-execdir|-fls|-fprint|-fprint0|-fprintf|-ls|-ok|-okdir|-print|-print0|-printf)
+			assertError "Actions find options are not allowed. ($1)" ;;
+
+		-prune)
+			[ "$fTypeOpt" ] && assertError "-prune can not be used with either the -D (directories only) or -F (files only). Use -type d|f in your expression with -prune "
+			findExpressions+=("$1") ;;
+
+		# assume any other is a valid test expression, operator or positional option. If not, find will fail
+		 *) findExpressions+=("$1") ;;
+	esac; shift; done
+
+	# if the user supplied more than 1 find test expression, it may contain 'or' logic so enclose it in () so that we can treat it
+	# like one and'd filter criteria
+	[ "${#findExpressions[@]}" -gt 1 ] && findExpressions=('(' "${findExpressions[@]}" ')')
+
+	# the final findExpressions is composed.
+	#    recursiveOpt is a 'global option' that must come first. If the user specified -maxdepth or -mindepth recursiveOpt is cleared
+	#    fTypeOpt is ANDed with the rest of the expression.
+	findExpressions=("${recursiveOpt[@]}" "${findGlobalExpressions[@]}" "${fTypeOpt[@]}" "${findExpressions[@]}")
+
+	# now invoke the find command
+	[ "$fsef_prefixToRemove" ] && fsef_prefixToRemove="#${fsef_prefixToRemove#'#'}"
+	local _file _found;
+	while IFS="" read -r -d$'\b' _file; do
+		[ "$fsef_prefixToRemove" ] && _file="${_file/$fsef_prefixToRemove}"
+		varSetRef "${outputOpts[@]}" "$_file"
+		_found="1"
+	done < <(find "${findOpts[@]}" "${findStartingPoints[@]}" "${findExpressions[@]}" -print0 | tr "\0" "\b")
+
+	# if no matching pathes were found be forceFlag was specified, output /dev/null. -f is used when making a cmd line for utils
+	# (like awk) that read from stdin if no input files are specified.
+	if [ "$forceFlag" ] && [ ! "$_found" ]; then
+		varSetRef "${outputOpts[@]}" "/dev/null"
 	fi
 }
 
 
-
 #######################################################################################################################################
-### From bg_libTimer.sh
+### From bg_coreTimer.sh
 
-# this is a stub function that will load the bg_libTimer.sh and the real bgtimerStart if its called
+# this is a stub function that will load the bg_coreTimer.sh and the real bgtimerStart if its called
 function bgtimerStart()
 {
 	[ "$1" == "--stub" ] && {
-		(assertError --allStack "could not load bg_libTimer.sh from libCore stub")
+		(assertError --allStack "could not load bg_coreTimer.sh from libCore stub")
 		return
 	}
-	import -f bg_libTimer.sh ;$L1;$L2
+	import -f bg_coreTimer.sh ;$L1;$L2
 	bgtimerStart --stub "$@"
 }
 
 #######################################################################################################################################
-### From bg_procDaemon.sh
+### From bg_coreDaemon.sh
 
-# this is a stub function that will load the bg_procDaemon.sh and the real daemonDeclare if its called
+# this is a stub function that will load the bg_coreDaemon.sh and the real daemonDeclare if its called
 function daemonDeclare()
 {
-	[ "$1" == "--stub" ] && assertError "could not load bg_procDaemon.sh from libCore stub"
-	import bg_procDaemon.sh ;$L1;$L2
+	[ "$1" == "--stub" ] && assertError "could not load bg_coreDaemon.sh from libCore stub"
+	import bg_coreDaemon.sh ;$L1;$L2
 	daemonDeclare --stub "$@"
 }
