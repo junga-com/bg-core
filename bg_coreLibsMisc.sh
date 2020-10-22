@@ -2669,14 +2669,14 @@ function assertNotEmpty()
 # returned to each parent, the stack enteries of the child needs to be removed anyway.
 #
 # When the assertError function is called, only the top bgBASH_tryStack entry is relevent. If there are no bgBASH_tryStack entries,
-# then the code is not excuting in any Try/Catch block and asserError terminates the script. If the BASHPID its running in is $$ then
+# then the code is not excuting in any Try/Catch block and assertError terminates the script. If the BASHPID its running in is $$ then
 # it only needs to call exit. If not, it sends a SIGINT to $$ and all its children and then exists.
 #
 # if the bgBASH_tryStack is not empty, it will indicate the BASHPID and function depth where the Catch block is located. Note that
 # the Try function does not know exactly where the Catch command will be below it but by design, the Catch block needs to be in the
 # same scope as the Try so the Try uses its BASHPID and function depth.
 #
-# If the asserError is running in the same BASHPID as the target Catch, it uses the DEBUG and RETURN
+# If the assertError is running in the same BASHPID as the target Catch, it uses the DEBUG and RETURN
 # DEBUG and RETURN trap features to start skipping script simple commands until it comes to the Catch:. The bgBASH_tryStack includes
 # the BASHPID and the function depth of the last Catch so that it can skip more efficiently until it gets back to the function where
 # the Catch: block will be found.
@@ -2754,7 +2754,7 @@ function Try()
 
 # usage: Catch
 # Catch: is part of a Try/Catch exception mechanism for bash scripts. It is not appropriate to use this mechanism for everything.
-# See man(3) Try and man(3) asserError for more details. assertError* family of functions is the way to "throw exceptions"
+# See man(3) Try and man(3) assertError for more details. assertError* family of functions is the way to "throw exceptions"
 # Try: and Catch: are used in pairs. The pair must be in the same function at the same scope. The Catch: statment ends the protected
 # block of code where excetptions are  caught. The return value of the Catch: can be checked and the true case is the case that an
 # exception was caught and the false case is the normal case where no exception was caught.
@@ -2939,12 +2939,31 @@ function fsExists()
 # obtain a list of files to use on a commandline of another command like awk or use it to populate an Array or Set with the filenames
 # that you can then iterate in a script without creating a subshell.
 #
-# It has these properties.
-# * The list is suitable for iteration without having to check if each element exists because non matching wildcards are removed
-# * If -f is used, /dev/null will be returned if no other files match. This supports invoking commands like awk with the the results
-#   without the command reading from stdin or issuing an error.
-# * If -S or -A is specified the list of files can be iterated in a script without the common pitfalls of the file processing
-#   being done in a subshell or failing when a filename contains whitespace
+# Common Idioms:
+# 'find' and this command are tricky to get right. Big changes to the output pivot on some subtle input changes.
+# Use to get a list of files to operate on...
+#    bgfind .    # !anti-idiom!. This is often not what you want. hidden files will be included and its awkward to exclude them.
+#                # everything will start with './'  The option -B=./ will remove it in the output, but tests will need to account for './'
+#    bgfind * ...        # prefered. filenames are simple with no prefix in tests and output. only non-hidden files/folders
+#    bgfind * .[^.]* ... # if you want hidden files, include a <fileSpec> to match them. Note that .* will match . and ..
+#    * Note that * could be replaced with any wildcard expression but remember that hidden and non-hidden specs depend on the leading .
+#    bgfind -S mySet ... # (or -A) returning the found list in a Set or Array eliminates all the problems with special characters
+#                        # in filenames. Many other patterns are ok most of the time, but have edge cases that can bite you.
+#    fsExpandFiles * -type f -perm /a+x # glob exansion with find's test expression filtering
+# Use to run a cmd on a set of files that match a pattern...
+#    awk '...' $(fsExpandFiles -f <somePath>*.myExt) # run a cmd on some files without getting an error if there are no files
+#    * Note that this will fail for filenames that conatin whitespace. If you need to support those, get the list in an array and loop
+# Common find tests...
+#    -type f|d|p|l|s|b|c     # f(files),d(folders),p(pipes),l(symlinks),s(sockets),b(blockDevice),c(charDevice)
+#    -perm /a+x  # executable files
+#    -name "*.exe"     # use globs to match the filename only (no leading path)
+#    -path "./foo*/*"  # use globs to match the full name which includes the starting point
+#    -regex ".*foo.*"  # use regex to match the full name which includes the starting point
+#
+# * Think about whether the <fileSpec> expansion is the main workhorse or whether you are specifying a fixed starting point for
+#   find's recursive search to be the main workhorse. When using the latter, account for the starting point prefix in tests and outputs
+# * fsExpandFiles is an alias for specifying no recursion. Use this when you really are just expanding the <fileSpecN>
+# * bgfind is an alias for specifying recursion.
 #
 # Working Directory:
 # The <fileSpecN> and output names will all be relative to the current working directory if they are not absolute. You can change
@@ -2952,6 +2971,10 @@ function fsExists()
 # but that does not affect the <fileSpecN> nor -wholename tests. Often, it is helpful to change to a base folder before invoking this
 # command so that the <fileSpecN>, tests and output are all relative to that base folder. This command can not build in that feature
 # because it relies on the <fileSpecN> parameters being expanded by bash before the command starts.
+#
+# Specifying * or . as the <fileSpec> both start finding files in the current working directory but are not the same. * will cause
+# the shell to expand to a list of non-hidden files and folders in the CWD so that each will be a starting point for find. '.' will
+# result in find using the CWD as the single starting point and it will consider all files/folder including hidden ones.
 #
 # Recursive (-R) vs Non-recursive (+R) Mode:
 # The <fileSpecN> parameters on the commandline are always processed by bash to expand them into a list of matching filesystem objects.
@@ -3081,6 +3104,15 @@ function fsExpandFiles()
 		'(') break ;;
 		 *)  [ -e "$1" ] && findStartingPoints+=("$1") ;;
 	esac; shift; done
+
+	# if none of the starting points exist it will match nothing, but there is nothing we can set findStartingPoints to so that find
+	# would exit cleanly without displaying an error so we return here
+	if [ ${#findStartingPoints} -eq 0 ]; then
+		[ "$forceFlag" ] && varSetRef "${outputOpts[@]}" "/dev/null"
+		return 0
+	fi
+
+
 
 	# Section3: /bin/find expressions section. The rest of the command line is interpretted as the find expression
 	local findGlobalExpressions=() findExpressions=()
