@@ -225,47 +225,45 @@ if [ "$1" != "--queryMode" ]; then
 		bgtimerGlobalTimer[1]="${bgtimerGlobalTimer[0]}"
 	fi
 
-	# This first time we are sourced, we need to create the findInclude function so that we can find bg_coreImport.sh to load
-	if [ "$1" == "-f" ] || [ "$(type -t findInclude)" != "function" ]; then
-
-		# usage: findInclude scriptName
-		# this function will be redefined in bg_coreImport.sh
-		function findInclude()
-		{
-			local filename=$1
-
+	# create the findInclude function so that we can find bg_coreImport.sh to load without introducing global vars for its algorithm
+	function _coreFindInclude()
+	{
+		# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
+		# searched in non-develoment mode
+		if [ "$bgSourceOnlyUnchangable" ]; then
+			local includePaths="$scriptFolder:/usr/lib"
+		else
 			local includePaths="$scriptFolder:${bgLibPath}:/usr/lib"
+		fi
 
-			local found incPath
-			local saveIFS=$IFS
-			IFS=":"
-			for incPath in ${includePaths}; do
-				incPath="${incPath%/}"
-				if [ -f "$incPath${incPath:+/}$filename" ]; then
-					found="$incPath${incPath:+/}$filename"
-					break
-				fi
-				if [ -f "$incPath${incPath:+/}lib/$filename" ]; then
-					found="$incPath${incPath:+/}lib/$filename"
+		local found incPath tryPath
+		local saveIFS=$IFS
+		IFS=":"
+		for incPath in ${includePaths}; do
+			incPath="${incPath%/}"
+			for tryPath in "$incPath${incPath:+/}"{,lib/,creqs/,core/,coreOnDemand/}"bg_coreImport.sh"; do
+				if [ -f "$tryPath" ]; then
+					bg_coreImport_path="$tryPath"
 					break
 				fi
 			done
-			IFS=$saveIFS
+			[ "$bg_coreImport_path" ] && break
+		done
+		IFS=$saveIFS
 
-			bg_coreImport_path="$found"
-		}
-	fi
+		# end with error if not found
+		if [ ! "$bg_coreImport_path" ]; then
+			echo "error: Woops. Something is not right." >&2
+			echo "   /usr/lib/bg_core.sh is being sourced by a script but it can not find the rest of the bg-core" >&2
+			echo "   package which should contain the bg_coreImport.sh script libraries." >&2
+			echo $includePaths | tr ":" "\n" | awk 'BEGIN{print "   Search path tried:"} /[^[:space:]]/ {print "      "$0}'  >&2
+			exit 1
+		fi
+	}
 
 	# this sets the bg_coreImport_path global var
-	findInclude bg_coreImport.sh
-
-	# end with error if not found
-	if [ ! "$bg_coreImport_path" ]; then
-		echo "error: 'import $filename ;\$L1;\$L2'" >&2
-		echo "   bash library not found by in any of these paths" >&2
-		echo $includePaths | tr ":" "\n" | awk '{print "      "$0}'  >&2
-		exit 1
-	fi
+	_coreFindInclude bg_coreImport.sh
+	unset -f _coreFindInclude
 
 	# this is a double check. The real prevention is that bgLibPath is cleared so that bg_coreImport_path will only be found in /usr/lib/
 	if [ "$bgSourceOnlyUnchangable" ] && [ -w "$bg_coreImport_path" ]; then
@@ -280,8 +278,8 @@ if [ "$1" != "--queryMode" ]; then
 	# importCntr reloadAll to reload bg_coreImport.sh also if it changes.
 	declare -gA _importedLibraries
 	_importedLibraries[lib:bg_coreImport.sh]="$bg_coreImport_path"
+	unset bg_coreImport_path
 	source "${_importedLibraries[lib:bg_coreImport.sh]}"
-
 
 	# bgtrace "in common.sh"
 	# printfVars _bgtraceFile bgTracingOn bgTracingOnState  >>/tmp/bgtrace.out

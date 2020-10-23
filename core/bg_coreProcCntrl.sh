@@ -43,7 +43,7 @@ function bgwait()
 
 	# this code still support ubuntu 12.04 so copy the pidsvar array instead of using a -n ref
 	local -A bgw_pids;     arrayCopy "$pidsVar" bgw_pids
-	local -A bgw_pidNames; arrayTranspose -d" " "$pidsVar" bgw_pidNames 
+	local -A bgw_pidNames; arrayTranspose -d" " "$pidsVar" bgw_pidNames
 
 
 	# these keep track of which are still running. bgw_pidsLeft is an array of PIDS
@@ -65,7 +65,7 @@ function bgwait()
 	while [ ${#bgw_pidsLeft[@]} -gt 0 ] && [ ${result:-0} -ne 127 ]; do
 		# if needed, we can add $sleepPID to the wait -n command. This effectively implements a timeout so that
 		# wait -n will wakeup whenever the sleep expires. This should not interfere with the real tasks because
-		# as soon as we see that none of them are still running this loop will exit even if the sleep has not yet expired.  
+		# as soon as we see that none of them are still running this loop will exit even if the sleep has not yet expired.
 		#sleep 1 &
 		#sleepPID=$?
 
@@ -109,7 +109,7 @@ function bgwait()
 	done
 
 	### result will be set to the overall status for all the process - all good, all bad, or some of each
-	# TODO: maybe we should return the value errorCountVar directly, capping it at 256 or something  
+	# TODO: maybe we should return the value errorCountVar directly, capping it at 256 or something
 	result=0
 	if [ ${!errorCountVar:-0} -eq 0 ]; then
 		setReturnValue "$summaryStrVar" "all succeeded"
@@ -129,14 +129,14 @@ function bgwait()
 #function bgkillTree() moved to bg_libCore.sh
 
 # usage: local bgPID="$(bgGetSpawnedPID $!)
-# this is a work around for a strange error that I do not fully understand. When spawning multiple 
+# this is a work around for a strange error that I do not fully understand. When spawning multiple
 # "git $gitFolderOpt gui &" processes in a tight loop, the PIDs returned by $! turn out to be the
 # aspell child process that git gui creates and not the git processes itself. It seems if I put a 1 second
 # sleep in the loop we get the git PID. It also seems that running an external command in the loop also
 # fixes the problem.
 # This function walks takes the PID returned by $! and walks back up the ppid links until the ppid == $$
 # that should be the real process we spawned in the background. Ironically, because this function calls ps
-# in a subshell (apparently) the $! passed in always seems to be right anyway. 
+# in a subshell (apparently) the $! passed in always seems to be right anyway.
 function bgGetSpawnedPID()
 {
 	local pid="$1"
@@ -218,8 +218,8 @@ function bgSleep()
 
 # usage: delayedExec <jobSpecName> <delayMinutes> <cmd> ...
 # this function schedules a command in the future.
-# If an existing <jobSpecName> is already scheduled, it resets the delay to the new value.  
-# This supports a convenient pattern for commands that rebuild a cache after data has changed when 
+# If an existing <jobSpecName> is already scheduled, it resets the delay to the new value.
+# This supports a convenient pattern for commands that rebuild a cache after data has changed when
 # changes are made in clumps. If the cache is rebuilt after every small change, it performs too much work
 # and only the last time it runs matters. By using this function after each small change, the rebuild
 # function will not run right away. While new changes are happenning, it only pushes the job's sheduled time
@@ -255,7 +255,7 @@ function delayedExec()
 # contain call back functions. This makes it so the caller does not need to check to see if the variable
 # is empty before calling it. If the variable is empty, requiredFn or optionalFn will provide the command
 # that will be invoked.  requiredFn will assert an error that the required callback function is not set
-# and optionalFn will be a noop so that the optional missing call back is just ignored. 
+# and optionalFn will be a noop so that the optional missing call back is just ignored.
 # SECURITY: assertRequiredFn,  requiredFn and optionalFn support a pattern to invoke dynamic code. The caller must know to only invoke dynamic code from system code sources.
 declare requiredFn="assertRequiredFn "
 declare optionalFn=": "
@@ -270,7 +270,7 @@ function assertRequiredFn()
 # host vs a development host.
 # Plugin commands are data fields that can be set by untrusted actors that are converted to code via execution. A secure
 # plugin command is safe to run because it is restricted to:
-#    1) running only installed commands on the host -- no arbitrary scripts with unvetted content. 
+#    1) running only installed commands on the host -- no arbitrary scripts with unvetted content.
 #       * Any path is stripped off so that the command has to be either a function, builtin or an external cmd installed
 #         into a system path
 #       * TODO: in production mode, hard set PATH and bgLibPaths, etc.. to know vlaues
@@ -282,7 +282,7 @@ function assertRequiredFn()
 # Params:
 #      Note that unlike most functions, this treats the entire command line as one string. Each token
 #      will be whitespace delimitted even if it is quoted when passing to this function. %20 can be used
-#      to prevent spaces from making separate tokens but they will be passed that way to the cmd so 
+#      to prevent spaces from making separate tokens but they will be passed that way to the cmd so
 #      the target command needs to know how to handle %20
 #      <cmdToken> : the first whitespace delimitted token is taken as the command name
 #      <pN> : each subsequent whitespace delimitted token is taken as a positional paramter
@@ -306,9 +306,9 @@ function runPluginCmd()
 	# parameters.
 	if [[ ! "${pluginCmd%% *}" =~ ^((at-.*)|(bg-.*)|(.*::.*))$ ]]; then
 		assertError -v pluginCmd "
-			This plugin command can not be guaranteed safe and will not be run. Acceptable commands can be 
+			This plugin command can not be guaranteed safe and will not be run. Acceptable commands can be
 				* a bash library function like <libFile>::<functionInLib>
-				* a command that begins with either at-* or bg-* 
+				* a command that begins with either at-* or bg-*
 				* signed by a trusted source
 			"
 	fi
@@ -332,7 +332,7 @@ function runPluginCmd()
 
 	### Load the libFile if needed and confirm that progName exists as the right type
 	if [ "$libFile" ]; then
-		local libPath="$(findInclude "$libFile")"
+		local libPath="$(import --getPath "$libFile")"
 		if [ ! "$libPath" ] || [ ! -e "$libPath" ]; then
 			assertError "library '$libFile' not installed when invoking '$pluginCmd'"
 		fi
@@ -347,7 +347,7 @@ function runPluginCmd()
 			assertError -v pluginCmd -v libPath -v progName "the function is not present after sourcing the specified library"
 		fi
 	else
-		# 
+		#
 		local cmdType="$(type -t $progName)"
 		case :$cmdType in
 			:function) assertError -v pluginCmd -v progName -v cmdType "program name resolves to a function but the function syntax <libScript>::<functionName> was not used" ;;
@@ -357,8 +357,8 @@ function runPluginCmd()
 
 	fi
 
-	### execute the cmd. 
-	# TODO: consider using eval to support quoted/escaped params but then we must escape the tokens to prevent ; and other 
+	### execute the cmd.
+	# TODO: consider using eval to support quoted/escaped params but then we must escape the tokens to prevent ; and other
 	#       constructs from running a second, hidden command
 	$progName "${opts[@]}" $debugFlag $params
 }
@@ -394,7 +394,7 @@ function cronNormSchedule()
 	local cronScheduleSpec="${1,,}"
 	cronScheduleSpec="${cronScheduleSpec//"*"/&}";   # replace '*' so bash does not expand them. & is not valid in crons
 	cronScheduleSpec="${cronScheduleSpec//sla/slam}"; cronScheduleSpec="${cronScheduleSpec//slamm/slam}"
-	cronScheduleSpec="${cronScheduleSpec//slam/slam }";   # slam+2h is a easier to interpret as "slam +2h" 
+	cronScheduleSpec="${cronScheduleSpec//slam/slam }";   # slam+2h is a easier to interpret as "slam +2h"
 
 	local slamStart slamStartDay slamStartHour slamStartMinute
 	local pParts=(${cronScheduleSpec})
@@ -425,7 +425,7 @@ function cronNormSchedule()
 		### detected and handle name and name-lists for dow and month
 		if [[ "$part" =~ ^(($(arrayJoin -d"|" dayNames)|$(arrayJoin -d"|" monthNames)),{0,1}){1,}$ ]]; then
 			pField="${pFieldsMap[${part%%,*}]}"
-			local i; for i in ${part//,/ }; do 
+			local i; for i in ${part//,/ }; do
 				pValOffset="${pValOffset}${pValOffset:+,}${i:0:3}"
 			done
 
@@ -482,7 +482,7 @@ function cronNormSchedule()
 	# In general, the default for larger time periods than is specified is all (*)
 	# and the default for smaller time periods than is specified will one occurance at (pStart[?])
 	# We start out with a state variable default='*' and iterate from right to left (large time periods to smaller time periods)
-	# once we hit a part that is not set to all(*), we change default='pStart[?]' 
+	# once we hit a part that is not set to all(*), we change default='pStart[?]'
 	local default='*'
 	[ "${pSched[4]}" == "" ] && pSched[4]='*'
 
@@ -663,7 +663,7 @@ function cronShouldRun()
 
 
 # usage: cronCntr -n <cronName> show
-# usage: cronCntr -n <cronName> -c <cronCmd> [-p <cronPeriod>] [-u <cronUser>] on  
+# usage: cronCntr -n <cronName> -c <cronCmd> [-p <cronPeriod>] [-u <cronUser>] on
 # usage: cronCntr -n <cronName> off
 # Manage a cron.d/<confFile> to have a command ran in periodically in the background
 # Params:
@@ -683,8 +683,8 @@ function cronCntr()
 	    -c*) cronCmd="$(bgetopt "$@")" && shift ;;
 	    -p*) period="$(bgetopt "$@")" && shift ;;
 	esac; shift; done
-	assertNotEmpty cronName 
-	local cmd="${1:-show}"; [ $# -gt 0 ] && shift 
+	assertNotEmpty cronName
+	local cmd="${1:-show}"; [ $# -gt 0 ] && shift
 	local cronFile="/etc/cron.d/$cronName"
 
 	case ${cmd:-show} in
@@ -737,7 +737,7 @@ function cronCntr()
 			cat <<-EOS2 | sudo tee "$cronFile" >/dev/null
 				# this file was created by cronCntr feature in $(basename $0)
 				# changes to this file could be overwritten so use that cmd to manage this file
-				# or copy to a different name 
+				# or copy to a different name
 				# cronSpec: $period
 				SHELL=/bin/bash
 				$path

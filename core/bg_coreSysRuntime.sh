@@ -62,7 +62,7 @@
 #    bg-plugins   : uses this function
 #    templateFind : uses this function
 #    import <scriptName> ;$L1;$L2  : this is how libraries and scripts source libraries they need
-#    findInclude : this uses the same algorithm as import but just returns the path where its found
+#    import --getPath <scriptName> : returns the path without sourcing it
 #    findInPaths : this is a much more flexible algorithm for finding various types of installed files
 function findInPaths()
 {
@@ -158,72 +158,6 @@ function findInPaths()
 				}
 			}
 		'
-	fi
-}
-
-# usage: findInclude <scriptName> [<retVar>]
-# This allows scripts to access the same algorithm used by 'import <scriptName> ;$L1;$L2' to find the
-# location of library files. The fully qualified path of <scriptName> is returned. If not found, it
-# asserts an error by default or returns exit code 1 if the -q option is specified.
-# this honors the bgLibPath environment variable that is set with bg-debugCntr to vinstall pacakges.
-# There was a time when scripts used 'source $(findInclude <scriptName>)' but
-# Params:
-#    <retVar> : if passed in, the result of the function is returned by setting this variable. Otherwise
-#               its written to stdout
-# See Also:
-#    import <scriptName> ;$L1;$L2  : this is how libraries and scripts source libraries they need
-#    findInclude : this uses the same algorithm as import but just returns the path where its found
-#    findInPaths : this is a much more flexible algorithm for finding various types of installed files
-function findInclude()
-{
-	local quietFlag
-	[ "$1" == "-q" ] && { quietFlag=1; shift; }
-	local filename=$1
-
-	# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
-	# searched in non-development mode
-	if [ "$bgSourceOnlyUnchangable" ]; then
-		local includePaths="/usr/lib"
-	else
-		local includePaths="$scriptFolder:${bgLibPath}:/usr/lib"
-	fi
-
-	local found incPath
-	local saveIFS=$IFS
-	IFS=":"
-	for incPath in ${includePaths}; do
-		incPath="${incPath%/}"
-		if [ -f "$incPath${incPath:+/}$filename" ]; then
-			found="$incPath${incPath:+/}$filename"
-			break
-		fi
-		if [ -f "$incPath${incPath:+/}lib/$filename" ]; then
-			found="$incPath${incPath:+/}lib/$filename"
-			break
-		fi
-		if [ -f "$incPath${incPath:+/}creqs/$filename" ]; then
-			found="$incPath${incPath:+/}creqs/$filename"
-			break
-		fi
-	done
-	IFS=$saveIFS
-	if [ ! "$found" ]; then
-		if [ ! "$quietFlag" ]; then
-			# assertError ...  (this function does not depend on any other function libraries)
-			echo "error: bash library not found by 'source \$(findInclude $filename)'" >&2
-			echo "       use 'echo \$bgLibPath | tr \":\" \"\\n\"' to see the current paths. " >&2
-			echo "       /usr/lib/ is implied at the end of \$bgLibPath" >&2
-			exit 1
-		fi
-		[ "$2" ] && printf -v "$2" "%s" "$found"
-		return 1
-	fi
-
-	# returnValue "$found" "$2" (this function does not depend on any other function libraries)
-	if [ "$2" ]; then
-		printf -v "$2" "%s" "$found"
-	else
-		echo "$found"
 	fi
 }
 

@@ -204,7 +204,7 @@ function bgStackMakeLogical()
 		# if the trap handler is invoking _debugEnterDebugger then we assume its our well know debugSetTrap handler
 		_constructSimpleCommandFromBashStack "$((i-1))" frmSimpleCmd
 		if [[ "$frmSimpleCmd" =~ _debugEnterDebugger.*DEBUG-852 ]]; then
-			findInclude bg_debugger.sh frmSrcFile; assertNotEmpty frmSrcFile --critical
+			import --getPath bg_debugger.sh frmSrcFile; assertNotEmpty frmSrcFile --critical
 			frmFunc="DEBUGTrap"
 			frmSrcLineNo="$(awk '/^[[:space:]]*_debugEnterDebugger[[:space:]][[:space:]]*.!DEBUG-852!./ {print NR}' "$frmSrcFile")"
 			frmSimpleCmd='_debugEnterDebugger "!DEBUG-852!"'

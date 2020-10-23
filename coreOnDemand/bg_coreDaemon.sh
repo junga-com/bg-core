@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Library bg_coreDaemon.sh
-# This library provides support for bash scripts that can be controlled as daemons.
+# This library provides support for bash scripts that can be controlled as daemons. It is a core library meaning that you do not
+# need to explicitly import (aka source) it, however, it only gets loaded if the script declares the daemonDefaultStartLevels variable
+# and uses the daemonDeclare API.
 # See Also:
 #    daemonInvokeOutOfBandSystem : implements the control cui for a deamon script. called by invokeOutOfBandSystem when it
 #         detects that the script is a daemon

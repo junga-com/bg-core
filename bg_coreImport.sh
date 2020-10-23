@@ -90,7 +90,8 @@ function importCntr()
 					((_importedLibrariesBumpAdj++))
 				fi
 			done
-			[ ${_importedLibrariesBumpAdj:-0} -gt 1 ] && L1="source $(findInclude bg_coreImport.sh)"
+			# 2020-10 these seems like it does nothuing b/c L1 is an 'import ... ;$L2' thing, not an importCntr thing
+			[ ${_importedLibrariesBumpAdj:-0} -gt 1 ] && L1="source $(import --getPath bg_coreImport.sh)"
 			;;
 		reloadAll)
 			declare -g _importedLibrariesTimeRefTmpFile
@@ -120,18 +121,21 @@ function importCntr()
 }
 
 # usage: 'import [-f] <scriptName> ;$L1;$L2'
+# usage: import --getPath <scriptName> [<returnVar>]
 # Source a bash library. Similar to "source <scriptName>" or ". <scriptName>"
 #
-# Note the unusual usage syntax. The ;$L at the end of the line is needed to allow <scriptName> to be sourced in the global context.
+# Note the unusual usage syntax. The ;$L1;$L2 at the end of the line is needed to allow <scriptName> to be sourced in the global context.
 # Sourcing from the context of inside a function is not quite the same for some things (a declare -g <varname> wont be truely global )
 #
-# The advantage of import over direct sourcing is that you do not need to know the path of the script because it finds installed
-# verions and honours virtually installed projects. It is also idempotent by default, meaning that it will not source the same
-# script multple times. This allows library scripts to declare their dependancies on other libraries without having to take into
-# account whether the script or another library has already sourced that dependency.
-#
-# Libraries sourced with this function automatically work with system development features that will detect when a library file has
-# changed during the run of a script and selectively re-source those changed libraries.
+# There are several advantages of using import over direct sourcing.
+#   * it can enforce some security constraints (use a lint in the SDLC to not allow source or . statements in accepted scripts)
+#   * the author does not need to know the path of the library -- if the library is 'installed' on the host, it will find it
+#   * works with bg-debugCntr vinstall'd projects
+#   * it is idempotent by default, meaning that it will not source the same script multple times. This allows library scripts to
+#     declare their dependancies on other libraries without having to take into account whether the script or another library has
+#     already sourced that dependency.
+#   * Libraries sourced with this function automatically work with system development features that will detect when a library file
+#     has changed during the run of a script and selectively re-source those changed libraries.
 #
 # Params:
 #    <scriptName> : the simple filename without path. The name is taken relative to system paths so
@@ -142,26 +146,26 @@ function importCntr()
 # Options:
 #    -f : force sourcing. Even if the script has already been sourced into the environment, do it again.
 #    -q : if the library is not found, set the exit code to 202 instead of ending the script with an assert.
+#    --getPath : This options gives utilities the chance to lookup the path without sourcing it.
 # See Also:
 #    importCntr  : change settings and get the current state of imported libraries
-#    findInclude : this uses the same algorithm as import but just returns the path where its found
 #    findInPaths : this is a much more flexible algorithm for finding various types of installed files
-function _import() { import "$@"; }
 function import()
 {
 	declare -gA _importedLibraries
-	local forceFlag quietFlag
+	local forceFlag quietFlag getPathFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-f) forceFlag="-f" ;;
 		-q) quietFlag="-q" ;;
+		--getPath) getPathFlag="--getPath" ;;
 	esac; shift; done
 	local scriptName=$1
 
-	### return quickly if we dont have to load the library
-	if ! [ "$forceFlag" ] && [ "${_importedLibraries[lib:$scriptName]}" ]; then
+	### return quickly when the library is already loaded
+	if [ ! "$forceFlag" ] && [ ! "$getPathFlag" ] && [ "${_importedLibraries[lib:$scriptName]}" ]; then
 		L1=""
 		L2=""
-		return
+		return 0
 	fi
 
 	### look up the library in the system paths
@@ -174,33 +178,38 @@ function import()
 		local includePaths="$scriptFolder:${bgLibPath}:/usr/lib"
 	fi
 
-	local foundScriptPath incPath
+	local foundScriptPath incPath tryPath
 	local saveIFS=$IFS
 	IFS=":"
 	for incPath in ${includePaths}; do
 		incPath="${incPath%/}"
-		if [ -f "$incPath${incPath:+/}$scriptName" ]; then
-			foundScriptPath="$incPath${incPath:+/}$scriptName"
-			break
-		fi
-		if [ -f "$incPath${incPath:+/}lib/$scriptName" ]; then
-			foundScriptPath="$incPath${incPath:+/}lib/$scriptName"
-			break
-		fi
-		if [ -f "$incPath${incPath:+/}creqs/$scriptName" ]; then
-			foundScriptPath="$incPath${incPath:+/}creqs/$scriptName"
-			break
-		fi
+		for tryPath in "$incPath${incPath:+/}"{,lib/,creqs/,core/,coreOnDemand/}"$scriptName"; do
+			if [ -f "$tryPath" ]; then
+				foundScriptPath="$tryPath"
+				break
+			fi
+		done
+		[ "$foundScriptPath" ] && break
 	done
 	IFS=$saveIFS
 
+	if [ "$getPathFlag" ]; then
+		if [ "$2" ]; then
+			printf -v "$2" "%s" "$foundScriptPath"
+		else
+			echo "$foundScriptPath"
+		fi
+		[ "$foundScriptPath" ]
+		return
+	fi
+
 	### success path
 	if [ "$foundScriptPath" ]; then
-
+		# this is not the real security constraint because a user can edit a file and then make it unwritable by themselves.
+		# the real constraint is limiting the search path in the block above. If there are user wrtable scripts in /usr/lib, the
+		# host is already compromised
 		if [ "$bgSourceOnlyUnchangable" ] && [ -w "$foundScriptPath" ]; then
-			echo "error: can not source a writable library in a script that is not writeable by the user" >&2
-			echo "   if the script that was launched by the user is not writable by the user we consider it not eligible for any" >&2
-			echo "   action that would down grade its security because it may be an installed script in a system library" >&2
+			echo "error: in this host environment we can not source a writable library in a script that is not writeable by the user" >&2
 			echo "   script path  = '$0'" >&2
 			echo "   library path = '$foundScriptPath'" >&2
 			exit 2

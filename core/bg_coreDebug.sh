@@ -108,6 +108,7 @@ else
 	##################################################################################################################
 	### recognize debugger environment var maintianed by bg-debugCntr to activate the debugger when a script runs
 	if [ "$bgDevModeUnsecureAllowed" ] &&  [ "$bgLibExecMode" == "script" ] && [ "${bgDebuggerOn}" ]; then
+		[ ! "$(import --getPath bg_debugger.sh)" ] && assertError "the debugger is not installed. Try installing the bg-dev package"
 		import bg_debugger.sh ;$L1;$L2
 		bgtrace "bgDebuggerOn is on : ${bgDebuggerOn}"
 

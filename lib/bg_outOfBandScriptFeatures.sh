@@ -4,6 +4,13 @@
 # Out of Band (OOB) Functions are functions that deal with scripts as generic maintainable entities.
 # In-band is the subject that the script is written to perform and can be anything. Out-of-band are the things
 # that a script needs to support to be a good citizen in the OS and package environment.
+#
+# oob_invokeOutOfBandSystem is a logical part of this library that is a core function in bg_coreLibsMisc.sh. Scripts should call
+# that function before they start doing their real work or processing their cmdline paramters. That function examines the cmdline
+# parameters and will invoke callbacks functions in the script to perform bash completion processing or help system functions.
+# This full library will be imported (aka sourced) before callbacks are invoked so a script does not need to import this library
+# explicitly
+#
 # Out-Of-Band Mechanisms:
 #    cmdline line syntax : common conventions for cmdline options and positional commands.
 #    cmdline completion : support for providing cmdline completion UI
@@ -18,7 +25,6 @@
 ### OOB Core
 
 #function oob_invokeOutOfBandSystem() moved to bg_coreLibsMisc.sh
-#function invokeOutOfBandSystem() moved to bg_coreLibsMisc.sh
 
 #################################################################################################################################
 ### Cmdline processing Method 1 of Spec based cmdline Processing.
