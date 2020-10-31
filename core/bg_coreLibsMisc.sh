@@ -263,10 +263,10 @@ function bgOptionGetOpt()
 # like -h* help processing bash command line completion.
 #  Supported Mechanisms:
 #   * Bash Completion:
-#   * Sudo Enforcement:
 #   * Help Processing:
+#   * bg-debugCntr reminder Banner:
+#   * Sudo Enforcement:
 #   * Umask Setting:
-#   * Trace Check Banner:
 # Bash Completion:
 # Srcipt authors can provide BC suggestions from inside their script. This promotes including BC support
 # from the start of developing the script since its all in one place and its convenient to have BC
@@ -274,8 +274,10 @@ function bgOptionGetOpt()
 # script author can provide interactive feed back about what information is expected from the user and
 # the current state of the command line up to that point.
 #  Script Author Callbacks:
-#    oob_printOptBashCompletion() -- return BC suggestions for options w/ paramters
-#    oob_printBashCompletion()    -- return BC suggestions for positional paramters
+#    oob_printBashCompletion()    -- return BC suggestions
+#  See also man(3) _bgbc-complete-viaCmdDelegation
+#  See also man(7) oob_printBashCompletion
+#
 # Sudo Enforcement:
 # The script author can declare that it must be ran as a root or as the loguser or as any arbitrary user
 # and group. The script will transparently use sudo to change to the required user and it will fail and
@@ -285,6 +287,7 @@ function bgOptionGetOpt()
 #        The command line arguments are passed to this function in the same manner as the oob_printOptBashCompletion
 #        callback so the they can be inspected to decide what priviledge is required for the particulare
 #        operation being invoked.
+#
 # Help Processing:
 # Script authors can provide out-of-band help (-h) processing. The default is to invoke the script's
 # man(1) page by the same name as the script command and exit the script. The script author can define
@@ -295,6 +298,7 @@ function bgOptionGetOpt()
 #  Script Author Callbacks:
 #    oob_helpMode() -- respond to -h for example open the appropriate man page give the command line
 #    oob_helpMode_endOfLineOption="off" :
+#
 # Umask Setting:
 # The invokeOutOfBandSystem currently sets the group read/write bits in te umask so that any files created
 # during the script run will be accesible to the group. This is a common pattern on a domain server.
@@ -303,6 +307,7 @@ function bgOptionGetOpt()
 # If bgtrace (see man(1) bg-debugCntr) is turned on in the users environment a one line banner is written
 # to stderr when the script starts to remind the user. bg-debugCntr can turn that off for the session
 # if that is a problem.
+#
 # Daemon Scripts:
 # When a script calls daemonDeclare before invokeOutOfBandSystem, it will operate as a daemon script
 # This means that invokeOutOfBandSystem will process status,start,stop,restart,reload, and auto start
@@ -317,8 +322,8 @@ function bgOptionGetOpt()
 #    bg-sp-addCommand -t sh-<tye> <newCmdName>
 #    daemonDeclare
 #    daemonInvokeOutOfBandSystem
-function oob_invokeOutOfBandSystem() { invokeOutOfBandSystem "$@"; }
-function invokeOutOfBandSystem()
+function invokeOutOfBandSystem() { oob_invokeOutOfBandSystem "$@"; }
+function oob_invokeOutOfBandSystem()
 {
 	# this is the end block from the end of bg_coreImport.sh. When a script calls invokeOutOfBandSystem, it marks the end of initialization
 	if [ "$bgImportProfilerOn" ]; then
@@ -339,7 +344,7 @@ function invokeOutOfBandSystem()
 				[ "$(type -t oob_printOptBashCompletion)" ] && oob_printOptBashCompletion "$@"
 				[ "$(type -t printOptBashCompletion)" ]     && printOptBashCompletion "$@"
 				;;
-			-hb)
+			-hb|-hbOOBCompGen)
 				local -A _bgbcData=(); arrayFromString _bgbcData "$_bgbcDataStr"
 				local -A options=()
 				local words=() cword=0 opt="" cur="" prev="" optWords=() posWords=() posCwords=0
@@ -1933,7 +1938,7 @@ function bgtrap()
 		scriptMatchRE="(^|${sep1}${sep2}|${sep2})(${script})(${sep1}|${sep1}${sep2}|$)"
 	fi
 
-	# if the script coincidentlly contains a sep1 or sep2, escape them from our routines. Everything
+	# if the script coincidentally contains a sep1 or sep2, escape them from our routines. Everything
 	# uses the escaped version except if we print or return the script in any way, we unescape it
 	# Its not likely this will happen but for completeness of predictablity, we do it.
 	# sep1 by necesity a comment line so escaping will not chage the execution. sep2 may not but we
@@ -2209,7 +2214,8 @@ function bgTrapStack()
 			eval 'local handler="${'"$stackVar"'[@]:0:1}"; '
 			if [ "$action" == "pop" ]; then
 				eval "$stackVar"'=( "${'"$stackVar"'[@]:1}" )'
-				builtin trap "${handler:--}" "$sig"
+				# 2020-10 for empty handler changed '-' to ''  (${handler:--} to ${handler})  b/c in test case, Catch was not clearing the DEBUG trap when it called this function
+				builtin trap "${handler}" "$sig"
 			else
 				returnValue "$handler" "$handlerVar"
 			fi
@@ -2500,7 +2506,7 @@ function assertError()
 	# _ae_stackFrameStart will control where the stack print will start. We want that to include the first assert function so we -1
 	# --frameOffest (_ae_frameOffset) allows the caller declare the some number of functions on the stack should be skipped too
 	# --allStack (_ea_allStack) makes the render algorithm ignore _ae_frameOffset and show everything including this function
-	local _ae_failingFunctionName=""
+	local _ae_failingFunctionName="" _ae_assertFunctionName
 	local i; for i in "${!FUNCNAME[@]}"; do
 		if [ ! "$_ae_failingFunctionName" ] && [[ ! "${FUNCNAME[$i]}" =~ ^[aA]ssert|^[a-zA-Z][a-z]*Assert|^_ ]]; then
 			_ae_failingFunctionName="${FUNCNAME[$i]}"
@@ -2509,6 +2515,7 @@ function assertError()
 	done
 	local _ae_stackFrameStart=$(( (i+_ae_frameOffset-1<0)?0:i+_ae_frameOffset-1 ))
 	_ae_failingFunctionName="${FUNCNAME[_ae_stackFrameStart+1]}"
+	_ae_assertFunctionName="${FUNCNAME[_ae_stackFrameStart]}"
 
 	# the action on the top of the stack tells us what environment we are being called in and therefore how we should behave
 	# The Try() function sets this to 'catch'. The default is 'abort'
@@ -2585,6 +2592,10 @@ function assertError()
 			;;
 
 		catch)
+			catch_errorCode="$_ae_exitCode"
+			catch_errorDescription="$(cat $assertOut)"
+			catch_errorClass="$_ae_assertFunctionName"
+
 			local tryStatePID="${bgBASH_tryStackPID[@]:0:1}"
 			local pidsToKill=()
 			local pid="$(ps -o ppid= --pid $BASHPID)"
@@ -2704,6 +2715,12 @@ function Try()
 		 *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
+	# these globals are used to pass the error to the Catch block. Clear them on Try: so that there is no chance of leaking the last
+	# catch info through to another
+	catch_errorCode=""
+	catch_errorDescription=""
+	catch_errorClass=""
+
 	# collect the current state
 	local tryStatePID="$BASHPID"
 	local tryStateFuncDepth="$(( ${#BASH_SOURCE[@]}-funcDepthOffset ))"
@@ -2724,6 +2741,7 @@ function Try()
 		else # bingo. BASH_COMMAND == Catch: at this funcDepth
 			IFS='$' \t\n'' # no need to save because we will restore the tryStateIFS copy when we return to user code
 			bgTrapStack pop DEBUG
+
 			unset bgBASH_debugTrapLINENO bgBASH_prevTrap
 			IFS="'"$tryStateIFS"'" # return IFS to the value it had at the try statement
 			'"$tryStateExtdebug"'  # return the extdebug shopt to the value it had in at the try statement
@@ -2752,12 +2770,30 @@ function Try()
 }
 
 
-# usage: Catch
+# usage: Catch: [<assertFunctionSpec>] && { <errorPathCode...>; }
 # Catch: is part of a Try/Catch exception mechanism for bash scripts. It is not appropriate to use this mechanism for everything.
-# See man(3) Try and man(3) assertError for more details. assertError* family of functions is the way to "throw exceptions"
-# Try: and Catch: are used in pairs. The pair must be in the same function at the same scope. The Catch: statment ends the protected
-# block of code where excetptions are  caught. The return value of the Catch: can be checked and the true case is the case that an
-# exception was caught and the false case is the normal case where no exception was caught.
+# See man(3) Try and man(3) assertError for more details on the general mechanism.
+#
+# Params:
+#    <assertFunctionSpec> : a quoted glob style specification that matches the name of the assert* function that, when thrown inside
+#             the block, should stop on this Catch:
+#             Multiple Catch: statements can be placed one after another and when an exception is being thrown inside the try/catch
+#             block, the first matching Catch: <spec> will be invoked. If none match at that function level, the coresponding catch
+#             stack frame will be popped and the exception will be re-thrown to the next higher level.
+#
+# The Error Path:
+# <errorPathCode...> will be executed only when an exception is caught by that Catch:
+# Inside this block some global variables starting with catch_* describe the state of the exception being caught.
+#    catch_errorCode        : the numeric exist code being thrown. If the exception was uncaught, this would be the exit code of the
+#                             process
+#    catch_errorDescription : The formatted text of the exception. If the exception was uncaught, this would be the text printed to
+#                             stderr
+#    catch_errorClass       : This is the name of the assert* function that raised the exception. assertError is the most generic
+#
+# Exit Code:
+#    0: (true) error path. This means that this Catch: statement is catching an error.
+#    1: (false) normal path. This Catch: statement is not catching an exception.
+#
 # Example:
 #     function foo()
 #     {
@@ -2768,6 +2804,27 @@ function Try()
 #             echo "doThis or doThat failed"
 #         }
 #     }
+#
+# Example With Specific Catching:
+# !!!NOTE: this is not implemented but we are close to it.
+#   1) option1: make Catch: detect when its being called multiple times on the same Try:
+#      if catching is true but assertFunctionName is not ours, reinstall a debug trap to monitor the additional Catch: and act if
+#      none match
+#   2) options2: (better) in the debgug trap, match the "Catch: assertFileNotFound" so that it only stops on a catch if it matches.
+#      we would still need to make catch detect multiple calls for a single Try: so that it pops the stack only once
+# (experimental)    function foo()
+# (experimental)    {
+# (experimental)        Try:
+# (experimental)            doThis ...
+# (experimental)            doThat ...
+# (experimental)        Catch: assertFileNotFound && {
+# (experimental)            echo "doThis or doThat failed"
+# (experimental)        }
+# (experimental)        # expect the exception to continue throwing if its
+# (experimental)            echo "doThis or doThat failed"
+# (experimental)        }
+# (experimental)    }
+#
 function Catch:() { Catch --decFuncDepth "$@"; }
 function Catch()
 {
@@ -2930,6 +2987,60 @@ function fsExists()
 }
 
 
+
+# usage: fsTouch [-d] [-p]  <fileOrFolder>
+# This improves the pattern of use for 'touch' that you want to make sure that a file exists before going on to use it.
+# The gnu 'touch' works that way for a file but only if the parent folder already exists. This function adds two features to support
+# this pattern better. First, it will create the parent folder if needed. It will create one folder normally but with the -p option
+# it will create multiple folders in a hierarchy. Second, you can use it to make sure that a folder exits without making a file in
+# that folder.
+# Params:
+#    <fileOrFolder>  : the path to a filesystem object that should exist. If it ends in a '/' it will be a folder and otherwise a file
+# Options:
+#    -d|--directory  : specify that <fileOrFolder> is a directory (aka folder). Another way to accomplish this is to append a
+#                      trailing '/' to <fileOrFolder>
+#    -p              : normaly it will create at most one parent folder but -p makes it create the entire parent chain as needed.
+#                      Its safer to use without -p because you know that the base part of the path should exist. If you make a mistake
+#                      in the base path, without -p you will get an error but with it it will create the wrong path. Be particularely
+#                      wary of using -p when sudo is in effect.
+function fsTouch()
+{
+	local recurseMkdirFlag typeMode="-f"
+	while [[ "$1" =~ ^- ]]; do case $1 in
+		-p) recurseMkdirFlag="-p" ;;
+		-d|--directory) typeMode="-d" ;;
+	esac; shift; done
+	local fileOrFolder="$1"
+
+	# if <fileOrFolder> ends in a '/', force fileMode to be -d
+	[ "${fileOrFolder: -1}" == "/" ] && typeMode="-d"
+	fileOrFolder="${fileOrFolder%/}"
+
+	# create the parent folder if needed
+	if [ ! -e "$fileOrFolder" ]; then
+		local parentFolder="${fileOrFolder%/*}"
+		[ ! -d "$parentFolder" ] && { mkdir $recurseMkdirFlag "$parentFolder" || assertError; }
+	fi
+
+	# if it aready exists,  check to make sure its the right type
+	if [ -e "$fileOrFolder" ]; then
+		if [ "$typeMode" == "-f" ]; then
+			[[ "$(stat -c"%F" "$fileOrFolder")" =~ file ]] || assertError -v fileOrFolder "fsTouch trying to make <fileOrFolder> a file but it is already a '$(stat -c"%F" "$fileOrFolder")'"
+			touch "$fileOrFolder" # update the timestamp
+		else
+			[[ "$(stat -c"%F" "$fileOrFolder/")" =~ directory ]] || assertError -v fileOrFolder "fsTouch trying to make <fileOrFolder> a file but it is already a '$(stat -c"%F" "$fileOrFolder")'"
+		fi
+
+	else
+		# at this point, we know the parent exists but fileOrFolder does not so create it
+		[ ! -e "$fileOrFolder" ] && if [ "$typeMode" == "-f" ]; then
+			touch "$fileOrFolder"
+		else
+			mkdir "$fileOrFolder"
+		fi
+	fi
+}
+
 # usage: fsExpandFiles|bgfind [<options>] <fileSpec1> ... <fileSpecN> [<findTestExpression>]
 # usage:    where <options> are [-f] [-F|-D] [-R|+R] [-A <retArrayVar>] [-S <setName>] [-b] [-B <prefix>]
 # usage: awk '...' $(fsExpandFiles -f path/*.ext)
@@ -3078,8 +3189,8 @@ function fsExpandFiles()
 		+R) recursiveOpt=("-maxdepth" "0") ;;
 
 		# how to return the results
-		-A*) bgOptionGetOpt  val: fsef_outputVarName "$@" && shift; outputOpts=(--array --append "$fsef_outputVarName") ;;
-		-S*) bgOptionGetOpt  val: fsef_outputVarName "$@" && shift; outputOpts=(--set "$fsef_outputVarName") ;;
+		-A*|--array) bgOptionGetOpt  val: fsef_outputVarName "$@" && shift; outputOpts=(--array --append "$fsef_outputVarName") ;;
+		-S*|--set)   bgOptionGetOpt  val: fsef_outputVarName "$@" && shift; outputOpts=(--set "$fsef_outputVarName") ;;
 
 		# modify the output
 		-b|--baseNames) fsef_prefixToRemove="*/" ;;

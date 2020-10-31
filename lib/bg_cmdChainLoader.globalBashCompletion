@@ -1,0 +1,30 @@
+# This bash completion script inserts an additional default completion loader function to load the completion spec for cmds on demand
+# If chains itself with the previous default handler so that it gets a chance to recognize and load the completion handler for the cmd
+# and then passes through to the previous default behavior if it does not recognize it.
+
+function _bg_subclassed_completionLoader() {
+	local cmd="$1"
+
+	# test to see if $cmd is listed in a package manifest file of a bg-core style package
+	if [[ "$cmd" =~ [.]ut$ ]] || { [ "$cmd" ] && [ "$(find /var/lib/bg-dev/*/manifest -print -quit 2>/dev/null)" ] && [ "$(awk '$2=="cmd" && $3=="'"$cmd"'" {print $3;exit}' /var/lib/bg-dev/*/manifest)" ]; } ; then
+		# register our generic handler which invokes the command with the -hb syntax to ask it to provide the completion list
+		complete -F _bgbc-complete-viaCmdDelegation "$cmd" && return 124
+		# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
+	fi
+
+	# the cmd is not one of ours so apply the specs that we replaced.
+	complete $_bg_subclassed_completionLoader_prevLoader} $cmd && return 124
+	# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
+}
+
+# in case we get reloaded, this block only runs the when the _bg_subclassed_completionLoader has not yet been installed (typically the first time)
+if [[ ! "$(complete -D -p)" =~ _bg_subclassed_completionLoader  ]]; then
+	# save the previous default loader spec, removing the -D b/c we will apply it to a specific cmd when we have to use it
+	# we also remove the leading 'complete ' so that when we execute it we cant be tricked into running an unknown command
+	_bg_subclassed_completionLoader_prevLoader="$(complete -D -p)"
+	_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader//-D}"
+	_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader#complete }"
+
+	# overwrite the default loader with our function
+	complete -D -F _bg_subclassed_completionLoader
+fi

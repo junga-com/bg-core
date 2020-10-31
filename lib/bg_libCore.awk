@@ -5,7 +5,7 @@
 
 # usage: hardExit(exitCode)
 # wrapper over exit that will skip END sections. The builtin awk exit passes control to each END section before actually exiting.
-# hardExit will exit without the END sections from running 
+# hardExit will exit without the END sections from running
 # if called from an END section, hardExit is the same as exit.
 function hardExit(exitCode) {
 	_hardExit=exitCode
@@ -70,8 +70,8 @@ function queueFilesToScan(fileSpec,where             ,i,pathlist,addCount,insert
 ### Output functions
 
 # usage: printfVars("<varName1>|<opt1> [...<varNameN>|<optN>]"                ,optionsStr)
-# This prints a list of awk global vars. Note that local function variables will not work with this function but do with 
-# printfVars2 
+# This prints a list of awk global vars. Note that local function variables will not work with this function but do with
+# printfVars2
 # Params:
 #    varNameN   : the name of a global awk variable to be displayed
 #    optionsStr : a string of optional args that apply to all. Note that options can be included among the varNames and effect
@@ -111,7 +111,7 @@ function printfVars(varNameListStr            ,optionsStr,level, varNameList, i,
 # usage: printfVars2(level, varName, varValue, optionsStr)
 # This is an alternate form of printfVars that allows descending nested arrays of arrays and printing local variables but only
 # accepts one variable with the name and value passed separately to print instead of a string list.
-# printfVars is implemented with this function. 
+# printfVars is implemented with this function.
 # Params:
 #    level      : the indentation level. level*3 spaces will be printed before each line
 #    varName    : the name to be displayed as the label for the variable being printed
@@ -238,11 +238,11 @@ function split2(str, array, elName, delim) {
 ### Debug functions
 
 function bgtraceIsActive() {
-	if (! ENVIRON["bgTracingOn"]) 
+	if (! ENVIRON["bgTracingOn"])
 		return 0
 	else if (ENVIRON["bgTracingOn"]~"^(file|on):") {
 		_bgtraceFile=ENVIRON["bgTracingOn"]; sub("^(file|on):","",_bgtraceFile);  sub("^win$","",_bgtraceFile)
-		
+
 		_bgtraceFile=((_bgtraceFile)?_bgtraceFile:"/tmp/bgtrace.out")
 	} else
 		_bgtraceFile="/dev/stderr"
@@ -466,7 +466,7 @@ function fsExists(file1,     fileStats1,result) {
 # usage: fsTouch(f)
 # creates a file or folder.
 # Params:
-#    path       : a file or folder. If it ends in '/' its a folder, otherwise a file 
+#    path       : a file or folder. If it ends in '/' its a folder, otherwise a file
 #    parentFlag : if true and path is a folder, the -p option will be used to make the parent folders as needed.
 function fsTouch(path, parentFlag         ,cmd,result) {
 	if (path ~ /\/$/) {

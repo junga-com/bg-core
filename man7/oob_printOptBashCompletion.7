@@ -1,0 +1,115 @@
+.TH oob_printOptBashCompletion 7 "October 2014" "Junga" "bg-core"
+
+.SH NAME
+function oob_printOptBashCompletion() { ...} - is a callback function that you can define in your script
+
+.SH OVERVIEW
+Authors of bash scripts that can provide BC processing by defining a function oob_printBashCompletion() that produces suggestions.
+  1. the script must source bg_core.sh (from the bg-core package)
+  2. function oob_printBashCompletion() that examines the parameters
+     sent to it and return appropriate suggestions.
+  3. call oob_invokeOutOfBandSystem "$@" early in the script
+  4. register _bgbc-complete-viaCmdDelegation as the script's completion
+     function (complete -F _bgbc-complete-viaCmdDelegation <scriptName>)
+
+.SH Using _bgbc-complete-viaCmdDelegation
+Scripts that are packaged in a project maintained by the bg-dev tool will automatically have _bgbc-complete-viaCmdDelegation set
+as their completion function. The bg-core package installs a hook into the default bash completion loader so that it registers
+_bgbc-complete-viaCmdDelegation for any command listed in a manifest file in /var/lib/bg-core/
+
+Alternatively, you can create a bash completion script that just sets _bgbc-complete-viaCmdDelegation as the handler and place it
+in the folder where command bash completion scripts reside on your distribution (/usr/share/bash-completion/completions/ on debian)
+    # cat /usr/share/bash-completion/completions/_myCmd
+    complete -F _bgbc-complete-viaCmdDelegation myCmd
+
+And finally to try it out in any environment just run the complete command from a terminal.
+    complete -F _bgbc-complete-viaCmdDelegation myCmd
+
+The bg-core package needs to be installed in any case for this mechanism to work. You can virtual install bg-core in a terminal
+on a host where bg-core is not actually installed. See man(1) bg-debugCntr
+
+.SH Writing the Script
+Source the bg_core.sh library in your script like...
+     source /usr/lib/bg_dev.sh
+
+Note that this is the only library that should be sourced directly by your script. After bg_core.sh is sourced, use import to use
+other libraries in your script.
+
+Before doing any real work in your script, call the oob_invokeOutOfBandSystem function which was provided by bg_cor.sh like this...
+    oob_invokeOutOfBandSystem "$@"
+
+Typically this should be after any function declarations and global environment variables are set but before options and parameter
+processing.
+
+The oob_invokeOutOfBandSystem function recognizes certain options on the command line and hijacks the script execution. When that happens
+it wont return and the 'real' part of your script will not be executed.
+
+If you stop here, the oob_invokeOutOfBandSystem will try to glean the cmdline syntax from the usage lines in the funcman Library section
+of your script. This is a new experimental feature circa 2020-10.
+
+To have complete control over the BC processing, go on to define a oob_printBashCompletion() function in your script before the
+call to oob_invokeOutOfBandSystem. When oob_invokeOutOfBandSystem detects that its being called to provide BC, if this function is defined
+it will delegate to it.
+
+    function oob_printOptBashCompletion()
+    {
+        # this line sets up the environment in a nice way to process the completion.
+        # After this line, the positional arguments will be in $1..$N and the leading
+        # options that were removed will be in $options[<opt>]=<value>. The "vqo:p"
+        # argument lets bgBCParse know how to separate the leading options. The syntax
+        # is that of getopts where a trailing : behind the letter indicates that it
+        # requires an argument.
+        # Also, a handful of variables are set like posCwords, cwords, etc...
+        # See man(3) bgBCParse
+        bgBCParse "vqo:p" "$@"; set -- "${posWords[@]:1}"
+
+        cmd="$1"
+        case $opt:$cmd:$posCwords in
+            # match for when the user is completing the argument for the -o option.
+            -o*)  echo "<suggestionsForOption_o_arg>  one two three" ;;
+
+            # match the first positional token being completed.
+            :*:1) echo "cmd1 cmd2 cmd3" ;;
+
+            # when the first token is 'cmd1' match the positions that follow it
+            :cmd1:2) echo "dog cat fish" ;;
+            :cmd1:3) echo "utah california new%20york" ;;
+
+            # here is a little more complicated one with another layer of sub commands
+            :cmd2:2)  echo "subCmdA subCmdB" ;;
+            :cmd2:*)
+                subCmd="$2"
+                case $subCmd:$((posCwords-2)) in
+                    subCmdA:1) [[ "$cur" =~ ^- ]] && echo "--compare --dry-run"  ;;
+                    subCmdB:*)  echo "\$(doFilesAndDirs)";;
+                esac
+                ;;
+        esac
+        exit
+    }
+
+See man(3) bgBCParse
+
+.SH Debugging Completion Routines
+The first thing to keep in mind is that you can always see what exactly your completion routine is outputting by invoking it on the
+command line. You prepend 3 arguments to the beginning of the command line that you are testing. 1) the name of your command, 2)
+the oob option token -hbOOBCompGen and 3) the number of the token in the command line that you are completing. Note that the finished
+command line will have the name of your function twice because its the zero'th token on the command line as well as the command being
+invoked.
+
+    For Example:
+    <prompt>$ bg-dev -hbOOBCompGen 3 bg-dev funcman test
+    $(doFilesAndDirs)
+    <prompt>$
+
+For more full featured debugging, enable tracing in your terminal with the followng command
+    $ bg-debugCntr trace on:
+
+and then in another terminal run this command to observe the information.
+    tail -f /tmp/bgtrace.out
+
+see man(1) bg-debugCntr for more information about what you can do with tracing like sending the trace information to your IDE/editor
+
+You can add bgtrace* statements to your completion algorithm to get specific information. You can also get more information about
+the post processing of the suggestions and directives you return by turning on verbose bash completion tracing.
+    bg-debugCntr trace bashCompOpts:verbose

@@ -8,11 +8,16 @@ Learn more in the package's man(7) bg-corePkg.
 ## Key features include...
 
  * import: system for importing (aka sourcing) bash libraries.
+   See man(3) import  (you need to specify the section like man -s3 import)
  * options processing: easy, idiomatic options processing syntax that supports short and long options both with and without arguments and short option concatenation.
  * in-place cmdline argument completion: your script provides the completion data to bash so that the syntax is maintained in one place
+   See man(3) _bgbc-complete-viaCmdDelegation, man(3) oob_printBashCompletion, and man(3) oob_invokeOutOfBandSystem
+ * simple text template expansion against the linux environment variabels
  * full featured bash debugger (the debugger UI's are in the bg-dev package)
  * easy to use error handling patterns with some exception throw / catch semantics and stack traces for script exits
+   See man(3) assertError
  * tracing: system for putting trace statements in scripts that can be turned on/off and redirected to various destinations
+   See man(1) bg-debugCntr
  * progress feedback: scripts can 'broadcast' their progress and the environment that the script runs and user preferences can determine if and how the progress is displayed
  * bash idioms: various idiomatic functions are provided to make passing parameters to functions and working with bash variables easier
  * cuiWin : when running on a desktop host, a script can open additional terminal windows to provide UI
@@ -44,5 +49,3 @@ The coreOnDemand/ subfolder contains libraries that are not imported initially w
 ### lib/
 
 The lib/ subfolder contains libraries that are available for a script to use if they import them.
-
- 

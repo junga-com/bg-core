@@ -31,6 +31,7 @@
 # This should merge into Method 2. Method one is characterized by the spec being defined by the script author and the values of
 # the spec are the variable names that will receive the cmdline data
 
+# OBSOLETE? see method 2 functions in this file like bgBCParse
 # usage: bgOptionsParse <cmdlineSpecVar> "$@"
 # Method 1
 # This parses the command line in "$@" according the to spec passed in via <cmdlineSpec>
@@ -151,7 +152,7 @@ function parseSyntaxSpecString()
 }
 
 
-# usage: bcFromSyntaxString <cmdlineSyntaxString> <cword> <word1> .. <wordN>
+# usage: bcFromSyntaxString <cmdlineSyntaxString> <cword> <cmdName_word0> <word1> .. <wordN>
 # Method 2
 # This performs bash command line completion on the words passed in according to the syntax described in
 # <cmdlineSyntaxString>
@@ -162,6 +163,7 @@ function parseSyntaxSpecString()
 # Options:
 #    -r|--removePosCount <removePosCount> : when the syntax in <cmdlineSyntaxString> is for a sub command, it applies to only a
 #            subset of the commandline passed in. This can used ignore this many of the input words to sync up with the syntax.
+#            This assumes that the command name is the zero'th word so it leaves it and removes <removePosCount> words after it.
 function completeFromSyntaxString() { bcFromSyntaxString "$@"; }
 function bcFromSyntaxString()
 {
@@ -172,7 +174,7 @@ function bcFromSyntaxString()
 	done
 	local cmdlineSyntaxString="$1"; shift
 	local cword="$(($1-removePosCount))"; shift
-	local words=("${@:0:1}" "${@:$removePosCount+2}")
+	local words=("${@:0:1}" "${@:$removePosCount+1}")  # using the ${0:..} syntax cause the zero'th entry to be included. "$@" does not
 
 	local -A syntaxSpec=()
 	parseSyntaxSpecString syntaxSpec "$cmdlineSyntaxString"
@@ -240,13 +242,16 @@ function bgetopt()
 #    <optSpecs>  : a string that contains the accepted options like "ab:c" (see man getopt). If its value is "<glean>" then the
 #         source script will be scanned to glean the option syntax spec from the standard while/case loop that follows the
 #         invokeOutOfBandSystem call.
-#    <cword> : the token position in teh cmdline that the user is currently completing.
+#    Note: the remainder of the parameters follow the syntax of the arguments passed to the command by _bgbc-complete-viaCmdDelegation
+#    <cword> : the token position in the cmdline that the user is currently completing.
+#    <cmdName> : ($0) the name of the command whose commandline is being completed
+#    <pN>  : ($N) parameters on the command line being completed
 #
 # Return Scope Vars:
 # The invokeOutOfBandSystem function declares these variables which this function fills in so when this function is called from
 # the oob_printBashCompletion() callback, it does not have to declare these variables and can use them after calling this funciton.
 #    $cur : $cur is the current word being completed. It contains only the text behind the cursor which is the text that is
-#         subject to change. Its coresponding word in words[] will contain the whole word that is on the command line
+#         subject to change. Its coresponding word in words[$cword] will contain the whole word that is on the command line
 #    $opt : indicates if an option or its required argument is being completed. If its empty, a positional param is being
 #         completed. It will contain one of these values.
 #         ""         : if $opt is the empty string, the user is completing a positional argument (not an optional argument)
@@ -284,7 +289,7 @@ function bgBCParse()
 		while IFS="," read -r name value; do
 			syntaxSpec[$name]="$value"
 			if [[ "$name" =~ ^-- ]] && [[ "$value" =~ ^\< ]]; then
-				syntaxSpec[options]+=" $name= "
+				syntaxSpec[options]+=" $name=%3A "
 			elif [[ "$name" =~ ^-[^-]$ ]] && [[ "$value" =~ ^\< ]]; then
 				syntaxSpec[options]+=" $name%3A "
 			else
@@ -390,7 +395,7 @@ function bgBCParse()
 # usage: parseForBashCompletion [-o"hs:a:"] wordsVarName cwordVarName curVarName prevVarName optWordsVarName posWordsVarName  "$@"
 # usage: (cont)                 <cword> [<word1> .. <wordN>]
 # This function supports previous versions with a --compatN option.
-# this is typicalally used at the top of a script's printBashCompletion function to get the
+# this is typically used at the top of a script's printBashCompletion function to get the
 # information from the current command line that makes it easy to provide bash completion suggestions.
 # --compatN changes the contract with the caller slightly.
 #     1) there is the extra posCwords return variable

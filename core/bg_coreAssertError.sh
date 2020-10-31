@@ -86,8 +86,8 @@ function assertValidFilename()
 	fi
 }
 
-# usage: assertPathExists pathToTest "error description to display if it fails"
-# assert that pathToTest exists as any file system entity
+# usage: assertPathExists <pathToTest> "error description to display if it fails"
+# assert that <pathToTest> exists as any file system entity
 function assertPathExists()
 {
 	if [ ! -e "$1" ]; then
@@ -99,8 +99,8 @@ function assertPathExists()
 	fi
 }
 
-# usage: assertPathNotExists pathToTest "error description to display if it fails"
-# assert that pathToTest does not exist as any file system entity
+# usage: assertPathNotExists <pathToTest> "error description to display if it fails"
+# assert that <pathToTest> does not exist as any file system entity
 function assertPathNotExists()
 {
 	if [ -e "$1" ]; then
@@ -113,8 +113,8 @@ function assertPathNotExists()
 }
 
 
-# usage: assertFileExists fileToTest "error description to display if it fails"
-# assert that fileToTest exists and is a regular file
+# usage: assertFileExists <fileToTest> "error description to display if it fails"
+# assert that <fileToTest> exists and is a regular file
 function assertFileExists()
 {
 	if [[ ! "$1" =~ ^((/dev/fd/[0-9]*)|(-))$ ]] && [ ! -f "$1" ]; then
@@ -126,8 +126,8 @@ function assertFileExists()
 	fi
 }
 
-# usage: assertFileNotExists fileToTest "error description to display if it fails"
-# assert that fileToTest is not a reqular file. It passes if it exists as a different
+# usage: assertFileNotExists <fileToTest> "error description to display if it fails"
+# assert that <fileToTest> is not a reqular file. It passes if it exists as a different
 # file system object
 # NOTE: many times assertPathNotExists is what you really want instead of this
 function assertFileNotExists()

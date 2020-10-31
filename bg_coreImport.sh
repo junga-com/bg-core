@@ -69,7 +69,7 @@ fi
 #               source file has changed. For efficiency and minimalism, we do not create the temp file
 #               that records when the reload is relative to by default. A long lived script application
 #               can call this with the --init option at its start. If --init is not called, then the
-#               first time reloadAll is called will reload reguardless of whether the sources changed
+#               first time reloadAll is called will reload regardless of whether the sources changed
 #               but then subsequent reloadAll calls will only reload changed librares
 #   list        print a list of imported Libraries
 function importCntr()
@@ -221,6 +221,8 @@ function import()
 		else
 			# put the real source statement in L2 so that the return code from the library is set for the overall import line
 			# this allows 'import <library> ;$L1;$L2 || ...'
+			# CRITICALTODO: function pass() { return $?; } works as L2 to pass the error code through. I cant take time to test it right now.
+			#               this change would make the L2 optional so that import <name> ;$L1  would still work, but just not record time trace info
 			L1=""
 			L2="source $foundScriptPath"
 		fi

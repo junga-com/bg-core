@@ -1,0 +1,5 @@
+# the bootstrap library is the only one that needs to actually be installed on the host. If we have changed it or it does not exist,
+# copy it
+if  ! diff -q bg_core.sh /usr/lib/bg_core.sh &>/dev/null; then
+	sudo -p "to update bg_core.sh boot strap lib [sudo] " cp bg_core.sh /usr/lib/bg_core.sh
+fi

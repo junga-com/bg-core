@@ -161,14 +161,16 @@ function varUnMarshalToGlobal()
 #   arrayCopy  -- does a similar thing for returning arrays
 function returnValue()
 {
-	local _rv_inType="string" _rv_outType="stdout"
+	local _rv_inType="string" _rv_outType="stdout" quietFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		-q)       quietFlag="-q" ;;
 		--array)  _rv_inType="array"  ;;
 		--string) _rv_inType="string" ;;
 		--strset) _rv_inType="strset" ;;
 		*) break ;;
 	esac; shift; done
 	[ "$2" ] && _rv_outType="var"
+	[ "$quietFlag" ] && [ "$_rv_outType" == "stdout" ] && return 0
 
 	case $_rv_inType:$_rv_outType in
 		array:var)     arrayCopy "$1" "$2" ;;
@@ -297,10 +299,10 @@ function varSetRef()
 			done
 			;;
 
-		# TODO: I think we can get rid of eval here but not sure.
-		# SECURITY: get rid of eval in these two lines.
-		--array:)    eval $sr_varRef'=("$@")' ;;
-		--array:-a)  eval $sr_varRef'+=("$@")' ;;
+		# these use the -n syntax now because they used to use eval. If we need to be compaitble with older bashes, this will have
+		# to change
+		--array:)    local -n _sr_varRef="$sr_varRef"; _sr_varRef=("$@") ;;
+		--array:-a)  local -n _sr_varRef="$sr_varRef"; _sr_varRef+=("$@") ;;
 
 		--string:)   printf -v "$sr_varRef" "%s" "$*" ;;
 		--string:-a) printf -v "$sr_varRef" "%s%s" "${!sr_varRef}" "$*" ;;
@@ -352,7 +354,76 @@ function varGet()
 	returnValue "${!sr_varRef}" $1
 }
 
-# usage: setAdd <setVarName> <key>
+
+# usage: arraySet <varName> <index> <value>
+# sets the array element like <varName>[<index>]=<value>
+function arraySet()
+{
+	local aa_varRef="$1[$2]"; shift 2
+	printf -v "$aa_varRef" "%s" "$*"
+}
+
+# usage: arrayGet <varName> <index> [<retVar>]
+# returns the array element like ${<varName>[<index>]}
+function arrayGet()
+{
+	local aa_varRef="$1[$2]"; shift 2
+	returnValue "${!aa_varRef}" $1
+}
+
+# usage: arrayPush <varName> <value...>
+# grows the array by 1 setting the new element's value
+function arrayPush()
+{
+	local aa_varRef="$1"; shift
+	varSetRef -a --array "$aa_varRef" "$*"
+}
+
+# usage: arrayPop <varName> <retVar>
+# remove the last element and return its value
+function arrayPop()
+{
+	local -n aa_varRef="$1"; shift
+	local aa_value="${aa_varRef[@]: -1}"
+	aa_varRef=("${aa_varRef[@]: 0 : ${#aa_varRef[@]}-1}")
+	returnValue "$aa_value" $1
+}
+
+# usage: arrayShift <varName> <value...>
+# grows the array by inserting <value> at the start
+function arrayShift()
+{
+	local -n aa_varRef="$1"; shift
+	aa_varRef=("$@" "${aa_varRef[@]}")
+}
+
+# usage: arrayUnshift <varName> <retVar>
+# remove the first element and return its value
+function arrayUnshift()
+{
+	local -n aa_varRef="$1"; shift
+	local aa_value="${aa_varRef[@]:0:1}"
+	aa_varRef=("${aa_varRef[@]:1}")
+	returnValue "$aa_value" $1
+}
+
+# usage: arrayClear <varName>
+function arrayClear()
+{
+	local -n aa_varRef="$1"; shift
+	aa_varRef=();
+}
+
+# usage: arraySize <varName> [<retVar>]
+# returns the number of elements
+function arraySize()
+{
+	local -n aa_varRef="$1"; shift
+	returnValue "${#aa_varRef[@]}" $1
+}
+
+
+# usage: setAdd <setVarName> <key> [...<keyN>]
 # uses the keys of an associateive array as a Set data structure
 # Example:
 #    local -A mySet
@@ -364,10 +435,13 @@ function varGet()
 function varSetAdd() { setAdd "$@"; }
 function setAdd()
 {
-	local sr_varRef="$1"
-	local sr_key="${2:-emtptKey}"
+	local sr_varRef="$1"; shift
 	[ ! "$sr_varRef" ] &&  return 1
-	printf -v "$sr_varRef[$sr_key]" "%s" "1"
+
+	while [ $# -gt 0 ]; do
+		printf -v "$sr_varRef["${1:-emtptKey}"]" "%s" "1"
+		shift
+	done
 }
 
 # usage: setHas <setVarName> <key>
@@ -420,10 +494,22 @@ function setDelete()
 function varSetClear() { setClear "$@"; }
 function setClear()
 {
-	local sr_varRef="$1"
-	[ ! "$sr_varRef" ] &&  return 1
-	local -n sr_var="$sr_varRef"
-	sr_var=();
+	arrayClear "$@"
+}
+
+# usage: setClear <setVarName>
+# uses the keys of an associateive array as a Set data structure
+# Example:
+#    local -A mySet
+#    setAdd mySet dog
+#    setHas mySet dog && echo "this should print"
+#    setHas mySet car && echo "this should not print"
+#    setDelete mySet dog
+#    setHas mySet dog && echo "now this wont print either b/c dog gone"
+function varSetSize() { setSize "$@"; }
+function setSize()
+{
+	arraySize "$@"
 }
 
 
@@ -431,13 +517,24 @@ function setClear()
 # usage: mapSet <mapVarName> <key> <value...>
 function varMapSet() { mapSet "$@"; }
 function mapSet() {
+	local separatorChar appendFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-a|--append)  appendFlag="-a" ;;
+		-d*) bgOptionGetOpt val: separatorChar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local sr_varRef="$1"; shift
 	local sr_key="${1:-emtptKey}"; shift
 	[ ! "$sr_varRef" ] &&  return 1
-	printf -v "$sr_varRef[$sr_key]" "%s" "$*"
+	local sr_mapDeref="$sr_varRef[$sr_key]"
+	if [ "$appendFlag" ]; then
+		printf -v "$sr_mapDeref" "%s%s%s" "${!sr_mapDeref}" "${!sr_mapDeref:+$separatorChar}" "$*"
+	else
+		printf -v "$sr_mapDeref" "%s" "$*"
+	fi
 }
 
-# usage: mapGet <mapVarName> <key> [<returnVar>]
+# usage: mapGet <mapVarName> <key> [<retVar>]
 function varMapGet() { mapGet "$@"; }
 function mapGet() {
 	local sr_varRef="$1"
@@ -459,10 +556,13 @@ function mapDelete() {
 function varMapClear() { mapClear "$@"; }
 function mapClear()
 {
-	local sr_varRef="$1"
-	[ ! "$sr_varRef" ] &&  return 1
-	local -n sr_var="$sr_varRef"
-	sr_var=();
+	arrayClear "$@"
+}
+
+function varMapSize() { mapSize "$@"; }
+function mapSize()
+{
+	arraySize "$@"
 }
 
 

@@ -48,7 +48,6 @@ set +e
 # will be sourced and that any sourced system library will run under the correct production mode evironment variable.
 
 
-
 # provide a stand-alone implementation of assert so that the bootstrap code can have nice error handling
 function earlyAssert()
 {
@@ -75,8 +74,8 @@ function earlyTrace()
 }
 
 # usage: setSecureEnv <varNameN> <value>
-# this script will set a number of readonly variables that the rest of the script that called it can rely on. Its ok if they are
-# already set to the right value but it they are already set to a different value, we error out
+# this will create a readonly variable set to <value>. Its ok if the variable is readonly and already set to the right value or is
+# not yet readonly but if it is already set readonly to a different value, we error out
 function setSecureEnv()
 {
 	local varName="$1"

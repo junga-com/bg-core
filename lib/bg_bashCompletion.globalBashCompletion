@@ -1,3 +1,4 @@
+#!/usr/bin/bash
 # this files contains completion functions that implement a style of completion that delegates to the cmd
 
 declare -gA _bgbcData
@@ -5,29 +6,47 @@ declare -gA _bgbcData
 
 # MAN(3.bashFunction) _bgbc-complete-viaCmdDelegation
 # usage: complete -F _bgbc-complete-viaCmdDelegation <cmdName>
-# This is the main entry point for commands to use this bash completion mechanism
-# The bash completion script installed for a command can be a simple stub that calls
-# this function. This function invokes the command with the hidden -hb and -hbo command
-# line switches to delegate the responsibility of producing the completion suggestions
-# to the command itself.
+# This is a bash completion handler for commands that process their own completion by being invoked with
+# special out of band command line options. When the command is invoked with the first argument set to
+# -hbOOBCompGen it is expected to analyze the rest of the command line and return suggestions on stdout.
+#      <cmd> -hbOOBCompGen <cword> <cmd> <arg1> ... <argN>
+# The <cmd> responds by writing to stdout a list of suggests separated by whitespace. The list can also
+# include directives of the form '$(<directive> [<args...>])'. For example '$(doFilesAndDirs)'
+#
+# Commands written in this way make it easier to maintain the completion function because completion and
+# command code are together. There is potential that the same parameter processing code can do both
+# completion suggestions and also provide the variables that the command acts on when it is ran in the
+# normal way.
+#
+# This is an "out of band" mechanism because it is a function that is in the domain of computers and software
+# as opposed to the business domain of what ever the command is meant to do (which may coincidentally be in
+# the computer/software domain but does not need to be.). Put another way, every command should provide
+# completion suggestions regardless of what the command does. Its a function of being a command, not a function
+# of what the command does.
+#
 # Cmd Invocation:
-#   This function will call the script (<cmd>) in one of two ways depending on whether the user is editing an
-#   option or positional param.
-#     positional param:  <script> -hb <cword> <COMP_LINE>
-#     optional argument: <script> -hbo <option> <cur> <cword> <COMP_LINE>
-#           <option> is the single letter w/o the - (like 'v' for -v) or the complete <cur> tooken
-#                    for long form options
-#   bg-core style bash script commands typically call invokeOutOfBandSystem "$@" which handles these two
-#   cases and calls oob_printBashCompletion() or oob_printOptBashCompletion() which is where the script
-#   author actually puts the completion routines.
+#   This bc handler function will call the <cmd> that its registered to perform complation on like this.
+#      <cmd> -hbOOBCompGen <cword>  <cmd> <arg1> ... <argN>
+#      '-------------------------'  '---------------------'
+#                                   < this is the cmline  >
+#   The command should be written to respond to the -hbOOBCompGen option by analyzing the cmdline passed in
+#   at the <cword> token position. The <cword> that this command will not be messed up by COMP_WORDBREAKS
+#   but instead will follow exactly how bash breaks up tokens when invoking a command.
+#
+#   bg-core style bash script commands typically call invokeOutOfBandSystem "$@" which handles -hbOOBCompGen
+#   and exits so that the script body after that call will not be ran. If the script defines the
+#   oob_printBashCompletion() function, the author can manually analyze and produce suggestions. Then trend is
+#   for script to not do that but to instead document the usage syntax and let invokeOutOfBandSystem perform
+#   the completion base on that.
 #
 # Cmd Output:
-#    The script (or any cmd) should respond to being invoked with one of the syntax described above by
+#    The <cmd> should respond to being invoked with the --hbOOBCompGen syntax described above by
 #    writing a series of tokens to its standard out. The prevailing IFS (typically space, tab, newline)
 #    will be used to delimit the tokens except for directives of the form \$(<directive> p1 p2 .. )
 #    which can contain spaces and tabs between the (). All tokens are either suggestions or $(<directives>)
 #    or comments that are surrounded by <> like <myComment>
-#  Suggestions:
+#
+# Suggestions:
 #    any words that would be valid for the current position being editted should be written to stdout.
 #    The <cmd> does not need to eliminate ones that do not match what the user has typed so far. The list will
 #    be filtered by what the user has typed so far automatically. Whitespace needs to be escaped with
@@ -53,19 +72,36 @@ declare -gA _bgbcData
 #                   but rather a comment the same as if $(comment <token>) had been used. See comment directive.
 # .SH $(cur <partCur>) Directive:
 #    Normally suggestions are the full words of the position being completed. This directive specifies that
-#    the sggestions should be taken as a partial token relative to the start of the token already completed.
-#    This works regerdless of whether a character in COMP_WORDBREAKS separates the parts.
-#    For example <name>:<value>
-#       At first the user selects from a list of names but after a name is selected and the : is added,
-#       the user seess a list of <value> (without <name>: prefix).
-#    if [[ ! "$cur" =~ : ]]; then echo "name1: name2:"; else echo "\$(cur ${cur%:*}) val1 val2 val3"
+#    the suggestions should be taken as a partial token relative to some last part of the token.
+#         echo "\$(cur:${cur#'myCompletedPrefix'})"
+#
+#    Note that some BC routines rely on : being in COMP_WORDBREAKS to complete the parts before and after the
+#    : separately. This functions bypasses all of that so that words are only broken on IFS the same as bash
+#    uses to create the actual cmd argument in th invocation. COMP_WORDBREAKS seems like a hopelessly broken
+#    mechanism. The cur directive tells the BC processor exactly what the remaining suffix being completed is
+#    without the BC processor needing to know what COMP_WORDBREAKS to use to figure it out on its own.
+#
+#    For example, to complete a term like <name>:<value>
+#       if [[ ! "$cur" =~ : ]]; then
+#          echo "name1: name2: somthingElse \$(nextBreakChar :)"
+#       else
+#          echo "\$(cur ${cur#*:}) val1 val2 val3"
+#       fi
+#       At first the user selects from a list of <names>. If a suggestion without a trailing : is choosen, (like
+#       'somthingElse' in this example) the token will be completed and the cursor will more to the next token
+#       position. If, on the other hand, a suggestion that ends in a : is choosen the cursor will stay on this token
+#       to complete it further.  After a current token contains a :, the user sees a list of <value> (without <name>:
+#       prefix) to choose from to complete the token.
+#
 # .SH $(prefix:<word>) and $(suffix:<word>) Directives:
 #    any suggestions that come after this will have <word> prepended or appended up until another directive
 #    changes the prefix/suffix.
+#
 # .SH $(_filedir [-d]) Directive:
 #    complete on path names relative to the user's PWD.
 #    $(doFilesAndDirs) : synonym for $(_filedir)
 #    $(doDirs)         : synonym for $(_filedir -d)
+#
 # .SH $(replace <token>) Directive:
 #    causes the current word being editted to be replaced by <token>
 #    Note that what Bash considers the current word can be a little strange and I have found no way to
@@ -76,39 +112,82 @@ declare -gA _bgbcData
 #    on Ubuntu, that includes ':' and '='. So even though in "<cmd> name:value p2" "name:value" will be
 #    passed to <cmd> as one argument, readline/bash completion will treat name : and value as separate
 #    tomkens and depending on where the cursor is on that token, either "name" or "value" will be replaced.
+#
 # .SH $(usingListmode <separatorChar>) Directive:
 #    complete a token where the user can enter multiple choices separated by the <separatorChar>.
 #    For example echo "$(usingListmode ,) one two three four", will prompt the user for one of those
 #    4 suggestions and then gives the user a choice to enter a , to continue or a space to end the list. Then
 #    the remaining 3 suggestions , etc...
+#
 # .SH $(nextBreakChar <char>) Directive:
-#    This makes it so that any suggestion that does not end in a space/%20, will give the user a choice
-#    adding <char> or a space. Any suggestion that is specified with <char> at the end will not complete
-#    the postion but continue calling completion on the end of that word when it is selected.
+#    This makes it so that any suggestion that end in <char> will not complete the current token when selected
+#    by the user. Instead the cursor will stay at the position at the end of the token and further parts of the
+#    token will be expected. The user can enter a space to manually move to the next token.
+#    This is often used in conjunction with the '$(cur:)' directive. See that section for an example.
+#
 # .SH $(nospace) Directive:
-#    dont add any automatic terminating spaces to suggestions. This does not changes suggestions that
-#    explicitly incude a terminating %20(terminate) or %3A(dont terminate).
+#    dont atomatically move to the next token when a user chooses a suggestion. Normally you want this on
+#    and use other mechanisms to determine when the token is compete.
+#
+#    If a suggestion explicitly ends in %20 (which is the escape sequence for a space) then the cursor will move
+#    to the next token position regardless of the state of this dirrective. Likewise, if the suggestion ends in
+#    %3A (the escape sequence for :), then the cursor will stay on the current token.
+#
+#    See the "\$(nextBreakChar)" and "\$(cur:)" directives which is the prefered way of doing multipart tokens.
+#
 # .SH $(nosort) Directive:
 #    Display the suggestions to the user in the order shown instead of sorting them.
 #    bash prior to 4.4, not support this but on those systems, this will cause AA to be prepended to
 #    comment tokens so that they are more likely to appear before real suggestions.
+#
 # .SH $(comment <token>) Directive:
 #    Display <token> amoung the suggestions but in a way that it can not be choosen and the user can
 #    tell that it is not a suggestion but rather information about the completion being preformed.
 #    Typically this is used to indicate the cmd syntax by including the name of the parameter being
 #    completed.
-#    Note that <token> can be specified with this directive or by using <> to wrap the <token> instead
-#    of $(). For example <filename> or <FirstName>
+#    Note that wrapping a token in '<>' is a shortcut notation to this directive.
+#    For example <filename> is the same as "\$(comment filename)"
+#
 # .SH $(compgen <opts> ..) Directive:
 #    invoke comgen routines and use the results as suggestions.
+#
 # .SH $(compopt <opts>) Directive:
-#    invoke any comopt to affect the current completion. These changes are not permanent and only effect
+#    invoke any compopt to affect the current completion. These changes are not permanent and only effect
 #    the current completion run.
+#
 # .SH $(<bashFunction>) Directives:
 #    if <bashFunction> is a sourced function, it is invoked, adding the results as suggestions.
 #    See bash_completion project for many useful functions that are available in many distros.
 #    Note that we do not support passing parameters on purpose to limit the ability of cmds to abuse
 #    this interface to modify the user's environment.
+#
+#
+# .SH oob_printBashCompletion:
+#    Authors of scripts that source /usr/lib/bg_core.sh can provide BC processing by defining a function oob_printBashCompletion()
+#    and calling invokeOutOfBandSystem "$@" early in the script.
+#    Note that the trend (circa 2020-10) is to not write manual algorithms as much but instead to rely on automatic parsing of usage
+#    syntax strings but it will always be possile to process the BC manually
+#    Example:
+#       function oob_printOptBashCompletion()
+#       {
+#           bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+#           cmd="$1"
+#           case $cmd:$posCwords in
+#               *:1) echo "cmd1 cmd2 cmd3" ;;
+#
+#               cmd1:2) echo "subCmdA subCmdB" ;;
+#
+#               cmd2:2)  echo "update test listTemplates" ;;
+#               cmd2:*)
+#                   case $2:$((posCwords-2)) in
+#                       subCmdA:1) [[ "$cur" =~ ^- ]] && echo "--compare --dry-run"  ;;
+#                       subCmdB)  echo "\$(doFilesAndDirs)";;
+#                   esac
+#                   ;;
+#           esac
+#           exit
+#       }
+#
 # See Also:
 #    invokeOutOfBandSystem
 #    bgOptionsEndLoop
@@ -137,7 +216,7 @@ function __bgbc-complete-viaCmdDelegation()
 
 	# we make our own token array and position vars by parsing COMP_LINE and COMP_POINT directly
 	# because both bash (COMP_WORDS,CWORD) and bash_completion project (words,cword) have mistakes in
- 	# how they diviate from the bash grammer parsing. (words,cword) fixes the COMP_WORDBREAKS issue
+ 	# how they deviate from the bash grammar parsing. (words,cword) fixes the COMP_WORDBREAKS issue
 	# but not quoting when a quote begins after a COMP_WORDBREAKS char.
 	local cmd="" cmdTokens=() cmdTokensWOEsc=() cmdPos=0 cmdPrev="" cmdCur="" curBehindCusor curWhole curWRTBash curFixedBase cmdWordBreakCorrection=""
 	__bgbc_parseCOMPLINE
@@ -148,8 +227,8 @@ function __bgbc-complete-viaCmdDelegation()
 	# replace the new cur.  All the routines written for the bash_completion project should work.
 	local cur="$cmdCur"
 
-	# replace COMP_WORDS and COMP_CWORD with our version in case we call some function that relies on them
-	# they will handle quoting correctly
+	# replace COMP_WORDS and COMP_CWORD with our version in case we call some function that relies on them,
+	# they will get values that are correctly quoted
 	COMP_WORDS=("${cmdTokens[@]}")
 	CWORD="$cmdPos"
 
@@ -238,11 +317,11 @@ function __bgbc-complete-viaCmdDelegation()
 			# Anything that is not a suggestion is wrapped in $(<directive>) so that they can not collide
 			# with suggestions.
 			'$('*')')
-				[[ "$token" =~ ^[[:space:]]*\$\(([^:\ \)]*)[:[:space:]]*([^\)]*)\)[[:space:]]*$ ]]
-				local directiveSpec="${BASH_REMATCH[1]}:${BASH_REMATCH[2]}"
+				[[ "$token" =~ ^[[:space:]]*\$\(([^:\ \)]*)(:|[[:space:]]+)?([^\)]*)\)[[:space:]]*$ ]]
+				local directiveSpec="${BASH_REMATCH[1]}:${BASH_REMATCH[3]}"
 				local directive="${BASH_REMATCH[1]}"
-				local directiveArgs="${BASH_REMATCH[2]}"
-				set -- "${BASH_REMATCH[2]}"
+				local directiveArgs="${BASH_REMATCH[3]}"
+				set -- $directiveArgs
 				#local rematch=("${BASH_REMATCH[@]}"); bgtraceVars token rematch
 				local count="${#COMPREPLY[@]}"
 				case $directive in
@@ -258,7 +337,7 @@ function __bgbc-complete-viaCmdDelegation()
 					# $cur word will be replaced. If <partBeingCompleted> is empty, the suggestion will
 					# be appended to $cur
 					cur)
-						directiveSpec="$directiveArgs"
+						#(2020-10 removed this dont understand why it was ever here) directiveSpec="$directiveArgs"
 						__bgbc_trace -v "applying $directiveSpec directive"
 						__bgbc_setLogicalCur "$directiveArgs"
 						;;
@@ -927,8 +1006,8 @@ function _bgbc-complete-traceCompletion()
 }
 
 # usage: complete -F _bgbc-complete-traceCompletionWithTOKEN bcTest
-# This is a helper utility to see the behaior of Bash in terms of what it considers the current token
-# being editted during BC.
+# This is a helper utility to see the behavior of Bash in terms of what it considers the current token
+# being edited during BC.
 # it is the same as _bgbc-complete-traceCompletion but it also sets the COMPREPLY with exactly one entry "${bgTraceBCToken:-TOKEN}"
 # Set bgTraceBCToken if you want to test something other than 'TOKEN'
 # Setting COMPREPLY to a single entry will cause bash to unconditionally replace the current section

@@ -140,10 +140,11 @@ function fsMakeTemp()
 			local fileNameValue="${!fileNameVar}"
 		fi
 
+		local prevKeepFlag
 		local trapHandler="$(bgtrap -g -n "$fileNameValue"  EXIT 2>/dev/null)"
-		[[ "$trapHandler" =~ bgmktemp.*-k  ]] && keepFlag="1"
+		[[ "$trapHandler" =~ bgmktemp.*-k  ]] && prevKeepFlag="1"
 
-		if [ ! "$keepFlag" ]; then
+		if [ ! "$prevKeepFlag" ]; then
 			# remove the trap
 			bgtrap -r -n "$fileNameValue"  EXIT || assertError -c -v fileNameVar -v fileNameValue -V "$(trap -p EXIT)" "the trap previously set to remove the temp filecould not be removed."
 
@@ -154,7 +155,7 @@ function fsMakeTemp()
 			# TODO: decide if its safe to add an * to the end of this rm -rf or what we would have to do to safely rm
 			#       other temp files created by adding extensions to the base name. Some bg-lib code already does that
 			#       but maybe they should be refactored to create a temp directory to put multiple files
-			rm -rf "$fileNameValue"
+			[ ! "$keepFlag" ] && rm -rf "$fileNameValue"
 
 			if [ ! "$assertError_EndingScript" ] && [ "$mode" == "releaseInternal" ] && [ ! "$willNotReleaseFlag" ] && { [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; }; then
 				(assertError -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script.")

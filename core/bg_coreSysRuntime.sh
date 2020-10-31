@@ -175,7 +175,7 @@ function bgGetDataFolder()
 
 	# search in bgDataPath to honor virtually installed packages
 	local dataFolder="$(findInPaths  ".$pName" -r "data" "$bgDataPath" -r "" "/usr/share/$pName")"
-	[ "$dataFolder" ] && dataFolder="$(dirname "$dataFolder")"
+	dataFolder="${dataFolder%/*}"
 
 	# if no existing folder was found, set it to the system path even if it does not yet exist.
 	dataFolder="${dataFolder:-/usr/share/$pName}"
@@ -187,6 +187,7 @@ function bgGetDataFolder()
 		echo "$dataFolder"
 	fi
 }
+
 
 # scripts that are a part of a package typically set the projectName var at the top.
 # set the default dataFolder to the top level project the running script belongs to
