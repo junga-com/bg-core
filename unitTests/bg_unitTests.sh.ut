@@ -32,9 +32,6 @@ function exitWithNonZero()
 
 
 
-ut_emptySections=(
-	[1]="$(cmdline )"
-)
 function ut_emptySections()
 {
 	# expect just the empty section headers
@@ -43,9 +40,6 @@ function ut_emptySections()
 	ut test
 }
 
-ut_noSections=(
-	[1]="$(cmdline )"
-)
 function ut_noSections()
 {
 	# expect test output with no section headers
@@ -55,9 +49,6 @@ function ut_noSections()
 	exitWithNonZero 45
 }
 
-ut_outputNormalTypes=(
-	[1]="$(cmdline )"
-)
 function ut_outputNormalTypes()
 {
 	# expect stdout and stderr to display uniquely in setup and test sections. non-zero exits display in test section
@@ -72,9 +63,6 @@ function ut_outputNormalTypes()
 	echo one more thing...
 }
 
-ut_setupError1=(
-	[1]="$(cmdline )"
-)
 function ut_setupError1()
 {
 	# expect testcase to stop and fail when stderror output is seen in setup
@@ -89,9 +77,6 @@ function ut_setupError1()
 	echo somethingElse somethingElse...
 }
 
-ut_setupError2=(
-	[1]="$(cmdline )"
-)
 function ut_setupError2()
 {
 	# expect testcase to stop and fail when a command in setup section returns non-zero
@@ -106,9 +91,6 @@ function ut_setupError2()
 	echo somethingElse somethingElse...
 }
 
-ut_setupError3=(
-	[1]="$(cmdline )"
-)
 function ut_setupError3()
 {
 	# expect testcase to stop and fail when an assert* function is called in a setup section
@@ -123,9 +105,6 @@ function ut_setupError3()
 	echo somethingElse somethingElse...
 }
 
-ut_setupError4=(
-	[1]="$(cmdline )"
-)
 function ut_setupError4()
 {
 	# expect testcase to stop and fail when exit is called in a setup section
@@ -141,9 +120,6 @@ function ut_setupError4()
 }
 
 
-ut_exitInTest=(
-	[1]="$(cmdline )"
-)
 function ut_exitInTest()
 {
 	# expect testcase to finish without error indicating the exit in the output
@@ -152,9 +128,6 @@ function ut_exitInTest()
 	echo "this wont happen"
 }
 
-ut_assertInTest=(
-	[1]="$(cmdline )"
-)
 function ut_assertInTest()
 {
 	# expect testcase to finish without error indicating the assertion in the output

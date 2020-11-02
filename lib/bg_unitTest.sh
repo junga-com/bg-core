@@ -12,8 +12,6 @@
 declare -g bgUnitTestMode="utRuntime"; [[ "$bgLibExecCmd" =~ [.]ut$ ]] && bgUnitTestMode="direct"
 
 declare -g bgUnitTestScript="${BASH_SOURCE[1]}"
-declare -g ufFile="${bgUnitTestScript##*/}"
-ufFile="${ufFile%.ut}"
 
 
 ##################################################################################################################################
@@ -132,7 +130,8 @@ function ut()
 		local lineNo="$1"
 		local srcLine="$2"
 		# print the  source line that we are about to start executing so that its output will appear after it
-		printf "cmd> %s\n" "$srcLine"
+		local trimmedLine="${srcLine#[]}"; stringTrim -i trimmedLine
+		printf "cmd> %s\n" "${trimmedLine}"
 		;;
 
 	  onAfterSrcLine)
@@ -153,37 +152,6 @@ function ut()
 		exec {stdoutFD}>&1
 		exec {errOutFD}>$errOut
 		exec 2>&$errOutFD
-
-		# these are the state variables of the unit test run. the ut function and trap handlers and all the helper functions
-		# they use will treat these as their member state variables
-		_utRun_id="$utID"
-		_utRun_funcName="$utFunc"
-		_utRun_section=""  # default is 'test'. init to "" allows us to distinguish the case were no section is declared
-		_utRun_curLineNo=0
-		_utRun_srcCode=()
-		_utRun_srcLineStart="<uninit>"
-		_utRun_srcLineEnd=""
-
-		# load this ut_ function's source into an array
-		while read -r line; do
-			if [ "$_utRun_srcLineStart" == "<uninit>" ]; then
-				_utRun_srcLineStart=$line
-				_utRun_srcLineEnd=$line
-			else
-				_utRun_srcCode[$((_utRun_srcLineEnd++))]="$line"
-			fi
-		done < <(awk '
-			!inFunc && $1=="function" && $2=="'"$utFunc"'()" {linestart=FNR; print linestart}
-			!inFunc && $1=="'"$utFunc"'()"                   {linestart=FNR; print linestart}
-			linestart {print $0}
-			linestart && /^}/ {linestart=0; exit}
-		' $bgUnitTestScript)
-
-		for ((i=_utRun_srcLineStart; i<_utRun_srcLineEnd; i++)); do
-			if [[ "${_utRun_srcCode[i]}" =~ ^[[:space:]]*#[[:space:]]*expect ]]; then
-				_utRun_expect="${_utRun_srcCode[i]#*expect }"
-			fi
-		done
 
 		# set an EXIT trap to detect when the testcase ends prematurely
 		builtin trap 'exitCode="$?"; ut onExitCaught "$exitCode"; exit $?' EXIT
@@ -320,56 +288,121 @@ function _ut_debugTrap()
 }
 
 
-# usage: utfRunner_execute <utFunc> <utParams> [...<utParamsN>]
-# execute a testcase function one or more times with the specified utParams keys.
-# The ut script which contains the function should already be loaded (aka sourced, aka imported).
+# usage: utfRunner_execute <utFilePath> <utFunc> <utParams>
+# execute one testcase. A testcasse is a call to the utFunc with a particular array of cmdline arguments identified by utParams.
+# This function is written so that it will do what ever work it needs to to setup the environment for the testcase to run, but it
+# will detect if the caller has already done the work to set the environment and use it without repeatin the work. This makes it
+# efficient to call in a batch and functional to call on its own for a single testcase. This is the only function that executes
+# testcases.
+#
+# Output:
 # The output will go to stdout.
+#
+# Params:
+#    <utFilePath> : the path to the ut script that contains the testcases to run. This is a path that exists (relative or absolute)
+#                   The <utFile> component of the utID is created by removing the leading folders and the trailing .ut
+#    <utFunc>     : the name of the function that implements the testcase.
+#    <utParams>   : the name of the key (aka index) of the array of comdLine parameters that that this testcase instanace will be
+#                   invoked with
+# Source Context Variables:
+# The variables derived by scanning the source of the utFile are required to run the testcase. This function will get them if needed
+# but it is more efficient for the caller to provide their values when the caller is running multiple testcases from the same utFile.
+# So if they are already set they will not be calculated by this function.
+#    _utRun_srcCode      : an array containing the source file contents of the utFile script. The indexes are the line numbers
+#    _utRun_srcLineStart : the line number of the function declaration line of utFunc in the source file
+#    _utRun_srcLineEnd   : the line number of the ending } line of utFunc in the source file
+#    _utRun_expect       : the contents of the # expect comment contained inside the utFunc
+#
 function utfRunner_execute()
 {
+	local utFilePath="$1"; shift
 	local utFunc="ut_${1#ut_}"; shift
+	local utParams="$1"; shift
 
+	local utFile="${utFilePath##*/}"; utFile="${utFile%.ut}"
+	local utID="${utFile}:${utFunc#ut_}:$utParams"
+
+	# import script if needed and validate that the utFunc exists
+	[ "$(type -t "$utFunc")" == "function" ] || import "$utFilePath" ;$L1;$L2
 	[ "$(type -t "$utFunc")" == "function" ] || assertError -v utFile -v utFunc -v utParams "the unit test function is not defined in the unit test file"
-	varIsA array "$utFunc"                   || assertError -v utFile -v utFunc -v utParams "the unit test file does not define an array variable with the same name as the function to hold the utParams."
-	local -n inputArray="$utFunc"
-	[ "${inputArray[$utParams]+exists}" ]    || assertError -v utFile -v utFunc -v utParams "utParams is not a key the in the array variable with the same name as the function. It should be a key whose value is the parameter string to invoke the test function with"
+
+	# if utParams is emptyString, invoke with no params. Otherwise, utParams is the key of the array of cmdline arguments with the
+	# same name as the utFunc
+	local params=()
+	if [ "$utParams" ]; then
+		varIsA array "$utFunc"                   || assertError -v utFile -v utFunc -v utParams "the unit test file does not define an array variable with the same name as the function to hold the utParams."
+		local -n inputArray="$utFunc"
+		[ "${inputArray[$utParams]+exists}" ]    || assertError -v utFile -v utFunc -v utParams "utParams is not a key the in the array variable with the same name as the function. It should be a key whose value is the parameter string to invoke the test function with"
+		# for each utParams passed in, run the testcase function
+		utUnEsc params ${inputArray[$utParams]}
+	fi
+
+	# these are the state variables of the unit test run. the ut function and trap handlers and all their helper functions
+	# will treat these as their member state variables. Some of them that require work to set will use the value defined in the
+	# caller's scope if they exist. Notice that when declaring a variable local and seting it from itself, the initializer is the
+	# variable from the parent's scope b/c its not yet a local variable.
+	local _utRun_id="$utID"
+	local _utRun_funcName="$utFunc"
+	local _utRun_srcLineEnd=("${_utRun_srcLineEnd[@]}")  # maybe we dont need to copy the src file array? just comment out this line
+	local _utRun_srcLineStart=${_utRun_srcLineStart:-0}
+	local _utRun_srcLineEnd=${_utRun_srcLineEnd:-0}
+	local _utRun_section=""  # default is 'test'. init to "" allows us to distinguish the case were no section is declared
+	local _utRun_curLineNo=0
+
+	# if the caller has not already loaded the source,  load source file into an array
+	if [ ${#_utRun_srcCode[@]} -eq 0 ]; then
+		local line i=1; while IFS= read -r line; do
+			_utRun_srcCode[i++]="$line"
+		done < "$utFilePath"
+	fi
+
+	# if the caller has not already filled these in,  get the start line, end line and expect data from the src
+	[ ${_utRun_srcLineStart:-0} -eq 0 ] && for ((i=1; i<${#_utRun_srcCode[@]}; i++)); do
+		if [ $_utRun_srcLineStart -eq 0 ] && [[ ${_utRun_srcCode[i]} =~ ^[[:space:]]*(function)?[[:space:]]*$utFunc'()' ]]; then
+			_utRun_srcLineStart=$i
+		fi
+		if [ $_utRun_srcLineStart -ne 0 ]; then
+			if [[ "${_utRun_srcCode[i]}" =~ ^[[:space:]]*#[[:space:]]*expect ]]; then
+				_utRun_expect="${_utRun_srcCode[i]#*expect }"
+			fi
+			if [[ ${_utRun_srcCode[i]} =~ ^} ]]; then
+				_utRun_srcLineEnd=$i
+				break;
+			fi
+		fi
+	done
+
 
 	local setupOut; bgmktemp setupOut
-	local errOut; bgmktemp errOut
+	local errOut;   bgmktemp errOut
 
-	# for each utParams passed in, run the testcase function
-	while [ $# -gt 0 ]; do
-		local utParams="$1"; shift
-		local params=(); utUnEsc params ${inputArray[$utParams]}
-		local utID="${ufFile}:${utFunc#ut_}:$utParams"
+	(
+		# require an extra config to keep tracing on for tests because they can have many exceptions printing stack traces
+		# see bg-debugCntr trace tests:on|off
+		[ "$bgTracingTestRunner" == "on" ] || bgtraceCntr off
 
-		(
-			# require an extra config to keep tracing on for tests because they can have many exceptions printing stack traces
-			# see bg-debugCntr trace tests:on|off
-			[ "$bgTracingTestRunner" == "on" ] || bgtraceCntr off
+		ut onStart "$utID"
 
-			ut onStart "$utID"
+		Try:
+			$utFunc "${params[@]}"
+			ut onEnd
+		Catch: && {
+			ut onExceptionCaught
+		}
 
-			Try:
-				$utFunc "${params[@]}"
-				ut onEnd
-			Catch: && {
-				ut onExceptionCaught
-			}
+		ut onFinal "$_utRun_id" "OK"
+	)
 
-			ut onFinal "$_utRun_id" "OK"
-		)
+	local result="$?"
+	case $result in
+		  0) : ;;
+		  1) ut onFinal "$utID" "OK"; result=0 ;;
+		222) ut onFinal "$utID" "FAIL" ;;  # setup failure -- writing to stderr, cmd returns!=0, setup asserts or calls exit
+		  *) assertError "Unit test framework logic error. The testcase block ended with an unexpected exit code ($result)."
+	esac
 
-		local result="$?"
-		case $result in
-			  0) : ;;
-			  1) ut onFinal "$utID" "OK"; result=0 ;;
-			222) ut onFinal "$utID" "FAIL" ;;  # setup failure -- writing to stderr, cmd returns!=0, setup asserts or calls exit
-			  *) assertError "Unit test framework logic error. The testcase block ended with an unexpected exit code ($result)."
-		esac
-
-		[ -s "$setupOut" ] && assertError -f setupOut "Unit test framework error. Content was left in the setupOut temp file after a testcase run"
-		[ -s "$errOut" ]   && assertError -f errOut   "Unit test framework error. Content was left in the errOut temp file after a testcase run"
-	done
+	[ -s "$setupOut" ] && assertError -f setupOut "Unit test framework error. Content was left in the setupOut temp file after a testcase run"
+	[ -s "$errOut" ]   && assertError -f errOut   "Unit test framework error. Content was left in the errOut temp file after a testcase run"
 
 	bgmktemp --release setupOut
 	bgmktemp --release errOut
@@ -443,30 +476,36 @@ function utfDirectScriptRun()
 	[ "$projectFolder" ] && cd "$projectFolder"
 
 	# the default action is to list the test cases contained in the ut script
-	[ $# -eq 0 ] && set -- list
+	local spec="${1:-list}"; shift
 
-	local spec="$1"; shift
-	case ${spec} in
-	  runAll)
-		for utFunc in ${!ut_*}; do
-			local -n inputArray="$utFunc"
-			[ "$(type -t "$utFunc")" != "function" ] && assertError "malformed unit test. '$utFunc' should be a function name as well as the input array name"
+	if [ "$spec" == "list" ]; then
+		directUT_listLoadedIDs
+		return
+	fi
 
-			local utParams; for utParams in "${!inputArray[@]}"; do
-				utfRunner_execute "$utFunc" "$utParams"
-			done
-		done
-		;;
 
-	  list) directUT_listLoadedIDs ;;
+	# load this ut_ function's source into an array
+	local line i=1; while IFS= read -r line; do
+		_utRun_srcCode[i++]="$line"
+	done < "$bgUnitTestScript"
 
-	  *)
-		[[ "$spec" =~ ^([^:]*):?(.*)?$ ]]
-		local utFunc="ut_${BASH_REMATCH[1]}"
-		local utParams="${BASH_REMATCH[2]}"
-		utfRunner_execute "$utFunc" "$utParams"
-		;;
-	esac
+	# always run the testcases in the order found in the script (by bg_unitTests.awk)
+	local count=0
+	while read -r _utRun_srcLineStart _utRun_srcLineEnd utID _utRun_expect; do
+		if [ "$spec" == "runAll" ] || [[ "$utID" == $spec ]]; then
+			((count++))
+			[[ "$utID" =~ ^([^:]*):?(.*)?$ ]]
+			local utFunc="ut_${BASH_REMATCH[1]}"
+			local utParams="${BASH_REMATCH[2]}"
+			utfRunner_execute "$bgUnitTestScript" "$utFunc" "$utParams"
+		fi
+	done < <(awk -v lineNumFlag='on' \
+				 -v fullyQualyfied='' \
+				 -v expectCommentsFlag='on' '
+		@include "bg_unitTest.awk"
+	' "$bgUnitTestScript")
+
+	[ $count -eq 0 ] && assertError -v spec -v bgUnitTestScript "Spec did not match any testcases in this testcase script"
 }
 
 function directUT_listLoadedIDs()
