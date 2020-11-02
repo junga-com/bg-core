@@ -2606,6 +2606,9 @@ function assertError()
 			(( pid != tryStatePID )) && assertError --critical --allStack  -v pstreeOfTry__ -v pstreeOfCatch "
 				Try/Catch Logic Failed. PID of Try block($tryStatePID) is not a parent of PID of asserting exception($BASHPID)"
 
+			# for unitTest framework, disable the ERR trap when we assert
+			builtin trap '' ERR
+
 			# the goal is that we want the tryStatePID process to wake up an receive the SIGUSR2 signal.
 			# If we are a synchronous child subshell of the tryStatePID, then we, and any subshells inbetween us that tryStatePID
 			# must end before it will wake up. We can simply exit but we need to send the intermediate processes a SIGINT.
@@ -2728,6 +2731,7 @@ function Try()
 	local tryStateIFS="$IFS"
 	local tryStateExtdebug="$(shopt -p extdebug)"
 	local debugTrapScript='
+		#bgtrace "$FUNCNAME | $BASH_COMMAND"
 		if (( ${#BASH_SOURCE[@]} < '"$tryStateFuncDepth"' )); then
 			IFS='$' \t\n'' # no need to save because we will restore the tryStateIFS copy when we return to user code
 			assertError --critical "For Try block located at '"$tryStateTryStatementLocation"' no Catch block was found in the same Function. Check that code in the Try block did not skip the Catch by returning\n" >&2

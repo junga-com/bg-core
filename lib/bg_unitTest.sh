@@ -12,6 +12,8 @@
 declare -g bgUnitTestMode="utRuntime"; [[ "$bgLibExecCmd" =~ [.]ut$ ]] && bgUnitTestMode="direct"
 
 declare -g bgUnitTestScript="${BASH_SOURCE[1]}"
+declare -g ufFile="${bgUnitTestScript##*/}"
+ufFile="${ufFile%.ut}"
 
 
 ##################################################################################################################################
@@ -63,86 +65,264 @@ function utUnEsc()
 	_params=("${_params[@]//%0D/$'\r'}")
 }
 
+# usage: ut <event> ...
+# The ut function monitors and manages the state of the running testcase. The testcase author calls it to signal entering 'setup'
+# and 'test' sections that change the way the output of commands are written and the way that the exit codes are handled. The author
+# can go back and forth between setup and test section as many times as they want for example to include several logical tests in
+# one function.
+#
+# Also, the utf calls this function to signals various events in the testcase run.
+#
+# ut setup:
+# Used when writing testcases to signal that the follow code is setup and not the taget of the testcase. The output of setup code
+# is not significant for determining if the testcase passes. Also, if any setup code exits with non-zero or writes to stderr,
+# the testcase will terminate and be considered not elgible for running because its setup is failing.
+#
+# ut test
+# Used when writing testcases to signal that the follow code is the target of the testcase that is being tested. There is nothing
+# that test code can do that is considered wrong. All actions from writing to stderr, to having a command that exits non-zero, to
+# exiting the function prematurely (with exit; or assert*) will produce output in the testcase's stdout stream which will be compared
+# to the 'plato' output. If its identical, then the testcase passes and if not it fails.
+#
+# ut onStart
+# Called before the first line of the test function is executed.
+#
+# ut onEnd
+# Called after the testcase function has finished running if it ended normally.
+#
+# ut onExitCaught <exitCode>
+# Called after the testcase function has finished running if it ended by terminating the function early.
+#
+# ut onBeforeSrcLine <lineNo> <srcLine>
+# called before the first simple command in a source file line is called. There may be multiple simple commands called per src line.
+#
+# ut onAfterSrcLine <lineNo> <srcLine>
+# called after the last simple command on a src line is called.
+function ut()
+{
+	local event="$1"; shift
+
+	# if the last command produced stderr output, flush it
+	if [ -s "$errOut" ]; then
+		sync
+		cat "$errOut" | awk '{printf("stderr> %s\n", $0)}'
+		truncate -s0 "$errOut"
+		[ "$_utRun_section" == "setup" ] && ut setupFailed
+	fi
+
+	case $event in
+	  setup)
+		echo >&$stdoutFD
+		echo "##----------" >&$stdoutFD
+		echo "## $event" >&$stdoutFD
+		_utRun_section="$event"
+		exec >&$setupOutFD
+		;;
+
+	  test)
+		exec >&$stdoutFD
+		_ut_flushSetupFile
+		echo >&$stdoutFD
+		echo "##----------" >&$stdoutFD
+		echo "## $event" >&$stdoutFD
+		_utRun_section="$event"
+		;;
+
+	  onBeforeSrcLine)
+		local lineNo="$1"
+		local srcLine="$2"
+		# print the  source line that we are about to start executing so that its output will appear after it
+		printf "cmd> %s\n" "$srcLine"
+		;;
+
+	  onAfterSrcLine)
+		local lineNo="$1"
+		local srcLine="$2"
+		_ut_flushLineInfo
+		;;
+
+	  onCmdErrCode)
+		_utRun_lineInfo+="['$2' exitted $1]"
+		[ "$_utRun_section" == "setup" ] && ut setupFailed
+		;;
+
+
+	  onStart)
+		local utID="$1"; shift
+		exec {setupOutFD}>$setupOut
+		exec {stdoutFD}>&1
+		exec {errOutFD}>$errOut
+		exec 2>&$errOutFD
+
+		# these are the state variables of the unit test run. the ut function and trap handlers and all the helper functions
+		# they use will treat these as their member state variables
+		_utRun_id="$utID"
+		_utRun_funcName="$utFunc"
+		_utRun_section=""  # default is 'test'. init to "" allows us to distinguish the case were no section is declared
+		_utRun_curLineNo=0
+		_utRun_srcCode=()
+		_utRun_srcLineStart="<uninit>"
+		_utRun_srcLineEnd=""
+
+		# load this ut_ function's source into an array
+		while read -r line; do
+			if [ "$_utRun_srcLineStart" == "<uninit>" ]; then
+				_utRun_srcLineStart=$line
+				_utRun_srcLineEnd=$line
+			else
+				_utRun_srcCode[$((_utRun_srcLineEnd++))]="$line"
+			fi
+		done < <(awk '
+			!inFunc && $1=="function" && $2=="'"$utFunc"'()" {linestart=FNR; print linestart}
+			!inFunc && $1=="'"$utFunc"'()"                   {linestart=FNR; print linestart}
+			linestart {print $0}
+			linestart && /^}/ {linestart=0; exit}
+		' $bgUnitTestScript)
+
+		for ((i=_utRun_srcLineStart; i<_utRun_srcLineEnd; i++)); do
+			if [[ "${_utRun_srcCode[i]}" =~ ^[[:space:]]*#[[:space:]]*expect ]]; then
+				_utRun_expect="${_utRun_srcCode[i]#*expect }"
+			fi
+		done
+
+		# set an EXIT trap to detect when the testcase ends prematurely
+		builtin trap 'exitCode="$?"; ut onExitCaught "$exitCode"; exit $?' EXIT
+
+		# make sure ERR trap is not set to inherit. The first time the DEBUG trap fires from inside the target ut_ function, we
+		# will set the ERR trap there
+		set +E;
+
+		# turn off DEBUG trap inheritance globally with set +T and then turn it on just for the utFunc function
+		# the trap will turn on immediately for the process and any functions on the stack will be debugged but any newly launched
+		# function will not be debugged except the utFunc for which we explicitly set the DEBUG inherit flag. DEBUG will fire for
+		# the remainder of this call of 'ut' but the next time 'ut' is called, it wont.
+		set +T; declare -ft "$utFunc"; builtin trap 'bgBASH_debugTrapLINENO=$LINENO; bgBASH_debugTrapFUNCNAME=$FUNCNAME;  _ut_debugTrap' DEBUG
+
+		echo >&$stdoutFD
+		echo "###############################################################################################################################" >&$stdoutFD
+		echo "## $_utRun_id start" >&$stdoutFD
+		echo "## expect: $_utRun_expect" >&$stdoutFD
+		;;
+
+	  onFirstTimeInsideUTFunc)
+		# set an ERR trap to monitor non-zero exit codes
+		builtin trap 'ut onCmdErrCode "$?" "$BASH_COMMAND"' ERR
+		;;
+
+	  setupFailed)
+		builtin trap '' DEBUG ERR EXIT
+		_ut_flushLineInfo
+		exec >&$stdoutFD
+		_ut_flushSetupFile
+		printf "** Setup Failed: testcase not finished.  **\n"
+		exit 222
+		;;
+
+	  onExitCaught)
+		builtin trap '' DEBUG ERR EXIT
+		local exitCode="$1"
+		_ut_flushLineInfo
+		printf "!!! test case is exiting prematurely code=%s\n" "$exitCode"
+		exec >&$stdoutFD
+		_ut_flushSetupFile
+		if [ "$_utRun_section" == "setup" ]; then
+			ut setupFailed
+		else
+			return 1
+		fi
+		;;
+
+	  onExceptionCaught)
+		builtin trap '' DEBUG ERR EXIT
+		_ut_flushLineInfo
+		exec >&$stdoutFD
+		_ut_flushSetupFile
+		printf "** Exception thrown by testcase **\n"
+		catch_errorDescription="${catch_errorDescription##$'\n'}"
+		printfVars "   " ${!catch_*}
+		[ "$_utRun_section" == "setup" ] && ut setupFailed;
+		;;
+
+	  onEnd)
+		_ut_flushLineInfo
+		builtin trap '' DEBUG ERR EXIT
+		echo  # if we end normally, put a blank line in between the last testcase output and the end banner
+		true
+		;;
+
+	  onFinal)
+		_ut_flushLineInfo
+		builtin trap '' DEBUG ERR EXIT
+		if [ "$2" == "OK" ]; then
+			echo "## $1 finished"
+		else
+			echo "## $1 ERROR: setup could not complete"
+		fi
+		echo "###############################################################################################################################"
+		echo
+		;;
+
+	  *) assertError -v event:"$event" "unknown ut <event> in testcase" ;;
+
+	esac
+}
+
+function _ut_flushSetupFile()
+{
+	# if we are entering test mode and there is collected setup content, flush it
+	if [ -s "$setupOut" ]; then
+		sync
+		awk '{printf("##     | %s\n", $0)}' $setupOut >&$stdoutFD
+		truncate -s0 "$setupOut"
+	fi
+}
+
+function _ut_flushLineInfo()
+{
+	[ "$_utRun_lineInfo" ] && echo "$_utRun_lineInfo"
+	_utRun_lineInfo=""
+}
+
+
 # This is called from the DEBUG trap while running test case functions. global (set +T) is turned off and only the utFunc will
 # have the -t attribute set so only the commands in that function will get the trap called.
 # The purpose is to print the source line to stdout just before it is executed and posibly write output to stdout.
 # The trap is called per simple command instead of by line so we read the function source from its script file. In the trap we know
 # the source lineno so we use that to identify the line to print and suppress printing the same line multiple times in a row.
-function _utfRunner_debugTrap()
+function _ut_debugTrap()
 {
-	[[ "$BASH_COMMAND" =~ ^[$]utFunc ]] && return 0
-	[ "$BASH_COMMAND" == "builtin trap - DEBUG" ] && return 0
-	[[ "$BASH_COMMAND" =~ ^ut\  ]] && return 0
+	#bgtrace "$bgBASH_debugTrapFUNCNAME | $BASH_COMMAND"
 
-	if [ ${#_utfRunner_debugTrapData[@]} -eq 0 ]; then
-		declare -g _utfRunner_debugTrapData=()
-		declare -g _utfRunner_debugTrapStart=""
-		declare -g _utfRunner_debugTrapCurrent=0
-		while read -r line; do
-			if [ ! "$_utfRunner_debugTrapStart" ]; then
-				_utfRunner_debugTrapStart="$line"
-			else
-				_utfRunner_debugTrapData+=("$line")
-			fi
-		done < <(awk '
-			!inFunc && $1=="function" && $2=="'"$utFunc"'()" {
-				linestart=FNR
-				print linestart
-			}
-			!inFunc && $1=="'"$utFunc"'()" {
-				linestart=FNR
-				print linestart
-			}
-			linestart {print $0}
-			linestart && /^}/ {linestart=0; exit}
+	# we are only interested in DEBUG traps for the target ut_ function but its not possible to turn it on only for it so filter out
+	# the other calls
+	[[ "$bgBASH_debugTrapFUNCNAME" == ut_* ]] || return 0
 
-		' $bgUnitTestScript)
-	fi
+	# The DEBUG trap is called once in the begining of a function call with the BASH_COMMAND set to the command that invoked it
+	# the ERR trap can only be set from that time.
+	[[ "$BASH_COMMAND" == '$utFunc '* ]] && { ut onFirstTimeInsideUTFunc; return 0; }
 
-	if [ ${_utfRunner_debugTrapCurrent:-0} -ne ${bgBASH_debugTrapLINENO:-0} ]; then
-		_utfRunner_debugTrapCurrent="$bgBASH_debugTrapLINENO"
-		local lineIndex=$(($bgBASH_debugTrapLINENO-$_utfRunner_debugTrapStart))
-		if (( 0 < lineIndex && lineIndex < _utfRunner_debugTrapStart+${#_utfRunner_debugTrapData[@]} )); then
-			printf "cmd> %s\n" "${_utfRunner_debugTrapData[$lineIndex]}"
-		# else
-		# 	printfVars -l"!!! index for source array is out of bounds " lineIndex _utfRunner_debugTrapStart bgBASH_debugTrapLINENO -l"scr array size=${#_utfRunner_debugTrapData[@]}" _utfRunner_debugTrapData
+	# calls to ut setup|test take care of themselves
+	[[ "$BASH_COMMAND" == 'ut '* ]] && return 0
+
+	# there might be multiple BASH_COMMAND (which are simple cmd) on each source line so only drop in the first time we see a new lineno
+	# inside this block is just before we are about to run the first simple cmd on a new source line.
+	if [ ${_utRun_curLineNo:-0} -ne ${bgBASH_debugTrapLINENO:-0} ]; then
+		if (( _utRun_srcLineStart < _utRun_curLineNo && _utRun_curLineNo < _utRun_srcLineEnd )); then
+			ut onAfterSrcLine "$_utRun_curLineNo"  "${_utRun_srcCode[$_utRun_curLineNo]}"
+		fi
+
+		_utRun_curLineNo="$bgBASH_debugTrapLINENO"
+
+		if (( _utRun_srcLineStart < _utRun_curLineNo && _utRun_curLineNo < _utRun_srcLineEnd )); then
+			ut onBeforeSrcLine "$_utRun_curLineNo"  "${_utRun_srcCode[$_utRun_curLineNo]}"
 		fi
 	fi
 }
 
-# this is the function that implements the "ut setup|test" syntax in test cases
-function ut()
-{
-	[ ! "$stdoutFD" ] && assertError "ut called outside of a unit test run"
 
-	# flush the setup file to stdout if it exists because we are changing sections
-	sync
-	[ -s "$setupOut" ] && awk '{printf("##     | %s\n", $0)}' $setupOut >&$stdoutFD
-	truncate -s0 "$setupOut"
-
-	if [ "$1" == "exitCaught" ]; then
-		printf "!!! test case is exiting prematurely code=%s\n" "$2"
-		exec >&$stdoutFD
-		return 0
-	else
-		{
-			echo
-			echo "###############################################################################################################################"
-			echo "## $*"
-		}
-	fi >&$stdoutFD
-
-	if [ "$1" == "setup" ]; then
-		exec >&$setupOutFD
-	elif [ "$1" == "test" ]; then
-		exec >&$stdoutFD
-	else
-		assertError -v directive:"$1" "unknown ut <directive> in testcase"
-	fi
-}
-
-# usage: utfRunner_execute <utFunc> <utParams>
-# execute one test case which sould already be loaded (aka sourced, aka imported) into the bash process.
+# usage: utfRunner_execute <utFunc> <utParams> [...<utParamsN>]
+# execute a testcase function one or more times with the specified utParams keys.
+# The ut script which contains the function should already be loaded (aka sourced, aka imported).
 # The output will go to stdout.
 function utfRunner_execute()
 {
@@ -153,38 +333,46 @@ function utfRunner_execute()
 	local -n inputArray="$utFunc"
 	[ "${inputArray[$utParams]+exists}" ]    || assertError -v utFile -v utFunc -v utParams "utParams is not a key the in the array variable with the same name as the function. It should be a key whose value is the parameter string to invoke the test function with"
 
-	bgmktemp setupOut
+	local setupOut; bgmktemp setupOut
+	local errOut; bgmktemp errOut
 
+	# for each utParams passed in, run the testcase function
 	while [ $# -gt 0 ]; do
 		local utParams="$1"; shift
 		local params=(); utUnEsc params ${inputArray[$utParams]}
+		local utID="${ufFile}:${utFunc#ut_}:$utParams"
 
 		(
-			exec {setupOutFD}>$setupOut
-			exec {stdoutFD}>&1
+			# require an extra config to keep tracing on for tests because they can have many exceptions printing stack traces
+			# see bg-debugCntr trace tests:on|off
+			[ "$bgTracingTestRunner" == "on" ] || bgtraceCntr off
 
-			builtin trap 'exitCode="$?"; [ "$normExit" ] || { ut exitCaught "$exitCode"; exit 0; }' EXIT
+			ut onStart "$utID"
 
-			# turn off DEBUG trap globally with set +T and then turn it on just for the utFunc function
-			set +T; declare -ft "$utFunc"; builtin trap 'bgBASH_debugTrapLINENO=$LINENO; _utfRunner_debugTrap' DEBUG
 			Try:
 				$utFunc "${params[@]}"
+				ut onEnd
 			Catch: && {
-				exec >&$stdoutFD
-				printf "** Exception thrown by testcase **\n"
-				catch_errorDescription="${catch_errorDescription##$'\n'}"
-				printfVars "   " ${!catch_*}
-
+				ut onExceptionCaught
 			}
-			builtin trap - DEBUG
-			normExit="1"
+
+			ut onFinal "$_utRun_id" "OK"
 		)
+
 		local result="$?"
-		# exits are caught and suppressed in the EXIT trap but just in case...
-		[ ${result:-0} -ne 0 ] && printf "!!! UNIT TEST FRAMEWORK ERROR test case ended with exit code (%s)\n" "$result"
+		case $result in
+			  0) : ;;
+			  1) ut onFinal "$utID" "OK"; result=0 ;;
+			222) ut onFinal "$utID" "FAIL" ;;  # setup failure -- writing to stderr, cmd returns!=0, setup asserts or calls exit
+			  *) assertError "Unit test framework logic error. The testcase block ended with an unexpected exit code ($result)."
+		esac
+
+		[ -s "$setupOut" ] && assertError -f setupOut "Unit test framework error. Content was left in the setupOut temp file after a testcase run"
+		[ -s "$errOut" ]   && assertError -f errOut   "Unit test framework error. Content was left in the errOut temp file after a testcase run"
 	done
 
 	bgmktemp --release setupOut
+	bgmktemp --release errOut
 }
 
 
@@ -208,7 +396,7 @@ function utfRunner_execute()
 # the rest of this file is only included if the ut script is being directly executed
 [ "$bgUnitTestMode" == "utRuntime" ] && return 0
 
-# man(1) bg-unitTestScriptName.ut
+# man(1.bashCmd) bg-unitTestScriptName.ut
 # usage: <bg-unitTestScriptName>.ut list|runAll|<utID>
 # This is the man page for all *.ut unit test script files in bg-core style packages. A ut script looks like a library but can also
 # be executed as a stand alone command.
@@ -251,7 +439,7 @@ function utfDirectScriptRun()
 	invokeOutOfBandSystem "$@"
 
 	# run unit tests from their project root folder no matter where the user ran the command from
-	local projectFolder="${0%unitTests*}"
+	local projectFolder="${0%unitTests/*}"
 	[ "$projectFolder" ] && cd "$projectFolder"
 
 	# the default action is to list the test cases contained in the ut script
@@ -260,7 +448,7 @@ function utfDirectScriptRun()
 	local spec="$1"; shift
 	case ${spec} in
 	  runAll)
-		for utFunc in "${!ut_*}"; do
+		for utFunc in ${!ut_*}; do
 			local -n inputArray="$utFunc"
 			[ "$(type -t "$utFunc")" != "function" ] && assertError "malformed unit test. '$utFunc' should be a function name as well as the input array name"
 
@@ -283,7 +471,7 @@ function utfDirectScriptRun()
 
 function directUT_listLoadedIDs()
 {
-	for utFunc in "${!ut_*}"; do
+	for utFunc in ${!ut_*}; do
 		local -n inputArray="$utFunc"
 		[ "$(type -t "$utFunc")" != "function" ] && assertError "malformed unit test. '$utFunc' should be a function name as well as the input array name"
 
@@ -295,7 +483,7 @@ function directUT_listLoadedIDs()
 
 function directUT_listLoadedUTFunc()
 {
-	for utFunc in "${!ut_*}"; do
+	for utFunc in ${!ut_*}; do
 		local -n inputArray="$utFunc"
 		[ "$(type -t "$utFunc")" != "function" ] && assertError "malformed unit test. '$utFunc' should be a function name as well as the input array name"
 		echo "${utFunc#ut_}"

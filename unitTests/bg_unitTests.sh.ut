@@ -1,0 +1,170 @@
+#!/bin/bash
+
+source /usr/lib/bg_core.sh
+import bg_unitTest.sh ;$L1;$L2
+
+
+###################################################################################################
+### Data
+
+###################################################################################################
+### Unit Tests
+
+
+function produceStdout()
+{
+	false # stick this here to make sure that the test Runner ERR trap does not hit it b/c its not in hte direct ut function
+	printf "here is some data\n%s\n" "$*"
+}
+function produceStderr()
+{
+	printf "here is some data\n%s\n" "$*" >&2
+}
+function produceStdoutAndStderr()
+{
+	printf "here is some data\n%s\n" "$*"
+	printf "here is some data\n%s\n" "$*" >&2
+}
+function exitWithNonZero()
+{
+	return "${1:-1}"
+}
+
+
+
+ut_emptySections=(
+	[1]="$(cmdline )"
+)
+function ut_emptySections()
+{
+	# expect just the empty section headers
+	ut setup
+
+	ut test
+}
+
+ut_noSections=(
+	[1]="$(cmdline )"
+)
+function ut_noSections()
+{
+	# expect test output with no section headers
+	produceStdout "hello"
+	produceStderr "cars and bikes"
+	produceStdoutAndStderr "dejavue"
+	exitWithNonZero 45
+}
+
+ut_outputNormalTypes=(
+	[1]="$(cmdline )"
+)
+function ut_outputNormalTypes()
+{
+	# expect stdout and stderr to display uniquely in setup and test sections. non-zero exits display in test section
+	ut setup
+	echo stdout data in setup section
+
+	ut test
+	echo stdout data in test section
+	# comments are not shown
+	echo stderr data in test section >&2
+	(exit 2); echo hi; false
+	echo one more thing...
+}
+
+ut_setupError1=(
+	[1]="$(cmdline )"
+)
+function ut_setupError1()
+{
+	# expect testcase to stop and fail when stderror output is seen in setup
+	ut setup
+	echo something something...
+	echo "some error" >&2
+	echo somethingElse somethingElse...
+
+	ut test
+	echo something something...
+	# comments are not shown
+	echo somethingElse somethingElse...
+}
+
+ut_setupError2=(
+	[1]="$(cmdline )"
+)
+function ut_setupError2()
+{
+	# expect testcase to stop and fail when a command in setup section returns non-zero
+	ut setup
+	echo setting up something something...
+	false
+	echo somethingElse somethingElse...
+
+	ut test
+	echo testing something something...
+	# comments are not shown
+	echo somethingElse somethingElse...
+}
+
+ut_setupError3=(
+	[1]="$(cmdline )"
+)
+function ut_setupError3()
+{
+	# expect testcase to stop and fail when an assert* function is called in a setup section
+	ut setup
+	echo setting up something something...
+	assertError "bad setup"
+	echo somethingElse somethingElse...
+
+	ut test
+	echo testing something something...
+	# comments are not shown
+	echo somethingElse somethingElse...
+}
+
+ut_setupError4=(
+	[1]="$(cmdline )"
+)
+function ut_setupError4()
+{
+	# expect testcase to stop and fail when exit is called in a setup section
+	ut setup
+	echo setting up something something...
+	exit
+	echo somethingElse somethingElse...
+
+	ut test
+	echo testing something something...
+	# comments are not shown
+	echo somethingElse somethingElse...
+}
+
+
+ut_exitInTest=(
+	[1]="$(cmdline )"
+)
+function ut_exitInTest()
+{
+	# expect testcase to finish without error indicating the exit in the output
+	ut test
+	exit 2
+	echo "this wont happen"
+}
+
+ut_assertInTest=(
+	[1]="$(cmdline )"
+)
+function ut_assertInTest()
+{
+	# expect testcase to finish without error indicating the assertion in the output
+	ut test
+	assertError "this is an error"
+	echo "this wont happen"
+}
+
+
+
+
+# this should be the last line of any ut script
+unitTestCntr "$@"
