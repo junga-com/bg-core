@@ -3,7 +3,22 @@
 
 # library to parse *.ut scripts
 
+# Params:
+#    -v cmd=getUtIDs|getUtFuncs|getUtParamsForUtFunc  : The default cmd is getUtIDs
+#   getUtIDs
+#     -v fullyQualyfied='1'     : include the utFile in part in the utIDs
+#     -v lineNumFlag='1'        : include the starting and ending line numbers of its utFunc for each returned utID
+#     -v expectCommentsFlag='1' : include the expect comment for each returned utID
+#
+#   getUtParamsForUtFunc
+#      -v utFunc="<utFunc>" : the utFunc to return the utParams for.
+
+
 BEGIN {
+	# rename this input because we use utFunc as a working variable during the scan.
+	if (! cmd)
+		cmd="getUtIDs"
+	utFuncCmdInput=utFunc
 	arrayCreate(utFuncs)
 }
 
@@ -55,22 +70,41 @@ utFunc && $1=="#" && $2=="expect" {
 }
 
 END {
-	for (i in utFuncs) {
-		utFunc=utFuncs[i]
+	switch (cmd) {
+		case "getUtFuncs":
+			for (i in utFuncs)
+				print gensub(/^ut_/,"","g",utFuncs[i])
+		break;
 
-		if (lineNumFlag)
-			lineNumPrefix=sprintf("%4s %4s ", funcLineStart[utFunc], funcLineEnd[utFunc])
+		case "getUtParamsForUtFunc":
+			utFunc="ut_"utFuncCmdInput
+			if (utFunc in utPByFunct)
+				for (i in utPByFunct[utFunc])
+					print utPByFunct[utFunc][i]
+		break;
 
-		if (expectCommentsFlag)
-			expectCommentsSuffix=funcExpectComments[utFunc]
+		case "getUtIDs":
+			for (i in utFuncs) {
+				utFunc=utFuncs[i]
 
-		if (utFunc in utPByFunct) {
-			for (j in utPByFunct[utFunc]) {
-				utParams = utPByFunct[utFunc][j]
-				printf("%s%s%s:%s %s\n", lineNumPrefix, utFilePrefix, gensub(/^ut_/,"","g",utFunc), utParams, expectCommentsSuffix)
+				if (lineNumFlag)
+					lineNumPrefix=sprintf("%4s %4s ", funcLineStart[utFunc], funcLineEnd[utFunc])
+
+				if (expectCommentsFlag)
+					expectCommentsSuffix=funcExpectComments[utFunc]
+
+				if (utFunc in utPByFunct) {
+					for (j in utPByFunct[utFunc]) {
+						utParams = utPByFunct[utFunc][j]
+						printf("%s%s%s:%s %s\n", lineNumPrefix, utFilePrefix, gensub(/^ut_/,"","g",utFunc), utParams, expectCommentsSuffix)
+					}
+				} else {
+					printf("%s%s%s: %s\n", lineNumPrefix, utFilePrefix, gensub(/^ut_/,"","g",utFunc), expectCommentsSuffix)
+				}
 			}
-		} else {
-			printf("%s%s%s: %s\n", lineNumPrefix, utFilePrefix, gensub(/^ut_/,"","g",utFunc), expectCommentsSuffix)
-		}
+		break;
+
+		default:
+			assert("unknown cmd='"cmd"'")
 	}
 }

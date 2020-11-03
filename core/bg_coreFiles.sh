@@ -158,7 +158,7 @@ function fsMakeTemp()
 			[ ! "$keepFlag" ] && rm -rf "$fileNameValue"
 
 			if [ ! "$assertError_EndingScript" ] && [ "$mode" == "releaseInternal" ] && [ ! "$willNotReleaseFlag" ] && { [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; }; then
-				(assertError -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script.")
+				(assertError -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script." &>>$_bgtraceFile)
 			fi
 		fi
 	fi

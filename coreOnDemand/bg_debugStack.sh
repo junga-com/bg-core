@@ -22,6 +22,7 @@
 # this tells bash to record function arguments in the stack data and source file and line number
 # of functions. search for extdebug in man bash
 shopt -s extdebug
+set +o errtrace # extdebug turns this on but unit tests need it off
 
 # usage: bgStackMakeLogical [--noSrcLookup] [--logicalStart+<n>]
 # This makes a logical call stack that is intuitive to use. It initializes the $bgStatck* global vars. Whereas the item described
@@ -281,7 +282,7 @@ function bgStackMakeLogical()
 		# This detection block handles the case when a trap handler is executing and does not give us the hint. This happens on the
 		# fist line when we step into a trap call on the line that is about to call BGTRAPEntry (which records the hint information)
 		# Also, we might want to turn off the way bgtrap does the hint when bgtraceing is not active and we still want to detect the
-		# trap so that stack traces in asserts are not misleading when they try to get the lineno from the adjancent frame which is
+		# trap so that stack traces in asserts are not misleading when they try to get the lineno from the adjacent frame which is
 		# not correct. When FUNCNAME[$i] is not interruped by a trap handler, the source line within FUNCNAME[$i] at
 		# BASH_SOURCE[$1]:BASH_LINENO[$i-1] will include a reference to FUNCNAME[$i-1]. If not, we can glean that the FUNCNAME[$i-1]
 		# is the result of a trap handler interruping FUNCNAME[$i]. If we find FUNCNAME[$i-1] in one of the active handlers, we can
@@ -292,7 +293,9 @@ function bgStackMakeLogical()
 			frmSrcLineNo=$(( (frameIdxOfDEBUGTrap == i)?bgBASH_debugTrapLINENO:${BASH_LINENO[$i-1]} ))
 			# CRITICALTODO: this code that gets the source line from the file needs to take into account \ line continuations.
 			[ ${frmSrcLineNo:-0} -gt 0 ] && [ -r "${BASH_SOURCE[$i]}" ] && frmSrcLineText="$(sed -n "${frmSrcLineNo}"'{s/^[[:space:]]*//;p;q}' "${BASH_SOURCE[$i]}" 2>/dev/null )"
-			if [[ ! "$frmSrcLineText" =~ $referenceText ]]; then
+			# if the src line invokes the referenceText in a variable (like $utFunc ...) then it wont match. We could try to deref
+			# but that var might not be in scope at the point we are running and its probably good enough to assume that its not a trap
+			if [[ ! "$frmSrcLineText" =~ $referenceText ]] && [[ ! "$frmSrcLineText" =~ ^[[:space:]]*[$] ]]; then
 				local sigCandidates="" sigCandidatesCount=0 sigTest
 				for sigTest in "${!trapHandlers[@]}"; do
 					if [[ "${trapHandlersByLineNo[$sigTest:$frmSrcLineNo]}" =~ $referenceText ]]; then
@@ -306,13 +309,13 @@ function bgStackMakeLogical()
 				detectedTrapFrame="${sigCandidates[*]}"
 				if [ ! "$detectedTrapFrame" ]; then
 					if ((frameIdxOfDEBUGTrap != i)); then
-						detectedTrapFrame="UNKPOTTRAP"
+						detectedTrapFrame="UNKTRAP"
 					fi
 				fi
 			fi
 		fi
 
-		# Non-adjancent Frame -- First frame.
+		# Non-adjacent Frame -- First frame.
 		# Add a logical frame for this code, right here.  FUNCNAME[0]==bgStackMakeLogical (this function) but there is no bash stack
 		# frame below [0] to indicate where we are in that function. For completeness, we can hardcode a frame to represent this line.
 		if ((i==0)); then
@@ -325,7 +328,7 @@ function bgStackMakeLogical()
 			continue
 		fi
 
-		# Non-adjancent Frame -- DEBUGTrap transistion to a normal function that it interuptted.
+		# Non-adjacent Frame -- DEBUGTrap transistion to a normal function that it interuptted.
 		# This will only hit when we are in the debugger. We are at the frame where the DEBUG handler started.
 		# In this case, the debugger did not interupt a top level UserTrap line so BASH[$i] is a normal frame (UserTrap or LogicalScript)
 		# except for being interupted by the DEBUGTrap
@@ -353,7 +356,7 @@ function bgStackMakeLogical()
 		fi
 
 
-		# Non-adjancent Frame -- DEBUGTrap transistion to code directly in a UserTrap that it interuptted.
+		# Non-adjacent Frame -- DEBUGTrap transistion to code directly in a UserTrap that it interuptted.
 		# In this case, we are stepping through the UserTrap handler at the top level while that handler is not in a function call.
 		# BASH[$i] is the function that was being executed when the UserTrap hapenned. The stack does not say which line in that function
 		# BASH[$i-1] is the first function of the DEBUG trap that led to this code running.
@@ -392,7 +395,7 @@ function bgStackMakeLogical()
 		fi
 
 
-		# Non-adjancent Frame -- UserTrap transistion to a normal function that it interuptted.
+		# Non-adjacent Frame -- UserTrap transistion to a normal function that it interuptted.
 		# At UserTrap handler which is calling at least one function (b/c we are not alos at the DEBUGTrap frame)
 		if ((i != frameIdxOfDEBUGTrap)) && [ "$detectedTrapFrame" ]; then
 			# synthesize a frame to represent the handler script

@@ -292,7 +292,7 @@ function cuiWinOpen()
 				fi
 				type -t ${cuiWinClass} >/dev/null || cuiWinClass="$decoratedWinClass"
 				export -f "${cuiWinClass}"
-				gnome-terminal --geometry=100x24+0+0 --zoom=1.0   -- bash -c "$cuiWinClass" 2>$assertOut || assertError
+				gnome-terminal --geometry=130x24+0+0 --zoom=1.0   -- bash -c "$cuiWinClass" 2>$assertOut || assertError
 			)
 
 			# block waiting for the handler to signal that its started by sending its tty on the pipe.

@@ -1455,12 +1455,15 @@ function endLock()
 #######################################################################################################################################
 ### From bg_coreProcCntrl.sh
 
-# usage: signalNorm [-n] <signalSpec> [<retVar>]
+# usage: signalNorm [-l] [-q] <signalSpec> [<retVar>]
 # the trap and kill command allow several different names for each signal. For example, (SIGUSR1, USR1, usr1, and 10) are all the
 # same signal. This function returns the canonical name for the signal so that no matter how it is specified, we can determine
 # if it is the same signal. It asserts an error if <signalSpec> does not refer to a signal known to 'kill'
-# Param:
+# Params:
 #     <sigSpec> : can be any token understood by kill. e.g. (SIGUSR1, USR1, usr1, and 10) all refer to signal 10
+# Options:
+#    -l : list all known SIGNAL names
+#    -q : quiet. If <signalSpec> does not exist, return the empty string and return code 1 instead of asserting an error
 function signalNorm()
 {
 	local quietFlag listFlag
@@ -1524,6 +1527,7 @@ function signalNorm()
 	sn_sigID="${_signalNormData[${sn_sigID:-emptyStr}]}"
 	if [ ! "$sn_sigID" ]; then
 		[ ! "$quietFlag" ] && assertError "'$1' is not a signal name known to 'kill'. See 'trap -l' for a list"
+		returnValue "" "$2"
 		return 1
 	fi
 
@@ -2192,7 +2196,7 @@ function bgtrap()
 # usage: bgTrapStack peek <sig> <handlerVar>
 # usage: bgTrapStack pop <sig> <handlerVar>
 # usage: bgTrapStack push <sig> <handler>
-# For some ways the traps are used (particularely DEBUG traps) a different pattern than bgtrap is called for.
+# For some ways the traps are used (particularely DEBUG traps) a different pattern than bgtrap's aggregateScript is called for.
 # bgTrapStack implements a pattern of pushing the previous handler onto a global variable stack and replacing it when done.
 # There may be complications for subshells so be catious using this.
 # See Also:
@@ -2770,6 +2774,7 @@ function Try()
 		builtin trap - SIGUSR2
 		bgTrapStack push DEBUG '\'''"$debugTrapScript"''\''
 		shopt -s extdebug
+		set +o errtrace # extdebug turns this on but unit tests need it off
 	'
 }
 

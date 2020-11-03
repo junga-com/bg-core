@@ -119,7 +119,6 @@ function ut_setupError4()
 	echo somethingElse somethingElse...
 }
 
-
 function ut_exitInTest()
 {
 	# expect testcase to finish without error indicating the exit in the output
