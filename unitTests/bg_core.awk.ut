@@ -1,0 +1,99 @@
+#!/bin/bash
+
+source /usr/lib/bg_core.sh
+import bg_unitTest.sh ;$L1;$L2
+
+ut_parserCreateFromDelimList=(
+   [0]="$(cmdLine '
+   ../
+   ../..
+   d./..
+   .d/..
+
+   ./..
+   .//..
+   ../foo
+   ../../foo
+   ../../../foo
+   /../../../foo
+   /../../one/two/../newTwo
+
+   1/2/3/4/5/6/7/8/../../foo.txt
+   1/2/3/4/5/6/7/8/.././../foo.txt
+   1/2/3/4/5/6/7/8/./.././.././foo.txt
+   .1/2/3/4/5/6/7/8/../../../../../../../.foo.txt
+   .1/2/3/4/5/6/7/8/../../../../../../../../.foo.txt
+   .1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+   /.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+   /.1/2/3/4/5/6/7/8/.../.foo.txt
+   /.1/2/3/4/5/6/7/8/../.../../../../../../../../.foo.txt
+
+   .../2/3/4/5/6/7/8/../../../../../../../.foo.txt
+   .../2/3/4/5/6/7/8/../../../../../../../../.foo.txt
+   .../2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+
+   one/../../../../foo
+   /one/../../../../foo
+   /one/two/././../foo
+   one/two/this.that/..
+   ..one/two../this..that/..d
+   one../two../this..that/d..
+   ..one/two/this.that/..
+   one/two/this.that/../../foo
+
+   /
+   //
+   /./
+   /.//
+   /foo
+   //foo
+   /./foo
+   /.//foo
+   one
+   one/
+   one//
+   one/./
+   /one
+   /one/
+   //one//
+   /./one/
+   one/two
+   one/two/
+   one/./two/
+   one/././two/
+   one./././two/
+   one./././.two/
+   /one/two
+   /one/two/
+   one/two/this.that
+   one/two/this.that/
+')"
+)
+awkScript='
+	@include "bg_core.awk"
+	/^[[:space:]]*$/ {print; next}
+	{
+		sub(/^[[:space:]]*/, "")
+		printf("inputFolder:'\''%s'\''\n", $0)
+		fflush()
+		printf("      plain:'\''%s'\''\n", pathGetCanonStr($0))
+		fflush()
+		printf("      w/env:'\''%s'\''\n", pathGetCanonStr($0, 1))
+		fflush()
+	}
+'
+ut_parserCreateFromDelimList() {
+	ut setup
+	echo "$awkScript"
+	export HOME="/home/joeUser"
+	export PWD="/myPWD"
+
+	ut test
+	echo "$1" | awk "$awkScript" 2>&1
+}
+
+
+
+
+# this should be the last line of any ut script
+unitTestCntr "$@"

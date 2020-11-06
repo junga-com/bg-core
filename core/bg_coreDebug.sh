@@ -88,7 +88,7 @@ else
 	# where its kind of hidden from sight.
 
 	# install a cntr-c signal handler to invoke the debugger.
-	[ "$bgDevModeUnsecureAllowed" ] && [ "$bgLibExecMode" == "script" ] && bgtrap '
+	[ ! "$bgDebuggerInhibitCntrC" ] && [ "$bgDevModeUnsecureAllowed" ] && [ "$bgLibExecMode" == "script" ] && bgtrap '
 		if debuggerIsInBreak; then
 			# if we are already stopped in the debugger, interpret cntr-c normally and end the script
 			bgtrace "cntr-c caught in bgtrace mode. Already stopped in debugger so interrupting script."
@@ -111,13 +111,10 @@ else
 		[ ! "$(import --getPath bg_debugger.sh)" ] && assertError "the debugger is not installed. Try installing the bg-dev package"
 		import bg_debugger.sh ;$L1;$L2
 		bgtrace "bgDebuggerOn is on : ${bgDebuggerOn}"
-
-		read -r bgDebuggerDbgID bgDebuggerOnTempStopPoint <<<"$bgDebuggerOn"
-		case $bgDebuggerOnTempStopPoint in
-			stopOnLibInit)           debuggerOn "${bgDebuggerDbgID#on:}" stepOver ;;
-			stopOnFirstScriptLine|*) debuggerOn "${bgDebuggerDbgID#on:}" stepToLevel 1 ;;
+		case ${bgDebuggerOn#on:} in
+			stopOnLibInit)           debuggerOn stepOver ;;
+			*|stopOnFirstScriptLine) debuggerOn stepToLevel 1 ;;
 		esac
-		unset bgDebuggerDbgID bgDebuggerOnTempStopPoint
 	fi
 fi
 

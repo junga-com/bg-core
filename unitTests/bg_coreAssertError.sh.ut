@@ -1,0 +1,30 @@
+#!/bin/bash
+
+source /usr/lib/bg_core.sh
+import bg_unitTest.sh ;$L1;$L2
+
+
+###################################################################################################
+### Data
+
+###################################################################################################
+### Unit Tests
+
+ut_testcase=(
+	[1]="$(cmdline "$iniFileData_empty")"
+	[2]="$(cmdline "$iniFileData_noSections")"
+	[3]="$(cmdline "$iniFileData_noTopLevel")"
+	[4]="$(cmdline "$iniFileData_topAndSections")"
+	[5]="$(cmdline "$iniFileData_colonInSectNames")"
+)
+function ut_testcase()
+{
+	ut setup
+
+	ut test
+}
+
+
+
+# this should be the last line of any ut script
+unitTestCntr "$@"

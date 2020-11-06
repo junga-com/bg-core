@@ -1,0 +1,153 @@
+
+###############################################################################################################################
+## bg_unitTests.sh:emptySections: start
+## expect: just the empty section headers
+
+##----------
+## setup
+
+##----------
+## test
+
+## bg_unitTests.sh:emptySections: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_unitTests.sh:noSections: start
+## expect: test output with no section headers
+cmd> produceStdout "hello"
+here is some data
+hello
+cmd> produceStderr "cars and bikes"
+stderr> here is some data
+stderr> cars and bikes
+cmd> produceStdoutAndStderr "dejavue"
+here is some data
+dejavue
+stderr> here is some data
+stderr> dejavue
+cmd> exitWithNonZero 45
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+
+## bg_unitTests.sh:noSections: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_unitTests.sh:outputNormalTypes: start
+## expect: stdout and stderr to display uniquely in setup and test sections. non-zero exits display in test section
+
+##----------
+## setup
+##     | cmd> echo stdout data in setup section
+##     | stdout data in setup section
+
+##----------
+## test
+cmd> echo stdout data in test section
+stdout data in test section
+cmd> echo stderr data in test section >&2
+stderr> stderr data in test section
+cmd> (exit 2); echo hi; false
+cmd> (exit 2); echo hi; false
+hi
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> echo one more thing...
+one more thing...
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+
+## bg_unitTests.sh:outputNormalTypes: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_unitTests.sh:setupError1: start
+## expect: testcase to stop and fail when stderror output is seen in setup
+
+##----------
+## setup
+##     | cmd> echo something something...
+##     | something something...
+##     | cmd> echo "some error" >&2
+##     | stderr> some error
+** Setup Failed: testcase not finished.  **
+## bg_unitTests.sh:setupError1: ERROR: setup could not complete
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_unitTests.sh:setupError2: start
+## expect: testcase to stop and fail when a command in setup section returns non-zero
+
+##----------
+## setup
+##     | cmd> echo setting up something something...
+##     | setting up something something...
+##     | cmd> false
+##     | cmd> 
+##     | ['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+** Setup Failed: testcase not finished.  **
+## bg_unitTests.sh:setupError2: ERROR: setup could not complete
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_unitTests.sh:setupError3: start
+## expect: testcase to stop and fail when an assert* function is called in a setup section
+
+##----------
+## setup
+##     | cmd> echo setting up something something...
+##     | setting up something something...
+##     | cmd> assertError "bad setup"
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorCode='36'
+   catch_errorDescription='error: ut_setupError3: bad setup'
+** Setup Failed: testcase not finished.  **
+## bg_unitTests.sh:setupError3: ERROR: setup could not complete
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_unitTests.sh:setupError4: start
+## expect: testcase to stop and fail when exit is called in a setup section
+
+##----------
+## setup
+##     | cmd> echo setting up something something...
+##     | setting up something something...
+##     | cmd> exit
+##     | !!! test case is exiting prematurely code=0
+** Setup Failed: testcase not finished.  **
+## bg_unitTests.sh:setupError4: ERROR: setup could not complete
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_unitTests.sh:exitInTest: start
+## expect: testcase to finish without error indicating the exit in the output
+
+##----------
+## test
+cmd> exit 2
+!!! test case is exiting prematurely code=0
+## bg_unitTests.sh:exitInTest: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_unitTests.sh:assertInTest: start
+## expect: testcase to finish without error indicating the assertion in the output
+
+##----------
+## test
+cmd> assertError "this is an error"
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorCode='36'
+   catch_errorDescription='error: ut_assertInTest: this is an error'
+## bg_unitTests.sh:assertInTest: finished
+###############################################################################################################################
+

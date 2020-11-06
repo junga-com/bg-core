@@ -296,7 +296,7 @@ function bgBCParse()
 				syntaxSpec[options]+=" $name "
 			fi
 		done < <(awk '
-			@include "bg_libCore.awk"
+			@include "bg_core.awk"
 			/invokeOutOfBandSystem/ {trigger=1}
 			/^done|^esac/ {trigger=0}
 			# 	-C*|--domID*)      bgOptionGetOpt opt: passThruOpts "$@" && shift ;;

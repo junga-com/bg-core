@@ -84,7 +84,7 @@
 #
 # Even though this library uses the DEBUG, EXIT, and ERR traps to monitor the testcase function's progress, it is compatible with
 # the traps set by the debugger. To run a testcase in the debugger, either use the debug subcommand to the ut script or place a
-# bgtraceBreak statement in your testcase function at the point you want to debug. 
+# bgtraceBreak statement in your testcase function at the point you want to debug.
 #
 # See Also:
 #    man(1) bg-unitTest.ut
@@ -122,6 +122,7 @@ function unitTestCntr()
 # as string with a single IFS character separating each parameter. If that string is subsequently passed to utUnEsc, it will populate
 # an array properly with each element containing the original version of the parameter
 function cmdline() { utEsc "$@" ; }
+function cmdLine() { utEsc "$@" ; }
 function utEsc()
 {
 	local params=("$@")
@@ -234,8 +235,6 @@ function ut()
 		exec {stdoutFD}>&1
 		exec {errOutFD}>$errOut
 		exec 2>&$errOutFD
-
-		bgtrace "funcLevel=${#FUNCNAME[@]} BASHPID='$BASHPID'  \$\$=$$   "
 
 		# set an EXIT trap to detect when the testcase ends prematurely
 		trap -n unitTests 'exitCode="$?"
@@ -400,7 +399,7 @@ function _ut_debugTrap()
 #
 # Params:
 #    <utFilePath> : the path to the ut script that contains the testcases to run. This is a path that exists (relative or absolute)
-#                   The <utFile> component of the utID is created by removing the leading folders and the trailing .ut
+#                   The <utFileID> component of the utID is created by removing the leading folders and the trailing .ut
 #    <utFunc>     : the name of the function that implements the testcase.
 #    <utParams>   : the name of the key (aka index) of the array of comdLine parameters that that this testcase instanace will be
 #                   invoked with
@@ -424,20 +423,22 @@ function utfRunner_execute()
 	local utFunc="ut_${1#ut_}"; shift
 	local utParams="$1"; shift
 
-	local utFile="${utFilePath##*/}"; utFile="${utFile%.ut}"
-	local utID="${utFile}:${utFunc#ut_}:$utParams"
+	local utFileID="${utFilePath##*/}"; utFileID="${utFileID%.ut}"
+	local utID="${utFileID}:${utFunc#ut_}:$utParams"
 
 	# import script if needed and validate that the utFunc exists
-	[ "$(type -t "$utFunc")" == "function" ] || import "$utFilePath" ;$L1;$L2
-	[ "$(type -t "$utFunc")" == "function" ] || assertError -v utFile -v utFunc -v utParams "the unit test function is not defined in the unit test file"
+	[ "$(type -t "$utFunc")" == "function" ] || [ "$bgUnitTestMode" == "direct" ] || import "$utFilePath" ;$L1;$L2
+	[ "$(type -t "$utFunc")" == "function" ] || assertError -v utFileID -v utFunc -v utParams "the unit test function is not defined in the unit test file"
 
-	# if utParams is emptyString, invoke with no params. Otherwise, utParams is the key of the array of cmdline arguments with the
-	# same name as the utFunc
+	# if utParams is emptyString, invoke with no params. If its '...' use the arguments passed in to this function by the caller,
+	# Otherwise, utParams is the index (aka map key) of the array of cmdline arguments with the same name as the utFunc
 	local params=()
-	if [ "$utParams" ]; then
-		varIsA array "$utFunc"                   || assertError -v utFile -v utFunc -v utParams "the unit test file does not define an array variable with the same name as the function to hold the utParams."
+	if [ "$utParams" == "..." ]; then
+		params=("$@")
+	elif [ "$utParams" ]; then
+		varIsA array "$utFunc"                   || assertError -v utFileID -v utFunc -v utParams "the unit test file does not define an array variable with the same name as the function to hold the utParams."
 		local -n inputArray="$utFunc"
-		[ "${inputArray[$utParams]+exists}" ]    || assertError -v utFile -v utFunc -v utParams "utParams is not a key the in the array variable with the same name as the function. It should be a key whose value is the parameter string to invoke the test function with"
+		[ "${inputArray[$utParams]+exists}" ]    || assertError -v utFileID -v utFunc -v utParams "utParams is not a key the in the array variable with the same name as the function. It should be a key whose value is the parameter string to invoke the test function with"
 		# for each utParams passed in, run the testcase function
 		utUnEsc params ${inputArray[$utParams]}
 	fi
@@ -540,38 +541,53 @@ function utfRunner_execute()
 [ "$bgUnitTestMode" == "utRuntime" ] && return 0
 
 # MAN(1.bashCmd) bg-unitTest.ut
-# usage: <bg-unitTestScriptName>.ut list|runAll|<utID>
+# usage: <bg-unitTestScriptName>.ut [list]
+# usage: <bg-unitTestScriptName>.ut run <utID>
+# usage: <bg-unitTestScriptName>.ut debug <utID>
+# usage: <bg-unitTestScriptName>.ut run <testcaseFunction>:... [<p1>...<pN>]
 # *.ut files are scripts containing test cases. This is the man page for all *.ut files.
 # A ut script looks like a library but can also be executed as a stand alone command complete with bash command line completion.
+# Each function in the script whose name starts with "ut_" will become a testcase function. A testcase function can produce multiple
+# test cases, each with a different argument list. See man(7) bg_unitTest.ut.
 #
 # Unit Test Framework:
 # The "bg-dev test ..." command sources and runs the test cases contained in *.ut files in a special way that redirect their
 # output and determines if they pass or fail.
 #
 # Direct Execution:
-# *.ut unit test scripts can be executed directly from the command line also. The utfDirectScriptRun function in bg_unitTest.sh
+# *.ut unit test scripts can be executed directly from the command line while developing. The utfDirectScriptRun function in bg_unitTest.sh
 # provides this functionality. It supports command line completion so that the user can see how to run it and complete the utIDs
 # contained in the script.
 #
 # When a test case is run via direct execution, it is meant for testing and development of the test case as opposed to running it
 # under the unit test framework which records the results in the project. The output of the test case(s) goes to stdout so that it
-# can be immediately examined.  Running a test case this way makes it easier to run in the debugger.
+# can be immediately examined.  Running a test case this way makes it easier to run in the debugger because its exceuption environment
+# is more simple.
 #
-# list sub command
+# A testcase function can be executed with arguments provided on the command line. Instead of specifying a complete testcase ID with
+# the name of an argument list, "..." can be specified and then what ever arguments specidied on the command line after it will be
+# passed to the testcase function.
+#
+#
+#
+# <bg-unitTestScriptName>.ut [list]
 #    print a list of the utIDs contained in this script. Each is a unique testcase that can be ran.
 #
-# runAll sub command
-#    Run all the utIDs contained in this script, one after another. The output goes to stdout.
+# <bg-unitTestScriptName>.ut run [<utID>]
+# <bg-unitTestScriptName>.ut run <testcaseFunction>:... [<p1>...<pN>]
+#    Run the specified testcase. If <utID> is empty, all testcases are ran. The ... syntax allows trying new aurgument lists on the
+#    fly without adding a named argument list to the script for that testcase function  The output goes to stdout.
 #
-# <utId> sub command
-#    Run a specific utIDs contained in this script. The output goes to stdout.
+# <bg-unitTestScriptName>.ut debug [<utID>]
+#    Run a specific utIDs and stop on the first line of the <utID> in the debugger.
 #
 # Params:
 #    <utID> : A utID to run. It must be one that resides in this ut script. Use bash completion to fill it in. Use the 'list'
 #             command to see a list of all of the utID contained in the script.
+#             Syntax: <testcaseFunctionNameWithoutLeading "ut_">:<argListNameOr...>
 # See Also:
 #    man(7) bg_unitTest.ut
-
+#    man(1) bg-dev-tests
 
 
 #NO_FUNC_MAN
@@ -590,8 +606,8 @@ function utfDirectScriptRun()
 
 	case $cmd in
 		list)   directUT_listContainedUtIDs ;;
-		run)    directUT_runTestCases "$1" ;;
-		debug)  directUT_runTestCases "--debug" "$1" ;;
+		run)    directUT_runTestCases "$@" ;;
+		debug)  directUT_runTestCases "--debug" "$@" ;;
 		*)      assertError -v cmd -v bgUnitTestScript "unkown cmd. expeting list run or debug"
 	esac
 }
@@ -603,7 +619,7 @@ function directUT_runTestCases()
 		--debug) debugFlag="--debug" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local spec="$1"
+	local spec="$1"; shift
 
 	# load this ut_ function's source into an array
 	local line i=1; while IFS= read -r line; do
@@ -625,6 +641,17 @@ function directUT_runTestCases()
 				 -v expectCommentsFlag='on' '
 		@include "bg_unitTest.awk"
 	' "$bgUnitTestScript")
+
+	# allow the user to specific testcase arguments directly from the cmdline for testing.
+	# usage: <testcaseName>:... [<p1>...<pN>]
+	if [ ${count:-0} -eq 0 ] && [[ "$spec" =~ :...$ ]]; then
+		((count++))
+		local utFunc="ut_${spec%:...}"
+		utfRunner_execute $debugFlag "$bgUnitTestScript" "$utFunc" "..." "$@"
+	fi
+
+
+	[ ${count:-0} -eq 0 ] && assertError -v spec "utID spec did not match any testcases"
 }
 
 function directUT_listContainedUtIDs()

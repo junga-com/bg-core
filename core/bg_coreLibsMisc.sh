@@ -109,11 +109,19 @@ function bgOptionsEndLoop()
 	fi
 
 	# A typical options loop has a case statement for each option that it recognizes so if bgOptionsEndLoop gets called when the
-	# next argument looks like a token, it means that the option loop did not recognize it. By default, that is an "unknown option"
-	# error but the --eatUnknown option makes it ok to have extra options that are silently ignored
+	# next argument looks like a token, it means that the option loop did not recognize it.
+	# The bgOptionsOnUnknown and bgOptionsOnUnknownDefault functions handle options that the caller's loop does not. If they do not
+	# recognize it, the default bahavior is to throw the unrecognized option exception. The --eatUnknown option changes that to
+	# suppress the exception and silently ignore unknown options
 	if [[ "$1" =~ ^[+-].?$ ]] || [[ "$1" =~ ^[+-][+-] ]]; then
-		[ "$eatUnknown" ] || assertError --frameOffest=1 "unknown option '$1'"
 		bgOptionsExpandedOpts=("$@")
+		local result=1
+		if [ "$(type -t bgOptionsOnUnknown)" == "function" ]; then
+			bgOptionsOnUnknown "$@"; result="$?"
+			[ ${result:-0} -eq 0 ] && return 1
+		fi
+		[ ${result:-0} -eq 1 ] && bgOptionsOnUnknownDefault "$@" && return 1
+		[ ! "$eatUnknown" ] && assertError --frameOffest=1 "unknown option '$1'"
 
 	# maybe its a set of combined options so split of the first one. Note we know that the fist one
 	# is not an option with an argument because the scripts author's cases would have matched it.
@@ -124,7 +132,7 @@ function bgOptionsEndLoop()
 		# the calling loop will shift the next token so add a "" in front
 		bgOptionsExpandedOpts=("" "${first:0:2}" "-${first:2}" "$@")
 
-	# this is the block that recognizes only the first positional argument is that option is in effect
+	# this is the block that recognizes only the first positional argument if that option is in effect
 	elif [ "$firstParamVar" ] && [ ! "${!firstParamVar+isset}" ]; then
 		setReturnValue $firstParamVar "$1"
 		# the calling loop will shift "$1" for us
@@ -138,6 +146,51 @@ function bgOptionsEndLoop()
 	fi
 
 	# ensure that all the other cases return 1(false, do not end loop) to keep looping
+	return 1
+}
+
+# usage: bgOptionsOnUnknownDefault "$@"
+# this is called by bgOptionsEndLoop when the caller's case statement does not handle an option token. The user can override this
+# by defining the function bgOptionsOnUnknown() which will be called instead of this if it exists.
+# Default Global Options:
+# These are the global options that are recognized by default.
+#    verbosity
+#    Only if a variable named 'verbosity' exists, these options will be processed.
+#    A function that supports verbosity should typically define it locally like this so that changes only affect that function call.
+#    local verbosity="$verbosity"
+#       -q|--quiet)   ((verbosity--)); return 0 ;;
+#       -v|--verbose) ((verbosity++)); return 0 ;;
+#       --verbosity*) bgOptionGetOpt val: verbosity "$@" && bgOptionsExpandedOpts=("" "${@:2}"); return 0 ;;
+# bgOptionsOnUnknown:
+#    The script author can define the bgOptionsOnUnknown() function in order to change the behaior for unrecognized options.
+#    The function should examine "$1" which will be a token starting with '-' and if it recognizes it, process the option and return
+#    0(true). If it does not recognize and process the option it can either return 1 to indicate that bgOptionsOnUnknownDefault should
+#    get a shot at recognizing the default global options or 2 to indicate that the standard unknown option exception should be raised.
+#    If the recognized option consumes the $2 argument, it should set bgOptionsExpandedOpts=("" "${@:2}")
+# Params:
+#    "$@" are the remaining cmdline arguments. $1 is a token that starts with '-' that this function determined if it recognizes.
+#    This function can consume $2 by setting bgOptionsExpandedOpts=("" "${@:2}")
+# Return Value:
+#    0(true) : the option was recognized and processed
+#    1(false): the option was not recognized, try the default global options next
+#    2(false): the option was not recognized, do not perform default global options. assert unknown option
+#    bgOptionsExpandedOpts  : if it consumes additional tokens, it sets this variable to the remaining tokens (plus one leading token
+#             that will be shifted automatically by the calling loop)
+function bgOptionsOnUnknownDefault()
+{
+	# if a variable 'verbosity' has been defined in the script, recognize these options
+	# A function that supports verbosity should define it locally, optionally initializing it to the value above it like...
+	#    local verbosity="$verbosity"
+	if [ "${verbosity+exists}" ]; then
+		case $1 in
+			-q|--quiet)   ((verbosity--)); return 0 ;;
+			-v|--verbose) ((verbosity++)); return 0 ;;
+			--verbosity*)
+				bgOptionGetOpt val: verbosity "$@" && bgOptionsExpandedOpts=("" "${@:2}")
+				return 0
+				;;
+		esac
+	fi
 	return 1
 }
 

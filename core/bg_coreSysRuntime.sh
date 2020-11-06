@@ -68,6 +68,7 @@ function findInPaths()
 {
 	local allowDupes addScriptFolderFlag="1" debug relativePaths=("") tmpPaths allPaths
 	local posCwords=1 fileSpec preCmd findPrintFmt="%p" retVar
+	local retArgs=("--echo")
 
 	# this is an atypical option processing loop because we want to allow -r to appear anywhere and
 	# effect only the paths that follow it. So this loops over options and positional params
@@ -86,7 +87,7 @@ function findInPaths()
 		--no-scriptFolder:*) addScriptFolderFlag="" ;;
 		--debug:*)           debug="1"; preCmd="echo " ;;
 		--return-relative:*) findPrintFmt="%P" ;;
-		-R*|--retVar*) bgOptionGetOpt val: retVar "$@" && shift ;;
+		-R*|--retVar*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--array --append) ;;
 
 		# first positional param is the filespec
 		[^-]*:1) fileSpec="$1"; ((posCwords++)) ;;
@@ -132,33 +133,20 @@ function findInPaths()
 	# since we allow wildcards in <fileSpec>, we could be returning multiple matching files even if
 	# the allowDupes option was not specified so the awk filter is needed to remember which fileSpecs
 	# have been seen and suppress outputting subsequent fileSpecs.
-	if [ "$retVar" ]; then
-		while IFS="" read -r -d$'\b' _line; do
-			varSetRef --array --append "$retVar" "$_line"
-		done < <(find "${allPaths[@]}" -maxdepth 1 -type f -name "$fileSpec" -printf "${findPrintFmt}\0" 2>/dev/null | awk -v RS='\0' -F"/" '
-			{
-				# $NF is the basename -- the last field separated by -F"/"
-				if ("'"${allowDupes}"'"!="") {
-					printf("%s\b", $0)
-				} else if (!seen[$NF]) {
-					seen[$NF]=1
-					printf("%s\b", $0)
-				}
+	while IFS="" read -r -d$'\b' _line; do
+		varSetRef "${retArgs[@]}"  "$retVar" "$_line"
+	done < <(find "${allPaths[@]}" -maxdepth 1 -type f -name "$fileSpec" -printf "${findPrintFmt}\0" 2>/dev/null \
+		| awk -v RS='\0' -F"/" -v allowDupes="$allowDupes" '
+		{
+			# $NF is the basename -- the last field separated by -F"/"
+			# allowDupes refers to the same basename in different folders. In any case, we do not return the same full path twice
+			dupToken = (allowDupes) ? $0 : $NF
+			if (!seen[dupToken]) {
+				seen[dupToken]=1
+				printf("%s\b", $0)
 			}
-		')
-	else
-		find "${allPaths[@]}" -maxdepth 1 -type f -name "$fileSpec" -printf "${findPrintFmt}\0" 2>/dev/null | awk -v RS='\0' -F"/" '
-			{
-				# $NF is the basename -- the last field separated by -F"/"
-				if ("'"${allowDupes}"'"!="") {
-					printf("%s\n", $0)
-				} else if (!seen[$NF]) {
-					seen[$NF]=1
-					printf("%s\n", $0)
-				}
-			}
-		'
-	fi
+		}
+	')
 }
 
 
@@ -197,7 +185,7 @@ if [ "$projectName" ]; then
 	# 2020-10 - created new naming standard to group the paths related to the package running the code
 	pkgDataFolder="$dataFolder"
 	pkgConfFile="$confFile"
-	pkgManifest="/var/lib/bg-dev/$projectName"
+	pkgManifest="/var/lib/bg-core/$projectName"
 fi
 
 
@@ -369,64 +357,41 @@ function templateFind()
 # projects will be returned.
 function bgListInstalledProjects()
 {
-	echo "${bgInstalledPkgNames//:/$'\n'}"
+	if [ "$bgInstalledPkgNames" ]; then
+		echo "${bgInstalledPkgNames//:/$'\n'}"
+	else
+		fsExpandFiles -B /var/lib/bg-core/ /var/lib/bg-core/* -type d
+	fi
 }
 
-# usage: bgListAllInstalledCodeFiles
+# usage: bgManifestOfInstalledAssets
 # return a list of all the installed bash libraries and bash script commands from any script package
 # project. If any virtually installed projects are detected, only virutally installed paths will be
 # returned. Otherwise any found in the system pathes /usr/bin/ and /usr/lib are returned.
-# Options:
-#   --project=<projName> : return only files from the named project. default is "all" which returns files from all vinstalled projects
-#   --commandsOnly       : return only script files which are commands (not libraries)
-#   --librariesOnly      : return only script files which are libraries (not commands)
-#   --unitTestsOnly      : return only script files which are unit tests
-function bgListAllInstalledCodeFiles()
+function bgManifestOfInstalledAssets()
 {
-	local whichCode="getCodeList" project=all
-	while [ $# -gt 0 ]; do case $1 in
-		--project*) bgOptionGetOpt val: project "$@" && shift ;;
-		--commandsOnly)  whichCode="getCommandList" ;;
-		--librariesOnly) whichCode="getLibraryList" ;;
-		--unitTestsOnly) whichCode="getUnitTestList" ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	local awkScript outType='{printf("%s\n", $3)}'
+	while [ $# -gt 0 ]; do
+		awkScript+='$2=="'"$1"'" '"$outType"$'\n'
+		shift
 	done
-	# c) whichCode="getCommandList" ;;
-	# l) whichCode="getLibraryList" ;;
-	# a) whichCode="getCodeList" ;;
-	# u) whichCode="getUnitTestList" ;;
+	awkScript="${awkScript:-$outType}"
 
-	if [ "$bgLibPath" ]; then
+	local manifestFiles=()
 
-		# Since bgLibPath is set, we need to find the bg-scriptprojectdev Makefile
-		local makeFilePath="$(bgGetDataFolder "bg-scriptprojectdev")/Makefile"
-		if [ ! -f "$makeFilePath" ]; then
-			# this is here because its reasonable to vinstall just the bg-lib project on a machine where bg-scriptprojectdev is not installed.
-			# TODO: maybe this means that bg-debugCntr and Makefile both should only be in bg-scriptprojectdev -- maybe a stripped done bg-traceCntr should be in bg-lib
-			makeFilePath="$(bgGetDataFolder "bg-lib")/Makefile"
-		fi
-		[ -f "$makeFilePath" ] || assertError "there are vinstalled projects but a Makefile was not found to list files. Looked in scriptprojectdev/data and bg-lib/data bit installed and vinstalled"
-
-		local codeFiles vInstalledProj
-		local bgLibPathArray; IFS=":" read -a bgLibPathArray <<<"$bgLibPath"
-		for vInstalledProj in "${bgLibPathArray[@]}"; do
-			vInstalledProj="${vInstalledProj%/}"
-
-			if [ "$project" == "all" ] || [[ "$vInstalledProj" =~ /$project$ ]]; then
-				codeFiles+="$(
-					cd "$vInstalledProj" || return
-
-					# Let local Makefile override the shared Makefile
-					[ -f ./Makefile ] && makeFilePath="./Makefile"
-
-					echo
-					make -f "$makeFilePath" $whichCode | awk '/[^[:space:]]/ {sub("^[.]/",""); print "'"$vInstalledProj"'/"$0}'
-				)"
-			fi
-		done
+	if [ "$bgInstalledPkgNames" ]; then
+		findInPaths -R manifestFiles -d -r .bglocal/ manifest "$bgLibPath"
 	else
-		codeFiles=$(fsExpandFiles /usr/lib/??_*.sh)
-		codeFiles+=$(fsExpandFiles "/usr/lib/\(\(at\)\|\(bg\)\)-*")
+		# TODO: the installer needs to produce an additional manifest with the filenames located in the host
+		fsExpandFiles -A manifestFiles /var/lib/bg-core/*/hostmanifest
 	fi
-	echo "$codeFiles"
+
+	awk '
+		@include bg_core.awk
+		BEGINFILE {
+			prefix=gensub(/.bglocal.manifest/,"","g", FILENAME)
+		}
+		{if ($3!~/^\//)  $3 = prefix""$3}
+		'"$awkScript"'
+	' "${manifestFiles[@]:-/dev/null}"
 }

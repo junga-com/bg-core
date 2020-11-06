@@ -1,0 +1,231 @@
+
+###############################################################################################################################
+## bg_core.awk:parserCreateFromDelimList:0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> echo "$awkScript"
+##     | 
+##     | 	@include "bg_core.awk"
+##     | 	/^[[:space:]]*$/ {print; next}
+##     | 	{
+##     | 		sub(/^[[:space:]]*/, "")
+##     | 		printf("inputFolder:'%s'\n", $0)
+##     | 		fflush()
+##     | 		printf("      plain:'%s'\n", pathGetCanonStr($0))
+##     | 		fflush()
+##     | 		printf("      w/env:'%s'\n", pathGetCanonStr($0, 1))
+##     | 		fflush()
+##     | 	}
+##     | 
+##     | cmd> export HOME="/home/joeUser"
+##     | cmd> export PWD="/myPWD"
+
+##----------
+## test
+cmd> echo "$1" | awk "$awkScript" 2>&1
+
+inputFolder:'../'
+awk warning ($awkDataLibrary) : invalid path path=../
+      plain:''
+      w/env:'/'
+inputFolder:'../..'
+awk warning ($awkDataLibrary) : invalid path path=../..
+      plain:''
+awk warning ($awkDataLibrary) : invalid path path=../..
+      w/env:''
+inputFolder:'d./..'
+      plain:''
+      w/env:'/myPWD'
+inputFolder:'.d/..'
+      plain:''
+      w/env:'/myPWD'
+
+inputFolder:'./..'
+awk warning ($awkDataLibrary) : invalid path path=./..
+      plain:''
+      w/env:'/'
+inputFolder:'.//..'
+awk warning ($awkDataLibrary) : invalid path path=.//..
+      plain:''
+      w/env:'/'
+inputFolder:'../foo'
+awk warning ($awkDataLibrary) : invalid path path=../foo
+      plain:''
+      w/env:'/foo'
+inputFolder:'../../foo'
+awk warning ($awkDataLibrary) : invalid path path=../../foo
+      plain:''
+awk warning ($awkDataLibrary) : invalid path path=../../foo
+      w/env:''
+inputFolder:'../../../foo'
+awk warning ($awkDataLibrary) : invalid path path=../../../foo
+      plain:''
+awk warning ($awkDataLibrary) : invalid path path=../../../foo
+      w/env:''
+inputFolder:'/../../../foo'
+awk warning ($awkDataLibrary) : invalid path path=/../../../foo
+      plain:''
+awk warning ($awkDataLibrary) : invalid path path=/../../../foo
+      w/env:''
+inputFolder:'/../../one/two/../newTwo'
+awk warning ($awkDataLibrary) : invalid path path=/../../one/two/../newTwo
+      plain:''
+awk warning ($awkDataLibrary) : invalid path path=/../../one/two/../newTwo
+      w/env:''
+
+inputFolder:'1/2/3/4/5/6/7/8/../../foo.txt'
+      plain:'1/2/3/4/5/6/foo.txt'
+      w/env:'/myPWD/1/2/3/4/5/6/foo.txt'
+inputFolder:'1/2/3/4/5/6/7/8/.././../foo.txt'
+      plain:'1/2/3/4/5/6/foo.txt'
+      w/env:'/myPWD/1/2/3/4/5/6/foo.txt'
+inputFolder:'1/2/3/4/5/6/7/8/./.././.././foo.txt'
+      plain:'1/2/3/4/5/6/foo.txt'
+      w/env:'/myPWD/1/2/3/4/5/6/foo.txt'
+inputFolder:'.1/2/3/4/5/6/7/8/../../../../../../../.foo.txt'
+      plain:'.1/.foo.txt'
+      w/env:'/myPWD/.1/.foo.txt'
+inputFolder:'.1/2/3/4/5/6/7/8/../../../../../../../../.foo.txt'
+      plain:'.foo.txt'
+      w/env:'/myPWD/.foo.txt'
+inputFolder:'.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt'
+awk warning ($awkDataLibrary) : invalid path path=.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+      plain:''
+      w/env:'/.foo.txt'
+inputFolder:'/.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt'
+awk warning ($awkDataLibrary) : invalid path path=/.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+      plain:''
+awk warning ($awkDataLibrary) : invalid path path=/.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+      w/env:''
+inputFolder:'/.1/2/3/4/5/6/7/8/.../.foo.txt'
+      plain:'/.1/2/3/4/5/6/7/8/.../.foo.txt'
+      w/env:'/.1/2/3/4/5/6/7/8/.../.foo.txt'
+inputFolder:'/.1/2/3/4/5/6/7/8/../.../../../../../../../../.foo.txt'
+      plain:'/.1/.foo.txt'
+      w/env:'/.1/.foo.txt'
+
+inputFolder:'.../2/3/4/5/6/7/8/../../../../../../../.foo.txt'
+      plain:'.../.foo.txt'
+      w/env:'/myPWD/.../.foo.txt'
+inputFolder:'.../2/3/4/5/6/7/8/../../../../../../../../.foo.txt'
+      plain:'.foo.txt'
+      w/env:'/myPWD/.foo.txt'
+inputFolder:'.../2/3/4/5/6/7/8/../../../../../../../../../.foo.txt'
+awk warning ($awkDataLibrary) : invalid path path=.../2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+      plain:''
+      w/env:'/.foo.txt'
+
+inputFolder:'one/../../../../foo'
+awk warning ($awkDataLibrary) : invalid path path=one/../../../../foo
+      plain:''
+awk warning ($awkDataLibrary) : invalid path path=one/../../../../foo
+      w/env:''
+inputFolder:'/one/../../../../foo'
+awk warning ($awkDataLibrary) : invalid path path=/one/../../../../foo
+      plain:''
+awk warning ($awkDataLibrary) : invalid path path=/one/../../../../foo
+      w/env:''
+inputFolder:'/one/two/././../foo'
+      plain:'/one/foo'
+      w/env:'/one/foo'
+inputFolder:'one/two/this.that/..'
+      plain:'one/two'
+      w/env:'/myPWD/one/two'
+inputFolder:'..one/two../this..that/..d'
+      plain:'..one/two../this..that/..d'
+      w/env:'/myPWD/..one/two../this..that/..d'
+inputFolder:'one../two../this..that/d..'
+      plain:'one../two../this..that/d..'
+      w/env:'/myPWD/one../two../this..that/d..'
+inputFolder:'..one/two/this.that/..'
+      plain:'..one/two'
+      w/env:'/myPWD/..one/two'
+inputFolder:'one/two/this.that/../../foo'
+      plain:'one/foo'
+      w/env:'/myPWD/one/foo'
+
+inputFolder:'/'
+      plain:'/'
+      w/env:'/'
+inputFolder:'//'
+      plain:'/'
+      w/env:'/'
+inputFolder:'/./'
+      plain:'/'
+      w/env:'/'
+inputFolder:'/.//'
+      plain:'/'
+      w/env:'/'
+inputFolder:'/foo'
+      plain:'/foo'
+      w/env:'/foo'
+inputFolder:'//foo'
+      plain:'/foo'
+      w/env:'/foo'
+inputFolder:'/./foo'
+      plain:'/foo'
+      w/env:'/foo'
+inputFolder:'/.//foo'
+      plain:'/foo'
+      w/env:'/foo'
+inputFolder:'one'
+      plain:'one'
+      w/env:'/myPWD/one'
+inputFolder:'one/'
+      plain:'one'
+      w/env:'/myPWD/one'
+inputFolder:'one//'
+      plain:'one'
+      w/env:'/myPWD/one'
+inputFolder:'one/./'
+      plain:'one'
+      w/env:'/myPWD/one'
+inputFolder:'/one'
+      plain:'/one'
+      w/env:'/one'
+inputFolder:'/one/'
+      plain:'/one'
+      w/env:'/one'
+inputFolder:'//one//'
+      plain:'/one'
+      w/env:'/one'
+inputFolder:'/./one/'
+      plain:'/one'
+      w/env:'/one'
+inputFolder:'one/two'
+      plain:'one/two'
+      w/env:'/myPWD/one/two'
+inputFolder:'one/two/'
+      plain:'one/two'
+      w/env:'/myPWD/one/two'
+inputFolder:'one/./two/'
+      plain:'one/two'
+      w/env:'/myPWD/one/two'
+inputFolder:'one/././two/'
+      plain:'one/two'
+      w/env:'/myPWD/one/two'
+inputFolder:'one./././two/'
+      plain:'one./two'
+      w/env:'/myPWD/one./two'
+inputFolder:'one./././.two/'
+      plain:'one./.two'
+      w/env:'/myPWD/one./.two'
+inputFolder:'/one/two'
+      plain:'/one/two'
+      w/env:'/one/two'
+inputFolder:'/one/two/'
+      plain:'/one/two'
+      w/env:'/one/two'
+inputFolder:'one/two/this.that'
+      plain:'one/two/this.that'
+      w/env:'/myPWD/one/two/this.that'
+inputFolder:'one/two/this.that/'
+      plain:'one/two/this.that'
+      w/env:'/myPWD/one/two/this.that'
+
+
+## bg_core.awk:parserCreateFromDelimList:0 finished
+###############################################################################################################################
+

@@ -6,7 +6,7 @@ function _bg_subclassed_completionLoader() {
 	local cmd="$1"
 
 	# test to see if $cmd is listed in a package manifest file of a bg-core style package
-	if [[ "$cmd" =~ [.]ut$ ]] || { [ "$cmd" ] && [ "$(find /var/lib/bg-dev/*/manifest -print -quit 2>/dev/null)" ] && [ "$(awk '$2=="cmd" && $3=="'"$cmd"'" {print $3;exit}' /var/lib/bg-dev/*/manifest)" ]; } ; then
+	if [[ "$cmd" =~ [.]ut$ ]] || { [ "$cmd" ] && [ "$(find /var/lib/bg-core/*/manifest -print -quit 2>/dev/null)" ] && [ "$(awk '$2=="cmd" && $3=="'"$cmd"'" {print $3;exit}' /var/lib/bg-core/*/manifest)" ]; } ; then
 		# register our generic handler which invokes the command with the -hb syntax to ask it to provide the completion list
 		complete -F _bgbc-complete-viaCmdDelegation "$cmd" && return 124
 		# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs

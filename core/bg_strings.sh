@@ -108,7 +108,7 @@ function stringSplit()
 
 # usage: stringConsumeNext <tokenVar> <inputStrVar> [<delim>]
 # This consumes a string by removing one token at a time. <tokenVar> <inputStrVar> are the names of valiables in the caller's
-# scope. As the string is consumed, <inputStrVar> gets smaller <tokenVar> is overwritten with the next part.
+# scope. As the string is consumed, <inputStrVar> gets smaller and <tokenVar> is overwritten with the next part.
 # If the <delim> is not found, the entire value of <inputStrVar> is consumed and set into <tokenVar>.
 # It is quaranteed that if the return value is true(0) something was consumed so that it can be used as a while condition
 # without risk of an infinite loop.

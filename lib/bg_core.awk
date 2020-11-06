@@ -70,14 +70,21 @@ function queueFilesToScan(fileSpec,where             ,i,pathlist,addCount,insert
 ### Output functions
 
 # usage: printfVars("<varName1>|<opt1> [...<varNameN>|<optN>]"                ,optionsStr)
-# This prints a list of awk global vars. Note that local function variables will not work with this function but do with
-# printfVars2
+# The input is a string of space separated global variable names and optional parameters that start with '-'
+# This prints the listed awk global vars in a reasonable format.
+# Note that you must use printfVars2 to print local function variables. printfVars2 works with global variobles also but the trade
+# off is that printfVars allows a list of variables in one call but printfVars2 requires one call per variable.
 # Params:
 #    varNameN   : the name of a global awk variable to be displayed
-#    optionsStr : a string of optional args that apply to all. Note that options can be included among the varNames and effect
-#                 only varNames from that point on.
+#    optionsStr : a string of optional args that affect how subsequent varNames are printed. Note that options can be included
+#                 among the varNames and effect only varNames from that point on.
+# Options:
+#    -l<str> : literal. write <str> to the output instead of interpreting it as a global varName
+#    -o<filename> : redirect output to <filename>
+#    -w<n>   : pad subsequent <varNames> to <n> characters
+#
 # See Also:
-#    printfVarss : print only one var at a time but works with local and netsted arrays that this function does not work with
+#    printfVars2 : print only one var at a time but works with local and netsted arrays that this function does not work with
 #    (bash)printfVars : similar bash function
 function printfVars(varNameListStr            ,optionsStr,level, varNameList, i,options,outFile) {
 	level=0
@@ -155,6 +162,27 @@ function printfVars2(level, varName, varValue, optionsStr,      i,optToken,optio
 #################################################################################################################################
 ### Array functions
 
+# usage: arrayPush(array, element)
+# add <element> to the end of <array>
+function arrayPush(array, element) {
+	array[length(array)]=element
+}
+
+# usage: arrayPop(array)
+# remove and return the last element from the end of <array>
+function arrayPop(array                      , element) {
+	element=array[length(array)-1]
+	delete array[length(array)-1]
+	return element
+}
+
+function arrayIndexOf(array, element           , i) {
+	for (i=0; i<length(array); i++)
+		if (element == array[i])
+			return i
+	return -1
+}
+
 # usage: arrayCopy(source, dest)
 # copy the contents of one array var into another
 # Return Value:
@@ -224,7 +252,7 @@ function spliti2(str, array, elName, delim    ,tmp,i) {
 
 # MAN(3) split
 # usage: split2(str, array, elName, [delim])
-# Like split but works to assign new,untyped sub-arrays elements with split can not do
+# Like split but works to assign new,untyped sub-arrays elements which split can not do
 function split2(str, array, elName, delim) {
 	if (!delim) delim=FS
 	array[elName][1]=""
@@ -312,6 +340,47 @@ function strExtract(s, leadingRegEx, trailingRegEx) {
 	sub(trailingRegEx,"",s)
 	return s
 }
+
+# This initializes parseState as an array and fills in attributes for it to parse inputStr based on delimChars
+# other parserCreate* functions can set it up to parse on other types of delimiters
+# Params:
+#    <parseState>    : the array variable that will hold the parser state. It can be an unitializaed variable or an array that will be cleared
+#    <inputStr>      : the target of the parsing. This entry will be consumed and when its empty, the next call to parserConsume* will return false
+#    <delimChars>    : a string of one or more characters that will split the input on
+#    <inclDelimFlag> : if truthy, the trailing delimieter will be included in each consumed token
+function parserCreateFromDelimList(parseState, inputStr, delimChars, inclDelimFlag) {
+	arrayCreate(parseState)
+	parseState["input"] = inputStr
+	parseState["delim"] = delimChars
+	parseState["matchRegexp"] = "^([^"delimChars"]*)(["delimChars"])(.*)$"
+	parseState["includeDelim"]=inclDelimFlag
+	#bgtraceVars2(0,"parseState", parseState)
+}
+
+# run the parser once. The input string will be reduced by some amount of leading characters and those characters will be placed in token
+function parserConsumeNext(parseState                       ,rematch) {
+	return parserConsumeNextFromRE(parseState, parseState["matchRegexp"])
+}
+
+# like  parserConsumeNext but the caller can specify the exact regex to use, overrided any that was initiallized by the parserCreate
+# function. The regex must contain 3 () groups. [1] matches the consumed token, [2] the delimeter found at the end of token, [3] the
+# remainder of the input left onconsumed
+function parserConsumeNextFromRE(parseState, regex                       ,rematch) {
+	if (match( parseState["input"], regex, rematch)) {
+		parseState["token"] = (parseState["includeDelim"]) ? rematch[1]""rematch[2]  : rematch[1];
+		parseState["input"] = rematch[3];
+		#bgtraceVars2(0,"parseState", parseState)
+		return 1
+	} else if (length(parseState["input"]) >0) {
+		parseState["token"] = parseState["input"]
+		parseState["input"] = "";
+		#bgtraceVars2(0,"parseState", parseState)
+		return 1
+	} else {
+		return 0
+	}
+}
+
 function norm(s) {
 	if (s=="") return "--"
 	if (s~/[ \t\n]/) s="\"" s "\""
@@ -378,6 +447,7 @@ function stringTrimQuotes(str       ,rematch) {
 		return rematch[1]
 	return str
 }
+
 
 # usage: stringExpand(str,context)
 # expand str as a template that contains variable references of the form %<varName>[:<default>]%
@@ -459,6 +529,7 @@ function expandTemplate(templateFilename, context, outFile            ,name,valu
 # usage: fsExists(f)
 # returns true(1) if file f exists and false(0) if it does not exist
 function fsExists(file1,     fileStats1,result) {
+	if (!file1) return 0;
 	result=stat(file1, fileStats1)
 	return (result==0)
 }
@@ -538,7 +609,7 @@ function fsIsDifferent(file1, file2         ,cmd,result,fileStats1,fileStats2) {
 	cmd="sh -c 'diff -q "file1" "file2" 2>&1 '"
 	cmd | getline result
 	close(cmd)
-	return (result)
+	return (result!="")
 }
 
 # usage: updateIfDifferent(srcFile, dstFile)
@@ -555,5 +626,195 @@ function updateIfDifferent(srcFile, dstFile               ,cmd,srcExists,dstExis
 		close("sh")
 	} else if (!srcExists && dstExists) {
 		print "rm "dstFile | "sh"
+	} else if (srcExists) {
+		print "rm "srcFile | "sh"
+		close("sh")
 	}
 }
+
+
+#################################################################################################################################
+### Path functions
+
+# usage: pathGetCommon <path1> <path2>
+# compare the two paths from left to right and return the prefix that is common to both.
+# put another way, it returns the folder with the longest path that is a parent of both paths
+# Example:
+#    p1 = /var/lib/foo/data
+#    p2 = /var/lib/bar/five/fee
+#   out = /var/lib/
+function pathGetCommon(p1, p2                                   ,t1,t2,out,finished)
+{
+	parserCreateFromDelimList(t1, p1, "/", 1)
+	parserCreateFromDelimList(t2, p2, "/", 1)
+
+	while ( t1["token"] == t2["token"] && ! finished ) {
+		out=out""t1["token"]
+		if (!parserConsumeNext(t1)) finished="1"
+		if (!parserConsumeNext(t2)) finished="1"
+	}
+
+	return out
+}
+
+
+# usage: pathGetCanonStr -e <path>  [<retVar>]
+# usage: canoPath="$(pathGetCanonStr "path")"
+# return the canonical version of <path> without requiring that any part of it exists.
+#
+# Note that starting in Ubuntu 16.04, the realpath core gnu util is much more capable including
+#       logical/physical symlink mode
+# Note that "readlink -f" does something similar but expands any symlinks in the path. It also requires
+# that all folders in the path must exist or it returns empty string. This function does not expand
+# symlinks so that the logical path names are preserved but does simplify the path to its canonical form
+#
+# This is a pure string manipulation and does not reference the filesystem tree except for
+# the -e option to turn a relative path into a absolute path.
+# Often you want the full path relative to the current folder which is what the -e option does
+#
+# Params:
+#    <retVar> : return the result in this variable name. default is to write result to stdout
+# Options:
+#    -e : use the environment to make a relative path absolute. If the path does not start with /
+#         it will be prepended with either $home if it begins with ~ or $PWD. It does not matter
+#         if the resulting path exists or not.
+# Output:
+#    if path is invalid the empty string will be returned and the exit code is 1
+#    otherwise the canonical version is returned on stdout and the exit code is 0
+#    if -e id specified the returned path will be absolute
+#    The second param <retVar> is specified, it will be set with the value. otherwise the value
+#    is written to stdout
+# What it does:
+#    removes any './', '//' sequences
+#    removes any trailing /
+#    process ../  by removing the previous part, handling adjacent ../../
+#        if the path begins with /../ it is an invalid path because there is no previous part to remove
+#        if the path begins with ../ it is relative to something this function can not know and any
+#            leading ../../... sequences will not be removed
+function pathGetCanonStr(path, useEnvFlag                                , parser, pathArray, origPath, out )
+{
+	origPath=path
+	arrayCreate(pathArray)
+
+	if (useEnvFlag) {
+		if (path ~ /^~/ ) path=ENVIRON["HOME"]"/"substr(path, 2)
+		if (!path || path ~ /^[^/]/)
+			path=ENVIRON["PWD"]"/"path
+		fi
+	}
+
+	parserCreateFromDelimList(parser, path, "/")
+	while ( parserConsumeNext(parser) ) {
+		switch (parser["token"]) {
+			case "..":
+				if (length(pathArray)==0 || (length(pathArray)==1 && pathArray[0]=="")) {
+					warning("invalid path path="origPath)
+					return ""
+				}
+				delete pathArray[length(pathArray)-1]
+				break
+			case ".":
+				break
+			case "":
+				# if the first path is empty, it means its an absolute path starting with / but any other is a duplicate //
+				if (length(pathArray)==0)
+					pathArray[length(pathArray)]=parser["token"]
+				break
+			default:
+				pathArray[length(pathArray)]=parser["token"]
+		}
+	}
+bgtraceVars2(0,"pathArray", pathArray)
+
+	if ((length(pathArray)==1 && pathArray[0]==""))
+		out="/"
+	else
+		out=join(pathArray,"/")
+	return out
+}
+
+
+# # usage: pathCompare [-e] <p1> <p2>
+# # compares two paths taking into account path globing (i.e. *)
+# # Options:
+# #    -e : pathGetCanonStr each path first which removes things that dont effect the meaning (like extra / "//" )
+# #         and also makes the paths absolute.
+# function pathCompare()
+# {
+# 	local envFlag=""
+# 	while [[ "$1" =~ ^- ]]; do case $1 in
+# 		-e) envFlag="1" ;;
+# 	esac; shift; done
+# 	# remove a trailing / because the presense of a trailing / or not does not change the meaning of the path
+# 	local p1="${1%/}"
+# 	local p2="${2%/}"
+#
+# 	if [ "$envFlag" ]; then
+# 		p1="$(pathGetCanonStr -e "$p1")"
+# 		p2="$(pathGetCanonStr -e "$p2")"
+# 	fi
+#
+# 	# use the == op of [[ ]] because it understands * globing -- i.e "/var/*" is equal to "/var/lib"
+# 	# replace spaces in the paths with '\ ' which escapes them so that [[ ]] does not break the tokens on spaces
+# 	[[ ${p1// /\\ } == ${p2// /\\ } ]]
+# }
+#
+#
+# # usage: pathGetRelativeLinkContents <linkFrom> <linkTo> [<retVar>]
+# # returns the relative path that would make a symlink at <linkFrom> point to the filessysem object at <linkTo>
+# # linkFrom and linkTo do not need to be absolute, but they do need to be relative to the same PWD so that they
+# # have a command path. this does not necessarily mean that they have any common parts in there strings.
+# # Params:
+# #    <linkFrom> : The path where a symlink cound be created. If this is a folder, its where an unamed symlink
+# #                 in that folder could be created.
+# #    <linkTo>   : The file or folder where the symlink will point to.
+# #    <retVar>   : if provided, the result is returned in this variable instead of stdout
+# function pathGetRelativeLinkContents()
+# {
+# 	local linkFrom="$1"
+# 	local linkTo="$2"
+#
+# 	# if linkFrom ends in a / its a folder location. Put a dummy link name b/c the alogorithm assumes its a link
+# 	[[ "$linkFrom" =~ /$ ]] && linkFrom+="linkFilename"
+#
+# 	local commonPath="$(pathGetCommon "$linkFrom" "$linkTo")"
+#
+# 	# if there is no common path, and either contains a protocol part, there path parts might still be
+# 	# relative so parse out everything but the path part of the URLs and try again.
+# 	# TODO: take into account if the users are different and the resource paths are relative they have different PWD
+# 	if [ ! "$commonPath" ]; then
+#  		local host1 host2
+#  		[[ "${linkFrom}" =~ [:] ]] && parseURL "$linkFrom" "" "" "" host1 "" linkFrom
+#  		[[ "${linkTo}" =~ [:] ]]   && parseURL "$linkTo"   "" "" "" host2 "" linkTo
+#
+# 		# if they refer to different hosts, they have nothing in common
+# 		[ "$host1" ] && [ "$host2" ] && [ "$host1" != "$host2" ] && return
+#
+# 		# now restart with the paths now that niether have the host/protocol
+# 		commonPath="$(pathGetCommon "$linkFrom" "$linkTo")"
+# 	fi
+#
+# 	# if there is still no common path, and niether are absolute, assume that they are both relative to the PWD and add ./
+# 	if [ ! "$commonPath" ] && [ "${linkFrom:0:1}" != "/" ] && [ "${linkTo:0:1}" != "/" ]; then
+# 		commonPath="./"
+# 		linkFrom="./$linkFrom"
+# 		linkTo="./$linkTo"
+# 	fi
+#
+# 	# if there is still no common path but one of them is absolute, we have to make the other one absoute using the PWD
+# 	# note that if both are absolute, commonPath could not be empty (it would be at least "/")
+# 	if [ ! "$commonPath" ]; then
+# 		# TODO: it seems that we should call pathGetCanonStr on both unconditionally here but I don't want to test that now
+# 		[ "${linkFrom:0:1}" == "/" ] && linkTo="$(pathGetCanonStr -e "$linkTo")"
+# 		[ "${linkTo:0:1}" == "/" ] && linkFrom="$(pathGetCanonStr -e "$linkFrom")"
+# 		commonPath="$(pathGetCommon "$linkFrom" "$linkTo")"
+# 	fi
+#
+# 	local linkFromRel="${linkFrom#${commonPath%/}}"; linkFromRel="${linkFromRel#/}"
+# 	local linkToRel="${linkTo#${commonPath%/}}"; linkToRel="${linkToRel#/}"
+#
+# 	# the first -e statement turns all the leading folders ("something>/") into ../
+# 	# the second -e statement removes the filename of the link
+# 	local result="$(echo "$linkFromRel" | sed -e 's|[^/][^/]*/|\.\./|g' -e 's|/*[^/]*$||')"
+# 	returnValue "$result${result:+/}$linkToRel" "$3"
+# }

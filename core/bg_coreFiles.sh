@@ -165,6 +165,14 @@ function fsMakeTemp()
 }
 
 
+# usage: fsIsNewer <filename1> <filename2>
+# this is a wrapper over the [ <filename1> -nt <filename2> ] syntax.
+# Either file can be non-existent or an empty filename. Returns 0(true) only if <filename1> exists and either has a newer timestamp
+# than <filename2> or <filename2> does not exist.
+function fsIsNewer()
+{
+	[ "$1" -nt "$2" ]
+}
 
 # usage: fsIsDifferent [<diffIgnoreOpt>] <file1> <file2>
 # returns true(0) if <file1> <file2> do not have the same contents and false(1) if they do

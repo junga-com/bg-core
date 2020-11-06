@@ -1,0 +1,450 @@
+
+###############################################################################################################################
+## bg_ini.sh:getIniParam:1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+
+##----------
+## test
+cmd> getIniParam "$iniFile" '.' p1
+
+cmd> getIniParam "$iniFile" '.' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" '.' p2
+
+cmd> getIniParam "$iniFile" '.' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' p1
+cmd> getIniParam "$iniFile" '.' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' p2
+cmd> getIniParam "$iniFile" '.' noExist
+
+cmd> getIniParam "$iniFile" 'sect1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' honey
+cmd> getIniParam "$iniFile" 'sect1' p1
+
+cmd> getIniParam "$iniFile" 'sect1' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" 'sect1' p2
+
+cmd> getIniParam "$iniFile" 'sect1' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' p1
+cmd> getIniParam "$iniFile" 'sect1' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' p2
+cmd> getIniParam "$iniFile" 'sect1' noExist
+
+cmd> getIniParam "$iniFile" 'sect2' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' honey
+cmd> getIniParam "$iniFile" 'sect2' p1
+
+cmd> getIniParam "$iniFile" 'sect2' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" 'sect2' p2
+
+cmd> getIniParam "$iniFile" 'sect2' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+cmd> getIniParam "$iniFile" 'sect2' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+cmd> getIniParam "$iniFile" 'sect:1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+cmd> getIniParam "$iniFile" 'sect:1' p1
+
+cmd> getIniParam "$iniFile" 'sect:1' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+
+## bg_ini.sh:getIniParam:1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniParam:2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=foo
+##     | p2 = 3
+##     | p3.a = "hello world"
+##     | 
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> getIniParam "$iniFile" '.' p1
+foo
+cmd> getIniParam "$iniFile" '.' p2
+3
+cmd> getIniParam "$iniFile" '.' honey
+good
+cmd> getIniParam "$iniFile" '.' noExist
+
+cmd> getIniParam "$iniFile" 'sect1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' honey
+cmd> getIniParam "$iniFile" 'sect1' p1
+
+cmd> getIniParam "$iniFile" 'sect1' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" 'sect1' p2
+
+cmd> getIniParam "$iniFile" 'sect1' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' p1
+cmd> getIniParam "$iniFile" 'sect1' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' p2
+cmd> getIniParam "$iniFile" 'sect1' noExist
+
+cmd> getIniParam "$iniFile" 'sect2' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' honey
+cmd> getIniParam "$iniFile" 'sect2' p1
+
+cmd> getIniParam "$iniFile" 'sect2' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" 'sect2' p2
+
+cmd> getIniParam "$iniFile" 'sect2' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+cmd> getIniParam "$iniFile" 'sect2' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+cmd> getIniParam "$iniFile" 'sect:1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+cmd> getIniParam "$iniFile" 'sect:1' p1
+
+cmd> getIniParam "$iniFile" 'sect:1' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+
+## bg_ini.sh:getIniParam:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniParam:3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+##     | [ sect14 ]
+##     | this=that
+##     | 
+
+##----------
+## test
+cmd> getIniParam "$iniFile" '.' p1
+
+cmd> getIniParam "$iniFile" '.' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" '.' p2
+
+cmd> getIniParam "$iniFile" '.' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' p1
+cmd> getIniParam "$iniFile" '.' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' p2
+cmd> getIniParam "$iniFile" '.' noExist
+
+cmd> getIniParam "$iniFile" 'sect1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' honey
+cmd> getIniParam "$iniFile" 'sect1' p1
+foo
+cmd> getIniParam "$iniFile" 'sect1' p2
+3
+cmd> getIniParam "$iniFile" 'sect1' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' p2
+cmd> getIniParam "$iniFile" 'sect1' noExist
+
+cmd> getIniParam "$iniFile" 'sect2' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' honey
+cmd> getIniParam "$iniFile" 'sect2' p1
+
+cmd> getIniParam "$iniFile" 'sect2' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" 'sect2' p2
+
+cmd> getIniParam "$iniFile" 'sect2' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+cmd> getIniParam "$iniFile" 'sect2' honey
+good
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+cmd> getIniParam "$iniFile" 'sect:1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+cmd> getIniParam "$iniFile" 'sect:1' p1
+
+cmd> getIniParam "$iniFile" 'sect:1' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+
+## bg_ini.sh:getIniParam:3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniParam:4 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+
+##----------
+## test
+cmd> getIniParam "$iniFile" '.' p1
+topFoo
+cmd> getIniParam "$iniFile" '.' p2
+0
+cmd> getIniParam "$iniFile" '.' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' p2
+cmd> getIniParam "$iniFile" '.' noExist
+
+cmd> getIniParam "$iniFile" 'sect1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' honey
+cmd> getIniParam "$iniFile" 'sect1' p1
+foo
+cmd> getIniParam "$iniFile" 'sect1' p2
+3
+cmd> getIniParam "$iniFile" 'sect1' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' p2
+cmd> getIniParam "$iniFile" 'sect1' noExist
+
+cmd> getIniParam "$iniFile" 'sect2' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' honey
+cmd> getIniParam "$iniFile" 'sect2' p1
+
+cmd> getIniParam "$iniFile" 'sect2' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" 'sect2' p2
+
+cmd> getIniParam "$iniFile" 'sect2' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+cmd> getIniParam "$iniFile" 'sect2' honey
+good
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+cmd> getIniParam "$iniFile" 'sect:1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+cmd> getIniParam "$iniFile" 'sect:1' p1
+
+cmd> getIniParam "$iniFile" 'sect:1' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+
+## bg_ini.sh:getIniParam:4 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniParam:5 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect:1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect:2 ]
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> getIniParam "$iniFile" '.' p1
+topFoo
+cmd> getIniParam "$iniFile" '.' p2
+0
+cmd> getIniParam "$iniFile" '.' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' p2
+cmd> getIniParam "$iniFile" '.' noExist
+
+cmd> getIniParam "$iniFile" 'sect1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect1' honey
+cmd> getIniParam "$iniFile" 'sect1' p1
+
+cmd> getIniParam "$iniFile" 'sect1' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" 'sect1' p2
+
+cmd> getIniParam "$iniFile" 'sect1' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' p1
+cmd> getIniParam "$iniFile" 'sect1' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' p2
+cmd> getIniParam "$iniFile" 'sect1' noExist
+
+cmd> getIniParam "$iniFile" 'sect2' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect2' honey
+cmd> getIniParam "$iniFile" 'sect2' p1
+
+cmd> getIniParam "$iniFile" 'sect2' honey
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> 
+cmd> getIniParam "$iniFile" 'sect2' p2
+
+cmd> getIniParam "$iniFile" 'sect2' noExist
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+cmd> getIniParam "$iniFile" 'sect2' honey
+
+cmd> 
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+cmd> getIniParam "$iniFile" 'sect:1' p1
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+cmd> getIniParam "$iniFile" 'sect:1' p1
+foo
+cmd> getIniParam "$iniFile" 'sect:1' p2
+3
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+
+## bg_ini.sh:getIniParam:5 finished
+###############################################################################################################################
+
