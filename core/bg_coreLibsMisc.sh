@@ -974,7 +974,7 @@ function bgGetLoginuid()
 function progress()
 {
 	if [[ ! "$progressDisplayType" =~ ^(none|null|off)$ ]]; then
-		import -f bg_cui.sh ;$L1;$L2 || assertError
+		import -f bg_cuiProgress.sh ;$L1;$L2 || assertError
 		progress "$@"
 	fi
 }

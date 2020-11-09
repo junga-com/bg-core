@@ -120,6 +120,9 @@ function importCntr()
 	esac
 }
 
+function _importNOOPWithExitCodePasstrough() { return $?; }
+function _importSetErrorCode() { return 202; }
+
 # usage: 'import [-f] <scriptName> ;$L1;$L2'
 # usage: import --getPath <scriptName> [<returnVar>]
 # Source a bash library. Similar to "source <scriptName>" or ". <scriptName>"
@@ -223,8 +226,8 @@ function import()
 			# this allows 'import <library> ;$L1;$L2 || ...'
 			# CRITICALTODO: function pass() { return $?; } works as L2 to pass the error code through. I cant take time to test it right now.
 			#               this change would make the L2 optional so that import <name> ;$L1  would still work, but just not record time trace info
-			L1=""
-			L2="source $foundScriptPath"
+			L1="source $foundScriptPath"
+			L2="_importNOOPWithExitCodePasstrough"
 		fi
 
 		# if we are reloading a lib that had already been sourced, then insert a unique row to
@@ -242,13 +245,13 @@ function import()
 	### library not found path
 
 	# if we are being called early in the initialization process, the real assertError might not be loaded yet so make a simple version
-	type -f assertError &>/dev/null || function assertError() { printf "simpleErrorReporter: 'import $scriptName ;\$L1;\$L2' $*\n" >&2; exit; }
+	type -t assertError &>/dev/null || function assertError() { printf "(early import error reporter): $*\n" >&2; exit; }
 
 	# if $quietFlag is specified, we only return the 202 exit code, otherwise we assert an error
 	# because of the unusual ;$L1;$L2 pattern, we cant just return the exit code from this function
 	if [ "$quietFlag" ]; then
-		L1=""
-		L2='(exit 202)'
+		L1='_importSetErrorCode'
+		L2="_importNOOPWithExitCodePasstrough"
 	else
 		assertError -v bgLibPath "bash library not found by in any system path. Default system path is '/usr/lib'"
 	fi

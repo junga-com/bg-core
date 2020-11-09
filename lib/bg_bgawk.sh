@@ -5,13 +5,13 @@
 # this function combines some common behavior of sed and awk. The -i and -n options have the same
 # semantics as in sed which means you can use awk syntax to do stream editting. By default, any line
 # that your script does not modify will be passed through to the output unchanged. Any changed you make
-# to $0, will be reflected in the output.  
+# to $0, will be reflected in the output.
 #
 # outputOff variable:
 #    if your script sets outputOff="1", the current line will not be outputed. It only effects the current
-#    line so you need to set it on every line you what to suppress. {outputOff="1"} would suppress all the 
+#    line so you need to set it on every line you what to suppress. {outputOff="1"} would suppress all the
 #    lines so that your script will be solely responsible for the output. -n does the same.  If your code
-#    prints a line that is meant to replace the current line, set this variable. The other way to change 
+#    prints a line that is meant to replace the current line, set this variable. The other way to change
 #    the line outputed is to simply change the $0 variable and allow it to be automatically printed. i.e.
 #    {$0="hello"} would replace the current line with "hello".
 # insertLineBefore(newLine), insertLineAfter(newLine):
@@ -26,15 +26,15 @@
 # -q : quietFlag. don't assert an error if the script returns non zero. This does not apply when -i is specified.
 #      When -i is not specified, you only need this if your script must return 1 and you want to process that result.
 #      If your script returns codes >1, they will be passed back to you anyway. awk uses 1 to indicate a syntax error
-# -i : behaves like sed's -i. It causes the file to be changed in place. It makes a temp file and then 
+# -i : behaves like sed's -i. It causes the file to be changed in place. It makes a temp file and then
 #      overwrites the <file>. If the awk exits with a non-zero code, it will not overwrite the original file
 #      The script needs to exit 0 for -i to be sucessful
-#      Anything written to stdout will be become the file contents. See -n. 
+#      Anything written to stdout will be become the file contents. See -n.
 #      Anything written to "/dev/fd/3" will be redircted to the calling processe's stdout so that status
 #      can be captured or progress can be displayed.
-#      If multiple files are specified, each is read and written to separately 
+#      If multiple files are specified, each is read and written to separately
 #      return true(0) if the file was modified or false(1) if it was not
-# --checkOnly : when -i is specified, do not change file. return true(0) if the file would be modified 
+# --checkOnly : when -i is specified, do not change file. return true(0) if the file would be modified
 #       or false(1) if it would not be. no effect without -i
 # -n : behaves like sed's -n. unlike plain awk, this command prints each line by default. -n suppresses that
 # -d : debug. When specified with the -i option, it will not overwrite the configFile and it will launch meld
@@ -60,12 +60,12 @@
 # Exit Codes:
 #   in filter mode (without -i),
 #     <n> : the exit code is the exit code that awk returned when invoked to run the <script>
-#      1  : awk uses exit code 1 to indicate a script syntax error but it could also be that the script 
-#           called exit(1). Scripts written for use with bgawk should not exit(1) to avoid this confusion. 
+#      1  : awk uses exit code 1 to indicate a script syntax error but it could also be that the script
+#           called exit(1). Scripts written for use with bgawk should not exit(1) to avoid this confusion.
 #           without -q, when awk return 1, assertError is call to end the process (or sub shell)
 #           If your want to process the exit code 1 case, use -q
 #
-#   in inplace (-i) mode, 
+#   in inplace (-i) mode,
 #     0 (true)   : the the file was modified or would be modified (in check mode)
 #     1 (false)  : the file does not need to be changed as a result of this script
 #     assertError: the awk script returned non-zero exit code. We assume that if the exit code was 1 its
@@ -83,7 +83,7 @@
 #                                 whether the file was or would be changed
 function bgawk()
 {
-	local file awkScript inplace quietFlag debugFlag outOffFlag cols1Flag cols2Flag outputDefaultOff 
+	local file awkScript inplace quietFlag debugFlag outOffFlag cols1Flag cols2Flag outputDefaultOff
 	local useCols checkOnlyFlag stripCommentsFlag passThruOpts=("--re-interval") returnTrueIfChanged="1" returnTrueIfSuccessful
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-i)  inplace="-i" ;;
@@ -138,7 +138,7 @@ function bgawk()
 			fi
 		fi
 
-		local script=""
+		local script='@include "bg_core.awk"'$'\n'
 		[ "$useCols" == "2" ] && script='
 			NR==1 {for (i=1; i<=NF; i++) colNames[i]=$i}
 			NR>1 {for (i=1; i<=NF; i++) {if (colNames[i]) {row[colNames[i]]=$i; }}}
@@ -156,7 +156,7 @@ function bgawk()
 		'
 
 
-		local script="$script"'
+		script="$script"'
 			function deleteLine() {
 				outputOff="1"
 			}
@@ -189,7 +189,7 @@ function bgawk()
 			return 1
 		fi
 
-		# this case enumerates the 4 possible combinations of 
+		# this case enumerates the 4 possible combinations of
 		#    1) where the input comes from (stdin vs input file)
 		#    2) where the output goes to (inplace vs stdout).
 		case ${file:+fileExists}:${inplace:+inplace} in
@@ -230,7 +230,7 @@ function bgawk()
 				[ "$returnTrueIfChanged" ]
 				return
 
-			# do nothing. original and new file are the same.  
+			# do nothing. original and new file are the same.
 			else
 				rm "$tmpFile"
 				[ "$returnTrueIfSuccessful" ] && return 0
