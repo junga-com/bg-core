@@ -1,367 +1,11 @@
 #!/bin/bash
 
 
-function _printfAtInit()
-{
-	if [ ! "${_printfAt_xColMin+exists}" ]; then
-		declare -g _printfAt_xColMin="1"
-		declare -g _printfAt_yLineMin="1"
-		declare -g _printfAt_xColMax="10000"
-		declare -g _printfAt_yLineMax="10000"
-
-		declare -g _printfAt_xColMinVP="1"
-		declare -g _printfAt_yLineMinVP="1"
-		declare -g _printfAt_xColMaxVP="10000"
-		declare -g _printfAt_yLineMaxVP="10000"
-
-		declare -g _printfAt_xColStart="1"
-		declare -g _printfAt_yLineStart="1"
-	fi
-}
-
-# usage: printfAt <xCol> <yLine> [--eol] [--sol] <fmtStr> ...
-# This can be used like bash's printf (without the -v option) but it accepts for optional parameters
-# in any order.
-# There are a family of printfAt_* functions that can be used to influence how printfAt works.
-# Features:
-#    * buffer output by enclosing it in printfAt_startBufferedOutput / printfAt_endBufferedOutput
-#    * limit output to within a virtual view port with printfAt_setViewport
-#    * scroll output within a virtual view port with printfAt_scrollViewport[To]
-# Options:
-#    These options are unusual because <xCol> and <yLine> do not begin with - The first two numeric params
-#    that appear before a param that can not be an options will be taken as xCol and yLine
-#    <xCol>  : the column postion to start out at. The first numeric param is taken as xCol
-#              1 is the first column on the left
-#    <yLine> : the line postion to start out at. The second numeric param is taken as yLine
-#              1 is the first line on the top.
-#    --eol   : clear to the end of the line after writing the output.
-#    --sol   : clear from the start of the line to xCol before writing the output.
-#    --      : end of options. the rest of the cmd line will not be checked to see if they match options
-# See Also:
-#    printfAt_*
-function termPrintfAt() { printfAt "$@"; }
-function printfAt()
-{
-	if [ "${_printf_buf_xmin+exits}" ] && [ ! "${_printf_flushing+exists}" ]; then
-		printfAt_buffered "$@"
-		return
-	fi
-
-	_printfAtInit
-	local xCol yLine clearToEOL clearToSOL cCnt=0
-	while [[ "$1" =~ (^-)|(^[0-9][0-9]*$) ]]; do case $1:$cCnt in
-		--eol*)  clearToEOL="${CSI}$cClrToEOL" ;;
-		--sol*)  clearToSOL="${CSI}$cClrToSOL" ;;
-		[0-9]*:0) xCol="$1";  ((cCnt++)) ;;
-		[0-9]*:1) yLine="$1"; ((cCnt++)) ;;
-		[0-9]*:*) break ;;
-		--:*) shift; break ;;
-		*) break ;;
-	esac; shift; done
-
-	local fmtStr="$1"; [ $# -gt 0 ] && shift
-
-	# this can be turned on to debug page formatting issues
-	local DBGFmt DBGContent
-	if false; then
-		DBGFmt="%2s "
-		DBGContent="$yLine"
-	fi
-
-	local locationTerm=""
-	if [ "$xCol$yLine" ]; then
-
-		# adjust for the current viewport
-		local xColGlb="$(( ${xCol:-1} + ${_printfAt_xColMin:-1} - 1 ))"
-		local yLineGlb="$(( ${yLine:-1} + ${_printfAt_yLineMin:-1} - ${_printfAt_yLineStart:-1} ))"
-
-		# if the line is beyond the the clipping win, the whole output is clipped
-		[ ${yLineGlb} -lt ${_printfAt_yLineMin:-1} ] && return 0
-		[ ${yLineGlb} -gt ${_printfAt_yLineMax:-10000} ] && return 0
-
-		# to scroll and clip horizontally, we need to get the final formated string and then extract the
-		# substring that falls within the viewport. The challenge is that the string can contain control
-		# codes that do not ocupy a column cell so we need to parse the control codes and keep track of
-		# the content position
-		local xStrStart=$(( ${_printfAt_xColStart:-1} - 1 ))
-		local xStrEnd=$(( ${_printfAt_xColStart:-1} + ( ${_printfAt_xColMax:-10000} - ${_printfAt_xColMin:-1} + 1 ) - 1 ))
-		# TODO: this is commented out b/c we are not yet handling the xcol extents completely
-		#if [ ${_printfAt_xColStart:-1} -ne 1 ] || [ ${_printfAt_xColMax:-10000} -lt 10000 ]; then
-		if [ ${_printfAt_xColStart:-1} -ne 1 ]; then
-			local totalStr; printf -v totalStr -- "$fmtStr" "$@"
-
-			local char i="0" vi=0 outStr=""
-			while [ $i -lt ${#totalStr} ]; do
-				char="${totalStr:$i:1}"
-				case $char in
-					[\])
-						if [ "${totalStr:$i:5}" == "\033[" ]; then
-							outStr+="\033["; ((i+=5))
-							while [  $i -lt ${#totalStr}  ] && [[ "$char" =~ [0-9\;] ]]; do
-								outStr+="$char"; ((i++))
-							done
-							outStr+="$char"; ((i++))
-						else
-							[ ${vi:-0} -ge ${xStrStart:-0} ] && [ ${vi:-0} -le ${xStrEnd:-0} ] && outStr+="$char"
-							((i++)); ((vi++))
-						fi
-						;;
-					$'\033')
-						outStr+="$char"; ((i++))
-						char="${totalStr:$i:1}"
-						case $char in
-							# CSI codes. <ESC> <[> N[;N] <code>
-							# N can be 1 or more digits
-							$'[')
-								outStr+="$char"; ((i++))
-								while [  $i -lt ${#totalStr}  ] && [[ "${totalStr:$i:1}" =~ [-0-9\;] ]]; do
-									outStr+="${totalStr:$i:1}"; ((i++))
-								done
-								outStr+="${totalStr:$i:1}"; ((i++))
-								;;
-							*)	outStr+="$char"; ((i++)) ;;
-						esac
-						;;
-					[[:print:]\t])
-						[ ${vi:-0} -ge ${xStrStart:-0} ] && [ ${vi:-0} -le ${xStrEnd:-0} ] && outStr+="$char"
-						((i++)); ((vi++))
-						;;
-					*)	outStr+="$char"
-						((i++))
-						;;
-				esac
-			done
-			printf -- "${CSI}${yLineGlb:-1};${xColGlb:-1}$cMoveAbs${clearToSOL}$outStr${clearToEOL}"
-			return
-		fi
-
-		locationTerm="${CSI}${yLineGlb:-1};${xColGlb:-1}$cMoveAbs"
-	fi
-
-	if [ "$clearToEOL" ] && [[ "$fmtStr" =~ \\n ]]; then
-		fmtStr="${fmtStr//\\n/$clearToEOL\\n}"
-		clearToEOL=""
-	fi
-	printf -- "$locationTerm${clearToSOL}${DBGFmt}$fmtStr${clearToEOL}" $DBGContent "$@"
-}
-
-
-
-
-function printfAt_buffered()
-{
-	_printfAtInit
-	local xCol="--" yLine="--" clearToEOL="--" clearToSOL="--" cCnt=0
-	while [[ "$1" =~ (^-)|(^[0-9][0-9]*$) ]]; do case $1:$cCnt in
-		--eol*)  clearToEOL="--eol" ;;
-		--sol*)  clearToSOL="--sol" ;;
-		[0-9]*:0) xCol="$1";  ((cCnt++)) ;;
-		[0-9]*:1) yLine="$1"; ((cCnt++)) ;;
-		[0-9]*:*) break ;;
-		--:*) shift; break ;;
-	esac; shift; done
-
-	local fmtStr="$1"; [ $# -gt 0 ] && shift
-	local lineBuffer; printf -v lineBuffer -- "$fmtStr" "$@"
-
-	[ "$xCol" != "--" ]  && _printf_buf_xmin=$(( (xCol < _printf_buf_xmin) ? xCol : _printf_buf_xmin ))
-	[ "$yLine" != "--" ] && _printf_buf_ymin=$(( (yLine < _printf_buf_ymin) ? yLine : _printf_buf_ymin ))
-	[ "$xCol" != "--" ]  && _printf_buf_xmax=$(( (xCol > _printf_buf_xmax) ? xCol : _printf_buf_xmax ))
-	[ "$yLine" != "--" ] && _printf_buf_ymax=$(( (yLine > _printf_buf_ymax) ? yLine : _printf_buf_ymax ))
-
-	_printf_bufCalls+=("$xCol $yLine $clearToEOL $clearToSOL _$lineBuffer")
-}
-
-# usage: printfAt_getBufferedExtents <xColMinVar> <yLineMinVar> <xColMaxVar> <yLineMaxVar>
-# before calling printfAt_endBufferedOutput, this can be called to find out the extents that the
-# buffered output has written to. This is useful to adust the viewport before the output is written
-function printfAt_getBufferedExtents()
-{
-	local xminValue="$(( (_printf_buf_xmin == 10000) ? 1 : _printf_buf_xmin ))"
-	local yminValue="$(( (_printf_buf_ymin == 10000) ? 1 : _printf_buf_ymin ))"
-	local xmaxValue="$(( (_printf_buf_xmax == -10000) ? 10000 : _printf_buf_xmax ))"
-	local ymaxValue="$(( (_printf_buf_ymax == -10000) ? 10000 : _printf_buf_ymax ))"
-
-	setReturnValue "$1" "$xminValue"
-	setReturnValue "$2" "$yminValue"
-	setReturnValue "$3" "$xmaxValue"
-	setReturnValue "$4" "$ymaxValue"
-}
-
-# usage: printfAt_startBufferedOutput
-# start buffing any calls made to printfAt. When printfAt_endBufferedOutput is later called, any
-# printfAt output that was buffered will be written to the terminal. This buffer maintains the extends
-# that the output is written to so that before printfAt_endBufferedOutput is called you can adjust
-# the viewport.
-function printfAt_startBufferedOutput()
-{
-	declare -g  _printf_bufCalls=()
-	declare -g  _printf_buf_xmin=10000
-	declare -g  _printf_buf_ymin=10000
-	declare -g  _printf_buf_xmax=-10000
-	declare -g  _printf_buf_ymax=-10000
-}
-
-# usage: printfAt_endBufferedOutput
-# see printfAt_startBufferedOutput
-function printfAt_endBufferedOutput()
-{
-	local _printf_flushing="1"
-	local i xCol yLine clearToEOL clearToSOL outStr
-	for (( i = 0; i < ${#_printf_bufCalls[@]}; i++ )); do
-		read -r xCol yLine clearToEOL clearToSOL outStr <<<"${_printf_bufCalls[$i]}"
-		[ "$clearToEOL" == "--" ] && clearToEOL="" || clearToEOL="--eol"
-		[ "$clearToSOL" == "--" ] && clearToSOL="" || clearToSOL="--sol"
-		[ "$xCol" == "--" ] && xCol=""
-		[ "$yLine" == "--" ] && yLine=""
-
-		printfAt $xCol $yLine $clearToEOL $clearToSOL -- "${outStr#_}"
-	done
-
-	local xColMinVP yLineMinVP xColMaxVP yLineMaxVP
-	printfAt_getBufferedExtents xColMinVP yLineMinVP xColMaxVP yLineMaxVP
-	for (( yLine = $((yLineMaxVP+1)); yLine < $((_printfAt_yLineMax-_printfAt_yLineMin +1 +_printfAt_yLineStart)); yLine++ )) do
-		printfAt 1 $yLine --eol -- ""
-	done
-
-	unset _printf_bufCalls
-	unset _printf_buf_xmin
-	unset _printf_buf_ymin
-	unset _printf_buf_xmax
-	unset _printf_buf_ymax
-}
-
-
-
-
-
-
-
-
-
-# usage: printfAt_setViewport <xColMinTerm> <yLineMinTerm> <xColMaxTerm> <yLineMaxTerm> <xColMinVP> <yLineMinVP> <xColMaxVP> <yLineMaxVP>
-# Set a clipping window that printfAt will observe
-# Params:
-#    <xColMinTerm> <yLineMinTerm> <xColMaxTerm> <yLineMaxTerm> : coordinates of the window in
-#           terminal global cordinates relative to top left corner (1,1)
-#    <xColMinVP> <yLineMinVP> <xColMaxVP> <yLineMaxVP> : the logical VP (viewport) coordinates of
-#           the window. These are the extends of the logical view that is painted. When the VP extents
-#           are larger than the Term (physical terminal) window extents the content can be scrolled
-function printfAt_setViewport()
-{
-	_printfAtInit
-	[ "$1" ] && _printfAt_xColMin="$1"
-	[ "$2" ] && _printfAt_yLineMin="$2"
-	[ "$3" ] && _printfAt_xColMax="$3"
-	[ "$4" ] && _printfAt_yLineMax="$4"
-
-	[ "$5" ] && _printfAt_xColMinVP="$5"
-	[ "$6" ] && _printfAt_yLineMinVP="$6"
-	[ "$7" ] && _printfAt_xColMaxVP="$7"
-	[ "$8" ] && _printfAt_yLineMaxVP="$8"
-}
-
-# usage: printfAt_scrollViewportTo <xColStart> <yLineStart>
-# Set the top left VP coordinates to these values
-function printfAt_scrollViewportTo()
-{
-	_printfAtInit
-	_printfAt_xColStart="${1:-1}"
-	_printfAt_yLineStart="${2:-1}"
-}
-
-# usage: printfAt_scrollViewport <xColDelta> <yLineDelta>
-# Set a clipping window that printfAt will observe
-function printfAt_scrollViewport()
-{
-	_printfAtInit
-
-	local xColDelta="${1:-0}"
-	local yLineDelta="${2:-0}"
-
-	local xColStartSaved="$_printfAt_xColStart"
-	local yLineStartSaved="$_printfAt_yLineStart"
-
-	_printfAt_xColStart=$(( ${_printfAt_xColStart:-1} + xColDelta))
-	_printfAt_yLineStart=$(( ${_printfAt_yLineStart:-1} + yLineDelta))
-
-	_printfAt_xColStart=$(( (_printfAt_xColStart<1) ? 1 : _printfAt_xColStart ))
-	_printfAt_yLineStart=$(( (_printfAt_yLineStart<1) ? 1 : _printfAt_yLineStart ))
-
-#	local max_xColStart=$(( (_printfAt_xColMaxVP-_printfAt_xColMinVP) - (_printfAt_xColMax-_printfAt_xColMin) +2 ))
-	local max_yLineStart=$(( (_printfAt_yLineMaxVP-_printfAt_yLineMinVP) - (_printfAt_yLineMax-_printfAt_yLineMin) +2 ))
-
-#	_printfAt_xColStart=$(( (_printfAt_xColStart > max_xColStart) ? max_xColStart : _printfAt_xColStart ))
-	_printfAt_yLineStart=$(( (_printfAt_yLineStart > max_yLineStart) ? max_yLineStart : _printfAt_yLineStart ))
-
-	[ "$xColStartSaved" != "$_printfAt_xColStart" ] || [ "$yLineStartSaved" != "$_printfAt_yLineStart" ]
-}
-
-
-# usage: printfAt_autoScrollUpdate  <rangeOfInterest_focus> <rangeOfInterest_start> <rangeOfInterest_end>
-function printfAt_autoScrollUpdate()
-{
-	local rangeOfInterest_focus="${1:-0}"
-	local rangeOfInterest_start="${2:-0}"
-	local rangeOfInterest_end="${3:-0}"
-
-	local visibleStart="$(( _printfAt_yLineStart ))"
-	local visibleEnd="$(( _printfAt_yLineStart + (_printfAt_yLineMax-_printfAt_yLineMin)  ))"
-
-	local delta=0
-	if 		(( rangeOfInterest_start > 0 && rangeOfInterest_end > 0 \
-			&& ( rangeOfInterest_start < visibleStart || rangeOfInterest_end > visibleEnd )  )); then
-		local interestSize=$(( rangeOfInterest_end - rangeOfInterest_start +1 ))
-		local windowSize=$(( _printfAt_yLineMax - _printfAt_yLineMin + 1 ))
-
-		# the whole interest range fits so make the smallest move to bring it into view
-		if (( interestSize <= windowSize )); then
-			((
-				delta+= (rangeOfInterest_start < visibleStart) \
-			 		? rangeOfInterest_start - visibleStart \
-					: rangeOfInterest_end - visibleEnd
-			))
-
-		# no overlap and too big so move nearest page into view
-		elif (( (rangeOfInterest_start > visibleEnd) || (rangeOfInterest_end < visibleStart) )); then
-			((
-				delta+= (rangeOfInterest_start > visibleEnd) \
-					? rangeOfInterest_start - visibleStart \
-					: rangeOfInterest_end - visibleEnd
-			))
-		fi
-		((visibleStart+=delta))
-		((visibleEnd+=delta))
-	fi
-
-	if (( rangeOfInterest_focus > 0 )); then
-		if (( rangeOfInterest_focus < visibleStart )); then
-			(( delta+=rangeOfInterest_focus - visibleStart ))
-		elif (( rangeOfInterest_focus > visibleEnd )); then
-			(( delta+=rangeOfInterest_focus - visibleEnd ))
-		fi
-	fi
-
-	# now scroll it
-	printfAt_scrollViewport 0 "$delta"
-}
-
-
-
-
-
-
-
-
-
-
-
-
 # CSI is a notation to refer to ansi escape sequences for terminals
 # see http://en.wikipedia.org/wiki/ANSI_escape_code
 # see http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
-# The advantage of using this CSI escape strings instead of tput is that you can create one
-# big printf call that does a lot of stuf and leave the cursor back in the right place. Because it
+# The advantage of using these CSI escape strings instead of tput is that you can create one
+# big printf call that does a lot of stuf and leave the cursor back in the right place. Because it is
 # all in one API call there is a better chance that it will be atomic. Its best to serialize access
 # to the terminal, but since all parties have to cooperate on obtaining the lock, its not always possible
 
@@ -522,38 +166,32 @@ function cuiClrScr()
 
 
 
-# OBSOLETE: its easier and faster to just make the sequences like "${CSI}$x;$y;${cMoveAbs}". Now we have cuiRealizeFmtToTerm we do not need this
-# usage: printf " ... $(CSI [p1 ...] <cCMD>) ... "
-# This function assembles a CSI escape sequence. All CSI escape sequences use a standard format
-#      $CSI + <0 or more params apearated by ;> + $<cCode>
-# The string that this function produces is a textual ASCII sequence that represent the real binary sequence
-# that will effect the terminal. printf automatically decodes the text escape sequence into its binary
-# representation. echo does not by default but will if the -e switch is given.
-# Examples:
-#     echo -en "$(CSI $cSave)"      # saves the current cursor position. uses no params
-#     printf "$(CSI 4 $cDOWN)"      # moves the cursor down 4 lines. 1 is the default
-#     printf "$(CSI y x $cMoveAbs)" # moves the the absolute (y, x) cursor position
-function CSI()
-{
-	[ -t 1 ] || return 1
-	[ "$CSIOff" ] && return
-	local params="" sep=""
-	while [ $# -gt 1 ]; do
-		params="${params}${sep}${1}"
-		sep=";"
-		shift
-	done
-	local cmd="$1"
+# # OBSOLETE: its easier and faster to just make the sequences like "${CSI}$x;$y;${cMoveAbs}". Now we have cuiRealizeFmtToTerm we do not need this
+# # usage: printf " ... $(CSI [p1 ...] <cCMD>) ... "
+# # This function assembles a CSI escape sequence. All CSI escape sequences use a standard format
+# #      $CSI + <0 or more params apearated by ;> + $<cCode>
+# # The string that this function produces is a textual ASCII sequence that represent the real binary sequence
+# # that will effect the terminal. printf automatically decodes the text escape sequence into its binary
+# # representation. echo does not by default but will if the -e switch is given.
+# # Examples:
+# #     echo -en "$(CSI $cSave)"      # saves the current cursor position. uses no params
+# #     printf "$(CSI 4 $cDOWN)"      # moves the cursor down 4 lines. 1 is the default
+# #     printf "$(CSI y x $cMoveAbs)" # moves the the absolute (y, x) cursor position
+# function CSI()
+# {
+# 	[ -t 1 ] || return 1
+# 	[ "$CSIOff" ] && return
+# 	local params="" sep=""
+# 	while [ $# -gt 1 ]; do
+# 		params="${params}${sep}${1}"
+# 		sep=";"
+# 		shift
+# 	done
+# 	local cmd="$1"
+#
+# 	printf "${CSI}${params}${cmd}"
+# }
 
-	printf "${CSI}${params}${cmd}"
-}
-
-
-# OBSOLETE: use cuiRealizeFmtToTerm
-function cuiRealizeFmtToTermOld()
-{
-	assertError "OBSOLETE: use cuiRealizeFmtToTerm"
-}
 
 declare -g _CSI="\033["
 declare -g _OSC="\033]"
@@ -597,6 +235,8 @@ function cuiRealizeFmtToTerm()
 		echo "CSIOn=1"
 		echo "CSIOff="
 	else
+bgtrace "CSI is OFF"
+bgtraceStack
 		local CSI=""
 		local OSC=""
 		echo "CSIOn="
@@ -1276,4 +916,352 @@ function getUserBrowser()
 	fi
 
 	[ "$quietMode" ] || assertError "no GUI available to open URL"
+}
+
+
+
+
+function _printfAtInit()
+{
+	if [ ! "${_printfAt_xColMin+exists}" ]; then
+		declare -g _printfAt_xColMin="1"
+		declare -g _printfAt_yLineMin="1"
+		declare -g _printfAt_xColMax="10000"
+		declare -g _printfAt_yLineMax="10000"
+
+		declare -g _printfAt_xColMinVP="1"
+		declare -g _printfAt_yLineMinVP="1"
+		declare -g _printfAt_xColMaxVP="10000"
+		declare -g _printfAt_yLineMaxVP="10000"
+
+		declare -g _printfAt_xColStart="1"
+		declare -g _printfAt_yLineStart="1"
+	fi
+}
+
+# usage: printfAt <xCol> <yLine> [--eol] [--sol] <fmtStr> ...
+# This can be used like bash's printf (without the -v option) but it accepts for optional parameters
+# in any order.
+# There are a family of printfAt_* functions that can be used to influence how printfAt works.
+# Features:
+#    * buffer output by enclosing it in printfAt_startBufferedOutput / printfAt_endBufferedOutput
+#    * limit output to within a virtual view port with printfAt_setViewport
+#    * scroll output within a virtual view port with printfAt_scrollViewport[To]
+# Options:
+#    These options are unusual because <xCol> and <yLine> do not begin with - The first two numeric params
+#    that appear before a param that can not be an options will be taken as xCol and yLine
+#    <xCol>  : the column postion to start out at. The first numeric param is taken as xCol
+#              1 is the first column on the left
+#    <yLine> : the line postion to start out at. The second numeric param is taken as yLine
+#              1 is the first line on the top.
+#    --eol   : clear to the end of the line after writing the output.
+#    --sol   : clear from the start of the line to xCol before writing the output.
+#    --      : end of options. the rest of the cmd line will not be checked to see if they match options
+# See Also:
+#    printfAt_*
+function termPrintfAt() { printfAt "$@"; }
+function printfAt()
+{
+	if [ "${_printf_buf_xmin+exits}" ] && [ ! "${_printf_flushing+exists}" ]; then
+		printfAt_buffered "$@"
+		return
+	fi
+
+	_printfAtInit
+	local xCol yLine clearToEOL clearToSOL cCnt=0
+	while [[ "$1" =~ (^-)|(^[0-9][0-9]*$) ]]; do case $1:$cCnt in
+		--eol*)  clearToEOL="${CSI}$cClrToEOL" ;;
+		--sol*)  clearToSOL="${CSI}$cClrToSOL" ;;
+		[0-9]*:0) xCol="$1";  ((cCnt++)) ;;
+		[0-9]*:1) yLine="$1"; ((cCnt++)) ;;
+		[0-9]*:*) break ;;
+		--:*) shift; break ;;
+		*) break ;;
+	esac; shift; done
+
+	local fmtStr="$1"; [ $# -gt 0 ] && shift
+
+	# this can be turned on to debug page formatting issues
+	local DBGFmt DBGContent
+	if false; then
+		DBGFmt="%2s "
+		DBGContent="$yLine"
+	fi
+
+	local locationTerm=""
+	if [ "$xCol$yLine" ]; then
+
+		# adjust for the current viewport
+		local xColGlb="$(( ${xCol:-1} + ${_printfAt_xColMin:-1} - 1 ))"
+		local yLineGlb="$(( ${yLine:-1} + ${_printfAt_yLineMin:-1} - ${_printfAt_yLineStart:-1} ))"
+
+		# if the line is beyond the the clipping win, the whole output is clipped
+		[ ${yLineGlb} -lt ${_printfAt_yLineMin:-1} ] && return 0
+		[ ${yLineGlb} -gt ${_printfAt_yLineMax:-10000} ] && return 0
+
+		# to scroll and clip horizontally, we need to get the final formated string and then extract the
+		# substring that falls within the viewport. The challenge is that the string can contain control
+		# codes that do not ocupy a column cell so we need to parse the control codes and keep track of
+		# the content position
+		local xStrStart=$(( ${_printfAt_xColStart:-1} - 1 ))
+		local xStrEnd=$(( ${_printfAt_xColStart:-1} + ( ${_printfAt_xColMax:-10000} - ${_printfAt_xColMin:-1} + 1 ) - 1 ))
+		# TODO: this is commented out b/c we are not yet handling the xcol extents completely
+		#if [ ${_printfAt_xColStart:-1} -ne 1 ] || [ ${_printfAt_xColMax:-10000} -lt 10000 ]; then
+		if [ ${_printfAt_xColStart:-1} -ne 1 ]; then
+			local totalStr; printf -v totalStr -- "$fmtStr" "$@"
+
+			local char i="0" vi=0 outStr=""
+			while [ $i -lt ${#totalStr} ]; do
+				char="${totalStr:$i:1}"
+				case $char in
+					[\])
+						if [ "${totalStr:$i:5}" == "\033[" ]; then
+							outStr+="\033["; ((i+=5))
+							while [  $i -lt ${#totalStr}  ] && [[ "$char" =~ [0-9\;] ]]; do
+								outStr+="$char"; ((i++))
+							done
+							outStr+="$char"; ((i++))
+						else
+							[ ${vi:-0} -ge ${xStrStart:-0} ] && [ ${vi:-0} -le ${xStrEnd:-0} ] && outStr+="$char"
+							((i++)); ((vi++))
+						fi
+						;;
+					$'\033')
+						outStr+="$char"; ((i++))
+						char="${totalStr:$i:1}"
+						case $char in
+							# CSI codes. <ESC> <[> N[;N] <code>
+							# N can be 1 or more digits
+							$'[')
+								outStr+="$char"; ((i++))
+								while [  $i -lt ${#totalStr}  ] && [[ "${totalStr:$i:1}" =~ [-0-9\;] ]]; do
+									outStr+="${totalStr:$i:1}"; ((i++))
+								done
+								outStr+="${totalStr:$i:1}"; ((i++))
+								;;
+							*)	outStr+="$char"; ((i++)) ;;
+						esac
+						;;
+					[[:print:]\t])
+						[ ${vi:-0} -ge ${xStrStart:-0} ] && [ ${vi:-0} -le ${xStrEnd:-0} ] && outStr+="$char"
+						((i++)); ((vi++))
+						;;
+					*)	outStr+="$char"
+						((i++))
+						;;
+				esac
+			done
+			printf -- "${CSI}${yLineGlb:-1};${xColGlb:-1}$cMoveAbs${clearToSOL}$outStr${clearToEOL}"
+			return
+		fi
+
+		locationTerm="${CSI}${yLineGlb:-1};${xColGlb:-1}$cMoveAbs"
+	fi
+
+	if [ "$clearToEOL" ] && [[ "$fmtStr" =~ \\n ]]; then
+		fmtStr="${fmtStr//\\n/$clearToEOL\\n}"
+		clearToEOL=""
+	fi
+	printf -- "$locationTerm${clearToSOL}${DBGFmt}$fmtStr${clearToEOL}" $DBGContent "$@"
+}
+
+
+
+
+function printfAt_buffered()
+{
+	_printfAtInit
+	local xCol="--" yLine="--" clearToEOL="--" clearToSOL="--" cCnt=0
+	while [[ "$1" =~ (^-)|(^[0-9][0-9]*$) ]]; do case $1:$cCnt in
+		--eol*)  clearToEOL="--eol" ;;
+		--sol*)  clearToSOL="--sol" ;;
+		[0-9]*:0) xCol="$1";  ((cCnt++)) ;;
+		[0-9]*:1) yLine="$1"; ((cCnt++)) ;;
+		[0-9]*:*) break ;;
+		--:*) shift; break ;;
+	esac; shift; done
+
+	local fmtStr="$1"; [ $# -gt 0 ] && shift
+	local lineBuffer; printf -v lineBuffer -- "$fmtStr" "$@"
+
+	[ "$xCol" != "--" ]  && _printf_buf_xmin=$(( (xCol < _printf_buf_xmin) ? xCol : _printf_buf_xmin ))
+	[ "$yLine" != "--" ] && _printf_buf_ymin=$(( (yLine < _printf_buf_ymin) ? yLine : _printf_buf_ymin ))
+	[ "$xCol" != "--" ]  && _printf_buf_xmax=$(( (xCol > _printf_buf_xmax) ? xCol : _printf_buf_xmax ))
+	[ "$yLine" != "--" ] && _printf_buf_ymax=$(( (yLine > _printf_buf_ymax) ? yLine : _printf_buf_ymax ))
+
+	_printf_bufCalls+=("$xCol $yLine $clearToEOL $clearToSOL _$lineBuffer")
+}
+
+# usage: printfAt_getBufferedExtents <xColMinVar> <yLineMinVar> <xColMaxVar> <yLineMaxVar>
+# before calling printfAt_endBufferedOutput, this can be called to find out the extents that the
+# buffered output has written to. This is useful to adust the viewport before the output is written
+function printfAt_getBufferedExtents()
+{
+	local xminValue="$(( (_printf_buf_xmin == 10000) ? 1 : _printf_buf_xmin ))"
+	local yminValue="$(( (_printf_buf_ymin == 10000) ? 1 : _printf_buf_ymin ))"
+	local xmaxValue="$(( (_printf_buf_xmax == -10000) ? 10000 : _printf_buf_xmax ))"
+	local ymaxValue="$(( (_printf_buf_ymax == -10000) ? 10000 : _printf_buf_ymax ))"
+
+	setReturnValue "$1" "$xminValue"
+	setReturnValue "$2" "$yminValue"
+	setReturnValue "$3" "$xmaxValue"
+	setReturnValue "$4" "$ymaxValue"
+}
+
+# usage: printfAt_startBufferedOutput
+# start buffing any calls made to printfAt. When printfAt_endBufferedOutput is later called, any
+# printfAt output that was buffered will be written to the terminal. This buffer maintains the extends
+# that the output is written to so that before printfAt_endBufferedOutput is called you can adjust
+# the viewport.
+function printfAt_startBufferedOutput()
+{
+	declare -g  _printf_bufCalls=()
+	declare -g  _printf_buf_xmin=10000
+	declare -g  _printf_buf_ymin=10000
+	declare -g  _printf_buf_xmax=-10000
+	declare -g  _printf_buf_ymax=-10000
+}
+
+# usage: printfAt_endBufferedOutput
+# see printfAt_startBufferedOutput
+function printfAt_endBufferedOutput()
+{
+	local _printf_flushing="1"
+	local i xCol yLine clearToEOL clearToSOL outStr
+	for (( i = 0; i < ${#_printf_bufCalls[@]}; i++ )); do
+		read -r xCol yLine clearToEOL clearToSOL outStr <<<"${_printf_bufCalls[$i]}"
+		[ "$clearToEOL" == "--" ] && clearToEOL="" || clearToEOL="--eol"
+		[ "$clearToSOL" == "--" ] && clearToSOL="" || clearToSOL="--sol"
+		[ "$xCol" == "--" ] && xCol=""
+		[ "$yLine" == "--" ] && yLine=""
+
+		printfAt $xCol $yLine $clearToEOL $clearToSOL -- "${outStr#_}"
+	done
+
+	local xColMinVP yLineMinVP xColMaxVP yLineMaxVP
+	printfAt_getBufferedExtents xColMinVP yLineMinVP xColMaxVP yLineMaxVP
+	for (( yLine = $((yLineMaxVP+1)); yLine < $((_printfAt_yLineMax-_printfAt_yLineMin +1 +_printfAt_yLineStart)); yLine++ )) do
+		printfAt 1 $yLine --eol -- ""
+	done
+
+	unset _printf_bufCalls
+	unset _printf_buf_xmin
+	unset _printf_buf_ymin
+	unset _printf_buf_xmax
+	unset _printf_buf_ymax
+}
+
+
+
+
+
+
+
+
+
+# usage: printfAt_setViewport <xColMinTerm> <yLineMinTerm> <xColMaxTerm> <yLineMaxTerm> <xColMinVP> <yLineMinVP> <xColMaxVP> <yLineMaxVP>
+# Set a clipping window that printfAt will observe
+# Params:
+#    <xColMinTerm> <yLineMinTerm> <xColMaxTerm> <yLineMaxTerm> : coordinates of the window in
+#           terminal global cordinates relative to top left corner (1,1)
+#    <xColMinVP> <yLineMinVP> <xColMaxVP> <yLineMaxVP> : the logical VP (viewport) coordinates of
+#           the window. These are the extends of the logical view that is painted. When the VP extents
+#           are larger than the Term (physical terminal) window extents the content can be scrolled
+function printfAt_setViewport()
+{
+	_printfAtInit
+	[ "$1" ] && _printfAt_xColMin="$1"
+	[ "$2" ] && _printfAt_yLineMin="$2"
+	[ "$3" ] && _printfAt_xColMax="$3"
+	[ "$4" ] && _printfAt_yLineMax="$4"
+
+	[ "$5" ] && _printfAt_xColMinVP="$5"
+	[ "$6" ] && _printfAt_yLineMinVP="$6"
+	[ "$7" ] && _printfAt_xColMaxVP="$7"
+	[ "$8" ] && _printfAt_yLineMaxVP="$8"
+}
+
+# usage: printfAt_scrollViewportTo <xColStart> <yLineStart>
+# Set the top left VP coordinates to these values
+function printfAt_scrollViewportTo()
+{
+	_printfAtInit
+	_printfAt_xColStart="${1:-1}"
+	_printfAt_yLineStart="${2:-1}"
+}
+
+# usage: printfAt_scrollViewport <xColDelta> <yLineDelta>
+# Set a clipping window that printfAt will observe
+function printfAt_scrollViewport()
+{
+	_printfAtInit
+
+	local xColDelta="${1:-0}"
+	local yLineDelta="${2:-0}"
+
+	local xColStartSaved="$_printfAt_xColStart"
+	local yLineStartSaved="$_printfAt_yLineStart"
+
+	_printfAt_xColStart=$(( ${_printfAt_xColStart:-1} + xColDelta))
+	_printfAt_yLineStart=$(( ${_printfAt_yLineStart:-1} + yLineDelta))
+
+	_printfAt_xColStart=$(( (_printfAt_xColStart<1) ? 1 : _printfAt_xColStart ))
+	_printfAt_yLineStart=$(( (_printfAt_yLineStart<1) ? 1 : _printfAt_yLineStart ))
+
+#	local max_xColStart=$(( (_printfAt_xColMaxVP-_printfAt_xColMinVP) - (_printfAt_xColMax-_printfAt_xColMin) +2 ))
+	local max_yLineStart=$(( (_printfAt_yLineMaxVP-_printfAt_yLineMinVP) - (_printfAt_yLineMax-_printfAt_yLineMin) +2 ))
+
+#	_printfAt_xColStart=$(( (_printfAt_xColStart > max_xColStart) ? max_xColStart : _printfAt_xColStart ))
+	_printfAt_yLineStart=$(( (_printfAt_yLineStart > max_yLineStart) ? max_yLineStart : _printfAt_yLineStart ))
+
+	[ "$xColStartSaved" != "$_printfAt_xColStart" ] || [ "$yLineStartSaved" != "$_printfAt_yLineStart" ]
+}
+
+
+# usage: printfAt_autoScrollUpdate  <rangeOfInterest_focus> <rangeOfInterest_start> <rangeOfInterest_end>
+function printfAt_autoScrollUpdate()
+{
+	local rangeOfInterest_focus="${1:-0}"
+	local rangeOfInterest_start="${2:-0}"
+	local rangeOfInterest_end="${3:-0}"
+
+	local visibleStart="$(( _printfAt_yLineStart ))"
+	local visibleEnd="$(( _printfAt_yLineStart + (_printfAt_yLineMax-_printfAt_yLineMin)  ))"
+
+	local delta=0
+	if 		(( rangeOfInterest_start > 0 && rangeOfInterest_end > 0 \
+			&& ( rangeOfInterest_start < visibleStart || rangeOfInterest_end > visibleEnd )  )); then
+		local interestSize=$(( rangeOfInterest_end - rangeOfInterest_start +1 ))
+		local windowSize=$(( _printfAt_yLineMax - _printfAt_yLineMin + 1 ))
+
+		# the whole interest range fits so make the smallest move to bring it into view
+		if (( interestSize <= windowSize )); then
+			((
+				delta+= (rangeOfInterest_start < visibleStart) \
+			 		? rangeOfInterest_start - visibleStart \
+					: rangeOfInterest_end - visibleEnd
+			))
+
+		# no overlap and too big so move nearest page into view
+		elif (( (rangeOfInterest_start > visibleEnd) || (rangeOfInterest_end < visibleStart) )); then
+			((
+				delta+= (rangeOfInterest_start > visibleEnd) \
+					? rangeOfInterest_start - visibleStart \
+					: rangeOfInterest_end - visibleEnd
+			))
+		fi
+		((visibleStart+=delta))
+		((visibleEnd+=delta))
+	fi
+
+	if (( rangeOfInterest_focus > 0 )); then
+		if (( rangeOfInterest_focus < visibleStart )); then
+			(( delta+=rangeOfInterest_focus - visibleStart ))
+		elif (( rangeOfInterest_focus > visibleEnd )); then
+			(( delta+=rangeOfInterest_focus - visibleEnd ))
+		fi
+	fi
+
+	# now scroll it
+	printfAt_scrollViewport 0 "$delta"
 }

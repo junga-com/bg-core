@@ -202,7 +202,7 @@ function progress()
 	# TODO: the $userFeedbackTemplate and $userFeedbackProtocol do not yet seem quite right. userFeedbackTemplate
 	#       should only be used if $userFeedbackProtocol is unstructured, (unstructured should mean that the
 	#       userFeedbackFD is a dumb terminal or logfile and in that case, only the selected $userFeedbackTemplate
-	#       is used. All progressUI plugins should get the structured protocol that has all infomation.
+	#       is used. All progressUI plugins should get the structured protocol that has all information.
 	local str=""
 	case $userFeedbackTemplate in
 		plain) str="${data[0]}:${data[2]}" ;;
@@ -217,10 +217,10 @@ function progress()
 		*) str="${data[*]}" ;;
 	esac
 
+#bgtraceVars data str userFeedbackTemplate
 	if [ "$userFeedbackProtocol" == "structured" ]; then
-		str="@1 $progressScope $str"
-	else
-		str="${str//%20/ }"
+		escapeTokens str data[0] data[1] data[2] data[6] data[7]
+		str="@1 $progressScope $str ${data[*]}"
 	fi
 
 	# its ok if we do not write anything because the driver could have been turned off or in the process
@@ -252,6 +252,10 @@ function progressCntr()
 			shift
 			_progressStartDriver "$@"
 			return
+			;;
+
+		stop|off)
+			_progressStartDriver off
 			;;
 
 		*)	# its fine if the active feedback driver does not have a control function registered because some

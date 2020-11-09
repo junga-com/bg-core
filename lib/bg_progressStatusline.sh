@@ -21,7 +21,7 @@
 function progressTypeStatusLineCntr()
 {
 	local cmd="$1"
-	case $1 in
+	case $cmd in
 		stop)
 			[ "$userFeedbackFD" ] && exec {userFeedbackFD}>&-
 			wait "${progressPIDs[0]}"
@@ -61,38 +61,28 @@ function progressTypeStatusLineCntr()
 
 				# when the calling process closes its FD to the pipe (and there are no other writers), read will exit with exit code 1
 				while IFS="" read -r -u 3 line; do
-					cmd=""
-					if [[ "$line" =~ ^@1\  ]]; then
-						line="${line#@1 }"
-						progressScope="${line%% *}"
-						line="${line#* }"
-						line="${line//%20/ }"
-					elif [[ "$line" =~ ^@2\  ]]; then
-						cmd="hide"
-					elif [[ "$line" =~ ^@end  ]]; then
-						cmd="end"
-					elif [[ "$line" =~ ^@rmPipe  ]]; then
-						cmd="rmPipe"
-					fi
+					read -r msgType progressScope formattedStr parent label msg startTime lapTime curTime target current <<<$line
+					unescapeTokens parent label msg target current formattedStr
 
 					termHeight=$(tput lines 2>/dev/tty)
 					termWidth=$(tput cols 2>/dev/tty)
 					line="${line:0:$((termWidth-1))}"
 
-					case $cmd in
-						end) exit ;;
+					case $msgType in
+						@end) exit ;;
 
 						# once both this copro and the calling process have redirected pipeToProgressHandler to make an open FD, we
 						# do not need it in the filesystem anymore. The caller sends us this msg to say its ok to rm
-						rmPipe)
+						@rmPipe)
 							rm -f "$pipeToProgressHandler" || assertError
 							;;
 
-						hide)
+						@hide|@2)
 							printf "${CSI}0;$termHeight${cSetScrollRegion}${CSI}$((termHeight));0${cMoveAbs}${csiClrToEOL}" >/dev/tty
 							;;
 
 						*)
+							formattedStr="${formattedStr:0:$termWidth}"
 							if  [ ! "${linesByScope[$progressScope]}" ]; then
 								# offset the existing status line offsets to make room for the new one
 								for i in ${!linesByScope[@]}; do
@@ -109,7 +99,7 @@ function progressTypeStatusLineCntr()
 
 							# we use the printf / CSI construct so that the entire sequence is one API call and (hopefully) one atomic write
 							local statusLineNum=$(( termHeight - linesByScope[$progressScope] ))
-							printf "${csiSave}${CSI}$statusLineNum;1${cMoveAbs}${csiBkMagenta}%s${csiClrToEOL}${csiDefBkColor}${CSI}${cRestore}" "$line" >/dev/tty
+							printf "${csiSave}${CSI}$statusLineNum;1${cMoveAbs}${csiBkMagenta}%s${csiClrToEOL}${csiDefBkColor}${CSI}${cRestore}" "$formattedStr" >/dev/tty
 							;;
 					esac
 				done;

@@ -30,8 +30,8 @@ function progressTypeOnelineCntr()
 	case $cmd in
 		stop)
 			userFeedbackFD=""
-			exec >&4 2>&5           # set the stdout and stderr back
 			progressTypeOnelineCntr stopInputLoop
+			exec >&4 2>&5           # set the stdout and stderr back
 			procIsRunning "${progressPIDs[0]}" &&  { kill "${progressPIDs[0]}"; wait "${progressPIDs[0]}"; }
 			procIsRunning "${progressPIDs[2]}" &&  { kill "${progressPIDs[2]}"; wait "${progressPIDs[2]}"; }
 			unset progressPIDs
@@ -56,96 +56,15 @@ function progressTypeOnelineCntr()
 			;;
 
 		startInputLoop)
-			local inputLoopType="${2:-spinner}"
-			if [[ "$inputLoopType" == "spinner" ]]; then
-				progressTypeOnelineCntr "startInputLoopWithSpinner"
-			else
-				progressTypeOnelineCntr "startInputLoopWithoutSpinner"
-			fi
-			;;
+			local inputLoopType="${2:-}"
 
-		startInputLoopWithoutSpinner)
-			# we should only start the stdin read loop if the 'oneline' feedback UI driver is active
-			[ "$_progressCurrentType" == "oneline" ] || return 1
-
-			# is is a co-process to read user input and display a spinner. If the user hits enter, the term
-			# scrolls the term directly (local echo) so we need to catch that. We turn off echo and we process the
-			# user input oursleves so that we can scroll in sync with the other output
-			(
-				#bgtrap 'myTestTrapHandler SIGTERM "'"$BASHPID"'" INP LOOP' SIGTERM
-				#bgtrap 'myTestTrapHandler SIGINT  "'"$BASHPID"'" INP LOOP' SIGINT
-				#bgtrap 'myTestTrapHandler EXIT    "'"$BASHPID"'" INP LOOP' EXIT
-				# turn echo off so that the linefeed will get written by us, so that we can update the ipcFile at the same time
-				stty -echo
-				bgtrap 'stty echo' EXIT
-
-				# the trap is the only way out of the loop SIGTERM is the default kill SIG
-				bgtrap 'exit' SIGTERM
-				while read -r buf; do
-					startLock $ipcFile.lock
-					echo >> "$ipcFile"
-					printf "${csiToSOL}   ${csiToSOL}"
-					echo
-					endLock $ipcFile.lock
-				done
-				stty echo
-			) >&4 <&6  &
-			progressPIDs[1]=$!
-			;;
-
-
-		startInputLoopWithSpinner)
-			# is is a co-process to read user input and display a spinner. If the user hits enter, the term
-			# scrolls the term directly (local echo) so we need to catch that. We turn off echo and we process the
-			# user input oursleves so that we can scroll in sync with the other output
-			(
-				#bgtrap 'myTestTrapHandler EXIT    "'"$BASHPID"'" INP LOOP' EXIT
-				#bgtrap 'myTestTrapHandler SIGINT  "'"$BASHPID"'" INP LOOP' SIGINT
-				#bgtrap 'myTestTrapHandler SIGTERM "'"$BASHPID"'" INP LOOP' SIGTERM
-				sleep 1
-				local spinner=( / - \\ \| )
-				local spinCount=0
-				printf " /]: "
-
-				# turn echo off so that the linefeed will get written by us, so that we can update the ipcFile at the same time
-				# turn echo off so that the linefeed will get written by us, so that we can update the ipcFile at the same time
-				stty -echo
-				bgtrap 'stty echo' EXIT
-
-				# the trap is the only way out of the loop SIGTERM is the default kill SIG
-				bgtrap 'exit' SIGTERM
-				while true; do
-					sleep 0.2
-					char=""
-					IFS="" read -r -d '' -t 0.2  -n 1 char ; readCode=$?
-bgtraceVars char readCode
-					if [ "$char" == $'\n' ]; then
-						startLock $ipcFile.lock
-						echo >> "$ipcFile"
-						printf "${csiSave}${csiToSOL}    ${csiRestore}"
-						printf "$char"
-						printf " /]: "
-						endLock $ipcFile.lock
-					else
-						printf "$char"
-					fi
-					# read timeout. update spinner
-					if [ $readCode -gt 128 ]; then
-						startLock $ipcFile.lock
-						printf "${csiSave}${csiToSOL} ${spinner[spinCount++%4]}]: ${csiRestore}"
-						endLock $ipcFile.lock
-					fi
-				done;
-				stty echo
-			) >&4 <&0  &
+			# is is a co-process to read user input from stdin and display a spinner.
+			# As the user enters input, the screen can scroll so we intercept that so that we can keep the ipcFile uptodate.
+			(_onelineReadStdinLoop "$inputLoopType") >&4 <&0  &
 			progressPIDs[1]=$!
 			;;
 
 		start)
-			#bgtrap 'myTestTrapHandler EXIT   "'"$BASHPID"'" SCRIPT' EXIT
-			#bgtrap 'myTestTrapHandler SIGINT "'"$BASHPID"'" SCRIPT' SIGINT
-			#bgtrap 'myTestTrapHandler SIGTERM "'"$BASHPID"'" SCRIPT' SIGTERM
-			# if we are not attached to a terminal, revert to plain stdout
 			if [ ! -t 1 ]; then
 				export userFeedbackFD="1"
 				export _progressCurrentType="stdout"
@@ -174,75 +93,17 @@ bgtraceVars char readCode
 			# what ever else we want. This will be output from the script or children that does not use 'progress'
 			pipeToStdStreamHandler=$(mktemp -u )
 			mkfifo "$pipeToStdStreamHandler"
-			(
-				#bgtrap 'myTestTrapHandler EXIT    "'"$BASHPID"'" OUT LOOP' EXIT
-				#bgtrap 'myTestTrapHandler SIGINT  "'"$BASHPID"'" OUT LOOP' SIGINT
-				#bgtrap 'myTestTrapHandler SIGTERM "'"$BASHPID"'" OUT LOOP' SIGTERM
-				local readCode lineEnd
-				# the trap is the only way out of the loop
-				bgtrap 'exit' SIGTERM
-				while true; do
-					line=""
-					IFS="" read -r -t 0.7 line; readCode=$?
-					if [ "$line" ]; then
-						if [ $readCode -lt 128 ]; then
-							startLock $ipcFile.lock
-							printf "    ${line}\n"
-							echo >> "$ipcFile"
-							endLock $ipcFile.lock
-						else
-							printf "    ${line}"
-						fi
-					fi
-				done;
-			) >&4 <$pipeToStdStreamHandler &
+			(_onelineReadStdoutStderrLoop) >&4 <$pipeToStdStreamHandler &
 			progressPIDs[0]=$!
 			exec &>$pipeToStdStreamHandler
 
 			progressTypeOnelineCntr startInputLoop
 
+
 			# this is a coproc to read the progress lines and display them
 			local pipeToProgressHandler=$(mktemp -u )
 			mkfifo "$pipeToProgressHandler"
-			(
-				#bgtrap 'myTestTrapHandler EXIT    "'"$BASHPID"'" PRO LOOP' EXIT
-				#bgtrap 'myTestTrapHandler SIGINT  "'"$BASHPID"'" PRO LOOP' SIGINT
-				#bgtrap 'myTestTrapHandler SIGTERM "'"$BASHPID"'" PRO LOOP' SIGTERM
-				local lineOffset=1 progressScope
-				# the trap is the only way out of the loop
-				bgtrap 'exit' SIGTERM
-				while IFS="" read -r line; do
-					if [[ "$line" =~ ^@1\  ]]; then
-						line="${line#@1 }"
-						progressScope="${line%% *}"
-						line="${line#* }"
-						line="${line//%20/ }"
-					fi
-					startLock $ipcFile.lock
-					line="${line:0:$termWidth}"
-					if ! grep -q "^$progressScope:" "$ipcFile" 2>/dev/null; then
-						echo "$progressScope:" >> "$ipcFile"
-						printf "${csiToSOL}%s${csiClrToEOL}\n" "$line"
-					else
-						local lineNR="$(awk '
-							$0~"^'"$progressScope"':" {printf("%s ", NR)}
-						' "$ipcFile" 2>/dev/null || echo "err")"
-						local totalNR="$(awk '
-							END {print NR}
-						' "$ipcFile" 2>/dev/null || echo "err")"
-
-
-						lineOffset="$(awk '
-							$0~"^'"$progressScope"':" {line=NR}
-							END {print NR-line+1}
-						' "$ipcFile" 2>/dev/null || echo "$lineOffset")"
-						if [ $termHeight -gt $lineOffset ]; then
-							printf "${csiToSOL}${CSI}$lineOffset${cUP}%s${csiClrToEOL}${csiToSOL}${CSI}$lineOffset${cDOWN}" "$line"
-						fi
-					fi
-					endLock $ipcFile.lock
-				done;
-			) >&4 <$pipeToProgressHandler &
+			(_onelineReadProgressLoop) >&4 <$pipeToProgressHandler &
 			progressPIDs[2]=$!
 			exec {userFeedbackFD}>$pipeToProgressHandler
 			export userFeedbackFD
@@ -254,4 +115,140 @@ bgtraceVars char readCode
 			;;
 	esac
 }
+
+# this function is executed in the background
+# stdin is the pipe that the main script writes progress msgs to.
+# stdout is the terminal
+function _onelineReadProgressLoop()
+{
+	local lineOffset=1 msgType progressScope formattedStr label msg startTime lapTime curTime target current
+	# the trap is the only way out of the loop
+	bgtrap 'exit' SIGTERM
+	while IFS="" read -r line; do
+		read -r msgType progressScope formattedStr parent label msg startTime lapTime curTime target current <<<$line
+		[ "$msgType" == "@1" ] || assertError -v msgType "'oneline' cui progress driver expects structured progress messages with msgType=='@1'"
+		unescapeTokens parent label msg target current formattedStr
+
+		startLock $ipcFile.lock
+
+		# dont let the progress line wrap to the next line
+		formattedStr="${formattedStr:0:$termWidth}"
+
+		# ipcFile mirrors the output to the terminal. Whenever we start a new progressScope we write a new line to ipcFile with its
+		# name. This mirrors the fact that we wrte a new line to the terminal for that progressScope masgs. Then in other loops we
+		# monitor the other things that can right to the terminal andwhen ever the cursor moves down a line (which may or may not
+		# scroll the terminal), we mirror that by writing a newline to the ipcFile. In this way, the ipcFile always tells us how
+		# many lines up from the current cursor each progressScope line is
+		lineOffset="$(awk -v progressScope="$progressScope" '
+			$0~"^"progressScope":" {line=NR}
+			END {print (line)?(NR-line+1):"NOTFOUND"}
+		' "$ipcFile" 2>/dev/null || echo "NOTFOUND")"
+
+		# "NOTFOUND" means that the is the first time we are seeing this progressScope so we need to write it on a new line
+		if [ "$lineOffset" == "NOTFOUND" ]; then
+			echo "$progressScope:" >> "$ipcFile"
+			printf "%s\n" "$formattedStr"
+
+		# this case, the ipcFile told us the lineOffset, so save the current cursor, move up to that line, overwrite it, and then
+		# restore the cursor back to where it was
+		else
+			if [ $termHeight -gt $lineOffset ]; then
+				printf "${csiSave}${csiToSOL}${CSI}$lineOffset${cUP}%s${csiClrToEOL}${csiRestore}" "$formattedStr"
+			fi
+		fi
+		endLock $ipcFile.lock
+	done;
+}
+
+
+# this function is executed in the background
+# stdin is a pipe in which we redirect both stdout and stderr to write to (because they both send output to the terminal)
+# stdout is the terminal
+# This purpose of this loop is to watch to see whenever the cursor moves down a line (chich may or may not scroll the terminal)
+# and mirror it by writing a newline in the ipcFile. Since the _onelineReadProgressLoop writes the progressScope name as a new line
+# whenever it adds a progress status line to the terminal, the ipcFile records how many lines above the current cursor each
+# progressScope status line is (so that _onelineReadProgressLoop can move up, update it, and move back when its status changes)
+function _onelineReadStdoutStderrLoop()
+{
+	local readCode lineEnd
+	# the trap is the only way out of the loop
+	bgtrap 'exit' SIGTERM
+	while true; do
+		line=""
+		IFS="" read -r -t 0.7 line; readCode=$?
+		if [ "$line" ]; then
+			if [ $readCode -lt 128 ]; then
+				startLock $ipcFile.lock
+				printf "${csiSave}${csiToSOL}    ${line}\n${csiRestore}"
+				echo >> "$ipcFile"
+				endLock $ipcFile.lock
+			elif [ "$line" ]; then
+				startLock $ipcFile.lock
+				printf "${line}"
+				endLock $ipcFile.lock
+			fi
+		fi
+	done;
+}
+
+
+# this function is executed in the background
+# stdin is the terminal
+# stdout is the terminal
+# The purpose of this loop is to capture the user input to the terminal and update the ipcFile whenever the user enters a newline.
+# It also writes the spinner if it is called for. The stdin read times out periodically and updates the spinner
+function _onelineReadStdinLoop()
+{
+	local spinFlag="$1"
+
+	# if the task is over quickly, dont draw the spinner
+	sleep 1
+
+	local spinner=( / - \\ \| )
+	local spinCount=0
+
+	# display the spinner at the start of the current line and leave the cursor directly after it
+	[ "$spinFlag" ] && printf "${csiToSOL} ${spinner[spinCount%4]}]: "
+
+	# turn echo off so that the linefeed will get written by us, so that we can update the ipcFile at the same time
+	stty -echo
+	bgtrap 'stty echo' EXIT
+
+	bgtrap 'exit' SIGTERM
+	while true; do
+		sleep 0.2
+		char=""
+		IFS="" read -r -d '' -t 0.2  -n 1 char 2>/dev/null; readCode=$?
+		[ ${readCode:-0} -eq 1 ] && break
+
+		if [ ${readCode:-0} -eq 0 ]; then
+			if [ "$char" == $'\n' ]; then
+				startLock $ipcFile.lock
+				echo >> "$ipcFile"
+				# when user enters a carrage return, clear the spinner, go to the next line and then display the spinner again
+				# the cursor will be right after the spinner which is where we want input to begin
+				if [ "$spinFlag" ]; then
+					printf "${csiToSOL}    ${csiRestore}\n ${spinner[spinCount%4]}]: "
+				else
+					printf "\n"
+				fi
+				endLock $ipcFile.lock
+			else
+				# when the user enters any other character, just print it at the current cursor position
+				printf "$char"
+			fi
+		fi
+
+		# read timeout. update spinner
+		if [ "$spinFlag" ] && [ $readCode -gt 128 ]; then
+			startLock $ipcFile.lock
+			# save the cursor, write the new spinner, then restore the cursor
+			printf "${csiSave}${csiToSOL} ${spinner[spinCount++%4]}]: ${csiRestore}"
+			endLock $ipcFile.lock
+		fi
+	done;
+	stty echo
+}
+
+
 progressTypeRegistry[oneline]="progressTypeOnelineCntr"
