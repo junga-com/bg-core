@@ -1,0 +1,39 @@
+#!/bin/bash
+
+source /usr/lib/bg_core.sh
+
+
+
+isSubset() {
+	bgtraceParams
+    local -a 'xkeys=("${!'"$1"'[@]}")' 'ykeys=("${!'"$2"'[@]}")'
+    set -- "${@/%/[key]}"
+	bgtraceParams "$@"
+	bgtraceVars xkeys ykeys
+
+    (( ${#xkeys[@]} <= ${#ykeys[@]} )) || return 1
+
+    local key
+    for key in "${xkeys[@]}"; do
+        [[ ${!2+_} && ${!1} == ${!2} ]] || return 1
+    done
+}
+
+main() {
+    # "a" is a subset of "b"
+    local -a 'a=({0..5})' 'b=({0..10})'
+    isSubset a b
+    echo $? # true
+
+    # "a" contains a key not in "b"
+    local -a 'a=([5]=5 {6..11})' 'b=({0..10})'
+    isSubset a b
+    echo $? # false
+
+    # "a" contains an element whose value != the corresponding member of "b"
+    local -a 'a=([5]=5 6 8 9 10)' 'b=({0..10})'
+    isSubset a b
+    echo $? # false
+}
+
+main

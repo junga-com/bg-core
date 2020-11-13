@@ -1,4 +1,5 @@
 
+* make funcman collect Environment: sections and BGENV: tags and create an agregate documentation 
 * fix bg-debugCntr listCodeFiles
 * break out progress from cui.sh to separate library script
 * add progress reporting to unitTest Runner

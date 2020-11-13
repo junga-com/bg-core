@@ -1,0 +1,50 @@
+#!/usr/bin/bash
+
+source /usr/lib/bg_core.sh
+
+import bg_cuiProgress.sh ;$L1;$L2
+
+# A simple loop that calls progress -u as fast as it can.
+# 2020-11 test results
+#            1000 iterations
+# tmpFileStk  26s
+# arrayStk     3.1s
+# (following w/arrayStk)
+# statusline   3.1
+# onleline     2.9
+# stderr       2.3
+# null         2.2
+# off          0.2
+#
+# 'null' and 'off' driver tests show the overhead of the progress() function. 'off' turns progress into a noop. 'null' it does the work
+# but takes no time sending it to the driver.
+#
+# I tested sending a hardcoded str to the userFeedbackFD and surprisingly it took twice as long (around 6s). It seems when the pipe
+# it saturated it becomes less efficient. Putting a bgtrace or a sleep in the loop maded it faster. I think that a small delay between
+# writes made the throughput higher. That could have to do with synchronization in the driver background process
+
+function worker() {
+	local name="$1"; shift
+	local count="${1:-4}"; shift
+	progress -s "worker$name" "starting" "$count"
+	#bgtraceVars _progressDriver
+	local i=0
+	while [ ${count:-0} -gt 0 ]; do
+		#(( count%10 == 0 )) && \
+		progress "i am at $count" "$i"
+		# str="@1 $BASHPID workerfoo:i%20am%20at%20$count workerfoo workerfoo i%20am%20at%20$count 1604962856873542897 1604962859388457416 1604962861377214339 -- --  "
+		# echo "$str" >&${_progressDriver["userFeedbackFD"]}
+#		(( count%100 == 0 )) && echo  "worker($name) $count "
+		((i++))
+		((count--))
+	done
+	progress -e "worker$name" "finished"
+bgtrace "worker out count='$count'  i='$i'"
+}
+
+#progressCntr loadCntxImpl Array
+
+worker foo ${1:-10}
+echo alldone
+#sleep 4
+#progressCntr exit

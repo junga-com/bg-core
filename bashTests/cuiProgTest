@@ -1,0 +1,46 @@
+#!/usr/bin/bash
+
+source /usr/lib/bg_core.sh
+
+import bg_cuiProgress.sh ;$L1;$L2
+
+function worker() {
+	local name="$1"; shift
+	local count="${1:-4}"; shift
+	progress --async -s "worker$name" "starting" "$count"
+	local i=0
+	while [ ${count:-0} -gt 0 ]; do
+		progress "i am at $count" "$((i++))"
+		sleep $(rand -M ${1:-3}) 0.$(rand -M 999)
+#		echo "worker($name) $count "
+		((count--))
+	done
+	echo "worker $name done"
+	progress -e "worker$name" "finished"
+}
+
+progressCntr start default
+
+#progress -s "cuiProgTest"
+#progressScope=
+worker foo 14  &
+pids+=($!)
+#progressScope=
+worker bar 20 1 &
+pids+=($!)
+
+# (
+# 	bgtrace "alive"
+# 	sleep 1
+# 	progressCntr @hide
+# 	sleep 2
+# 	progressCntr @show
+# 	sleep 4
+# )&
+
+bgtracePSTree
+# note that the wait wont  end because the driver background process continues. you need to collect the worker PIDs and wait for them
+bgwait pids
+#progress -e "cuiProgTest"
+
+echo done

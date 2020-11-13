@@ -978,6 +978,13 @@ function progress()
 		progress "$@"
 	fi
 }
+function progressCntr()
+{
+	if [[ ! "$progressCntrDisplayType" =~ ^(none|null|off)$ ]]; then
+		import -f bg_cuiProgress.sh ;$L1;$L2 || assertError
+		progressCntr "$@"
+	fi
+}
 
 
 #######################################################################################################################################
@@ -2246,8 +2253,8 @@ function bgtrap()
 }
 
 
-# usage: bgTrapStack peek <sig> <handlerVar>
-# usage: bgTrapStack pop <sig> <handlerVar>
+# usage: bgTrapStack peek <sig> [<handlerVar>]
+# usage: bgTrapStack pop <sig> [<handlerVar>]
 # usage: bgTrapStack push <sig> <handler>
 # For some ways the traps are used (particularely DEBUG traps) a different pattern than bgtrap's aggregateScript is called for.
 # bgTrapStack implements a pattern of pushing the previous handler onto a global variable stack and replacing it when done.
@@ -2261,21 +2268,17 @@ function bgTrapStack()
 	local sig; signalNorm "$1" sig; shift; assertNotEmpty sig
 
 	local stackVar="bgBASH_trapStack$sig"
-	if [ ! "${!stackVar+exists}" ]; then
-		declare -ga $stackVar
-	fi
 
 	case $action in
 		peek|pop)
 			local handlerVar="$1"
-			eval 'local handler="${'"$stackVar"'[@]:0:1}"; '
+			local -a 'handler=(${'"$stackVar"'[@]:0:1})'
 			if [ "$action" == "pop" ]; then
-				eval "$stackVar"'=( "${'"$stackVar"'[@]:1}" )'
+				declare -ag $stackVar'=( "${'"$stackVar"'[@]:1}" )'
 				# 2020-10 for empty handler changed '-' to ''  (${handler:--} to ${handler})  b/c in test case, Catch was not clearing the DEBUG trap when it called this function
 				builtin trap "${handler}" "$sig"
-			else
-				returnValue "$handler" "$handlerVar"
 			fi
+			returnValue -q "$handler" "$handlerVar"
 			;;
 		push)
 			local newHandler="$1"
@@ -2284,7 +2287,7 @@ function bgTrapStack()
 			handler="${handler%\'*}"
 			handler="${handler//"'\''"/\'}"
 
-			eval ''"$stackVar"'=( "$handler" "${'"$stackVar"'[@]}" )'
+			declare -ag $stackVar'=( '\'"${handler}"\'' "${'"$stackVar"'[@]}" )'
 			builtin trap "${newHandler:--}" "$sig"
 			;;
 	esac
@@ -2541,7 +2544,7 @@ function assertError()
 			local _ae_label _ae_filename dVar
 			bgOptionGetOpt val: dVar "$@" && shift
 			splitString -d":" "$dVar" _ae_filename _ae_label
-			if [ ! "$_ae_label" ] && [ ! -f "$_ae_filename" ]; then
+			if [ ! "$_ae_label" ] && [ ! -f "$_ae_filename" ] && [[ ! "$dVar" =~ [[:space:]]  ]]; then
 				_ae_label="$dVar"
 				_ae_filename="${!dVar}"
 			fi

@@ -17,19 +17,19 @@ function cuiSetTitle()
 
 # usage: cuiGetScreenDimension <lineCountVar> <columnCountVar> [< <tty>]
 # returns the hieght in lines and width in characters of the tty connected to stdin
-# If stdin is not a tty, returns 1 and sets the values to -1
+# If stdin is not a tty, returns 1 and sets the values to 999999. The assumption is that the caller is getting the dimensions to
+# clip or wrap the output so if there is no terminal. the dimensions should be large so that outp is not clipped nor wrapped.
+# if that is not the case, the caller can check the return value
 function CSIgetScreenDimension() { cuiGetScreenDimension "$@"; }
 function cuiGetTerminalDimension() { cuiGetScreenDimension "$@"; }
 function cuiGetScreenDimension()
 {
-	if [ -t 0 ]; then
-		# clear any pending data waiting to be read on the tty
-#		local scrapVar; while read -t 0 < "$tty"; do read -r -n1 scrapVar <"$tty"; done
+	if cuiHasControllingTerminal; then
 		local scrapVar; read -r "${1:-scrapVar}" "${2:-scrapVar}" < <(stty size)
 		return 0
 	else
-		setReturnValue "$1" "-1"
-		setReturnValue "$2" "-1"
+		setReturnValue "$1" "999999"
+		setReturnValue "$2" "999999"
 		return 1
 	fi
 }
@@ -235,8 +235,6 @@ function cuiRealizeFmtToTerm()
 		echo "CSIOn=1"
 		echo "CSIOff="
 	else
-bgtrace "CSI is OFF"
-bgtraceStack
 		local CSI=""
 		local OSC=""
 		echo "CSIOn="
@@ -276,7 +274,7 @@ bgtraceStack
 
 declare -Ag _csiCMD_p1=(
 	[cToCol]="G"				# <col>
-	[cToLine]="G"				# <line>
+#(there seems to not be a cmd for this)	[cToLine]="G"				# <line>
 )
 declare -Ag _csiCMD_p2=(
 	[cMoveAbs]="H"				# <line> <col>
@@ -501,19 +499,16 @@ function cuiHasControllingTerminal()
 	(true >/dev/tty)2>/dev/null
 }
 
-# usage: cuiGetSpinner <spinnerIndex>
-# usage: echo $(cuiGetSpinner $mySpinnerCount); ((mySpinnerCount++))
-# Each time this is called with incremented <spinnerIndex> value it returns the next character in a
-# sequence that simulates a spinning wheel in a text display. The caller should increment <spinnerIndex>
-# each time it wants the animation to change. This function wraps the <spinnerIndex> so the caller can
-# continuously increment it.
-function cuiGetSpinner()
-{
-	local spinnerIndex="$1"
-	local spinner=( / - \\ \| )
-	echo "${spinner[$(( spinnerIndex % ${#spinner[@]} ))]}"
+# usage: cuiGetSpinner <periodInMS> [<retVar>]
+# this returns a single character that changes periodically to simulate a spinning wheel on a text display.
+# it uses the current time to determine which of a roting set of characters to return. each time the mod of the time in milliseconds
+# passes <periodInMS>, the next character will be returned.
+declare -ax _cuiGetSpinner_spinnerChars=( '\' '|' '/' '-' )
+function cuiGetSpinner() {
+	local period="$1"
+	local t=$(( ($(date +"%s%N") / period /1000000) % ${#_cuiGetSpinner_spinnerChars[@]} ))
+	returnValue "${_cuiGetSpinner_spinnerChars[$t]}" "$2"
 }
-
 
 
 # usage: cuiPromptForPassword [-c] <prompt> <passwordVar>

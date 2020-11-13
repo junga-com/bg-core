@@ -1,0 +1,189 @@
+#!/bin/bash
+
+# This test was created to understand the progress driver async loop in bg_cui.sh
+# It is a general pattern for managing an async processing loop in a script
+
+# NOTE on running this script
+# You can monitor the existence of the async loop pid (when the parent does not kill it) with these commands
+#       ps -A | grep bg-sig  # then use 'pstree -ps <pid>' on each pid to see if its orphaned and 'kill -SIGTERM <pid>' to end them
+#       ll /tmp/bg-sigpipe* # see if any pipes exist
+#       echo yo > /tmp/bg-sigpipe-<random>   # if its healthy, will cause the loop to write to the terminal that start it
+#       echo exit > /tmp/bg-sigpipe-<random> # if its healthy, will cause the loop to kill itself
+
+# Notes:
+#   1) when bash creates an FD, it opens the file so when you save the FD and redirect directly to it, you are not not reopenning it
+#      this is more efficient, but you need to handle re-openning when needed
+#   2) if a pipe gets to EOF (sync appearently does that), then a FD on it will read exit code 1 until it is re-opened
+#   3) a pipe redirection on an async loop will keep the pipe open for read while the loop pid exists
+#   4) bash says that async commands ignore SIGINT when job control is not in effect. This seems to be the case -- loop PID SIGINT trap is never called
+#   5) the read -t <n> timeout does not apply when the read is waiting for a writer to open a new pipe to complete the communication.
+#      man fifo talks about the notion of the communication channle not being complete until both a reader and a writer exists and this
+#      seems to be a consequence of that.
+
+# Pattern:
+# * the async loop's pid lifecycle should be tied with the fifo pipe file's lifecycle
+#     * by redirecting a FD of the loop pid to the pipe, we make sure that while the loop pid exists, a the pipe is open for read
+#       so writers will block until we read the message.
+#     * when the loop pid ends, there will no longer be a reader and subsequent writes will fail which will send a SIGPIPE which
+#       by default, will end the writer's pid.
+#     * closing the read FD does not remove the file so the loop pid should remove the pipe file when it exits
+#     * redirecting the pipe to the loop pid FD means that it only gets openned for read when the redirection starts so if any writer
+#       sends an EOF, it will not automatically reset it.
+#         * if the loop life should extend to multiple write open and closes, the loop needs to detect read's exit code 1 and
+#           re-open it for reading with exec 3<$pipeName.
+# Pattern:
+# For the cui progress driver
+# * the loop can be setup to live for exactly one writer open/close cycle
+# * after creating the async loop, the calling process (typically $BASHPID==$$) can redirect the pipe with exec {variable}>$pipName
+#   which opens it for reading and completes the comunnication channel for the life of the script
+# * when the calling process ends, the FD is automatically closed which will cause the async loop to get read exit code 1 and terminate
+#   itself, deleting the $pipe from the filesytem
+# * the script can write to the FD to communicate with the async loop
+
+# Tests:
+# * if a second writer opens then closes the pipe while the first writer has it open, will that close cause the reader to see the pipe close?
+#      tried a subsheel with a redirection so that it made a second writer open and close in the script
+#      tried doing that same subsheel as async (with &)
+#      tried doing exec on the pipename from a second terminal will the script ran
+#      answer: no, it appears not.  As long as a writer has it opened it wont see an EOF
+# * can you rm the FIFO name after the reader and writer use it to open the pipe?
+#      tried -- added a msg rmPipe sent by writer after opening with exec. The read loop responds by rm the pipe file from file system
+#      answer: yes. the reader and write are unaffected but now noone else can access the pipe object
+# * can we create and setup the pipe without the FIFO appearing briefly in the filesystem (which could be a security risk)
+#      Not sure this is needed. in linux all the proc's files are available in /proc/$PID/fd/<n> so root can find and write to them.
+#      by calling mkfifo with -m 600 the permissions are the same as the /proc/$PID/fd/<n> so there is no difference in permissions
+#      option: bash "coproc". At least at one time, support was limitted to one per -- not sure anymore
+#           coproc <name> <command> <redirections>
+#            now FDs are in ${<name>[<n>]} array
+#            pid is <name>_PID
+#      option: 1) create a do nothing pipeline (tail -f /dev/null | tail -f /dev/null; PID2=$!PID1=$(jobs -p %+); )
+#              2) steal its FDs which are both sides of the one pipe (exec 3>/proc/$PID1/fd/1 4</proc/$PID2/fd/0),
+#              3) end the pipeline procs (disown $PID2; kill $PID1 $PID2)
+#      option: exec {name}<> <(:)  # appearantly this relies on a linux bug. {name} is read/write
+# * when the writer closes the pipe, will the reader read the reset of the buffere beofre getting a read erorr?
+#      yes. the EOF is queued at the end of the buffer
+
+function bgtraceGetLogFile()
+{
+	echo "/dev/stderr"
+	#echo "/tmp/bg-sigpipe.out"
+}
+
+
+
+echo "making pipe"
+pipeToProgressHandler=$(mktemp -u /tmp/bg-sigpipe-XXXXXXXXX); mkfifo -m 600 "$pipeToProgressHandler"; (
+
+	echo "   !!side jam begins life as '$pipeToProgressHandler'"
+	exec 3<$pipeToProgressHandler
+
+	# clean up on EXIT
+	trap '
+		rm -f "${pipeToProgressHandler:-NOFILENAME}"
+		echo "   !!side jam EXIT trap: we be dying. :(  removing -f '$pipeToProgressHandler'"
+	' EXIT
+
+	shouldPipeFileExist="1"
+	while true; do
+		IFS="" read -r -u 3 -t 10 line
+		readResult="$?";
+		[ ${readResult:-0} -gt 0 ] && printf "%s " "$readResult"
+		[ ${readResult:-0} -gt 128 ] && readResult=129
+		[ ${readResult:-0} -gt 0 ] && printf "(%s) " "$readResult"
+		case $readResult in
+			0) ;; # normal case, drop through to loop body
+
+			129) # timeout. do our health checks (note that we set it to 129 since case cant do -gt)
+				if [ "$shouldPipeFileExist" ] && [ ! -p "$pipeToProgressHandler" ]; then
+					echo "   !!side jam sees that pipe is gone so we take the hint and kill ourselves"
+					exit
+				fi
+				continue
+				;;
+
+			1) # pipe is in EOF state. A writer closed it
+				if [ ! -p "$pipeToProgressHandler" ]; then
+					echo "   !!side jam gets EOF and sees that pipe is gone so we take the hint and kill ourselves"
+					exit
+				fi
+				printf "re-openning the closed pipe\n"
+				exec 3<"$pipeToProgressHandler" || { echo "   !!side jam ERROR: failed to reopen pipe for reading"; exit; }
+				continue
+				;;
+			*) echo "   !!side jam ERROR: unknown read error ($readResult).  we die "; exit
+		esac
+
+		case $line in
+			exit)
+				echo "   !!side jam peace out."
+				exit
+				;;
+
+			rmPipe)
+				echo "   !!side jam rm pipe"
+				shouldPipeFileExist=""
+				rm $pipeToProgressHandler || echo "failed 'rm $pipeToProgressHandler'"
+				;;
+
+			buftest*)
+				line="${line#* }"
+				line="${line%% *}"
+				[ "$line" == "1000" ] && echo "   !!side jam received $line"
+				;;
+
+			*)	echo "   !!side jam ($BASHPID) says: '$line'"
+				;;
+		esac
+	done
+	echo "   !!side jam ends loop. see ya..."
+
+) >>"$(bgtraceGetLogFile)" 2>&1  &
+progressPIDs[0]=$!
+exec {userFeedbackFD}>$pipeToProgressHandler
+export userFeedbackFD
+
+# comment this line to let the FIFO filename live to be accessed by other terminals
+msg="rmPipe"; echo "#$msg"; echo "$msg" >&$userFeedbackFD   || echo "#:( me failed"
+
+echo "this is who me and my side jam are..."
+echo "userFeedbackFD='$userFeedbackFD'  progressPIDs[0]='${progressPIDs[0]}'"
+pstree -pl $$
+
+trap 'printf "SIGPIPE says you caught YYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYOOOOOOOOOOOOOOOOOOOOOOOOOOO\b\n"' SIGPIPE
+
+msg="hi 1"; echo "#$msg"; echo "$msg" >&$userFeedbackFD   || echo "#:( me failed"
+#msg="exit"; echo "#$msg"; echo "$msg" >&$userFeedbackFD   || echo "#:( me failed"
+sync
+msg="hi 2"; echo "#$msg"; echo "$msg" >&$userFeedbackFD   || echo "#:( me failed"
+msg="hi 3"; echo "#$msg"; echo "$msg" >&$userFeedbackFD   || echo "#:( me failed"
+
+(
+	echo "feeder starting"
+	for ((i=0; i<10; i++)); do
+		echo "feeder says '$i'"
+		sleep 1
+	done
+	echo "feeder ending"
+) >&$userFeedbackFD &
+feederPID=$!
+sleep 3
+kill $feederPID
+
+
+# test to see if closing the pipe allows the reader to clear the buffer before it sees a read error. It does.
+if false; then
+	for i in {1..1000}; do
+		echo "buftest $i  #################### ######################### ################################## ######################" >&$userFeedbackFD   || echo "#:( me failed"
+	done
+	exec {userFeedbackFD}>&-
+	echo "main sent 1000 msgs and closed the pipe"
+	sleep 5
+fi
+
+
+
+while true; do
+	msg="me thinks about ending..."; echo "#$msg"; echo "$msg" >&$userFeedbackFD   || echo "#:( me failed"
+	sleep 5
+done
+echo "me ends"

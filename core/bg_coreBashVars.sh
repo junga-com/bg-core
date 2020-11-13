@@ -113,7 +113,7 @@ function varMarshal()
 }
 
 # usage: varUnMarshalToGlobal <marshalledData>
-# This decalres the variable contained in the <marshalledData> in the global namespace and sets it value to the one contained in
+# This declares the variable contained in the <marshalledData> in the global namespace and sets it value to the one contained in
 # <marshalledData>
 # It would be possible to unmarshall to a local var but we would need to do it in two steps so the caller can declare the names local
 function varUnMarshalToGlobal()
@@ -154,6 +154,7 @@ function varUnMarshalToGlobal()
 #    --string : (default) treat <value> as a literal string
 #    --array  : treat <value> as a name of an array variable. If <value> is an associative array then <varRef> must be one too
 #    --strset : treat <value> as a string containing space separated array elements
+#    -q       : quiet. if <varRef> is not given, do not print <value> to stdout
 # See Also:
 #   setReturnValue -- similar but the order of the var and value are reversed and the value is ignored
 #                     instead of written to stdout if var name is not passed in
@@ -354,6 +355,29 @@ function varGet()
 	returnValue "${!sr_varRef}" $1
 }
 
+
+# usage: arrayToBashTokens <varName>
+# modifies each element in the array so that it would be interpreted as exactly one bash token if subject to bash word splitting
+# empty strings are replaced with '--' and whitespace in the strings are replaced with their %nn equivalent where nn is their two
+# digit ascii hex code.
+function arrayToBashTokens()
+{
+	local -a aa_keys='("${!'"$1"'[@]}")'
+	local aa_key; for aa_key in "${aa_keys[@]}"; do
+		stringToBashToken "${1}[$aa_key]"
+	done
+}
+
+# usage: arrayFromBashTokens <varName>
+# modifies each element in the array to undo what arrayToBashTokens did and return it to normal strings that could be empty and
+# could contain whitespace
+function arrayFromBashTokens()
+{
+	local -a aa_keys='("${!'"$1"'[@]}")'
+	local aa_key; for aa_key in "${aa_keys[@]}"; do
+		stringFromBashToken "${1}[$aa_key]"
+	done
+}
 
 # usage: arraySet <varName> <index> <value>
 # sets the array element like <varName>[<index>]=<value>

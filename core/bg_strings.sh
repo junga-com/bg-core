@@ -671,6 +671,74 @@ function stringEscapeForRegex()
 }
 
 
+function marshalCmdLine() { marshalCmdline "$@" ; }
+function marshalCmdline()
+{
+	local retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-v|--retVar) bgOptionGetOpt val: retVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local params=("$@")
+	arrayToBashTokens params
+	returnValue "${params[*]}" "$retVar"
+}
+
+
+# usage: escapeTokens <var1> [... <varN>]
+# modifies the contents of each of the variable names passed in so that they could then be passed unquoted on a command line and
+# be interpretted as exactly one argument. If the content is empty, it is replaced with '--' and any whitespace characters (space,
+# newline, carrigeReturn, or tab) are replaced with their $nn equivalent where nn is the two digit hex code. (%20, %0A, %0D %09)
+function escapeTokens() { stringToBashToken "$@"; }
+function stringToBashToken()
+{
+	while [ $# -gt 0 ]; do
+		local _adnr_dataVar="$1"; shift
+		assertNotEmpty _adnr_dataVar
+		local _adnr_dataValue="${!_adnr_dataVar}"
+		_adnr_dataValue="${_adnr_dataValue// /%20}"
+		_adnr_dataValue="${_adnr_dataValue//$'\n'/%0A}"
+		_adnr_dataValue="${_adnr_dataValue//$'\r'/%0D}"
+		_adnr_dataValue="${_adnr_dataValue//$'\t'/%09}"
+		_adnr_dataValue="${_adnr_dataValue:---}"
+		printf -v $_adnr_dataVar "%s" "$_adnr_dataValue"
+	done
+}
+
+
+
+# usage: unescapeTokens [-q] <data>
+# modifies the contents of each variable passed in to undo what arrayToBashTokens did and return it to normal strings that could
+# be empty and could contain whitespace
+# Options:
+#    -q : quotes. If the resulting string contains whitespace or is an empty string, surrond it with quotes
+function unescapeTokens() { stringFromBashToken "$@"; }
+function stringFromBashToken()
+{
+	local quotesFlag
+	if [ "$1" == "-q" ]; then
+		quotesFlag='"'
+		shift
+	fi
+
+	while [ $# -gt 0 ]; do
+		local _adnr_dataVar="$1"; shift
+		assertNotEmpty _adnr_dataVar
+		local _adnr_dataValue="${!_adnr_dataVar}"
+		_adnr_dataValue="${_adnr_dataValue//%20/ }"
+		_adnr_dataValue="${_adnr_dataValue//%0A/$'\n'}"
+		_adnr_dataValue="${_adnr_dataValue//%0a/$'\n'}"
+		_adnr_dataValue="${_adnr_dataValue//%0D/$'\r'}"
+		_adnr_dataValue="${_adnr_dataValue//%0d/$'\r'}"
+		_adnr_dataValue="${_adnr_dataValue//%09/$'\t'}"
+		[ "$_adnr_dataValue" == -- ] && _adnr_dataValue=""
+
+		local Q="$quotesFlag"; [ "$Q" ] && [[ ! "$_adnr_dataValue" =~ [[:space:]]|(^$) ]] && Q=""
+
+		printf -v $_adnr_dataVar "%s%s%s"  "$Q" "$_adnr_dataValue" "$Q"
+	done
+}
+
 
 
 
@@ -1256,17 +1324,22 @@ function stringNumToHuman()
 #         fuzzy : The fuzzy justification attempts to use the bash tokens separation to spread out
 #                 the removal so that some meaning can still be gleaned. tokens that have / are assumed
 #                 to be paths and the middle path components are removed first
+#   -p|--pad) : pad the string with spaces if its shorter than count. This is useful to overwrite the area of the terminal that it
+#               will be written to in case there are characters being overwritten
 #   -R <retVar>
 function strShorten() { stringShorten "$@"; }
 function stringShorten()
 {
-	local _just="left" _retVar
+	local _just="left" _retVar _pad _fillChar=" "
 	while [[ "$1" =~ ^- ]]; do case  $1 in
 		-j*) bgOptionGetOpt val: _just "$@" && shift ;;
+		-p|--pad) _pad="--pad" ;;
+		--fill*) bgOptionGetOpt val: _fillChar "$@" && shift ;;
 		-R*) bgOptionGetOpt val: _retVar "$@" && shift ;;
 	esac; shift; done
 	local _length="$1"; [ $# -gt 0 ] && shift
 	local _str="${*//$'\n'}"
+	[ "$_retVar" ] && _str="${_str:-${!_retVar}}"
 	stringTrim -i _str
 
 	local reduceCount=$(( ${#_str} - _length ))
@@ -1318,6 +1391,13 @@ function stringShorten()
 				[ ${#_str} -gt ${_length} ] && _str="${_str:0:$((_length-1))}$"
 				;;
 			*) assertError "unknown justification type '$just'"
+		esac
+	elif [ "$_pad" ]; then
+		[ ${#_fillChar} -eq 1 ] || assertError -v _fillChar "--fill=<_fillChar> _fillChar needs to be a string of length 1"
+		case $_just in
+			left)  while [ ${#_str} -lt $_length ]; do _str="${_str}${_fillChar:- }" ; done ;;
+			right) while [ ${#_str} -lt $_length ]; do _str="${_fillChar:- }${_str}" ; done ;;
+			fuzzy) while [ ${#_str} -lt $_length ]; do _str="${_str}${_fillChar:- }" ; done ;;
 		esac
 	fi
 
