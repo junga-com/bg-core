@@ -161,7 +161,8 @@ function bgGetSpawnedPID()
 
 
 
-# usage: procIsRunning [-f <pidFile>] [<pid>]
+# usage: procIsRunning <pid>
+# usage: procIsRunning -f <pidFile>
 # exit code is true if running, false if not
 # Params:
 #     <pid> : the pid of the process to check. If not specified, the -f option must be specified
@@ -175,10 +176,11 @@ function bgGetSpawnedPID()
 function procIsRunning()
 {
 	local pidFile pidVarName
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-f*) pidFile="$(bgetopt "$@")" && shift ;;
-		-P*) pidVarName="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
+	while [ $# -gt 0 ]; do case $1 in
+		-f*|--pidFile*) bgOptionGetOpt val: pidFile "$@" && shift ;;
+		-P*|--retVar*) bgOptionGetOpt val: pidVarName "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local pidValue="$1"
 
 	if [ "$pidFile" ]; then
@@ -295,11 +297,10 @@ function assertRequiredFn()
 function runPluginCmd()
 {
 	local opts=()
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-o) local t="$(bgetopt "$@")" && shift
-			[ "$t" ] && opts+=("$t")
-			;;
-	esac; shift; done
+	while [ $# -gt 0 ]; do case $1 in
+		-o) bgOptionGetOpt valArray: opts "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local pluginCmd="$*"
 
 	# assert that this command complies with the naming convention to prevent execution of commands that support unsafe
@@ -676,13 +677,14 @@ function cronShouldRun()
 #      -p <period>   : default is /30m. see man cronNormSchedule for details. It can be any 5 field cron spec plus some extensions
 function cronCntr()
 {
-	local ldFolder cronCmd period="/30m"
-	while [[ "$1" =~ ^- ]]; do case $1 in
-	    -n*) cronName="$(bgetopt "$@")" && shift ;;
-	    -u*) cronUser="$(bgetopt "$@")" && shift ;;
-	    -c*) cronCmd="$(bgetopt "$@")" && shift ;;
-	    -p*) period="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
+	local cronName cronUser ldFolder cronCmd period="/30m"
+	while [ $# -gt 0 ]; do case $1 in
+		-n*|--name*)   bgOptionGetOpt val: cronName "$@" && shift ;;
+		-u*|--user*)   bgOptionGetOpt val: cronUser "$@" && shift ;;
+		-c*|--cmd*)    bgOptionGetOpt val: cronCmd  "$@" && shift ;;
+		-p*|--period*) bgOptionGetOpt val: period   "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	assertNotEmpty cronName
 	local cmd="${1:-show}"; [ $# -gt 0 ] && shift
 	local cronFile="/etc/cron.d/$cronName"

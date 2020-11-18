@@ -26,8 +26,9 @@ set +o errtrace # extdebug turns this on but unit tests need it off
 
 # usage: bgStackMakeLogical [--noSrcLookup] [--logicalStart+<n>]
 # This makes a logical call stack that is intuitive to use. It initializes the $bgStatck* global vars. Whereas the item described
-# in each bash function call stack frame is a function scope, each frame in this logical stack is a line of code which is how most
-# programmers think of a call stack.
+# in each bash function call stack frame is a function scope, each frame in this logical stack is a line of code being executed,
+# possible inside a function but maybe not. Programmers think of a call stack as the later which is why this logical stack is more
+# intuitive.
 #
 # We are insterested in using this function in two scenarios. First, is assertError and bgtraceStack which are meant to give the
 # operator a view on what the script is doing at that point. Second is in the debugger which can stop via the DEBUG trap anywhere
@@ -46,11 +47,9 @@ set +o errtrace # extdebug turns this on but unit tests need it off
 # The logical source line of code for each stack frame which is gleaned from adjacent FUNCNAME, BASH_SOURCE, BASH_LINENO array
 # entries but at the point a trap is called, that adjancency is discontinuous.
 #
-# There are two distinct cases -- the DEBUG trap and all other (User level) traps. When in the DEBUG trap handler, this function
+# There are two distinct cases -- the DEBUG trap vs all other (User level) traps. When in the DEBUG trap handler, this function
 # adds an additional stack frame that represents the line of code that the debugger is stopped on and relies on the DEBUG trap
-# handler to record the LINENO variable in the bgBASH_debugTrapLINENO to no what source line corresponds to BASH_COMMAND.
-#
-#
+# handler to record the LINENO variable in the bgBASH_debugTrapLINENO to know what source line corresponds to BASH_COMMAND.
 #
 # Global Input Vars:
 # These global variables are referenced by this function to create the logical stack.
@@ -227,6 +226,7 @@ function bgStackMakeLogical()
 
 	# if we are in a DEBUG handler, frameIdxOfDEBUGTrap will point to the bash array index where the trap was invoked.
 	# an empty value indicates that there is no DEBUG handler on the stack. 0 would be a problem but we know that it can not be zero
+	# NOTE that a DEBUG trap can interrupt another trap so we could have  2 interupts on the stack with 2 dicontinuities in the BASH  function stack
 	local frameIdxOfDEBUGTrap; [ "$bgBASH_funcDepthDEBUG" ] && frameIdxOfDEBUGTrap="$(( ${#BASH_SOURCE[@]} - bgBASH_funcDepthDEBUG ))"
 
 	# logicalFrameStart determines the point in the stack where the plumbing code that is not interesting to the caller starts.
@@ -274,6 +274,7 @@ function bgStackMakeLogical()
 		local bashStkFrmSummary; printf -v bashStkFrmSummary "[%2s]%-20s : %4s : %s" "$i" "${BASH_SOURCE[$i]##*/}" "${BASH_LINENO[$i]}" "${FUNCNAME[$i]}"
 
 		# if one of our trap handlers managed by bgtrap is hinting us that they are active, use that instead of the frame dicontinuity algorithm
+		# NOTE that a DEBUG trap can interrupt another trap so we could have  2 interupts on the stack with 2 dicontinuities in the BASH  function stack
 		local detectedTrapFrame=""; ((i == (${#BASH_SOURCE[@]} - bgBASH_trapStkFrm_funcDepth) )) && detectedTrapFrame="$bgBASH_trapStkFrm_signal"
 
 		# detect if this frame is the start of a TrapHandler.
@@ -289,13 +290,21 @@ function bgStackMakeLogical()
 		# assume that it is running and responsible for FUNCNAME[$i-1] being on the stack.
 		if [ ! "$detectedTrapFrame" ] && ((i>0)) && [ ! "$noSrcLookupFlag" ] && [ "${BASH_SOURCE[$i]}" != "environment" ]; then
 			# BASH BUG: for the first DEBUG trap hit in a new UserTrap handler, BASH_COMMAND will still have the last value before the UserTrap
+			# if the DEBUGger interrupted top level trap code (before it calls a function) the frame no will be the same as frameIdxOfDEBUGTrap
 			local referenceText="${FUNCNAME[$i-1]}"; ((frameIdxOfDEBUGTrap == i)) && referenceText="$BASH_COMMAND"
+
+			# if the DEBUger is interrupting the trap  bgBASH_debugTrapLINENO is the lineno, otherwise the function stk that this trap
+			# called has the lineno. The only way for trap code to be seen on the stack is if its being interupted or has it called
+			# a function (either this function directly or a function that called this function like assert*
 			frmSrcLineNo=$(( (frameIdxOfDEBUGTrap == i)?bgBASH_debugTrapLINENO:${BASH_LINENO[$i-1]} ))
+
 			# CRITICALTODO: this code that gets the source line from the file needs to take into account \ line continuations.
 			[ ${frmSrcLineNo:-0} -gt 0 ] && [ -r "${BASH_SOURCE[$i]}" ] && frmSrcLineText="$(sed -n "${frmSrcLineNo}"'{s/^[[:space:]]*//;p;q}' "${BASH_SOURCE[$i]}" 2>/dev/null )"
 			# if the src line invokes the referenceText in a variable (like $utFunc ...) then it wont match. We could try to deref
 			# but that var might not be in scope at the point we are running and its probably good enough to assume that its not a trap
-			if [[ ! "$frmSrcLineText" =~ $referenceText ]] && [[ ! "$frmSrcLineText" =~ ^[[:space:]]*[$] ]]; then
+			# if the source does not start the line with $cmd (like [ "$cmd" ] && $cmd) this will be a false positive. We could make a better REGEX but I dont want to do that now.
+			if [[ ! "$frmSrcLineText" =~ $referenceText ]] && [[ ! "$frmSrcLineText" =~ ^[[:space:]]*\"?[$] ]]; then
+				bgtraceVars -1 -l"bgStackMakeLogical:DETECTED INTR Frame " frmSrcLineText referenceText
 				local sigCandidates="" sigCandidatesCount=0 sigTest
 				for sigTest in "${!trapHandlers[@]}"; do
 					if [[ "${trapHandlersByLineNo[$sigTest:$frmSrcLineNo]}" =~ $referenceText ]]; then
@@ -307,11 +316,17 @@ function bgStackMakeLogical()
 					fi
 				done
 				detectedTrapFrame="${sigCandidates[*]}"
-				if [ ! "$detectedTrapFrame" ]; then
-					if ((frameIdxOfDEBUGTrap != i)); then
-						detectedTrapFrame="UNKTRAP"
-					fi
-				fi
+
+				# if we did not end up finding trap code, reset frmSrcLineNo before we move on
+				[ "$detectedTrapFrame" ] || frmSrcLineNo=""
+
+				# 2020-11 commented out this block b/c we have false positives when a cmd is invoked from a variable and not at the
+				# start of the source line. (like [ "$cmd" ] && $cmd). If we did not find a trap source then maybe its not a trap after all
+				# if [ ! "$detectedTrapFrame" ]; then
+				# 	if ((frameIdxOfDEBUGTrap != i)); then
+				# 		detectedTrapFrame="TRAP"
+				# 	fi
+				# fi
 			fi
 		fi
 
@@ -323,7 +338,7 @@ function bgStackMakeLogical()
 			_pushLogicalStackEntry FRM0 \
 				"${BASH_SOURCE[$i]}" \
 				"${FUNCNAME[$i]}" \
-				"$((LINENO-1))" \
+				"$((LINENO))" \
 				"_pushLogicalStackEntry FRM0"
 			continue
 		fi
@@ -417,7 +432,7 @@ function bgStackMakeLogical()
 			_pushLogicalStackEntry UTR2 \
 				"${BASH_SOURCE[$i]}" \
 				"${FUNCNAME[$i]}" \
-				"${frmSrcLineNo:-0}" \
+				"${frmSrcLineNo:-${bgBASH_trapStkFrm_LINENO:-0}}" \
 				"${bgBASH_trapStkFrm_lastCMD:-<${FUNCNAME[$i]}() interupted by ${detectedTrapFrame// /,}>}"
 
 			doDefaultBlock=""
@@ -515,14 +530,81 @@ function bgStackPrint()
 	local startFrame=0; [ ! "$allStackFlag" ] && startFrame="$bgStackLogicalFramesStart"
 
 	echo "===============  BASH call stack trace P:$$/$BASHPID TTY:$(tty 2>/dev/null) ====================="
-	local frameNo; for ((frameNo=startFrame; frameNo<$bgStackSize; frameNo++)); do
+	local frameNo; for ((frameNo=$bgStackSize-1; frameNo>=startFrame; frameNo--)); do
 		if [ "$onelineFlag" ]; then
 			printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]/$'\n'*/...}"
 		else
 			printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]}"
 		fi
 	done
-	echo "=================  end of call stack trace  =========================="
+	echo "=================  last line invoked the stack trace  =========================="
+}
+
+
+# usage: bgStackGet <retStack>
+# create a stack trace of the current execution state and return it in an array where each array element is a tokenized string
+# of stack frame attributes
+# the last array element is a string of integers stackSize, logicalStart, and 3 max lengths for fields
+function bgStackGet()
+{
+	local noSrcLookupFlag allStackFlag logicalFrameStart=1 onelineFlag
+	while [ $# -gt 0 ]; do case $1 in
+		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
+		--logicalStart*) ((logicalFrameStart+=${1#--logicalStart?})) ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local retVar="$1"
+	local retVar2="$2"
+
+	bgStackMakeLogical $noSrcLookupFlag --logicalStart+$logicalFrameStart
+
+	varSetRef --array  $retVar
+	varSetRef --array  $retVar2
+
+	varSetRef --array -a $retVar "
+		"${bgStackSize}"
+		"${bgStackLogicalFramesStart}"
+		"${bgStackSrcLocationMaxLen}"
+		"${bgStackFunctionMaxLen}"
+		"${bgStackSrcCodeMaxLen}"
+	"
+	local frameNo; for ((frameNo=$bgStackSize-1; frameNo>=startFrame; frameNo--)); do
+		if ((frameNo > bgStackLogicalFramesStart )); then
+			varSetRef --array -a $retVar2 "$(printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]/$'\n'*/...}")"
+		fi
+
+		varSetRef --array -a $retVar "$(cmdline \
+			"${bgStackSrcFile[$frameNo]}" \
+			"${bgStackSrcLineNo[$frameNo]}" \
+			"${bgStackSrcLocation[$frameNo]}" \
+			"${bgStackSimpleCmd[$frameNo]}" \
+			"${bgStackFrameType[$frameNo]}" \
+			"${bgStackSrcCode[$frameNo]}" \
+			"${bgStackFunction[$frameNo]}" \
+			"${bgStackLine[$frameNo]}" \
+			"${bgStackLineWithSimpleCmd[$frameNo]}" \
+			"${bgStackBashStkFrm[$frameNo]}"
+		)"
+	done
+}
+
+
+function bgGetPSTree()
+{
+	local label passThruOpts
+	while [ $# -gt 0 ]; do case $1 in
+		-l*|--label*) bgOptionGetOpt val: label "$@" && shift ;;
+		-*) bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local retVar="${1:---echo}"
+
+	printf "%s: " "$label"
+	if which pstree &>/dev/null; then
+		varSetRef $retVar "$(pstree -pl "${passThruOpts[@]}" $$)"
+	else
+		varSetRef $retVar "bgtracePSTree: error: pstree not installed. install it to get process tree information"
+	fi
 }
 
 
@@ -572,8 +654,8 @@ function bgStackPrintFrame()
 #function bgStackGetFrame() moved to bg_libCore.sh
 
 # usage: bgStackDump
-# this is only used for debuggin stack trace functions. The bash stack vars are confusing so it can be helpful
-# to see the raw data printed in a neat table
+# this is only used for debuggin bgStackMakeLogical.
+# The typical way to use it is to uncomment the line in assertError that calls it
 function bgStackDump()
 {
 	local argIdx=0
@@ -582,7 +664,6 @@ function bgStackDump()
 		local argList="" j; for ((j=0; j<${BASH_ARGC[$frameNo]}; j++)); do  argList+=" '${BASH_ARGV[$((argIdx++))]}'"; done
 		((frameNo>0)) && printf "%4s %-25s %14s %-25s %2s %s\n" "$((frameNo-1))" "${FUNCNAME[$frameNo]}" "${BASH_LINENO[$frameNo]}" "${BASH_SOURCE[$frameNo]##*/}" "${BASH_ARGC[$frameNo]}" "$argList"
 	done
-	echo "BASH_COMMAND='$BASH_COMMAND' "
-	printfVars frameIdxOfDEBUGTrap bgBASH_funcDepthDEBUG bgBASH_debugTrapLINENO
+	printfVars bgBASH_funcDepthDEBUG bgBASH_debugTrapLINENO
 	printfVars ${!bgBASH_trapStkFrm_*}
 }

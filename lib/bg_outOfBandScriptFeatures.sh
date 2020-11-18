@@ -231,25 +231,53 @@ function bgetopt()
 }
 
 
-# usage: bgBCParse <optSpecs> <cword> <cmdName> [<p1> ... <pN>]
-# usage: bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
-# usage: bgBCParse "fvqC:" "$@"; set -- "${posWords[@]:1}"
-# This typically used from inside a oob_printBashCompletion() callback function to parse the cmdline sent by the
-# _bgbc-complete-viaCmdDelegation completion function into a set of well known variables used by the completion routine.
-# The caller passes in <optSpecs> which describes the options accepted by the script's cmdline syntax and passes through the
-# arguments passed into oob_printBashCompletion as "$@".
+# usage: bgBCParse <optSpecs> <cword> <cmdName> [<arg1> ... <argN>]
+#        bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+#        bgBCParse "fvqC:"   "$@"; set -- "${posWords[@]:1}"
+# This separtates the cmdline sent to it into an options part and positional part. A typical pattern reflected in the second usage
+# example is that after calling this, the option words that this function identifies are shifted off the "$@" variables.
+#
+# This function only removes leading options. When a cmd supports sub cmds, its common for options to appear later in the arguments
+# also but those options dont belong to the first group being parsed now and in the general case the <optSpec> for those options
+# would be different.
+#
+# The caller passes in <optSpecs> which describes the options that will be expected. It really only needs to know which options
+# require arguments so that it can determine where the positional arguments start (b/c otherwise the option arg can look like the
+# first positional arg)
+#
+# If <optSpecs> contains the special value "<glean>", the script that is being invoked will be read to look for a stadard options
+# processing loop in order to set the <optSpecs> from that.
+#
+# This function is typically used from inside oob_printBashCompletion() callback functions. This function will output to stdout the
+# basic completion syntax for the options specified in <optSpecs>. It also sets various variables that can then be used by the caller
+# to provide additional suggestions for the arguments of options and for positional parameters.
+#
 # Params:
 #    <optSpecs>  : a string that contains the accepted options like "ab:c" (see man getopt). If its value is "<glean>" then the
 #         source script will be scanned to glean the option syntax spec from the standard while/case loop that follows the
 #         invokeOutOfBandSystem call.
-#    Note: the remainder of the parameters follow the syntax of the arguments passed to the command by _bgbc-complete-viaCmdDelegation
 #    <cword> : the token position in the cmdline that the user is currently completing.
 #    <cmdName> : ($0) the name of the command whose commandline is being completed
-#    <pN>  : ($N) parameters on the command line being completed
+#    <argN>  : ($[0-9]) parameters on the command line
+# Note that typically, 2nd and subsequent arguments are passed through from the parmeters of the surrounding function like "$@"
 #
 # Return Scope Vars:
-# The invokeOutOfBandSystem function declares these variables which this function fills in so when this function is called from
-# the oob_printBashCompletion() callback, it does not have to declare these variables and can use them after calling this funciton.
+# This function returns its results in these well-known variables. The caller can declare these local before calling this function
+# to prevent them from becomeing global variables. The invokeOutOfBandSystem function does that so when used inside an oob_* callback
+# you dont need to.
+#    $options[<opt>]=<value> : output associative array. Indexes of this array are the options specified on the cmdline line according to
+#         the <optSpecs> and the corresponding value is the option's argument if it has one or the option repeated if it does not.
+#         This is provided in case the script needs to vary the suggestions based on what options the user has specified so far.
+#         The caller can test any option by looking it up in this array to see if its non-empty.
+#    $posWords[<n>]: this is words[] with the optional arguments removed so that <n> corresponds to the consistent
+#         position regardless of how many optional arguments and their arguments have been specified on the cmd line.
+#         $posCwords is the index into this array of the token currently being completed.
+#    $posCwords: is the index into $posWords of the word being completed. If it is 0, it means an option is being completed.
+#    $optWords[] : this is the leading part of $words[] that contains the optional arguments and their arguments.
+#    $words[<n>] $cword : words[] is an array of the entire cmdline. [0] is the command. cword is the index of into
+#         this array of the current position being completed
+#    $cword : the value passed into this function is returned in a variable. Its the position being completed before options are
+#             taken into account.
 #    $cur : $cur is the current word being completed. It contains only the text behind the cursor which is the text that is
 #         subject to change. Its coresponding word in words[$cword] will contain the whole word that is on the command line
 #    $opt : indicates if an option or its required argument is being completed. If its empty, a positional param is being
@@ -260,40 +288,223 @@ function bgetopt()
 #                      function and the caller typically does not have to respond to this case but can add additional suggestions.
 #         <option>   : if $opt contains the name of an option, that option requires an argument that is being completed. The
 #                      caller typically handles this case to provide the valid suggestions for this option's argument.
-#    $options[<opt>]=<value> : output associative array. Indexes of this array are the options specified on the cmdline line according to
-#         the <optSpecs> and the corresponding value is the option's argument if it has one or the option repeated if it does not.
-#         This is provided in case the script needs to vary the suggestions based on what options the user has specified so far.
-#         The caller can test any option by looking it up in this array to see if its non-empty.
-#    $posWords[<n>] $posCwords: this is words[] with the optional arguments removed so that <n> corresponds to the consistent
-#         position regardless of how many optional arguments and their arguments have been specified on the cmd line.
-#         $posCwords is the index into this array of the token currently being completed. If an optional argument is being
-#         completed. $posCwords will be 0
-#    $optWords[] : this is the leading part of $words[] that contains the optional arguments and their arguments.
-#    $words[<n>] $cword : words[] is an array of the entire cmdline. [0] is the command. cword is the index of into
-#         this array of the current position being completed
 #    $prev : $prev is the token before the one being completed. This is provided because the bash_completion project makes it
 #         available but it is not typically used because other variables provide better information.
 # See Also:
+#    bgCmdlineParse  : separates options similar to this function but does not do BC.
 #    invokeOutOfBandSystem
-#    parseForBashCompletion : (being replaced by bgBCParse) this is the long time function that script's printBashCompletion used.
+#    parseForBashCompletion : (being replaced by bgBCParse) this is the long time function that script's oob_printBashCompletion used.
 function bgBCParse()
 {
-	# these are the args to this (bgBCParse) function
+	# remove and process the args to this function, leaving the cmdline being parsed in "$@"
 	local optSpecs="$1"; shift
 	cword="$1"; shift
 	words=( "$@" )
+	shift # cmd name ($0)
+
+	options=()
+	varIsAMapArray options || assertError "The caller must 'declare -A options' before calling bgBCParse"
 
 	local -A syntaxSpec=()
-	if [ "$optSpecs" == "<glean>" ]; then
+	bgMakeUsageSpec "$optSpecs" syntaxSpec
+bgtraceVars syntaxSpec
+
+	cur="${words[$cword]}"
+	((cword>1)) && prev="${words[$(( $cword-1 ))]}"
+
+	local cmdlinePos=0
+	while [[ "$1" =~ ^- ]]; do
+		local _bcp_opt="$1"; shift; ((cmdlinePos++))
+		optWords+=("$_bcp_opt")
+
+		# this block means that the word being completed is in the options section of the cmdline
+		# we send some BC output and also set the output variable 'opt' so that the caller can easily add information when 'opt' is
+		# being completed.
+		# Note that we interpret the token a little differently based on whether the user is on this token
+		if ((cmdlinePos==cword)); then
+			# if we are completing the argument part of a short option. (i.e. '-f...')
+			if [[ "${syntaxSpec[${_bcp_opt:0:2}]}" =~ ^\< ]]; then
+				opt="${_bcp_opt:0:2}"
+				cur="${_bcp_opt:2}"
+				echo "\$(cur:$cur) ${syntaxSpec[${_bcp_opt:0:2}]:-<argument>}"
+			# if we are completing the argument part of a long option in one token. (i.e. '--file=...')
+			elif match "$_bcp_opt" "^(--[^=]*)=(.*)$" rematch; then
+				opt="${rematch[1]}"
+				cur="${rematch[2]}"
+				echo "\$(cur:$cur) ${syntaxSpec[$opt]:-<argument>}"
+			# still completing the option itself
+			else
+				echo "<options> ${syntaxSpec[options]}"
+				opt="@options"
+			fi
+
+		# when the user is not completing this option token we interpret whether it has a parameter or not based more on the form of
+		# the token than on the spec. This lets the user add a -f<filename> or --file=<filename> style argument even if it does not
+		# match our syntaxSpec and it will not mess up the remainder of the cmdline interpretation
+		else
+			if [[ "$_bcp_opt" =~ ^-[^-]. ]]; then
+				options[${_bcp_opt:0:2}]="${_bcp_opt:2}"
+			elif match "$_bcp_opt" "^(--[^=])=(.*)$" rematch; then
+				options[${rematch[1]}]="${rematch[2]}"
+			else
+				options[$_bcp_opt]="$_bcp_opt"
+			fi
+
+			# now determine if the next token should be interpreted as the argument to this option. Note that if the user's cursor is on the
+			# option and the option is complete and requires an argument, we really dont know but the most common case is that the user has
+			# just completed the option and has not yet entered a separate token
+			# if _bcp_opt is an exact option token that requires an argument, consume next arg position as the argument
+			if [[ "${syntaxSpec[$_bcp_opt]}" =~ ^\< ]]; then
+				options[$_bcp_opt]="$1"
+				optWords+=("$1")
+				shift; ((cmdlinePos++))
+				# if the user is completing the argument of an option is a separate token, set opt to indicate that to the caller
+				# the caller will not distuigish between one and two token option w/ arg
+			 	if ((cmdlinePos==cword)); then
+					echo "${syntaxSpec[$_bcp_opt]}"
+					opt="$_bcp_opt"
+				fi
+			fi
+		fi
+	done
+
+	posWords=( "${words[0]}" "$@" )
+	posCwords=$(( (cmdlinePos<cword) ?(cword - cmdlinePos) :0 ))
+
+	# if the user is beginning the first positional argument, let them know that there are options availble if they enter '-'
+	if [ ${posCwords:-0} -eq 1 ] && [ ! "$cur" ]; then
+		echo "<optionsAvailable> -%3A  \$(emptyIsAnOption)"
+	fi
+}
+
+
+
+# usage: bgCmdlineParse <optSpecs> [<arg1> ... <argN>]
+#        bgCmdlineParse "fvqC:" "$@"; shift "${options["shiftCount"]}"
+# This separtates the cmdline sent to it into an options part and positional part. A typical pattern reflected in the second usage
+# example is that after calling this, the option words that this function identifies are shifted off the "$@" variables.
+#
+# This function only removes leading options. When a cmd supports sub cmds, its common for options to appear later in the arguments
+# also but those options dont belong to the first group being parsed now and in the general case the <optSpec> for those options
+# would be different.
+#
+# The caller passes in <optSpecs> which describes the options that will be expected. It really only needs to know which options
+# require arguments so that it can determine where the positional arguments start (b/c otherwise the option arg can look like the
+# first positional arg)
+#
+# If <optSpecs> contains the special value "<glean>", the script that is being invoked will be read to look for a stadard options
+# processing loop in order to set the <optSpecs> from that.
+#
+# Params:
+#    <optSpecs>  : a string that contains the accepted options like "ab:c" (see man getopt). If its value is "<glean>" then the
+#         source script will be scanned to glean the option syntax spec from the standard while/case loop that follows the
+#         invokeOutOfBandSystem call.
+#    <argN>  : The $1 to $N parameters on the command line not including $0
+#
+# Output:
+# This function returns its results in the options well-known variable. The caller should "declare -A options" before calling this
+# function
+#    $options[<opt>]=<value>
+#         Indexes of this array are the options found on the cmdline. If the option does not require an argument, the value will
+#         be the option. If is does require an argument the value is the argument.
+#    $options["shiftCount"]=<N>
+#         The index "shiftCount" is set to the number of args that were determined to be options. The caller can pass this to shift
+#         to remove them and leave only the positional args in the "$@" vars
+# See Also:
+#    bgBCParse  : separates options similar to this function but also produces bash completion output and returns additional variables
+function bgCmdlineParse()
+{
+	local optSpecs="$1"; shift
+	local words=( "$0" "$@" )
+
+	options=()
+	varIsAMapArray options || assertError "The caller must 'declare -A options' before calling bgBCParse"
+
+	local -A syntaxSpec=()
+	bgMakeUsageSpec "$optSpecs" syntaxSpec
+
+	local _bcp_optPos=0
+	while [[ "$1" =~ ^- ]]; do
+		local _bcp_opt="$1"; shift; ((_bcp_optPos++))
+
+		# short opt with arg, no space between opt and arg (like -fmyfile.txt) so its one token
+		if [[ "$_bcp_opt" =~ ^-[^-]. ]]; then
+			options[${_bcp_opt:0:2}]="${_bcp_opt:2}"
+
+		# long opt with arg with = between opt and arg so its one token
+		elif match "$_bcp_opt" "^(--[^=]*)=(.*)$" rematch; then
+			options[${rematch[1]}]="${rematch[2]}"
+
+		# a short or long option by itself but it requires an arg
+		elif [[ "${syntaxSpec[$_bcp_opt]}" =~ ^\< ]]; then
+			options[$_bcp_opt]="$1"
+			optWords+=("$1")
+			shift; ((_bcp_optPos++))
+
+		# a short option without an arg, by itself
+		elif [[ "$_bcp_opt" =~ ^-[^-]$ ]]; then
+			options[$_bcp_opt]="$_bcp_opt"
+
+		# a long option without an arg, by itself
+		elif [[ "$_bcp_opt" =~ ^-- ]]; then
+			options[$_bcp_opt]="$_bcp_opt"
+
+		# whats left over must be a string of short options strung together
+		else
+			_bcp_opt="${_bcp_opt#-}"
+			while [ ${#_bcp_opt} -gt 0 ]; do
+				local shortOpt="${_bcp_opt:0:1}"; _bcp_opt="${_bcp_opt:1}"
+				if [[ "${syntaxSpec["-$shortOpt"]}" =~ ^\< ]]; then
+					options["-$shortOpt"]="${_bcp_opt}"
+				else
+					options["-$shortOpt"]="-$shortOpt"
+				fi
+			done
+		fi
+	done
+
+	options["shiftCount"]="$_bcp_optPos"
+}
+
+# usage: bgMakeUsageSpec <optSpecs> <syntaxSpecVar>
+# this populates the <syntaxSpecVar> associative array return variable with entries that reflect the options in <optSpecs>
+#
+# Output:
+# The <syntaxSpecVar> associative array will have elements added to it to reflect the options from <optSpecs>.
+#    <syntaxSpecVar>[options]  : is a sting containing space separated list of all valid options suitable for output of a  bash
+#             completion function.
+#    <syntaxSpecVar>[posCount]=<N>  : is the number of positional arguments that the spec includes.
+#    <syntaxSpecVar>[<opt>]=NOARG|<argName>  : The index is a valid long or short option (like syntaxSpec[-v]). the value indicates
+#             if this option requirs an argument and if so what its name is. <argument> is the default name.
+#    <syntaxSpecVar>[<N>]=<argName>|val1|val2...  : <N> is the position number (1,2,3...), up to the value of posCount. The value
+#             is a list of tokens separated by the | char. If the token is surrounded by <> it is the name of the argument,
+#             otherwise its a possible value
+#
+# Params:
+#    <optSpecs>  : this is a string in the format specified by getopts. Its a list of single characters that are valid options.
+#                  If a character is followed by : then it will require an argument. Option arguments may or may not have a space
+#                  separating them from their option.
+#    <syntaxSpecVar> : the name of an associative array (local -A) variable declared by the caller that will receive the output of
+#                  this function.
+# See Also:
+#    man(1) getopt for the description of "optstring" format
+function bgMakeUsageSpec() {
+	local optSpecs="$1"
+	local -n _syntaxSpecVar="$2"
+	_syntaxSpecVar=()
+	local cmdlineSyntax="$optSpecs"
+	local assertErrorContext+="-v cmdlineSyntax"
+	if [[ "$optSpecs" =~ \<glean\> ]]; then
+		optSpecs="${optSpecs//\<glean\>/ }"
 		local name value
 		while IFS="," read -r name value; do
-			syntaxSpec[$name]="$value"
+			_syntaxSpecVar[$name]="$value"
 			if [[ "$name" =~ ^-- ]] && [[ "$value" =~ ^\< ]]; then
-				syntaxSpec[options]+=" $name=%3A "
+				_syntaxSpecVar[options]+=" $name=%3A "
 			elif [[ "$name" =~ ^-[^-]$ ]] && [[ "$value" =~ ^\< ]]; then
-				syntaxSpec[options]+=" $name%3A "
+				_syntaxSpecVar[options]+=" $name%3A "
 			else
-				syntaxSpec[options]+=" $name "
+				_syntaxSpecVar[options]+=" $name "
 			fi
 		done < <(awk '
 			@include "bg_core.awk"
@@ -315,87 +526,82 @@ function bgBCParse()
 				}
 			}
 		' $0)
-	else
-		while [ "$optSpecs" ]; do
-			if [ "${optSpecs:1:1}" == ":" ]; then
-				syntaxSpec[-${optSpecs:0:1}]="<argument>"
-				syntaxSpec[options]+=" -${optSpecs:0:1}%3A "
-				optSpecs="${optSpecs:2}"
-			else
-				syntaxSpec[-${optSpecs:0:1}]="NOARG"
-				syntaxSpec[options]+=" -${optSpecs:0:1} "
-				optSpecs="${optSpecs:1}"
-			fi
-		done
 	fi
 
-	options=()
+	# to be compatible with simple optspec strings (single letter options with : to indicate required args) we start out
+	# considering the default case to be a single letter option. After we see a space or a '<' we know that its our extended
+	# syntanx and we consider the default case to be a literal token that can be entered at that point.
+	local defaultIs="optspec"
+	local pos=0
+	while [ "$optSpecs" ]; do
+		# if we see anything execpt these characters its not a simple optspec string (at least from this point forward)
+		[[ "${optSpecs:0:1}" =~ [^a-zA-Z0-9] ]] && defaultIs="newSyntax"
 
-	cur="${words[${cword:-1}]}"
+bgtraceVars -1 defaultIs optSpecs
 
-	shift # cmd name
+		# advance over spaces to the next start character
+		if [ "${optSpecs:0:1}" == " " ]; then
+			optSpecs="${optSpecs:1}"
 
-	local _bcp_optPos=0
-	while [[ "$1" =~ ^- ]]; do
-		local _bcp_opt="$1"; shift; ((_bcp_optPos++))
-		optWords+=("$_bcp_opt")
-
-		# if the user is currently completing an option word, we send some BC output and set opt to indicate that to the caller.
-		# We interpret the token a little differently based on whether the user is on this token
-		if ((_bcp_optPos==cword)); then
-			if [[ "${syntaxSpec[${_bcp_opt:0:2}]}" =~ ^\< ]]; then
-				opt="${_bcp_opt:0:2}"
-				cur="${_bcp_opt:2}"
-				echo "\$(cur:$cur) ${syntaxSpec[${_bcp_opt:0:2}]}"
-			elif match "$_bcp_opt" "^(--[^=])=(.*)$" rematch; then
-				opt="${rematch[1]}"
-				cur="${rematch[2]}"
-				echo "\$(cur:$cur) ${syntaxSpec[$opt]:-<argument>}"
-			else
-				echo "<options> ${syntaxSpec[options]}"
-				opt="@options"
+		# [-f|--file=<txtFile>]
+		# this consists of three parts, each of which is optional. shortOpt, longOpt, and argument.
+		elif [ "${optSpecs:0:1}" == "[" ]; then
+			optSpecs="${optSpecs:1}"
+			local oneOptSpec="${optSpecs%%]*}"
+			optSpecs="${optSpecs#*]}"
+			[[ "$oneOptSpec" =~ ^(-[^-|<])?\|?(--[^<|=]*)?=?(<[^>]*\>)?$ ]] || assertError -v invalidSpec:oneOptSpec "invalid option specification. "
+			local shortOpt="${BASH_REMATCH[1]}"
+			local longOpt="${BASH_REMATCH[2]}"
+			local arg="${BASH_REMATCH[3]}"
+			if [ "${shortOpt}" ]; then
+				_syntaxSpecVar[${shortOpt}]="${arg:-NOARG}"
+				_syntaxSpecVar[options]+=" ${shortOpt}%3A "
+			fi
+			if [ "${longOpt}" ]; then
+				_syntaxSpecVar[${longOpt}]="${arg:-NOARG}"
+				_syntaxSpecVar[options]+=" ${longOpt}=%3A "
 			fi
 
-		# when the user is not completing this option token we interpret whether it has a parameter or not based more on the form of
-		# the token than on the spec.
+		# f: or f<txtFile>
+		elif [[ "${optSpecs}" =~ ^[^\ ][:\<] ]]; then
+			local opt="${optSpecs:0:1}"; optSpecs="${optSpecs:1}"
+			_syntaxSpecVar[-${opt}]="<argument>"
+			_syntaxSpecVar[options]+=" -${opt}%3A "
+
+			[ "${optSpecs:0:1}" == ":" ] && optSpecs="${optSpecs:1}"
+			if [ "${optSpecs:0:1}" == "<" ]; then
+				_syntaxSpecVar[-${opt}]="${optSpecs%%>*}>"
+				optSpecs="${optSpecs#*>}"
+			fi
+
+		# in optspec mode assume that this is a single short option without an argument
+		elif [ "$defaultIs" == "optspec" ]; then
+#bgtraceVars -1 -l"oldSyn" optSpecs defaultIs pos
+			_syntaxSpecVar[-${optSpecs:0:1}]="NOARG"
+			_syntaxSpecVar[options]+=" -${optSpecs:0:1} "
+			optSpecs="${optSpecs:1}"
+
+		# in newSyntax mode this is a positional argument
+		# <argName>val1|val2
+		# This is a list of one or more tokens separated by the | char. If one of the tokens is surrounded by <> is it the
+		# name of the position. Other tokens are possible values.
 		else
-			if [[ "$_bcp_opt" =~ ^-[^-]. ]]; then
-				options[${_bcp_opt:0:2}]="${_bcp_opt:2}"
-			elif match "$_bcp_opt" "^(--[^=])=(.*)$" rematch; then
-				options[${rematch[1]}]="${rematch[2]}"
-			else
-				# we don't check for the complete form here because that is in common below
-				options[$_bcp_opt]="$_bcp_opt"
-			fi
-
-			# now determine if the next token should be interpreted as the argument to this option. Note that if the user's cursor is on the
-			# option and the option is complete and requires an argument, we really dont know but the most common case is that the user has
-			# just completed the option and has not yet entered a separate token
-			# if _bcp_opt is an exact option token that requires an argument, consume next arg position as the argument
-			if [[ "${syntaxSpec[$_bcp_opt]}" =~ ^\< ]]; then
-				options[$_bcp_opt]="$1"
-				optWords+=("$1")
-				shift; ((_bcp_optPos++))
-				# if the user is completing the argument of an option is a separate token, set opt to indicate that to the caller
-				# the caller will not distuigish between one and two token option w/ arg
-			 	if ((_bcp_optPos==cword)); then
-					echo "${syntaxSpec[$_bcp_opt]}"
-					opt="$_bcp_opt"
-				fi
-			fi
+#bgtraceVars -1 -l"newSyn" optSpecs defaultIs pos
+			((pos++))
+			local posArg="${optSpecs%% *}"
+			optSpecs="${optSpecs#$posArg}"
+			_syntaxSpecVar[$pos]="${posArg}"
 		fi
 	done
-
-	posWords=( "${words[0]}" "$@" )
-	posCwords=$(( (_bcp_optPos<cword) ?(cword-_bcp_optPos) :0 ))
 }
 
 
+# OBSOLETE: use bgBCParse or bgCmdlineParse
 # usage: parseForBashCompletion --compat2 wordsVarName cwordVarName curVarName prevVarName optWordsVarName posWordsVarName posCwordsVarName "$@"
 # usage: parseForBashCompletion [-o"hs:a:"] wordsVarName cwordVarName curVarName prevVarName optWordsVarName posWordsVarName  "$@"
 # usage: (cont)                 <cword> [<word1> .. <wordN>]
 # This function supports previous versions with a --compatN option.
-# this is typically used at the top of a script's printBashCompletion function to get the
+# this is typically used at the top of a script's oob_printBashCompletion function to get the
 # information from the current command line that makes it easy to provide bash completion suggestions.
 # --compatN changes the contract with the caller slightly.
 #     1) there is the extra posCwords return variable

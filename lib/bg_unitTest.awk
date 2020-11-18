@@ -55,6 +55,8 @@ inParams && /^)/ {
 # utParams in the middle
 inParams && $1~/^[[].*[]]=.*$/ {
 	utParams=gensub(/(^[[])|(]=.*$)/,"","g",$1)
+	if (utParams ~ /^["].*["]$/)
+		utParams=substr(utParams, 2, length(utParams)-2)
 	utPByFunct[inParams][length(utPByFunct[inParams])]=utParams
 }
 
@@ -77,8 +79,8 @@ utFunc && /^}[[:space:]]*$/ {
 }
 
 # expect comments in the middle
-utFunc && $1=="#" && $2=="expect" {
-	funcExpectComments[utFunc]=gensub(/^.*expect[[:space:]]+/,"","g",$0)
+utFunc && $1=="#" && $2~"^expect:?$" {
+	funcExpectComments[utFunc]=gensub(/^.*expect[:[:space:]]+/,"","g",$0)
 }
 
 ENDFILE {

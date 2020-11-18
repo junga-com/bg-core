@@ -119,11 +119,11 @@ declare -gA _bgbcData
 #    4 suggestions and then gives the user a choice to enter a , to continue or a space to end the list. Then
 #    the remaining 3 suggestions , etc...
 #
-# .SH $(nextBreakChar <char>) Directive:
-#    This makes it so that any suggestion that end in <char> will not complete the current token when selected
-#    by the user. Instead the cursor will stay at the position at the end of the token and further parts of the
-#    token will be expected. The user can enter a space to manually move to the next token.
-#    This is often used in conjunction with the '$(cur:)' directive. See that section for an example.
+# .SH $(nextBreakChar <brchar>) Directive:
+#    This makes it so that after the current word is completed, a <brchar> will be automatically appended and
+#    the cursor will stay on the token for the user to complete more parts of the token.
+#    This is often used in conjunction with the '$(cur:)' directive to provide suggestions for the additional
+#    parts. See that section for an example.
 #
 # .SH $(nospace) Directive:
 #    dont atomatically move to the next token when a user chooses a suggestion. Normally you want this on
@@ -134,6 +134,12 @@ declare -gA _bgbcData
 #    %3A (the escape sequence for :), then the cursor will stay on the current token.
 #
 #    See the "\$(nextBreakChar)" and "\$(cur:)" directives which is the prefered way of doing multipart tokens.
+#
+# .SH $(emptyIsAnOption) Directive:
+#    If the current position is blank, dont start filling it in until the user enters at least one character.
+#    If the suggestions are "on off" without this, the o would be filled in automatically but with this directive
+#    it will not be. Likewise, if the validWords has just one entry, this prevents it from being selected
+#    automatically
 #
 # .SH $(nosort) Directive:
 #    Display the suggestions to the user in the order shown instead of sorting them.
@@ -241,7 +247,12 @@ function __bgbc-complete-viaCmdDelegation()
 	if [ "${_bgbcData[lastbcID]}" == "$bcID" ]; then
 		# if this is a repeated tab, and caching is enabled, just return the results we already created last time
 		if [ ! "${_bgbcData[noCache]}" ] && [ "${_bgbcData[lastCur]}" == "${words[$cword]}" ]; then
+			# restore the COMPREPLY
 			IFS=$'\b' eval 'COMPREPLY=(${_bgbcData[lastCOMPREPLY]})'
+
+			# restore the sort/nosort state
+			[ "${_bgbcData[sortState]}" == "nosort" ] && compopt -o nosort 2>/dev/null || commentsSortPrefix="AA"
+
 			__bgbc_trace --timer "repeating saved bcID='$bcID' cur='${_bgbcData[lastCur]}'"
 			return
 		fi
@@ -296,9 +307,10 @@ function __bgbc-complete-viaCmdDelegation()
 	# nosort is introdeced in bash 4.4 (Ubuntu 18.04). We make it the default. \$(sort) directive undoes it
 	# in 4.3 and prior, commentsSortPrefix makes comments appear (almost) first
 	compopt -o nosort 2>/dev/null || commentsSortPrefix="AA"
+	_bgbcData[sortState]="nosort"
 
 	### First Stage Processing of the <cmd> output
-	# invoke the $cmd -hb and do the initial processing staging on its output.
+	# invoke the $cmd -hbOOBCompGen and do the initial processing staging on its output.
 	# The command output can contain both $(<directives>) and suggestions.
 	# Some <directives> are needed because there are compgen and bash_completion project functionality
 	# that we will like to reuse but can only be invoked the bash sourced environment as opposed to
@@ -308,7 +320,7 @@ function __bgbc-complete-viaCmdDelegation()
 	# This stage separates the <directives> and the suggestions into validWords().
 	# and invokes them to fill in COMPREPLY directly
 	# doing some feature processing like prefix and suffix additions.
-	local prefix suffix doFilesDirsFlag skipValidWords usingListmodeFlag nextBreakChar commentsSortPrefix nospaceFlag removePrefix
+	local prefix suffix doFilesDirsFlag skipValidWords usingListmodeFlag nextBreakChar commentsSortPrefix nospaceFlag emptyIsAnOption removePrefix
 	local removeSuffix
 	local token; while read -r token; do
 		[ ! "$token" ] && continue;
@@ -388,12 +400,18 @@ function __bgbc-complete-viaCmdDelegation()
 						nospaceFlag="1"
 						;;
 
+					emptyIsAnOption)
+						emptyIsAnOption="1"
+#						validWords+=("%20")
+						;;
+
 					# $(nosort) causes bash not to sort the suggestions so that we can controll the order
 					# prior to bash 4.4 nosort was not supported. If -o nosort returns an error we set
 					# the commentsSortPrefix="AA" so that comments appear first which is one reason we
 					# want to control the order.
 					nosort)
 						compopt -o nosort 2>/dev/null || commentsSortPrefix="AA"
+						_bgbcData[sortState]="nosort"
 						;;
 
 					# $(sort) causes bash not  sort the suggestions
@@ -401,6 +419,7 @@ function __bgbc-complete-viaCmdDelegation()
 					sort)
 						compopt +o nosort 2>/dev/null
 						commentsSortPrefix=""
+						_bgbcData[sortState]="sort"
 						;;
 
 					# $(enableModes) advanced mode is where the user can type a @ to toggle the mode between basic and
@@ -496,7 +515,7 @@ function __bgbc-complete-viaCmdDelegation()
 		export _bgbcDataStr="$(__bgbc_arrayToString _bgbcData)"
 		export bgDebuggerOn=""
 		export bgTracingOn=file:$_bgBCTracefile
-		$cmd -hb "$cmdPos" "${cmdTokensWOEsc[@]}" 2>>$_bgBCTracefile | sed "$_bgSedTokenizingScript"
+		$cmd -hbOOBCompGen "$cmdPos" "${cmdTokensWOEsc[@]}" 2>>$_bgBCTracefile | sed "$_bgSedTokenizingScript"
 # CRITICALTODO: update invokeOutOfBandSystem et all parsing to remove quotes like 'name:"that and that'
 	)
 	local cmdReturnedSuggestionCount="${#validWords[@]}"
@@ -521,14 +540,14 @@ function __bgbc-complete-viaCmdDelegation()
 		# The validWords array now contains just the suggestions from the <cmd> output. We support some
 		# extended syntax for what those suggestions can be so that its easier for the <cmd>.
 		# The most notable is the feature that each suggestion can specify whether it will complete the
-		# current position if it is choosen by the user.
+		# current position if it is choosen by the user by appending the %3A suffix.
 		__bgbc_processValidWords
 
 		### add our validWords to the COMPREPLY
-		# at this point, the COMPREPLY might already be populated  by one of the <directives> or it might
+		# at this point, the COMPREPLY might already be populated by one of the <directives> or it might
 		# be empty. Likewise, validWords may or may not be empty. But if there are any suggestions in
-		# validWords, they will be supersets of curBehindCusor (aka cur) so they will coexist with any words in
-		# COMPREPLY already.
+		# validWords, they will include curBehindCusor (aka cur) so they will be compatible with any words in
+		# COMPREPLY already. i.e. they all need to be relative to the same starting point.
 		COMPREPLY+=("${validWords[@]}")
 		__bgbc_trace -v "(3) validWordsCount='${#validWords[@]}' COMPREPLYCount='${#COMPREPLY[@]}'"
 	fi
@@ -544,8 +563,9 @@ function __bgbc-complete-viaCmdDelegation()
 	_bgbcData[lastbcID]="$bcID"
 	_bgbcData[lastCur]="${words[$cword]}"
 	IFS=$'\b' eval '_bgbcData[lastCOMPREPLY]="${COMPREPLY[*]}"'
+_bgtrace "settinging cache = '${_bgbcData[lastCOMPREPLY]}'"
 
-	__bgbc_trace --timer "invoked '$cmd -hb "$cmdPos" <COMPLINE>' produced '$cmdReturnedSuggestionCount' suggestions, '${#COMPREPLY[@]}' after processing and filtering with cur='$cur' "
+	__bgbc_trace --timer "invoked '$cmd -hbOOBCompGen "$cmdPos" <COMPLINE>' produced '$cmdReturnedSuggestionCount' suggestions, '${#COMPREPLY[@]}' after processing and filtering with cur='$cur' "
 }
 
 
@@ -631,8 +651,8 @@ function __bgbc_usingListMode()
 
 
 # usage: __bgbc_processValidWords
-# validWords is the array that we use to hold the suggestions returned from a script's -hb invocation.
-# the stdout of the script -hb is filtered by _bgSedTokenizingScript and placed in cmdOutputWords.
+# validWords is the array that we use to hold the suggestions returned from a script's -hbOOBCompGen invocation.
+# the stdout of the script -hbOOBCompGen is filtered by _bgSedTokenizingScript and placed in cmdOutputWords.
 # Those words can contains $(<directives>) and suggestion words. Directives are ran and produce suggestions
 # into COMPREPLY. Suggestions from  cmdOutputWords are put in validWords and then this function does
 # the extra processing on them
@@ -813,6 +833,9 @@ function __bgbc_finalizeCOMPREPLY()
 		newCur="${COMPREPLY_override#<EMPTY>}"
 	fi
 
+	# if the user has not entered any characters in this position yet and the $(emptyIsAnOption) directive
+	# has been used, set newCur to empty so that it will not advance.
+	[ ! "$cur" ] && [ "$emptyIsAnOption" ] && newCur=""
 
 	# if we made newCur longer, make readline advance to the newCur position
 	# Note that we may have more to complete. We sometimes deliberatley dont return some valid choices
@@ -857,7 +880,7 @@ function __bgbc_finalizeCOMPREPLY()
 		)
 	fi
 
-	# The case where we are advancing the cursor/token already returned above.
+	# The case where we are advancing the cursor/token does not get here b/c it already returned above.
 	# So now we have to stop readline/bash from doing any automatic cursor advancement on a common
 	# prefix because it will get it wrong.
 	# If there is a common prefix, we add '>' so that there won't be
@@ -866,7 +889,7 @@ function __bgbc_finalizeCOMPREPLY()
 		firstLetters[${COMPREPLY[$j]:0:1}]="1"
 	done
 	if [ ${#firstLetters[@]} -eq 1 ]; then
-		COMPREPLY+=(">")
+		COMPREPLY+=(" ")
 	fi
 }
 
@@ -912,6 +935,7 @@ function __bgbc_trace()
 	local timerFlag; [ "$1" == "--timer" ] && { timerFlag="--timer"; shift; }
 	if type -t _bgtrace &>/dev/null; then
 		_bgBCTracefile="$(_bgtrace --getDestination)"
+		[[ "$_bgBCTracefile" =~ stderr|stdout ]] && _bgBCTracefile=""
 	fi
 
 	if [ ! "$_bgBCTracefile" ] && [ -w "/tmp/bgtrace.out" ]; then

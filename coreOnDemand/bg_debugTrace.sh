@@ -152,6 +152,29 @@ function bgtraceCntr()
 		esac
 		if [ "$_bgtraceFile" != "/dev/null" ]; then
 			eval unalias bgtrace 2>/dev/null
+
+			if [ -w "$_bgtraceFile" ] && ! (echo -n >> "$_bgtraceFile") &>/dev/null; then
+				# turn tracing off
+				local fileOwner="$(stat -c"%U" "$_bgtraceFile")"
+				bgTracingOnState=""
+				bgTracingOn=""
+				_bgtraceFile="/dev/null"
+				eval alias bgtrace='#'
+
+				assertError -v _bgtraceFile -v USER -v fileOwner "
+					The _bgtraceFile can not be written to because it is in the /tmp filesystem and owned by a different user.
+					There was a kernel change circa 4.19 which made this the default behavior to make it harder to leak information
+					from programs by hijacking tmp files.
+
+					If you are working on a single user workstation it is relatively safe to disable that new feature with this command.
+					    sudo sysctl fs.protected_regular=0
+
+					An alternative to disabling the feature is to change the location of this terminal's trace file.
+					    bg-debugCntr trace on:<pathToFile>
+
+					Here is the information on the trace file and users
+				"
+			fi
 		fi
 		bgTracingOnState="$bgTracingOn"
 	fi
@@ -282,7 +305,7 @@ function bgtraceVars()
 		printf "$timerStr" >>$_bgtraceFile
 	fi
 
-	printfVars "$@" >>$_bgtraceFile
+	printfVars "$@" >>$_bgtraceFile || echo "could not write to '$_bgtraceFile' with user '$USER'"
 }
 
 # usage: bgtraceParams <token1> [... <tokenN>]
@@ -341,25 +364,12 @@ function bgtraceStack()
 
 
 # usage: bgtracePSTree
-# print the current stack trace to bgtrace destination
-# it is called by  assertError
+# print process tree of the script at this point
+# this is used by assertError to gather information when bgtracing is on
 function bgtracePSTree()
 {
 	bgtraceIsActive || return 0
-
-	local label passThruOpts
-	while [ $# -gt 0 ]; do case $1 in
-		-l*|--label*) bgOptionGetOpt val: label "$@" && shift ;;
-		-*) bgOptionGetOpt opt passThruOpts "$@" && shift ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-	done
-
-	printf "%s: " "$label" >>$_bgtraceFile
-	if which pstree &>/dev/null; then
-		pstree -pl "${passThruOpts[@]}" $$ >>$_bgtraceFile
-	else
-		echo "bgtracePSTree: error: pstree not installed. install it to get process tree information"  >>$_bgtraceFile
-	fi
+	bgGetPSTree "$@" >>$_bgtraceFile
 }
 
 

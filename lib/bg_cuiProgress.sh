@@ -249,6 +249,7 @@ function progress()
 			local msg="$2"
 			local target="$3"
 			local current="$4"
+			[ "$target" ] && current="${current:-0}"
 			data[1]="$subTask"
 			data[2]="$msg"
 			data[3]=$(date +"%s%N")  # task start time

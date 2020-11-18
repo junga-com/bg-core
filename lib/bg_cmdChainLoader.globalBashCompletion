@@ -5,16 +5,32 @@
 function _bg_subclassed_completionLoader() {
 	local cmd="$1"
 
-	# test to see if $cmd is listed in a package manifest file of a bg-core style package
-	if [[ "$cmd" =~ [.]ut$ ]] || { [ "$cmd" ] && [ "$(find /var/lib/bg-core/*/manifest -print -quit 2>/dev/null)" ] && [ "$(awk '$2=="cmd" && $3=="'"$cmd"'" {print $3;exit}' /var/lib/bg-core/*/manifest)" ]; } ; then
+	# The original way to identify compatible scripts was to look up in the manifests of bg-dev managed packages but that is problematic
+	# in two ways. We may miss commands that would work just because they were not packaged in that way, and also, a bg-dev package
+	# should be free to provide commands that are not compatible with this.
+	#
+	# Scripts are easy to identify because they are text files that contain oob_invokeOutOfBandSystem. We can extend that notion
+	# to binary files by requiring them to include a string constant containing oob_invokeOutOfBandSystem so that the strings util
+	# will print it
+
+	local isOneOfOurs
+	local cmdType="$(type -t "$cmd")"
+	if [ "$cmdType" == "file" ] && strings "$(which $cmd)" | grep -q oob_invokeOutOfBandSystem &>/dev/null; then
+		isOneOfOurs="1"
+	elif [ "$cmdType" == "function" ] && type $cmd | grep -q -E "(oob_invokeOutOfBandSystem|hbOOBCompGen)" &>/dev/null; then
+		isOneOfOurs="1"
+	fi
+
+	if [ "$isOneOfOurs" ]; then
 		# register our generic handler which invokes the command with the -hb syntax to ask it to provide the completion list
 		complete -F _bgbc-complete-viaCmdDelegation "$cmd" && return 124
 		# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
-	fi
 
-	# the cmd is not one of ours so apply the specs that we replaced.
-	complete $_bg_subclassed_completionLoader_prevLoader} $cmd && return 124
-	# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
+	else
+		# the cmd is not one of ours so apply the default specs that we replaced which is probably the default loader
+		complete $_bg_subclassed_completionLoader_prevLoader $cmd && return 124
+		# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
+	fi
 }
 
 # in case we get reloaded, this block only runs the when the _bg_subclassed_completionLoader has not yet been installed (typically the first time)

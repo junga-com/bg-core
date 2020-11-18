@@ -13,6 +13,8 @@
 #############################################################################################################################################
 ### API for use in Daemon Scripts
 
+# moved function daemonDeclare() to bg_coreLibsMisc.sh
+
 # usage: daemonDeclare "$@"
 # putting this at the top of a script will identify the script as a daemon to the invokeOutOfBandSystem
 # It will also initialize these global variables. Right after the call, the script can modify these values.
@@ -134,6 +136,11 @@ function daemonSignalHandler()
 
 	local sig; sig=$(signalNorm "$1") || return
 
+	# for INT or TERM,  if there is still an outstanding interrupt that has not yet been consumed, exit the process.
+	# If the daemon scipt has a trivial loop that does not call "daemonCheckForSignal INT TERM" then this logic will still allow
+	# the user to exit the daemon
+	[[ "$sig" =~ ^(INT|TERM)$ ]] && (( daemonSIGs[$sig] > 0 )) && exit 1
+
 	((daemonSIGs[$sig]++))
 
 	# pass on the signal to our children
@@ -143,7 +150,7 @@ function daemonSignalHandler()
 
 # usage: daemonCheckForSignal <sigSpec> [... <sigSpec>]
 # Checks to see if any of the specified <sigSpec> have been raised for the current thread since the last time it was checked
-# If yes, it returns true(0) and resets / modifies the signal's count according to the -n option.
+# If yes, it returns true(0) and resets or modifies the signal's count according to the -n option.
 # If no, it return false(1)
 # This function assumes that the current thread has traps installed on the <sigSpecs> that communicate
 # with this function. daemonInvokeOutOfBandSystem does that automatically for the main thread by calling
@@ -439,9 +446,6 @@ function daemonCntrInstallAutoStart()
 	esac
 
 	daemonCntrEnable $daemonName
-
-	# create a BC script stub if $daemonName != $0
-	# TODO: create a BC script stub. It can be a copy (or maybe a symlink?) of the one for $0
 }
 
 
@@ -548,19 +552,21 @@ function daemonCntrIsRunning()
 function daemonCntrStart()
 {
 	local daemonName="$1"; [ $# -gt 0 ] && shift
-	local daemonPIDFile="/var/run/$daemonName.pid"
 
 	daemonCntrIsRunning "$daemonName" && return 1
 
-	echo "" > $daemonPIDFile || assertError "USER='$USER' can not write to run file '$daemonPIDFile'"
-
-	case $(daemonCntrGetType "$daemonName") in
+	local daemonType="$(daemonCntrGetType "$daemonName")"
+	case $daemonType in
 		upstart) start "$daemonName" >/dev/null ;;
 		systemd)
 			systemctl start "$daemonName"
 		 	;;
 		sysv|none)
+			local daemonPIDFile="/var/run/$daemonName.pid"
 			local daemonLogFile="/var/log/$daemonName"
+
+			(echo "" > "$daemonPIDFile") 2>/dev/null || assertError "USER='$USER' can not write to run file '$daemonPIDFile'"
+
 			local daemonErrorFile="$daemonLogFile"
 
 			# re-run with setid (new linux session leader) and redirected std* file and in the background (&)
@@ -789,23 +795,34 @@ function cr_daemonAutoStartIsSetTo()
 # If the script's oob_getRequiredUserAndGroup returns a value it will override the one this function returns
 function daemon_oob_getRequiredUserAndGroup()
 {
-	local words cword cur prev optWords posWords posCwords reqUser="" reqGroup=""
-	parseForBashCompletion --compat2 words cword cur prev optWords posWords posCwords "$@"
-
+	bgCmdlineParse "hN:FvDqO" "$@"; shift "${options["shiftCount"]}"
 	# this sets the required user for the real daemon proc invocation
-	if [[ "${optWords[@]}" =~ -[F] ]]; then
-		echo "root"
+	if [ "${options[-F]}" ]; then
+		if [ "$(type -t oob_getRequiredUserAndGroup)" ]; then
+			oob_getRequiredUserAndGroup "$@"
+		fi
 		return
 	fi
 
+	local daemonName="${options["-N"]:-${0##*/}}"
+	local daemonType="$(daemonCntrGetType "$daemonName")"
+
+	local cntrCmd="$1"; shift
+
+	# the -N option can be to the script or to the cntrCmd so check the options again.
+	bgCmdlineParse "hN:vqO" "$@"; shift "${options["shiftCount"]}"
+	local daemonName="${options["-N"]:-$daemonName}"
+
 	# this sets the required user for the control commands
-	case ${posWords[1]} in
+	# Note that type 'none' still needs root even if the daemon does not b/c we need to write to the pid and log files in the
+	# system folders
+	case $daemonType:$cntrCmd in
 		# This daemon requires the user to be root to start,stop, or reload it
-		*start|stop|reload|setDefaultCmdLine)
+		*:start|*:stop|*:reload|*:setDefaultCmdLine)
 			echo "root"
 			return
 			;;
-		auto)
+		*:auto)
 			case ${posWords[2]} in
 				enable|disable|install|installSysV|installUpstart|installSystemd|uninstallSysV|uninstallUpstart|uninstallSystemd|uninstall)
 					echo "root"
@@ -820,18 +837,17 @@ function daemon_oob_getRequiredUserAndGroup()
 # usage: daemon_oob_printBashCompletion "$@"
 # This function is called from the invokeOutOfBandSystem function when a call to 'daemonDeclare' is included at the top of the script
 # This handles the oob_printBashCompletion for the standard daemon command line syntax.
-# The script's oob_printBashCompletion can add to suggestions
+# The script's oob_printBashCompletion will be called after this and can add to suggestions
 function daemon_oob_printBashCompletion()
 {
-	local words cword cur prev optWords posWords posCwords
-	parseForBashCompletion --compat2 words cword cur prev optWords posWords posCwords "$@"
+	bgBCParse "hN:FvDqO" "$@"; set -- "${posWords[@]:1}"
 
 	# if the user is running in the foreground for testing, don't complete on the control cmds
 	if [[ "${optWords[@]}" =~ -[F] ]]; then
 		exit
 	fi
 
-	cntrCmd="${posWords[1]}"
+	cntrCmd="$1"
 
 	case $cntrCmd:$posCwords in
 		*:1)
@@ -841,7 +857,7 @@ function daemon_oob_printBashCompletion()
 				# running
 				0) echo "<running> ${daemonCntrCmds_whileRunning[@]}" ;;
 				# crashed
-				1) echo "<crash>  restart ${daemonCntrCmds_whileStopped[@]}" ;;
+				1) echo "<crashed>  restart ${daemonCntrCmds_whileStopped[@]}" ;;
 				# stopped
 				2) echo "<stopped> ${daemonCntrCmds_whileStopped[@]}" ;;
 				*) echo "<unknown_run_state> ${daemonCntrCmds_whileRunning[@]} ${daemonCntrCmds_whileStopped[@]}"
@@ -878,10 +894,10 @@ function daemon_oob_printOptBashCompletion()
 
 
 # usage: daemon_oob_ReadDefaultCmdLineParams <daemonName> <paramsAryVar>
-# this is used by the daemonInvokeOutOfBandSystem to add the default damon parameters automatically
+# this is used by the daemonInvokeOutOfBandSystem to add the default daemon parameters automatically
 # no matter how the daemon is invoked. add -D to the command line (along with -F) if you don't  want to
 # use the default parameters from  /etc/default/<daemonName>
-# This read the /etc/default/<daemonName> into the array <paramsAryVar>
+# This reads the /etc/default/<daemonName> into the array <paramsAryVar>
 #   * blank lines and lines starting with # are ignored
 #   * lines starting with cmdlineArgs= will add each space separated token to the
 #     right as separate parameter. Quotes are not honored
@@ -988,20 +1004,16 @@ function daemonInvokeOutOfBandSystem()
 	local originalParams=("$@")
 
 	local cntrCmd foregrounMode defaultArgsAlreadyConsidered outputRedirectMode
-
-	# Handle the command line options as defined by the "getopts" unix/linux standard.
-	# Specify the supported options in the optSpecs. 'x:' requires and argument.
-	optSpecs="hN:FvDqO"
-	while getopts "$optSpecs" flag; do case $flag in
-		h) man $(basename $0); exit  ;;
-		N) daemonName="$OPTARG" ;;
-		F) 	foregrounMode="-F" ;;
-		O) 	outputRedirectMode="-O" ;;
-		D) 	defaultArgsAlreadyConsidered="-D" ;;
-		v) ((verbosity++)); verboseFlag="$verboseFlag -v" ;;
-		q) ((verbosity--)); verboseFlag="${verboseFlag/-v}" ;;
-		?) daemonLog "unrecognized option '$flag'. see man $(basename $0)"; exit  ;;
-	esac; done; shift $((OPTIND-1)); unset OPTIND
+	while [ $# -gt 0 ]; do case $1 in
+		-N*) bgOptionGetOpt val: daemonName "$@" && shift ;;
+		-F)  foregrounMode="-F" ;;
+		--test) foregrounMode="--test" ;;
+		-O)  outputRedirectMode="-O" ;;
+		-D)  defaultArgsAlreadyConsidered="-D" ;;
+		-v)  ((verbosity++)); verboseFlag="$verboseFlag -v" ;;
+		-q)  ((verbosity--)); verboseFlag="${verboseFlag/-v}" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	local daemonLogFile="/var/log/$daemonName"
 	local daemonErrorFile="$daemonLogFile"
@@ -1027,7 +1039,8 @@ function daemonInvokeOutOfBandSystem()
 		fi
 
 		# fail if another copy is already running
-		# this uses the lower level procIsRunning b/c in upstart mode, daemonCntrIsRunning will return true because when we are starting
+		# this uses the lower level procIsRunning b/c in upstart mode, daemonCntrIsRunning will return true because it considers
+		# this code already running as the daemon
 		local daemonPIDFile="/var/run/$daemonName.pid"
 		procIsRunning -f "$daemonPIDFile" && assertError "$daemonName singleton daemon is already running"
 		echo $$ > "/var/run/$daemonName.pid"
@@ -1047,20 +1060,15 @@ function daemonInvokeOutOfBandSystem()
 
 	cntrCmd="$1";    [ $# -gt 0 ] && shift
 
-	# repeat the option processing so that user can put them after sub cmd
-	# TODO: fix this. do this opt processing in a DRY way
-	while getopts "$optSpecs" flag; do case $flag in
-		h) man $(basename $0); exit  ;;
-		N) daemonName="$OPTARG" ;;
-		F) 	foregrounMode="-F" ;;
-		O) 	outputRedirectMode="-O" ;;
-		D) 	defaultArgsAlreadyConsidered="-D" ;;
-		v) ((verbosity++)); verboseFlag="$verboseFlag -v" ;;
-		q) ((verbosity--)); verboseFlag="${verboseFlag/-v}" ;;
-		?) daemonLog "unrecognized option '$flag'. see man $(basename $0)"; exit  ;;
-	esac; done; shift $((OPTIND-1)); unset OPTIND
+	# options that can be specied for cntr cmds
+	while [ $# -gt 0 ]; do case $1 in
+		-N) bgOptionGetOpt val: daemonName "$@" && shift ;;
+		-v) ((verbosity++)); verboseFlag="$verboseFlag -v" ;;
+		-q) ((verbosity--)); verboseFlag="${verboseFlag/-v}" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
-	# if the no subcmd and no -F was specified...
+	# if no subcmd and no -F was specified...
 	if [ ! "$cntrCmd" ]; then
 		if [ "$daemonCalledFromInitD" ]; then
 			echo "Usage: /etc/init.d/$daemonName {${daemonCntrCmds_whileStopped// /|}}"
@@ -1068,9 +1076,7 @@ function daemonInvokeOutOfBandSystem()
 		else
 			echo "This command is a singleton daemon."
 			echo "You can use this command to control the running state of the daemon."
-			echo "You can run this daemon in the foreground for testing, by stopping the daemon"
-			echo "and running this command with -F and optionally one or more -v to turn on"
-			echo "increased logging verbosity"
+			echo "You can test this daemon in the foreground, by running with the -F option"
 		fi
 		exit
 	fi

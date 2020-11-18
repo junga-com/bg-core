@@ -383,27 +383,35 @@ function oob_invokeOutOfBandSystem()
 		bgtimerTrace -T ImportProfiler "bg-lib finished includes"
 	fi
 
-
 	if [[ "$1" =~ ^-h ]]; then
 		import bg_outOfBandScriptFeatures.sh ;$L1;$L2
+		[ "${daemonDefaultStartLevels+isset}" ] && import bg_coreDaemon.sh ;$L1;$L2
 
 		local cmd="$(basename $0)"
 		local cmdFolder="$(dirname $0)"
 		local oobOpt="$1"; shift
 		case $oobOpt in
-			-hbo)
-				declare -A _bgbcData=(); arrayFromString _bgbcData "$_bgbcDataStr"
-				[ "${daemonDefaultStartLevels+isset}" ]     && daemon_oob_printOptBashCompletion "$@"
-				[ "$(type -t oob_printOptBashCompletion)" ] && oob_printOptBashCompletion "$@"
-				[ "$(type -t printOptBashCompletion)" ]     && printOptBashCompletion "$@"
-				;;
+			# OBSOLETE: the current _bgbc-complete-viaCmdDelegation function will not generate separate calls for options/non-options
+			# -hbo)
+			# 	declare -A _bgbcData=(); arrayFromString _bgbcData "$_bgbcDataStr"
+			# 	[ "${daemonDefaultStartLevels+isset}" ]     && daemon_oob_printOptBashCompletion "$@"
+			# 	[ "$(type -t oob_printOptBashCompletion)" ] && oob_printOptBashCompletion "$@"
+			# 	[ "$(type -t printOptBashCompletion)" ]     && printOptBashCompletion "$@"
+			# 	;;
 			-hb|-hbOOBCompGen)
 				local -A _bgbcData=(); arrayFromString _bgbcData "$_bgbcDataStr"
 				local -A options=()
 				local words=() cword=0 opt="" cur="" prev="" optWords=() posWords=() posCwords=0
-				[ "${daemonDefaultStartLevels+isset}" ]     && daemon_oob_printBashCompletion "$@"
-				[ "$(type -t oob_printBashCompletion)" ]    && oob_printBashCompletion "$@"
-				[ "$(type -t printBashCompletion)" ]        && printBashCompletion "$@"
+				[ "${daemonDefaultStartLevels+isset}" ] && [ "$(type -t daemon_oob_printBashCompletion)" ] && daemon_oob_printBashCompletion "$@"
+				local oobFn found; for oobFn in oob_printBashCompletion printBashCompletion; do
+					[ "$(type -t "$oobFn")" ] && { "$oobFn" "$@"; found=1; break; }
+					# if [ "$(type -t "$oobFn")" ]; then
+					# 	"$oobFn" "$@"
+					# 	found=1
+					# 	break
+					# fi
+				done
+				[ ! "$found" ] && oob_printBashCompletionDefault "$@"
 				;;
 
 			-he)
@@ -423,6 +431,14 @@ function oob_invokeOutOfBandSystem()
 		bgExit
 	fi
 
+	# if the calling script is a daemon script, redirect some of the callback function names
+	local userGroupCB="oob_getRequiredUserAndGroup"
+	if [ "${daemonDefaultStartLevels+isset}" ]; then
+		import bg_coreDaemon.sh ;$L1;$L2
+		userGroupCB="daemon_oob_getRequiredUserAndGroup"
+	fi
+
+
 	# if the command script defines the helpMode variable, we pass control to it to handle help and
 	# we allow putting the -h at the end of the line as well as at the start of the argumets to make
 	# it easier for users to get help on a sub command by tacking a -h at the end. Typically the script
@@ -440,43 +456,48 @@ function oob_invokeOutOfBandSystem()
 	# sudo.
 	# on what parameters are being specified on the command line,
 	# give the daemon control code a chance to process
-	if [ "$(type -t oob_getRequiredUserAndGroup )" ] || [ "${daemonDefaultStartLevels+isset}" ]; then
-		# if the calling script defines daemonDefaultStartLevels, it is a daemon script so check daemon_oob_getRequiredUserAndGroup
-		local cmdRequirements
-		[ "${daemonDefaultStartLevels+isset}" ] && cmdRequirements="$(daemon_oob_getRequiredUserAndGroup 1 "$0" "$@")"
-		local reqUser="${cmdRequirements%%:*}"
-		local reqGroup=""
-		[[ ! "$cmdRequirements" =~ : ]] && reqGroup="${cmdRequirements##*:}"
+	if [ "$(type -t "$userGroupCB")" ]; then
+		import bg_outOfBandScriptFeatures.sh ;$L1;$L2
 
-		# check the scripts oob_getRequiredUserAndGroup if it exists
-		cmdRequirements=""
-		[ "$(type -t oob_getRequiredUserAndGroup )" ] && cmdRequirements="$(oob_getRequiredUserAndGroup 1 "$0" "$@")"
-		[ "$cmdRequirements" ] && reqUser="${cmdRequirements%%:*}"
-		[[ ! "$cmdRequirements" =~ : ]] && reqGroup="${cmdRequirements##*:}"
+		declare -A options=()
+		local userAndGroup="$($userGroupCB "$@")"
+		local reqUser="${userAndGroup%%:*}"
+		local reqGroup; [[ ! "$userAndGroup" =~ : ]] && reqGroup="${userAndGroup##*:}"
 
 		local user="$(id -un)"
-		if [ "$reqUser" ] && [ "$reqUser" != "$user" ]; then
-			if [ "$reqUser" == "root" ]; then
-				local sudoOpts="$sudoOpts"
-				[ "$bgVinstalledPaths$bgTracingOn" ] && sudoOpts="-E"
-				reqGroup="${reqGroup:-$(id -gn)}"
-				[ "$reqGroup" == "root" ] && reqGroup=""
-				exec sudo $sudoOpts -u root ${reqGroup:+-g} $reqGroup $0 "$@"
-				bgExit
-			elif [ "$reqUser" == "notRoot" ] && [ "$user" == "root" ]; then
-				confirm "\nwarning: it is better to run this command not as root. \nDo you want to continue anyway?" >&2 || bgExit 5
-			else
-				local sudoOpts=""
-				[ "$bgVinstalledPaths$bgTracingOn" ] && sudoOpts="-E"
-				if [ "$reqGroup" ]; then
-					exec sudo $sudoOpts -u "$reqUser" -g "$reqGroup" $0 "$@"
-				else
-					exec sudo $sudoOpts -u root $0 "$@"
-				fi
-				bgExit
-			fi
+
+		if [ "$reqUser" == "notRoot" ] && [ "$user" == "root" ]; then
+			confirm "\nwarning: You are root but the author of this command intended it to be ran as regular users. \nDo you want to continue anyway?" >&2 || bgExit 5
+			reqUser=""
 		fi
 
+		# if the user needs to change, this block will re-invoke this cmd with sudo and not return
+		if [ "$reqUser" ] && [ "$reqUser" != "$user" ]; then
+			local sudoOpts=()
+			# -E allows sudo to not reset the environment. For development its OK to do that. Note that on a production machine
+			# the sudo policy should prohibit it so if we did add the -E option here, the sudo $0 execution below would fail.
+			[ "$bgDevModeUnsecureAllowed" ] && [ "$bgVinstalledPaths$bgTracingOn" ] && sudoOpts+=("-E")
+
+			sudoOpts+=(-u "$reqUser")
+
+			# when elevating to root, keep set the group to our user's default group so that we can preserve group permission
+			# strategies
+			# SECURITY: is there any vulnerability in running user root with a different group?
+			[ "$reqUser" == "root" ] && reqGroup="${reqGroup:-$(id -gn)}"
+
+			# even though setting the group to the default group for the user should do no harm, some sudo policies wont allow an
+			# explicit group setting even though it would not change the result so we suppress setting the group in this case
+			local defaultGroup="$(id -gn "$reqUser")"
+			[ "$reqGroup" == "$defaultGroup" ] && reqGroup=""
+
+			[ "$reqGroup" ] && sudoOpts+=(-g "$reqGroup")
+
+			exec sudo "${sudoOpts[@]}" $0 "$@"
+			bgExit
+		fi
+
+		# this block is the case where only the group needs to change. If the user is changing also, the previous block will
+		# use sudo to change both the user and group and will go down that path without ever getting here.
 		local group="$(id -gn)"
 		if [ "$reqGroup" ] && [ "$reqGroup" != "$group" ]; then
 			groups="$(id -Gn)"
@@ -485,7 +506,7 @@ function oob_invokeOutOfBandSystem()
 				bgExit
 			else
 				echo "error: this command requires being run by a user that is in " >&2
-				echo "       the group '' " >&2
+				echo "       the group '$reqGroup' but you are not in that group " >&2
 				bgExit 5
 			fi
 		fi
@@ -499,8 +520,8 @@ function oob_invokeOutOfBandSystem()
 	#       But, if the users umask is 0022 (read-only group and read-only world), the group can read
 	#       but not write those new files. This code currently is unconditional and makes it so that
 	#       any script that sources bg_lib.sh will make the default umask group read-write. If you
-	#       are reading this because ts causing a bug in your script, consider making a oob_ callback
-	#       function for scripts (like oob_getRequiredUserAndGroup above) for teh script to specify
+	#       are reading this because its causing a bug in your script, consider making a oob_ callback
+	#       function for scripts (like oob_getRequiredUserAndGroup above) for the script to specify
 	#       the umask requirement it needs.
 	local usersUmask="$(umask)"
 	if [[ ! "$usersUmask" =~ ??0? ]]; then
@@ -516,7 +537,6 @@ function oob_invokeOutOfBandSystem()
 
 	# if this is a daemon script there are certain subcmds that we can handle instead of making each daemon script handle them
 	if [ "${daemonDefaultStartLevels+isset}" ]; then
-		import bg_coreDaemon.sh ;$L1;$L2
 		daemonInvokeOutOfBandSystem "$@" || bgExit
 	fi
 }
@@ -546,6 +566,14 @@ function match()
 	return $_result
 }
 
+# usage: oob_printBashCompletionDefault <cword> <progrName($0)> [<arg1>..<argN>]
+# This is called for a script that includes oob_invokeOutOfBandSystem but does not define oob_printBashCompletion to provide a
+# custom completion alorgith. This implementation will glean what ever information it can from the script source to provide BC
+function oob_printBashCompletionDefault()
+{
+	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+
+}
 
 #######################################################################################################################################
 ### From bg_security.sh  (aka bg_auth.sh)
@@ -988,6 +1016,47 @@ function progressCntr()
 
 
 #######################################################################################################################################
+### From bg_unitTest.sh
+
+function unitTestCntr()
+{
+	import bg_unitTest.sh ;$L1;$L2 || assertError
+	unitTestCntr "$@"
+}
+
+# usage: utEsc [<p1> ...<pN>]
+# usage: cmdline [<p1> ...<pN>]
+# this escapes each parameter passed into it by replacing each IFS character with its %nn equivalent token and returns all parameters
+# as string with a single IFS character separating each parameter. If that string is subsequently passed to utUnEsc, it will populate
+# an array properly with each element containing the original version of the parameter
+function cmdline() { utEsc "$@" ; }
+function cmdLine() { utEsc "$@" ; }
+function utEsc()
+{
+	local params=("$@")
+	params=("${params[@]// /%20}")
+	params=("${params[@]//$'\t'/%09}")
+	params=("${params[@]//$'\n'/%0A}")
+	params=("${params[@]//$'\r'/%0D}")
+	echo "${params[*]}"
+}
+
+# usage: utUnEsc <retArrayVar> [<escapedP1> ...<escapedPN>]
+# this is the companion function to utEsc. It populates the array variable named in <retArrayVar> with the unescaped versions of
+# each of the parameters passed in.
+function utUnEsc()
+{
+	local -n _params="$1"; shift
+	_params=("$@")
+	_params=("${_params[@]//%20/ }")
+	_params=("${_params[@]//%09/$'\t'}")
+	_params=("${_params[@]//%0A/$'\n'}")
+	_params=("${_params[@]//%0D/$'\r'}")
+}
+
+
+
+#######################################################################################################################################
 ### From bg_string.sh
 
 # usage: arrayToString <arrayVarName> [<retVar>]
@@ -1109,9 +1178,9 @@ function bgtraceIsActive()
 
 	import bg_debugTrace.sh ;$L1;$L2
 
-	# its not realized, call bgtraceCntr to make _bgtraceFile reflect bgTracingOn
+	# if its not realized, call bgtraceCntr to make _bgtraceFile reflect bgTracingOn
  	# The value of bgTracingOn is exported/inherited from the parent proc but bgTracingOnState is reset
-	# to "" every time this library is sourced. This also picks up any code the changes bgTracingOn
+	# to "" every time this library is sourced. This also picks up any code that changes bgTracingOn
 	# directly without calling bgtraceCntr
 	[ "$bgTracingOn" != "$bgTracingOnState" ] && bgtraceCntr "$bgTracingOn"
 
@@ -1516,6 +1585,7 @@ function endLock()
 ### From bg_coreProcCntrl.sh
 
 # usage: signalNorm [-l] [-q] <signalSpec> [<retVar>]
+# return signalSpec like EXIT HUP TERM INT, etc...
 # the trap and kill command allow several different names for each signal. For example, (SIGUSR1, USR1, usr1, and 10) are all the
 # same signal. This function returns the canonical name for the signal so that no matter how it is specified, we can determine
 # if it is the same signal. It asserts an error if <signalSpec> does not refer to a signal known to 'kill'
@@ -1726,20 +1796,24 @@ function bgExit()
 #     <lastBASH_COMMAND>
 # See Also:
 #    bgtrap : documents this function in the header and footer section
-declare -g bgBASH_trapStkFrm_signal bgBASH_trapStkFrm_funcDepth bgBASH_trapStkFrm_lastCMD
+declare -g bgBASH_trapStkFrm_signal bgBASH_trapStkFrm_funcDepth bgBASH_trapStkFrm_lastCMD bgBASH_trapStkFrm_LINENO
 declare -g bgtrapHeaderRegEx="^BGTRAPEntry[[:space:]]([0-9]*)[[:space:]]([A-Z0-9]*)"
 function BGTRAPEntry()
 {
 	bgBASH_trapStkFrm_signal=(    "$2"                          "${bgBASH_trapStkFrm_signal[@]}"    )
 	bgBASH_trapStkFrm_funcDepth=( "$(( ${#BASH_SOURCE[@]}-1 ))" "${bgBASH_trapStkFrm_funcDepth[@]}" )
 	bgBASH_trapStkFrm_lastCMD=(   "$3"                          "${bgBASH_trapStkFrm_lastCMD[@]}"   )
-
+	# note that LINENO passed to us from the trap handler's first line will reflect the lineno of the handler (1) and not the
+	# interrupted lineno but we record it anyway in anticipation that it make change in a future version of bash
+	bgBASH_trapStkFrm_LINENO=(    "$4"                          "${bgBASH_trapStkFrm_LINENO[@]}"    )
 }
 
 function BGTRAPExit()
 {
-	bgBASH_trapStkFrm_signal=(    "${bgBASH_trapStkFrm_signal[@]:1}"   )
+	bgBASH_trapStkFrm_signal=(    "${bgBASH_trapStkFrm_signal[@]:1}"    )
 	bgBASH_trapStkFrm_funcDepth=( "${bgBASH_trapStkFrm_funcDepth[@]:1}" )
+	bgBASH_trapStkFrm_lastCMD=(   "${bgBASH_trapStkFrm_lastCMD[@]:1}"   )
+	bgBASH_trapStkFrm_LINENO=(    "${bgBASH_trapStkFrm_LINENO[@]:1}"    )
 }
 
 
@@ -2040,12 +2114,13 @@ function bgtrap()
 		previousScript="${previousScript%\'*}"
 		previousScript="${previousScript//"'\''"/\'}"
 
-		# this is the header that we put at the start of every trap handler we set. It servers two purposes. First it embeds the $BASHPID
-		# that set the handler so that we can detect when a trap we read with -p was set in a parent's subshell. (except for DEBUG
-		# and RETURN, handlers are only called when the PID that set them get the signal but trap -p shows the parent's handler even
-		# from a child subshell). Second, it allows the debugger to detect when the DEBUG trap gets called at the start of a trap
-		# handler. Note that for the debugger to stop on it, it can not be a comment but : it the noop command.
-		local trapHeader="BGTRAPEntry $BASHPID $signal \"\$BASH_COMMAND\""
+		# this is the header that we put at the start of every trap handler we set. It servers two purposes.
+		# First it embeds the $BASHPID that set the handler so that we can detect when a trap we read with -p was set in a
+		# parent's subshell. (except for DEBUG and RETURN handlers, trap handlers are only called when the PID that set them get
+		# the signal but trap -p shows the parent's handler even from a child subshell).
+		# Second, it allows the debugger to detect when the DEBUG trap gets called at the start of a trap
+		# handler.
+		local trapHeader="BGTRAPEntry $BASHPID $signal \"\$BASH_COMMAND\" \"\$LINENO\""
 		local trapFooter="BGTRAPExit $BASHPID $signal"
 
 
@@ -2586,52 +2661,55 @@ function assertError()
 
 	### write the error to stderr or to $assertOut
 	# the () are because we might redirect stderr for this block
-	(
-		# if we are catching the exception, redirect the error output to the assertOut file
-		if [ "${tryStateAction}" == "catch" ]; then
-			echo -n >$assertOut
-			exec 2>$assertOut
-		fi
+	# TODO: alternative to () -- create a FD to stream these output to. either exec {errorFD}>$asertOut or asertOut=2 then echo ".." >&$errorFD
 
-		echo >&2
-		echo -e "error: $_ae_failingFunctionName: $_ae_msg" >&2
+	local ae_outFD=2
+	[ "${tryStateAction}" == "catch" ] && exec {ae_outFD}>$assertOut.catchDescription
 
-		printfVars "    " "${_ae_contextVars[@]}" >&2
+	echo >&$ae_outFD
+	echo -e "error: $_ae_failingFunctionName: $_ae_msg" >&$ae_outFD
 
-		# display any file content that was provided
-		local _ae_label; for _ae_label in $_ae_dFilesList; do
-			printf "   %s:\n" "$_ae_label" >&2
-			[ -f "${_ae_dFiles[$_ae_label]}" ] && awk '
-				{print "      : "$0}
-			' "${_ae_dFiles[$_ae_label]}"
-		done
+	printfVars "    " "${_ae_contextVars[@]}" >&$ae_outFD
 
-		if [ "$_ae_contextOutput" ] && [ -s "$_ae_contextOutput" ]; then
-			awk '
-				{print "    : "$0}
-			' "${_ae_contextOutput}"
-		fi
+	# display any file content that was provided
+	local _ae_label; for _ae_label in $_ae_dFilesList; do
+		printf "   %s:\n" "$_ae_label" >&$ae_outFD
+		[ -f "${_ae_dFiles[$_ae_label]}" ] && awk '
+			{print "      : "$0}
+		' "${_ae_dFiles[$_ae_label]}"
+	done
 
-		# write the stack to bgtrace if active
-		# TODO: save the stack trace in assertOut and then have Catch parse and create an e[] object that includes it
-		#       for the Catch block to access.
-		# We write the stack to bgtrace even if we are catching the exception b/c a pipeline might cause several
-		# exceptions and only the last one will make it into assertOut so bgtrace might be the only place to see some
-		bgtraceIsActive && bgStackTrace $_ea_allStack --logicalStart=$((_ae_stackFrameStart))
-
-		# include the proccess tree of the script when bgtrace is active
-		bgtraceIsActive && bgtracePSTree
-
-		# write a blank line after the bgStackTrace b/c it might be set to stderr (typical for sysadmins to see what the error is)
-		echo >&2
-	)
-
-	# if running in the debugger, break here but not if we are being called from the debugger.
-	if debuggerIsActive && ! debuggerIsInBreak; then
-		bgtraceBreak
+	# the assertDefaultFormatter sets _ae_contextOutput when the source line redirects to 2>$assertOut
+	if [ "$_ae_contextOutput" ] && [ -s "$_ae_contextOutput" ]; then
+		printf "    stderr output=\n" >&$ae_outFD
+		awk '
+			{print "      : "$0}
+		' "${_ae_contextOutput}" >&$ae_outFD
 	fi
 
+	# for debugging the bgStackMakeLogical function, uncomment this line to dump the raw data to the bgtrace
+	bgStackDump >>$_bgtraceFile
+
+	# write the stack to bgtrace if active
+	# TODO: save the stack trace in assertOut and then have Catch parse and create an e[] object that includes it
+	#       for the Catch block to access.
+	# We write the stack to bgtrace even if we are catching the exception b/c a pipeline might cause several
+	# exceptions and only the last one will make it into assertOut so bgtrace might be the only place to see some
+	bgtraceIsActive && bgStackTrace $_ea_allStack --logicalStart=$((_ae_stackFrameStart))
+
+	# include the proccess tree of the script when bgtrace is active
+	bgtraceIsActive && bgtracePSTree
+
+	# write a blank line after the bgStackTrace b/c it might be set to stderr (typical for sysadmins to see what the error is)
+	echo >&$ae_outFD
+
+
 	### Perform the script Flow action
+
+	# if this exception is not being caught, check to see if we should invoke the debugger
+	if [ "$tryStateAction" != "catch" ] && { { debuggerIsActive && ! debuggerIsInBreak; } || [ "$bgDebuggerStopOnAssert" ]; }; then
+		bgtraceBreak
+	fi
 
 	# tryStateAction is the top element of the bgBASH_tryStack which indicates the enclosing Try block that we are being
 	# called in.
@@ -2652,9 +2730,7 @@ function assertError()
 			;;
 
 		catch)
-			catch_errorCode="$_ae_exitCode"
-			catch_errorDescription="$(cat $assertOut)"
-			catch_errorClass="$_ae_assertFunctionName"
+			## fill in pidsToKill which each pid between us and  tryStatePID which is the pid that will catch the exception
 
 			local tryStatePID="${bgBASH_tryStackPID[@]:0:1}"
 			local pidsToKill=()
@@ -2665,6 +2741,38 @@ function assertError()
 			done
 			(( pid != tryStatePID )) && assertError --critical --allStack  -v pstreeOfTry__ -v pstreeOfCatch "
 				Try/Catch Logic Failed. PID of Try block($tryStatePID) is not a parent of PID of asserting exception($BASHPID)"
+
+			## Record the state at this point that the exception is being raised
+
+			declare -ag _catch_stkArrayRaw catch_stkArray; bgStackGet _catch_stkArrayRaw catch_stkArray
+			declare -g catch_psTree; bgGetPSTree catch_psTree
+			declare -gx	catch_errorCode="$_ae_exitCode"
+			declare -gx	catch_errorClass="$_ae_assertFunctionName"
+			declare -gx	catch_errorDescription="$(cat $assertOut.catchDescription)"
+
+			## record the state in $assertOut.* files if catch that is receiving this exception is in a different subshell
+			if [ "$BASHPID" != "$tryStatePID"  ]; then
+				echo -n >$assertOut.stkArray
+				for _ae_stkFrame in "${catch_stkArray[@]}"; do
+					echo "$_ae_stkFrame" >>$assertOut.stkArray
+				done
+
+				echo -n >$assertOut.stkArrayRaw
+				for _ae_stkFrame in "${_catch_stkArrayRaw[@]}"; do
+					echo "$_ae_stkFrame" >>$assertOut.stkArrayRaw
+				done
+
+				bgGetPSTree >>$assertOut.psTree
+
+				echo "$catch_errorCode $catch_errorClass" >>$assertOut.errorInfo
+			else
+				[ -f "$assertOut.stkArray" ]    && rm "$assertOut.stkArray"
+				[ -f "$assertOut.stkArrayRaw" ] && rm "$assertOut.stkArrayRaw"
+				[ -f "$assertOut.psTree" ]      && rm "$assertOut.psTree"
+				[ -f "$assertOut.errorInfo" ]   && rm "$assertOut.errorInfo"
+			fi
+
+			## now throw the exception up to the nearest catch
 
 			# for unitTest framework, disable the ERR trap when we assert
 			builtin trap '' ERR
@@ -2836,7 +2944,7 @@ function Try()
 
 
 # usage: Catch: [<assertFunctionSpec>] && { <errorPathCode...>; }
-# Catch: is part of a Try/Catch exception mechanism for bash scripts. It is not appropriate to use this mechanism for everything.
+# Catch: is part of a Try/Catch exception mechanism for bash scripts.
 # See man(3) Try and man(3) assertError for more details on the general mechanism.
 #
 # Params:
@@ -2847,14 +2955,20 @@ function Try()
 #             stack frame will be popped and the exception will be re-thrown to the next higher level.
 #
 # The Error Path:
-# <errorPathCode...> will be executed only when an exception is caught by that Catch:
+# The <errorPathCode...> in the usage synteax will be executed only when an exception is caught by that Catch:
 # Inside this block some global variables starting with catch_* describe the state of the exception being caught.
 #    catch_errorCode        : the numeric exist code being thrown. If the exception was uncaught, this would be the exit code of the
 #                             process
 #    catch_errorDescription : The formatted text of the exception. If the exception was uncaught, this would be the text printed to
 #                             stderr
 #    catch_errorClass       : This is the name of the assert* function that raised the exception. assertError is the most generic
-#
+#    catch_stkArray         : each element of this array is a formatted string representing one stack frame.
+#    catch_psTree           : a string  containing the pstree output of the script at the point that the assert was raised. This
+#                             shows the state of subshells and spawn async commands.
+#    _catch_stkArrayRaw     : The first element [0] contains some information about the whole stack.
+#        read -r bgStackSize bgStackLogicalFramesStart bgStackSrcLocationMaxLen bgStackFunctionMaxLen bgStackSrcCodeMaxLen <<< "${_catch_stkArrayRaw[0]}"
+#                             Each of the other elements refer to one stack frame.
+#        read -r bgStackSrcFile bgStackSrcLineNo bgStackSrcLocation bgStackSimpleCmd bgStackFrameType bgStackSrcCode bgStackFunction bgStackLine bgStackLineWithSimpleCmd bgStackBashStkFrm <<< "${_catch_stkArrayRaw[$i]}"
 # Exit Code:
 #    0: (true) error path. This means that this Catch: statement is catching an error.
 #    1: (false) normal path. This Catch: statement is not catching an exception.
@@ -2920,8 +3034,20 @@ function Catch()
 		fi
 	fi
 
+
 	# The pattern is Catch: && { <catchCodeBlocl>; } so return 0(true) when we caught an exception
 	if [ "$tryStateWasThrown" ]; then
+		# if the exception was thrown from a subshell, restore the information from the $assertOut.* files into the vars in this PID
+		if [ -f $assertOut.stkArray ]; then
+			declare -ag _catch_stkArrayRaw catch_stkArray
+			mapfile catch_stkArray <$assertOut.stkArray
+			catch_stkArray=("${catch_stkArray[@]%$'\n'}")
+			mapfile _catch_stkArrayRaw <$assertOut.stkArrayRaw
+			declare -g catch_psTree; IFS= read -r -d '' catch_psTree <$assertOut.psTree
+			declare -gx	catch_errorCode catch_errorClass
+			read -r catch_errorCode catch_errorClass <$assertOut.errorInfo
+			declare -gx	catch_errorDescription="$(cat $assertOut.catchDescription)"
+		fi
 		return 0
 	else
 		return 1;
@@ -3361,7 +3487,7 @@ function bgtimerStart()
 # this is a stub function that will load the bg_coreDaemon.sh and the real daemonDeclare if its called
 function daemonDeclare()
 {
-	[ "$1" == "--stub" ] && assertError "could not load bg_coreDaemon.sh from libCore stub"
+	[ "$1" == "--stub" ] && assertError "could not load bg_coreDaemon.sh library from on-demand stub function in bg_coreLibsMisc.sh"
 	import bg_coreDaemon.sh ;$L1;$L2
 	daemonDeclare --stub "$@"
 }

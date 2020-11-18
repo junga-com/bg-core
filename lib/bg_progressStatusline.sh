@@ -183,7 +183,8 @@ function _readProgressMsgLoop()
 
 				if [ "$target" ]; then
 					local divCol msgSection meter meterBarStart meterBarEnd meterDiv meterBar="" marker
-					divCol=$((termWidth*20/100))
+					divCol=$(( ${#formattedStr} +1 ))
+					divCol=$(( (divCol < termWidth*60/100) ? divCol : termWidth*60/100 ))
 					stringShorten -j left --pad -R formattedStr "$divCol"
 					printf -v meter "[%2s of %-2s " "$current" "$target"
 					stringShorten --pad --fill="-" -R meterBar $(( termWidth - divCol -${#meter} -1 ))

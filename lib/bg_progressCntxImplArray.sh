@@ -68,6 +68,8 @@ function _progressStackUpdate()
 		read -r -a retArrayVar <<<"${progressScope[@]: -1}"
 	fi
 
+	[[ "$current" =~  ^[+-/'*'] ]] && current=$(( ${retArrayVar[7]} $current ))
+
 	escapeTokens msg
 
 	retArrayVar[2]="$msg"

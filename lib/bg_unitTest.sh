@@ -93,8 +93,14 @@
 # bgUnitTestMode=utRuntime|direct
 declare -g bgUnitTestMode="utRuntime"; [[ "$bgLibExecCmd" =~ [.]ut$ ]] && bgUnitTestMode="direct"
 
-declare -g bgUnitTestScript="${BASH_SOURCE[1]}"
-
+declare -g bgUnitTestScript=
+for _uttmpSrcname in "${BASH_SOURCE[@]}"; do
+	if [[ "$_uttmpSrcname" =~ [.]ut$ ]]; then
+		bgUnitTestScript="$_uttmpSrcname"
+		break
+	fi
+done
+assertNotEmpty bgUnitTestScript
 
 ##################################################################################################################################
 ### Common Section
@@ -114,36 +120,6 @@ function unitTestCntr()
 	else
 		utfDirectScriptRun "$@"
 	fi
-}
-
-# usage: utEsc [<p1> ...<pN>]
-# usage: cmdline [<p1> ...<pN>]
-# this escapes each parameter passed into it by replacing each IFS character with its %nn equivalent token and returns all parameters
-# as string with a single IFS character separating each parameter. If that string is subsequently passed to utUnEsc, it will populate
-# an array properly with each element containing the original version of the parameter
-function cmdline() { utEsc "$@" ; }
-function cmdLine() { utEsc "$@" ; }
-function utEsc()
-{
-	local params=("$@")
-	params=("${params[@]// /%20}")
-	params=("${params[@]//$'\t'/%09}")
-	params=("${params[@]//$'\n'/%0A}")
-	params=("${params[@]//$'\r'/%0D}")
-	echo "${params[*]}"
-}
-
-# usage: utUnEsc <retArrayVar> [<escapedP1> ...<escapedPN>]
-# this is the companion function to utEsc. It populates the array variable named in <retArrayVar> with the unescaped versions of
-# each of the parameters passed in.
-function utUnEsc()
-{
-	local -n _params="$1"; shift
-	_params=("$@")
-	_params=("${_params[@]//%20/ }")
-	_params=("${_params[@]//%09/$'\t'}")
-	_params=("${_params[@]//%0A/$'\n'}")
-	_params=("${_params[@]//%0D/$'\r'}")
 }
 
 # usage: ut <event> ...
@@ -599,7 +575,7 @@ function utfDirectScriptRun()
 
 	# run unit tests from their project root folder no matter where the user ran the command from
 	local projectFolder="${0%unitTests/*}"
-	[ "$projectFolder" ] && cd "$projectFolder"
+	[ -d "$projectFolder" ] && cd "$projectFolder"
 
 	# the default action is to list the test cases contained in the ut script
 	local cmd="${1:-list}"; shift

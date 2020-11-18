@@ -247,6 +247,7 @@ function setExitCode()
 
 
 # usage: varSetRef [-a] [--array|--set] <varRef> <value...>
+# See http://mywiki.wooledge.org/BashFAQ/048#line-120 for a discussion of why varRefs are problematic.
 # This sets the <varRef> with <value> only if it is not empty.
 # Note that this is an alternative using local -n varName. Each have tradeoffs.
 # Equivalent Statements:
@@ -268,6 +269,7 @@ function setExitCode()
 #   arrayCopy  -- does a similar thing for two arrays (<varRef>=(<varRef2>))
 #   arraryAdd  -- does a similar thing for two arrays (<varRef>+=(<varRef2>))
 #   stringJoin -- -a mode does similar but also adds a separator
+#   http://mywiki.wooledge.org/BashFAQ/048#line-120
 function setRef() { varSetRef "$@"; }
 function varSetRef()
 {
