@@ -435,7 +435,7 @@ function Object::bgtrace()
 		[ ! "$headersOff" ] && echo "${pad}  ### Methods " >>$_bgtraceFile
 		local i; for i in "${!this[@]}"; do
 			if [ "${i:0:9}" == "_method::" ]; then
-				printf "${pad}   %-21s : %s" "$i" "${this[$i]}" >>$_bgtraceFile
+				printf "${pad}   %-21s : %s\n" "$i" "${this[$i]}" >>$_bgtraceFile
 			fi
 		done
 	fi

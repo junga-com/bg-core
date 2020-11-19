@@ -301,8 +301,14 @@ function bgBCParse()
 	cword="$1"; shift
 	words=( "$@" )
 	shift # cmd name ($0)
-
+	cur=""
+	prev=""
 	options=()
+	completingType=""
+	optWords=()
+	posWords=()
+	posCwords=0
+
 	varIsAMapArray options || assertError "The caller must 'declare -A options' before calling bgBCParse"
 
 	local -A syntaxSpec=()
@@ -312,6 +318,7 @@ bgtraceVars syntaxSpec
 	cur="${words[$cword]}"
 	((cword>1)) && prev="${words[$(( $cword-1 ))]}"
 
+	### this loop consumes the options and their arguments from the front end of the parameter list
 	local cmdlinePos=0
 	while [[ "$1" =~ ^- ]]; do
 		local _bcp_opt="$1"; shift; ((cmdlinePos++))
@@ -326,13 +333,15 @@ bgtraceVars syntaxSpec
 			if [[ "${syntaxSpec[${_bcp_opt:0:2}]}" =~ ^\< ]]; then
 				opt="${_bcp_opt:0:2}"
 				cur="${_bcp_opt:2}"
-				echo "\$(cur:$cur) ${syntaxSpec[${_bcp_opt:0:2}]:-<argument>}"
+				completingType="${syntaxSpec[$opt]:-<argument>}"
+				echo "\$(cur:$cur) ${syntaxSpec[$opt]:-<argument>}"
 			# if we are completing the argument part of a long option in one token. (i.e. '--file=...')
 			elif match "$_bcp_opt" "^(--[^=]*)=(.*)$" rematch; then
 				opt="${rematch[1]}"
 				cur="${rematch[2]}"
+				completingType="${syntaxSpec[$opt]:-<argument>}"
 				echo "\$(cur:$cur) ${syntaxSpec[$opt]:-<argument>}"
-			# still completing the option itself
+			# we must still be completing the option itself
 			else
 				echo "<options> ${syntaxSpec[options]}"
 				opt="@options"
@@ -348,21 +357,21 @@ bgtraceVars syntaxSpec
 				options[${rematch[1]}]="${rematch[2]}"
 			else
 				options[$_bcp_opt]="$_bcp_opt"
-			fi
 
-			# now determine if the next token should be interpreted as the argument to this option. Note that if the user's cursor is on the
-			# option and the option is complete and requires an argument, we really dont know but the most common case is that the user has
-			# just completed the option and has not yet entered a separate token
-			# if _bcp_opt is an exact option token that requires an argument, consume next arg position as the argument
-			if [[ "${syntaxSpec[$_bcp_opt]}" =~ ^\< ]]; then
-				options[$_bcp_opt]="$1"
-				optWords+=("$1")
-				shift; ((cmdlinePos++))
-				# if the user is completing the argument of an option is a separate token, set opt to indicate that to the caller
-				# the caller will not distuigish between one and two token option w/ arg
-			 	if ((cmdlinePos==cword)); then
-					echo "${syntaxSpec[$_bcp_opt]}"
-					opt="$_bcp_opt"
+				# now determine if the next token should be interpreted as the argument to this option. Note that if the user's cursor is on the
+				# option and the option is complete and requires an argument, we really dont know but the most common case is that the user has
+				# just completed the option and has not yet entered a separate token
+				# if _bcp_opt is an exact option token that requires an argument, consume next arg position as the argument
+				if [[ "${syntaxSpec[$_bcp_opt]}" =~ ^\< ]]; then
+					options[$_bcp_opt]="$1"
+					optWords+=("$1")
+					shift; ((cmdlinePos++))
+					# if the user is completing the argument of an option is a separate token, set opt to indicate that to the caller
+					# the caller will not distuigish between one and two token option w/ arg
+				 	if ((cmdlinePos==cword)); then
+						echo "${syntaxSpec[$_bcp_opt]}"
+						opt="$_bcp_opt"
+					fi
 				fi
 			fi
 		fi
@@ -374,6 +383,12 @@ bgtraceVars syntaxSpec
 	# if the user is beginning the first positional argument, let them know that there are options availble if they enter '-'
 	if [ ${posCwords:-0} -eq 1 ] && [ ! "$cur" ]; then
 		echo "<optionsAvailable> -%3A  \$(emptyIsAnOption)"
+	fi
+
+	# if the user is completing a positional argument
+	if [ ${posCwords:-0} -gt 0 ] && [ ${posCwords:-0} -le ${syntaxSpec[posCount]} ]; then
+		echo "${syntaxSpec[$posCwords]}"
+		[ "${syntaxSpec[$posCwords]:0:1}" == "<" ] && completingType="${syntaxSpec[$posCwords]%% *}"
 	fi
 }
 
@@ -537,8 +552,6 @@ function bgMakeUsageSpec() {
 		# if we see anything execpt these characters its not a simple optspec string (at least from this point forward)
 		[[ "${optSpecs:0:1}" =~ [^a-zA-Z0-9] ]] && defaultIs="newSyntax"
 
-bgtraceVars -1 defaultIs optSpecs
-
 		# advance over spaces to the next start character
 		if [ "${optSpecs:0:1}" == " " ]; then
 			optSpecs="${optSpecs:1}"
@@ -555,11 +568,11 @@ bgtraceVars -1 defaultIs optSpecs
 			local arg="${BASH_REMATCH[3]}"
 			if [ "${shortOpt}" ]; then
 				_syntaxSpecVar[${shortOpt}]="${arg:-NOARG}"
-				_syntaxSpecVar[options]+=" ${shortOpt}%3A "
+				_syntaxSpecVar[options]+=" ${shortOpt}${arg:+%3A} "
 			fi
 			if [ "${longOpt}" ]; then
 				_syntaxSpecVar[${longOpt}]="${arg:-NOARG}"
-				_syntaxSpecVar[options]+=" ${longOpt}=%3A "
+				_syntaxSpecVar[options]+=" ${longOpt}${arg:+=%3A} "
 			fi
 
 		# f: or f<txtFile>
@@ -576,7 +589,6 @@ bgtraceVars -1 defaultIs optSpecs
 
 		# in optspec mode assume that this is a single short option without an argument
 		elif [ "$defaultIs" == "optspec" ]; then
-#bgtraceVars -1 -l"oldSyn" optSpecs defaultIs pos
 			_syntaxSpecVar[-${optSpecs:0:1}]="NOARG"
 			_syntaxSpecVar[options]+=" -${optSpecs:0:1} "
 			optSpecs="${optSpecs:1}"
@@ -586,13 +598,16 @@ bgtraceVars -1 defaultIs optSpecs
 		# This is a list of one or more tokens separated by the | char. If one of the tokens is surrounded by <> is it the
 		# name of the position. Other tokens are possible values.
 		else
-#bgtraceVars -1 -l"newSyn" optSpecs defaultIs pos
-			((pos++))
 			local posArg="${optSpecs%% *}"
 			optSpecs="${optSpecs#$posArg}"
-			_syntaxSpecVar[$pos]="${posArg}"
+			[[ "$posArg" =~ ^([<][^>[:space:]]*[>])?(\|[^\|[:space:]]*)*$ ]] || assertError -v posArg "invalid positional argument syntax"
+
+			((pos++))
+			_syntaxSpecVar[$pos]="${posArg//\|/ }"
 		fi
 	done
+
+	_syntaxSpecVar[posCount]=$pos
 }
 
 

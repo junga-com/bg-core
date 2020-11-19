@@ -1,5 +1,7 @@
 
-* test putting a bgtraceBreak in a sourced function to debug it. will it end the terminal in some cases? Try in conjuction with the feature to hotpatch sourced function code with breakpoints 
+* make funcman scan for iniParamGet/Set and document the config settings referenced by the function or script
+* add # FUNCMAN_ALIAS bg_bashCompletion support
+* test putting a bgtraceBreak in a sourced function to debug it. will it end the terminal in some cases? Try in conjuction with the feature to hotpatch sourced function code with breakpoints
 * bug: funcman: Catch.3 and Catch:.3 are different
 * make _bgbc_... resuse to send bgtrace to stderr or stdout so that BC does not get messed up
 * add a bg-db() function to bg-debugCntr so that `bg-db <myscript>` invokes the debugger

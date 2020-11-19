@@ -5,6 +5,7 @@ declare -gA _bgbcData
 
 
 # MAN(3.bashFunction) _bgbc-complete-viaCmdDelegation
+# FUNCMAN_ALIAS bg_bashCompletion
 # usage: complete -F _bgbc-complete-viaCmdDelegation <cmdName>
 # This is a bash completion handler for commands that process their own completion by being invoked with
 # special out of band command line options. When the command is invoked with the first argument set to
@@ -195,8 +196,9 @@ declare -gA _bgbcData
 #       }
 #
 # See Also:
-#    invokeOutOfBandSystem
-#    bgOptionsEndLoop
+#    man(7) bg_cmdChainLoader.globalBashCompletion
+#    man(3) invokeOutOfBandSystem
+#    man(3) bgOptionsEndLoop
 function _bgbc-complete-viaCmdDelegation()
 {
 	# disable the DEBUG trap handler while we are in this function

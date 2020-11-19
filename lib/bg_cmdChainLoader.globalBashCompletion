@@ -1,6 +1,16 @@
-# This bash completion script inserts an additional default completion loader function to load the completion spec for cmds on demand
-# If chains itself with the previous default handler so that it gets a chance to recognize and load the completion handler for the cmd
-# and then passes through to the previous default behavior if it does not recognize it.
+
+# MAN(7.bashLibrary) bg_cmdChainLoader.globalBashCompletion
+# This bash completion script library is intended to be placed in the /etc/bash_completion.d/ folder where it will be auto loaded
+# into every user's bash sessions. It inserts an additional default completion loader function to load the completion spec for cmds
+# on demand. If chains itself with the previous default handler so that it gets a chance to recognize and load the completion handler
+# for cmds it recognizes and then passes through to the previous default behavior if it does not.
+#
+# If the cmd contains the string "invokeOutOfBandSystem" then it is assumed that it supports the protocol defined by the
+# man(3) _bgbc-complete-viaCmdDelegation function and this loader will set its completion configuration. If the cmd is a binary file,
+# the strings utility is used to extract the strings to check. If its a text script it is greped directly.
+#
+# See Also:
+#    man(3) _bgbc-complete-viaCmdDelegation
 
 function _bg_subclassed_completionLoader() {
 	local cmd="$1"
@@ -15,9 +25,9 @@ function _bg_subclassed_completionLoader() {
 
 	local isOneOfOurs
 	local cmdType="$(type -t "$cmd")"
-	if [ "$cmdType" == "file" ] && strings "$(which $cmd)" | grep -q oob_invokeOutOfBandSystem &>/dev/null; then
+	if [ "$cmdType" == "file" ] && strings "$(which $cmd)" | grep -q invokeOutOfBandSystem &>/dev/null; then
 		isOneOfOurs="1"
-	elif [ "$cmdType" == "function" ] && type $cmd | grep -q -E "(oob_invokeOutOfBandSystem|hbOOBCompGen)" &>/dev/null; then
+	elif [ "$cmdType" == "function" ] && type $cmd | grep -q -E "(invokeOutOfBandSystem|hbOOBCompGen)" &>/dev/null; then
 		isOneOfOurs="1"
 	fi
 

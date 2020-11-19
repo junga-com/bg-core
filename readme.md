@@ -304,28 +304,36 @@ $ cat - >/tmp/test6.sh
 #!/usr/bin/env bash
 source /usr/lib/bg_core.sh
 function oob_printBashCompletion() {
-    bgBCParse "vqf:" "$@"; set -- "${posWords[@]:1}"
-    cmd="${posWords[1]}"
-    case $cmd:$posCwords in
-        *:1) echo "get set increment <chooseASubCmd>" ;;
-        get:2|set:2) echo "\$(doFilesAndDirs) <chooseATestFile>" ;;
-        set:3) echo "one two three" ;;
+    bgBCParse "[-v] [-q] [-f|--file=<foo>] <name> <species>|dog|cat|human" "$@"; set -- "${posWords[@]:1}"
+    case $completingType in
+        '<name>') getent passwd | awk -F: '$3>=1000{print $1}' ;;
+        '<foo>')  echo "\$(doFilesAndDirs)" ;;
     esac
 }
 oob_invokeOutOfBandSystem "$@"
-# ... the 'real' script follows...
+# ... the rest of the script would follow...
 <cntr-d>
 $ chmod a+x /tmp/test6.sh
 ```
 
 ```bash
-$ /tmp/test6.sh
-<chooseASubCmd>  get         set         increment
+$ /tmp/test6.sh <tab><tab>
+<optionsAvailable>  <name>              -                   nobody              bobg                libvirt-qemu        nobody
+$ /tmp/test6.sh -<tab><tab>
+<options>  -v         -q         -f         --file=    
+$ /tmp/test6.sh --file=<tab><tab>
+<foo>                       bg-dom/                     bg-atom-utils/              tags                     bgit
+$ /tmp/test6.sh --file=tags <tab><tab>
+<optionsAvailable>  <name>              -                   nobody              bobg                libvirt-qemu        nobody
+$ /tmp/test6.sh --file=tags bobg <tab><tab>
+<species>  dog        cat        human      
+$ /tmp/test6.sh --file=tags bobg cat
+***** bg-debugCntr: Tracing='/tmp/bgtrace.out'. Vinstall='ON:bg-core:'
 ```
 
-By having the bash completion algorithm inside the script, it encourages it to be developed and maintained along with the script. I find that I build the command line syntax first for each new feature I write so that I dont have to type the whole command line out while testing a new script. BC becomes a sort of UI for the command line that gives the user feedback while they complete the cmdline.
+By having the bash completion algorithm inside the script, it encourages its development and maintenance along with the script. I find that I build the command line syntax first for each new feature I write so that I can select files and other parameters from lists instead of finding the values and typing them in. BC becomes a sort of UI for the command line that gives the user lists of choices and with this system the tools of the script are available to the BC routine so it can be very dynamic, filtering the list to exactly the values that are possible given the arguments already completed. Check out the bg-awkData command for a great example of that.
 
-There is emerging support for gleaning the command line syntax from the usage comments in the file so that we would not even have to write the completion routine at all. If we define the oob_printBashCompletion function, we can have complete control over the syntax but if we leave it out, the syntax would be gleaned.
+There are many ways to write an oob_printBashCompletion function. This example passes a syntax string to bgBCParse that allow it to do most of the work. Then it adds to the results by providing suggestions for <name> and <foo> type arguments.
 
 See
 * man(3) _bgbc-complete-viaCmdDelegation
@@ -378,9 +386,9 @@ p2='defaultP2Value'
 
 ## Daemons
 
-Some commands are meant to be invoked by a user and others are meant to run in the background to provide some long running feature. Still others are meant to be invoked in response to some system event. Scripts that are run by the host init system  are daemons.
+Some commands are meant to be invoked by a user and others are meant to run in the background to provide some long running feature. Still others are meant to be invoked in response to some system event. Commands that are run by the host init system  are daemons.
 
-Writing a good unix/linux daemon has traditionally been difficult. Scripts that source /usr/lib/bg_core.sh can declare that they are a daemon and the oob_printBashCompletion system will provide many common features that a good daemon should support. For testing, the daemon can be started and stopped manually without installing it into the host and then when packaged and installed on a host, it
+Writing a good linux daemon has traditionally been difficult. Scripts that source /usr/lib/bg_core.sh can declare that they are a daemon and the oob_printBashCompletion system will provide many common features that a good daemon should support. For testing, the daemon can be started and stopped manually without installing it into the host and then when packaged and installed on a host, it
 will controlled by systemd, sysV, or what ever init system the host supports.
 
 ```bash
@@ -431,7 +439,92 @@ example, when it receives SIGTERM, it will finish the current loop and then drop
 
 ## Configuration Files
 
-Devops and sysops coding involves
+Devops and sysops coding involves a lot of configuration file manipulation. The bg_ini.sh library provides commands to read and write
+to different kinds of configuration files (not just just ini formatted files) while the bg_template library provides a way to manage
+and expand a library of template files.
+
+```bash
+$ bg-debugCntr vinstall sourceCore  
+$ import bg_ini.sh ;$L1
+$
+$ iniParamSet /tmp/data9 . name bobg
+$ iniParamSet /tmp/data9 home state "Ca"
+$ iniParamSet /tmp/data9 work state "NY"
+$ cat /tmp/data9
+name=bobg
+
+[ home ]
+state=Ca
+
+[ work ]
+state=NY
+$
+$ iniParamGet /tmp/data9 home city
+AnyTown
+$ iniParamGet /tmp/data9 webserver template
+
+$ # there is no webserver template setting. We can provide a default
+$ iniParamGet /tmp/data9 webserver template mytemplate
+mytemplate
+$ iniParamSet /tmp/data9 webserver template yourTemplate
+$ iniParamGet /tmp/data9 webserver template mytemplate
+yourTemplate
+```
+There are many features of the ini* and config* functions from bg_ini.sh so this example only illustrates a few. When these functions change files, they preserve the existing order and comments where ever possible. They try to make making a change as close as possible to how a human would make the change, preserving work done by other humans to organize and comment the file.
+
+Note that the /tmp/data9[webserver]template setting did not initially exist. A common idiom is that when making a script we decide that it needs some information like a file path. We dont want to hard code it but we also want the script to work in a reasonable way with zero configuration. So we can retrieve the value from a config file and provide a reasonable default value. If the file does not exist or the setting is missing, the default value is returned but the host admin or end user can configure the file to change the script's behavior. The script author can mention the setting in the comments of the script that will become the man page. The `domDataConfig ...` function from bg_domData.sh library is similar but uses a concept of a virtual config file for the operating domain so that not only can the script author provide the default value but also the domain admin, location admin or host admin can manage their default values and the most specific value will be used.
+
+**Templates**
+
+There are many different template languages but what separates the template system in bg_core is that it is native to the OS environment. There has to be a context of variables whose values  the template is expanded with and typically creating and populating that context is easy in the language runtime that the template system is native to but not so much in other runtime environments. Because `environment` variables are common to the OS execution environment it is universal.
+```bash
+$ import bg_template.sh ;$L1
+$ templateExpandStr "Hello %USER%. My favorite color is %color:blue%"
+Hello bobg. My favorite color is blue
+$ color=red
+$ templateExpandStr "Hello %USER%. My favorite color is %color:blue%"
+Hello bobg. My favorite color is red
+```
+Here for brevity I expanded a string literal template but I could have done the same by putting the content in a file. The extended template parser supports directives for flow control
+
+
+## Object Oriented Bash
+
+When writing a full featured script, one comes up against a limitation of bash's concept of data scope. There is no native concept of data structures that can be passed around to functions so its hard to provide a library that operates on something that is a collection of multiple variables.
+
+```bash
+$ import bg_objects.sh ;$L1
+$ DeclareClass Animal
+$ function Animal::__construct() { this[name]="$1"; }
+$ function Animal::whoseAGoodBoy() { echo "I am a ${this[_CLASS]}"; }
+$
+$ DeclareClass Dog Animal
+$ function Dog::__construct() { : do Dog init. You dont have to define a __constructor; }
+$ function Dog::whoseAGoodBoy() { echo "Is it me? I want to be a good dog."; }
+$
+$ DeclareClass Cat Animal
+$ function Cat::whoseAGoodBoy() { echo "Whatever, Cats are girls. Oh BTW, my I need some fresh food"; }
+$
+$ ConstructObject Dog george "George"
+$ $george.wagFrequency="45Htz" # add some more data to this object on the fly...
+$
+$ ConstructObject Cat kes "kes"
+$ $kes.sleepSchedule="22/7"
+$
+$ $george.whoseAGoodBoy
+Is it me? I want to be a good dog.
+$ $kes.whoseAGoodBoy
+Whatever, Cats are girls. Oh BTW, my I need some fresh food
+$
+$ printfVars george
+wagFrequency : 45Htz
+name         : George
+$
+$ printfVars kes
+name         : kes
+sleepSchedule: 22/7
+```
+
 
 
 ## Project Folder structure and naming

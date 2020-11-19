@@ -15,7 +15,7 @@ iniUserConfFile=~/.bg-lib.conf
 #
 # Basic Format:
 # An INI file is line oriented. Extensions that continue lines exist but might not be understood by all tools.
-# Each line is 
+# Each line is
 #    * whitespace -- 0 or more space or tabs
 #    * comment   -- first non-whitespace character is #
 #    * section name -- [<sectionName>]
@@ -25,7 +25,7 @@ iniUserConfFile=~/.bg-lib.conf
 # is considered empty if no parameter setting lines appear before the first section line.
 # The names of settings are typically unique within the section that they apear but that is not absolute.
 # If a parameter name appears more than once in a section it may be interprete by some readers as an
-# array/list of multiple values. 
+# array/list of multiple values.
 #
 # bg-lib Conventions:
 # The bg_ini.sh librabry provides functions to read and write INI files. The rest of the sections in
@@ -65,17 +65,17 @@ iniUserConfFile=~/.bg-lib.conf
 #   * the section name may be enclosed in single or double quotes and they will be removed. Quote chars that are not matching on
 #     the ends or appear in the interior will not be removed. Whitespace inside the quotes will not be removed so that is a way to
 #     support section names with leading or trailing whitespace
-# 
+#
 # ParameterSetting Lines...
 # When ParameterSetting are written...
 #    1) no leading whitespace
 #    2) the <paramName> will not have any leading or trailing whitespace.
 #    3) the <paramName> will be followed by a single delimeter character (defatul =) with no whitespace.
-#    4) <value> will immediately follow the delimeter with whitespace preserved. 
+#    4) <value> will immediately follow the delimeter with whitespace preserved.
 #    5) if a comment is specified, a # character is appended and the comment follows.
 #       note that the <value> may contain # characters in which case comments can be ambiguous.
 # When sections are read...
-#   * 0 or more whitespace can surround the <value> and delimiter tokens. 
+#   * 0 or more whitespace can surround the <value> and delimiter tokens.
 #
 # Comment Lines...
 # When Comment are written...
@@ -108,13 +108,13 @@ iniUserConfFile=~/.bg-lib.conf
 
 
 
- 
+
 # AWKLIB : awkLibINIFiles : provides iniSection, iniParamName, iniValue, and iniLineType variables
-# This awk library string can be included in an awk script and any script that apears after it can 
-# rely on a set of ini* variables to be defined while processing each line. 
-# The default delimiter for settings lines in "=". You can change the delimiter by adding a cmd line 
+# This awk library string can be included in an awk script and any script that apears after it can
+# rely on a set of ini* variables to be defined while processing each line.
+# The default delimiter for settings lines in "=". You can change the delimiter by adding a cmd line
 # option '-v iniDelim="<delim>"'. A line's first ocurance of iniDelim will separate <iniParamName> and
-# iniValue therefore iniParamName can not contain iniDelim but iniValue can.  
+# iniValue therefore iniParamName can not contain iniDelim but iniValue can.
 # Input Variables:
 #    iniTargetSection: a section to focus on. inTarget will be true only when processing this section. Several special values are recognized
 #              "<sectName>"   : <sectName> matches the word inbetween bracket on section lines.
@@ -132,7 +132,7 @@ iniUserConfFile=~/.bg-lib.conf
 #    iniParamName    : the name of the parameter (using iniDelim to parse) for the current line or empty if current line is not a setting
 #    iniValue        : the vaue of the parameter (using iniDelim to parse) for the current line or empty if current line is not a setting
 #    iniLineType     : the type of line of the current line
-#            "comment"    : the first non-whitespace character is a "#". 
+#            "comment"    : the first non-whitespace character is a "#".
 #            "whitespace" : the line is empty or contains only whitespace
 #            "section"    : the line is a section header of the form "[ <sectionName> ]"
 #            "setting"    : the line is not any of the other lines. Note that this means that the line might not contain a iniDelim
@@ -140,7 +140,7 @@ iniUserConfFile=~/.bg-lib.conf
 awkLibINIFiles='
 	#'"$awkDataLibrary"'
 	BEGIN {
-		# if the caller does not set iniTargetSection with -v iniTargetSection="", we set it to a 
+		# if the caller does not set iniTargetSection with -v iniTargetSection="", we set it to a
 		# value that is not likely to be a real section. If the caller wants to specify the top/empty
 		# section, they must use iniTargetSection="." or iniTargetSection="--"
 		iniTargetSection=(iniTargetSection=="")?"]!#<noSection>#!":iniTargetSection
@@ -179,18 +179,18 @@ awkLibINIFiles='
 # usage: cat $file | escapeIniSectionData
 # This facilitates storing arbitrary data in an INI section of a file
 # this is a filter that escapes data that looks like ini section headers so that the
-# data can be stored in a ini section.  
+# data can be stored in a ini section.
 # replaceIniSection and getIniSection do this internally, using this function and unescapeIniSectionData
-#  so you normally do not need to call this directly 
+#  so you normally do not need to call this directly
 function escapeIniSectionData()
 {
-	# insert the string "#!(esc)" before any line that looks like section header 
+	# insert the string "#!(esc)" before any line that looks like section header
 	sed -e 's/^[ \t]*\[.*\]/#!(esc)&/' <&0
 }
 
 # usage: <readDataFromSection> | unescapeIniSectionData
 # This facilitates storing arbitrary data in an INI section of a file
-# this is a filter that undoes the escaping that escapeIniSectionData does. 
+# this is a filter that undoes the escaping that escapeIniSectionData does.
 # see man escapeIniSectionData
 function unescapeIniSectionData()
 {
@@ -213,7 +213,7 @@ function unescapeIniSectionData()
 #                     if <sectionName> is an empty string or "." or "--", it refers to the section from the
 #                     start of a file to the first [ <sectionName> ] line.
 #                     This top/emptyName section is consider to exist if there is at least one parameter/setting
-#                     line before the first section line 
+#                     line before the first section line
 function iniSectionExists()
 {
 	local verboseFlag
@@ -237,7 +237,7 @@ function iniSectionExists()
 		}
 	' $(fsExpandFiles -f $iniFile)
 	local result=$?
-	return $result 	
+	return $result
 }
 
 # usage: assertINISectionExists <inifile> <sectionName> <errorDescription>
@@ -313,7 +313,7 @@ function iniSectionGet()
 # removes the lines in the <iniFile> corresponding to the specified <sectionName>
 # Options:
 #    -p : leaves the <sectionName> header but remove all lines from it. This effectively removes it but keeps its
-#         position in the file for when params are added back into the section  
+#         position in the file for when params are added back into the section
 function removeIniSection() { iniSectionRemove "$@"; }
 function iniSectionRemove()
 {
@@ -357,7 +357,7 @@ function iniSectionReplace()
 		BEGINFILE {
 			if (inTarget) {
 				hit=1
-				while (getline line < "/dev/stdin") 
+				while (getline line < "/dev/stdin")
 					print line;
 			}
 		}
@@ -365,7 +365,7 @@ function iniSectionReplace()
 		inTarget && iniLineType=="section" {
 			print $0
 			hit=1
-			while (getline line < "/dev/stdin") 
+			while (getline line < "/dev/stdin")
 				print line;
 			next
 		}
@@ -377,7 +377,7 @@ function iniSectionReplace()
 		END {
 			if (! hit) {
 				printf("[ %s ]\n", iniTargetSection);
-				while (getline line < "/dev/stdin") 
+				while (getline line < "/dev/stdin")
 					print line;
 			}
 		}
@@ -385,7 +385,7 @@ function iniSectionReplace()
 }
 
 # usage: cr_iniSectionNotExists <filename> <sectionName>
-# declares that the ini section should not exist 
+# declares that the ini section should not exist
 # apply removes the section
 function cr_iniSectionNotExists()
 {
@@ -418,7 +418,7 @@ function cr_iniSectionNotExists()
 
 
 # usage: iniParamExists <inifile> <sectionName> <paramName>
-# returns true if the file contains the given parmamName in the given section.  
+# returns true if the file contains the given parmamName in the given section.
 # Note that a param is considered to exist if the ini file has a line that sets it to the empty string so a parameter
 # can exist and be equal to "".
 # If you need to know the existing value is AND whether it exists or not, its efficient to use getIniParam
@@ -491,13 +491,13 @@ function iniParamList()
 #    <inifile>     : filename of config file. Can be a comma separated list of config files in which case the value of the first file
 #                    that defines <sectionName> <paramName> will be used or <defaultValue> if none define it
 #    <sectionName> : only settings in this section will be considered. the same <paramName> can exist in multi sections
-#                    Use "." or "" or "--" to indicate settings at the top of the file before any section start  
+#                    Use "." or "" or "--" to indicate settings at the top of the file before any section start
 #    <paramName>   : the name of the setting in the section. This is an exact match of the text to the left of the = with whitespace removed
 #    <defaultValue> : if the setting does not exist, this value is returned. Note that if the setting exists and has no text to the
 #           right of the =, its value is logically set to the empty string. In this case, "" is returned and not <defaultValue>
 #
 # Options:
-#    -R <retVar>    : return the value in this variable name instead of on stdout 
+#    -R <retVar>    : return the value in this variable name instead of on stdout
 #    -d <delimChar> : default is "=". set the character used to separate name and value on settings lines
 #    -a  : if the value does not exist, add the default value to the <inifile> (requires write privilege and might prompt for a sudo password)
 #    -t  : expand the value as a template before returning it. If the value has "%<varName>%" tokens they will be replaced by the
@@ -525,7 +525,7 @@ function iniParamGetOldImpl()
 
 	# we handle multiple <inifile> searches by defering to a helper function that calls us back
 	# with single files
-	if [[ "$1" =~ , ]]; then 
+	if [[ "$1" =~ , ]]; then
 		_getIniParamMultipleFiles $addFlag $templateFlag "$@"
 		return
 	fi
@@ -570,7 +570,7 @@ function iniParamGetOldImpl()
 	# the format of the sed command is...
 	# /StartLinePattern/,/EndLinePattern/ s/regExForLineWithNameSaved/SavedName $paramValue/
 	# The startLinePattern matches the sectionName start line
-	# The EndLinePattern matches all section lines which includes the next section line that ends our section  
+	# The EndLinePattern matches all section lines which includes the next section line that ends our section
 
 	# 2015-01 bg this version won't handle escaped double quotes
 	#	local value=$(sed -n -e '
@@ -580,7 +580,7 @@ function iniParamGetOldImpl()
 	# 2015-01 bg tried using eval to solve " quote interpretation (i.e. # inside "" -- problems are:
 	#    1) space around equal causes syntax error : solution -> sed -e 's/[ \t]*=[ \t]*/=/g'
 	#    2) special chars "' " ; \ | > < ` $ & ( ) " : solution -> no good solution. we can not control the quoting standard
-	#               of foreign config files so we would have to filter and escape those characters with a sed filter. might be better to 
+	#               of foreign config files so we would have to filter and escape those characters with a sed filter. might be better to
 	#               parse the line completely as data
 	#local value=$(eval "$(sed -n -e ''"$startLinePattern"','"$endLinePattern"' s/^[ \t]*'"$paramName"'[ \t]*=.*$/&/p' $iniFile| sed -e 's/[ \t]*=[ \t]*/=/g')"; eval echo '${!paramName-=}')
 
@@ -588,8 +588,8 @@ function iniParamGetOldImpl()
 	# get the raw data from the char after = to end of line
 	local value=$(sed -n -e ''"$startLinePattern"','"$endLinePattern"' s/^\([ \t]*'"$paramName"'[ \t]*=\)\(.*\)$/=\2/p' $iniFile)
 
-	# We don't want to use the default if the value is defined and empty so the sed script prepends an extra '=' to the value if 
-	# it was found so that its never empty. 
+	# We don't want to use the default if the value is defined and empty so the sed script prepends an extra '=' to the value if
+	# it was found so that its never empty.
 	if [ ! "$value" ]; then
 		if [ "$addFlag" ]; then
 			setIniParam $sectPad "$iniFile" "$sectionNameRaw" "$paramNameRaw" "$defaultValue"
@@ -638,7 +638,7 @@ function iniParamGetNewImpl()
 
 	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
 
-	local ipg_value ipg_foundInFile 
+	local ipg_value ipg_foundInFile
 
 	# if no file(s) exist to read from
 	if [ "${ipg_iniFiles[*]}" == "/dev/null" ]; then
@@ -694,10 +694,10 @@ function iniParamGetNewImpl()
 #    <sectionName> : If specified, only params in that section will be returned and names will NOT be prefixed with the <sectionName>
 # Options:
 #    -t  : expand the value as a template before returning it
-#    -A <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>) 
+#    -A <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>)
 #          that will be filled in with the values <retArrayName>[[sect.]name]=value
 #    -P <retPrefix>    : the values will be returned in variables named like <retPrefix>_[<sect>_]<name>=<value>
-#          special characters in <sect> and <name> in the the conig file are replaced with _ so that they make valid 
+#          special characters in <sect> and <name> in the the conig file are replaced with _ so that they make valid
 #          variable names. so this is only practical with files that use simple names
 function getAllIniParams() { iniParamGetAll "$@"; }
 function iniParamGetAll()
@@ -778,8 +778,8 @@ function iniParamGetAll()
 
 # usage: _getIniParamMultipleFiles <inifile> (sectionName | . ) paramName [ defaultValue ]
 # this is a private helper function for getIniParam.
-# It implements the multiple <inifile> search feature by separating the inifiles and calling back 
-# getIniParam for each one as needed. 
+# It implements the multiple <inifile> search feature by separating the inifiles and calling back
+# getIniParam for each one as needed.
 function _getIniParamMultipleFiles()
 {
 	local inifiles="$1"
@@ -793,7 +793,7 @@ function _getIniParamMultipleFiles()
 		if [ "$value" != "#$%__DEF__" ]; then
 			echo "$value"
 			return
-		fi 
+		fi
 	done
 	echo "$defaultValue"
 }
@@ -806,7 +806,7 @@ function _getIniParamMultipleFiles()
 #   3) if -i is given and the user can write to the file but not the folder to create the temporary file,
 #      it will edit the file in the /tmp folder and then move it back into the destination file.
 # Options:
-#     -p   : if this is the first parameter, it is not passed on to sed and if -i is given, its taken 
+#     -p   : if this is the first parameter, it is not passed on to sed and if -i is given, its taken
 #            that the parent folder should be created if needed so that the file can be created in it
 function bgsed()
 {
@@ -833,10 +833,10 @@ function bgsed()
 
 		# make sure the file exists and has at least on line
 		if [ ! -s "$iniFile" ]; then
-			# the idea behind this line is that any config file that this function creates will have the default policy that 
-			# local admins can modify it. It should not effect existing files and is something specifically sets the access policy
+			# the idea behind this line is that any config file that this function creates will have the default policy that
+			# local admins can modify it. It should not effect existing files and if something specifically sets the access policy
 			# this will not override it b/c it only sets the policy if the file does not exist
-			[ ! -f "$iniFile" ] && grep -q "adm:" /etc/group &>/dev/null && aaaTouch -d "" "$iniFile" group:adm:writable
+			[ ! -f "$iniFile" ] && grep -q "adm:" /etc/group &>/dev/null && which aaaTouch &>/dev/null && aaaTouch -d "" "$iniFile" group:adm:writable
 
 			# sed does not work on a truely empty file so give it a empty line
 			bgsudo -O sudoOpts bash -c "echo > \"$iniFile\""
@@ -864,10 +864,10 @@ function bgsed()
 # * When a value is replaced, it preserves the position of the param in the file
 # * When a value is replaced, it preserves end of line comments that could exist after the value
 # Parameters:
-#   <inifile> : 
-#       the file to modify. 
+#   <inifile> :
+#       the file to modify.
 #       * if the file does not exist, it will be created
-#       * if the parent folder of the file does not exist, it will only be created if the -p option is specified 
+#       * if the parent folder of the file does not exist, it will only be created if the -p option is specified
 #       * if the user does not have permission to modify or create the file, sudo will be used which may prompt the user
 #   sectionName :
 #       The INI style section heading that the paramName will be placed it
@@ -890,7 +890,7 @@ function bgsed()
 #         if the <inifile> gets changed, statusVarName will be set to "changed". The reason statusVarName is not explicitly
 #         set to indicated that its not changed is a typical pattern is for the caller to initialize statusVarName=""
 #         and then pass it to multiple setIniParam calles. At the end, it can check to see if any of the calls
-#         resulted in the <inifile> being changed. 
+#         resulted in the <inifile> being changed.
 #   -c <comment> : place this comment after the assignment like "name=value # comment"
 #   -x  : suppress section padding. don't add space around the section name when adding a section. This support compatibility to foreign formats
 #         that need [user] instead of [ user ]
@@ -902,7 +902,7 @@ function iniParamSet()
 	local comment=""
 	local statusVarName=""
 	local sectPad=" "
-	local flag; while getopts  "isq:c:pS:x" flag; do 
+	local flag; while getopts  "isq:c:pS:x" flag; do
 	case $flag in
 		p) mkdirFlag="-p" ;;
 		q) quoteMode=$OPTARG ;;
@@ -955,7 +955,7 @@ function iniParamSet()
 	getIniParam -R existingValue "$iniFile" $sectionNameRaw $paramNameRaw "$existTestVal"
 
 	# TODO: try writing this with awk using modern techniques developed for the awkData builders
-	#       the awk script could place the lines in existing files better taking into account comments 
+	#       the awk script could place the lines in existing files better taking into account comments
 	#       it might also be faster, but if its not slower it would be worth it
 
 	# case where there is nothing to do becuase the value is already set
@@ -970,7 +970,7 @@ function iniParamSet()
 		# the format of the sed command is...
 		# /StartLinePattern/,/EndLinePattern/ s/regExForLineWithNameSaved/SavedName $paramValue/
 		# The startLinePattern matches the sectionName start line
-		# The EndLinePattern matches all section lines which includes the next section line that ends our section  
+		# The EndLinePattern matches all section lines which includes the next section line that ends our section
 		bgsed $mkdirFlag -i -e " \
 			$startLinePattern,$endLinePattern s/^\([ \t]*$paramName[ \t]*=\)[ \t]*\\\"*\([^\\\"#]*\)\\\"*\([ \t]*#.*\)*$/\1$paramValue\3/ \
 		" "$iniFile"
@@ -987,10 +987,10 @@ function iniParamSet()
 
 	# case to add both the new section and the line at the end of the file
 	else
-		bgsed $mkdirFlag -i -e " 
+		bgsed $mkdirFlag -i -e "
 			$ {
 				a
-				a[${sectPad}$sectionName${sectPad}] 
+				a[${sectPad}$sectionName${sectPad}]
 				a$paramName=$paramValue
 			}
 		" "$iniFile"
@@ -1035,14 +1035,14 @@ function iniParamRemove()
 	# the format of the sed command is...
 	# /StartLinePattern/,/EndLinePattern/ s/regExForLineWithNameSaved/SavedName $paramValue/
 	# The startLinePattern matches the sectionName start line
-	# The EndLinePattern matches all section lines which includes the next section line that ends our section 
+	# The EndLinePattern matches all section lines which includes the next section line that ends our section
 	bgsed -i -e " \
 		$startLinePattern,$endLinePattern {/^\([ \t]*$paramName[ \t]*=\)[ \t]*\\\"*\([^\\\"#]*\)\\\"*\([ \t]*#.*\)*$/d} \
 	" "$iniFile"
 }
 
 # usage: cr_iniParamSet <filename> sectionName paramName paramValue [ acceptableValueRegEx ]
-# declares that the ini parameter should be set 
+# declares that the ini parameter should be set
 # if acceptableValueRegEx is specified, any value that matches the regex is acceptable
 # otherwise, the value must match paramValue
 # apply sets the value to paramValue
@@ -1086,7 +1086,7 @@ function cr_iniParamSet()
 
 # usage: cr_iniParamNotSet <filename> sectionName paramName
 # declares that the ini parameter should not be set. This means that it is not in the file
-# an ini parameter can be set to the empty string and that is still 'set' 
+# an ini parameter can be set to the empty string and that is still 'set'
 # apply removes the paramName
 function cr_iniParamNotSet()
 {
@@ -1126,12 +1126,12 @@ function cr_iniParamNotSet()
 ##################################################################################################################
 ### Name/Value Pair config format functions
 # Name/Value pairs are similar to INI Parameter line format but without enforcing the separator and quoting conventions
-# These should work with any line format where a name appears first and then some form of separator and then the 
+# These should work with any line format where a name appears first and then some form of separator and then the
 # rest of the line is a value.
 
 # usage: configNameValueGet [-d <separator>] [-s <iniSection>] <filename> <name>
 # Options:
-#    -d : delimeter (aka separator). default is whitespace. Defines what separates the name and value. 
+#    -d : delimeter (aka separator). default is whitespace. Defines what separates the name and value.
 #    -s : iniSection. operate only on <name> found in this section.
 #    -m : multipleValueFlag. The name can have multiple values, either on the same line or in multiple <name> lines
 #         This probably needs options to support different ways but for not -m returns the value of each found <name> line as differnent lines
@@ -1167,7 +1167,7 @@ function configNameValueGet()
 		}
 		$1=="'$name'" {
 			found++
-			if (multipleValueFlag || found<=1) 
+			if (multipleValueFlag || found<=1)
 				print $2
 		}
 		END {
@@ -1184,9 +1184,9 @@ function configNameValueGet()
 
 
 # usage: cr_configNameValue [-m] <filename> <name> <value> [ <valueRegEx> ]
-# declare the the config file contains name value attribute line that matches name and valueRegEx using the first 
-# whitespace (see note for -d opt) as the delim between name and value. 
-# If valueRegEx is not specified, it will be created from <value> by adding expressions that ignore leading 
+# declare the the config file contains name value attribute line that matches name and valueRegEx using the first
+# whitespace (see note for -d opt) as the delim between name and value.
+# If valueRegEx is not specified, it will be created from <value> by adding expressions that ignore leading
 # and trailing whitespace
 #
 # Apply follows this algorithm
@@ -1205,12 +1205,12 @@ function configNameValueGet()
 #    -d NOTE: this cr statement does not yet implement the -d option. Since it was a significant change to implement -d
 #             and the name/value line matching has some tricky cases. I implemented the -d algorithm in a new cr statement
 #             called cr_configNameValueEq. That one make the -d default to '='. New code should use this if the delimiter
-#             is whitespace and cr_configNameValueEq for delimiter '=' and cr_configNameValueEq if it needs to use -d 
+#             is whitespace and cr_configNameValueEq for delimiter '=' and cr_configNameValueEq if it needs to use -d
 #             to specify a different delimiter.
 #             Eventually, we will test to make sure that cr_configNameValueEq -d " " is exactly the same as cr_configNameValue
 #             and then replace this algorithm with the one in cr_configNameValueEq and make cr_configNameValueEq a wrapper
 #             over cr_configNameValue that changes the -d default to =.
-#    -d <delimiter> : not yet implemented here. See cr_configNameValueEq 
+#    -d <delimiter> : not yet implemented here. See cr_configNameValueEq
 #    -m : multipleValueFlag. <value> is interpreted as a list of values. If the first character is not a delimeter (not a letter)
 #         then the list is taken as the absolute, complete list that the value should have -- no more no less.
 #         Otherwise, if the value does begin with a delimiter (any non-letter) then the list is taken as a list of values
@@ -1307,9 +1307,9 @@ function cr_configNameValue()
 #       despite the name, this function can be used for lines that use any delimiter by specifying the -d option. -d" " should be equivalent
 #       to cr_configNameValue but it has not been well tested yet. After testing, we can replace the algorithm in cr_configNameValue wiht
 #       this one and make this cr_configNameValueEq be a wrapper that jst changes the default -d value.
-# declare the the config file contains name value attribute line that matches name and valueRegEx using = as the 
+# declare the the config file contains name value attribute line that matches name and valueRegEx using = as the
 # delim between name and value.
-# If valueRegEx is not specified, it will be created from <value> by adding expressions that ignore leading 
+# If valueRegEx is not specified, it will be created from <value> by adding expressions that ignore leading
 # and trailing whitespace
 #
 # Apply follows this algorithm
@@ -1319,9 +1319,9 @@ function cr_configNameValue()
 #       if it does not exist, name value pair will be appended to the end of the file
 #
 # Param:
-#    filename:   file to check for the presence of a line of text 
-#    name:       the left side of the equal sign 
-#    value:      the right side of the equal sign 
+#    filename:   file to check for the presence of a line of text
+#    name:       the left side of the equal sign
+#    value:      the right side of the equal sign
 #    valueRegEx: optional regex expression for value that will match any compliant line
 #                if not specified a compliant line must match value exactly except for leading and trailing whitespace
 #
@@ -1330,7 +1330,7 @@ function cr_configNameValue()
 #         then runs of tabs and spaces are treated like one delimter. Whitespace between name and <delimiter> is allowed
 #         but when this function adds a new line, it does not put a space between name and <delimeter> nor between
 #         <delimeter> and value. Normally whitespace is allowed and ifnored between <delimeter> and value but that could
-#         be changed by specifying valueRegEx. 
+#         be changed by specifying valueRegEx.
 #    -m : multipleValueFlag. <value> is interpreted as a list of values. If the first character is not a delimeter (not a letter)
 #         then the list is taken as the absolute, complete list that the value should have -- no more no less.
 #         Otherwise, if the value does begin with a delimiter (any non-letter) then the list is taken as a list of values
@@ -1346,7 +1346,7 @@ function cr_configNameValueEq()
 			while [[ "$1" =~ ^- ]]; do case $1 in
 				-m) multipleValueFlag="-m" ;;
 				-d*) bgOptionGetOpt val: delim "$@" && shift
-					 delimRegEx="$delim" 
+					 delimRegEx="$delim"
 					 [ "$delimRegEx" == " " ] && delimRegEx="[[:space:]]"
 					 ;;
 			esac; shift; done
@@ -1457,7 +1457,7 @@ function cr_configNameNotExists()
 			name="${2%[:=]}"
 
 			local filenameShort nameShort valueShort
-			strShorten -R filenameShort 25 "$filename" 
+			strShorten -R filenameShort 25 "$filename"
 			strShorten -R nameShort 20 "$name"
 			displayName="config '${filename}:$name' should not exist"
 			displayName="${filename}:$name config setting should not exist"
@@ -1501,7 +1501,7 @@ function cr_configNameNotExists()
 # usage: configLineReplace [--match=<type>] [-d] [-a] [-f] [-c] [--check] <filename> <line> [<lineMatchData>]
 # This function manages arbitrary lines in a config file. The core algorithm is that it removes all
 # lines that matches <mutexLineRegEx> (derived from --match=<type> and <lineMatchData>) and at the first ocurrance
-# where a matching line was, or at the end of file if none were found, it adds <line> (or does another operation 
+# where a matching line was, or at the end of file if none were found, it adds <line> (or does another operation
 # based on the options)
 #
 # This makes it tolerant of formating that human maintainers may do like changing whitespace or adding
@@ -1523,14 +1523,14 @@ function cr_configNameNotExists()
 # TODO: add more control of <valueMatchRegEx> (aka <lineRegExAcceptable>) E.G. ^<name>= identifies mutually exclusive lines, and "=(<val1>|<val2)" identifies if the value is acceptable to leave.
 # Algorithm:
 #  The algorithm is applied to the file and if it results in the same content as the file already had, the
-#  file will not be opened for writing and will not have its timestamp changed. 
+#  file will not be opened for writing and will not have its timestamp changed.
 #    1) remove any line that matches <mutexLineRegEx>
 #       if -c is specified, it also removes any commented out lines matching <mutexLineRegEx> without the comment prefix
 #    2) determine the operation position. This is the postion of the first matched line, prefering uncommented
 #       lines to matching commented lines (if -c is given). If no matches were found, the operation postion
 #       is the end of file.
 #    3) at the operation position perform the operation that is specified by the options.
-#           delete) if the mode is delete (-d) or if <line> is empty, no line is written at the operation 
+#           delete) if the mode is delete (-d) or if <line> is empty, no line is written at the operation
 #                   possition which leaves the file with no matching lines.
 #           leave)  if there was an existing line at the operation position and it either matches the
 #                   acceptable regEx or the mode is -a (any), that line is reinserted there to be
@@ -1543,7 +1543,7 @@ function cr_configNameNotExists()
 #                  in the file after the function is done. However, if <line> is the empty string, it will not be
 #                  inserted and it has a similar effect as the -d (delete) option.
 #    <lineMatchData> : this along with the --match=<type> determines the <mutexLineRegEx> expression that will
-#                  match all lines that are logically the same mutually exclusive semantic meaning. 
+#                  match all lines that are logically the same mutually exclusive semantic meaning.
 #                  The default is to create <mutexLineRegEx> from <line> in a manner that is tolerant of whitespace chagnes.
 # Options:
 #    -a : any line that matches <mutexLineRegEx> is sufficient. Only use <line> if none already exists.
@@ -1553,7 +1553,7 @@ function cr_configNameNotExists()
 #         instead always make sure that its exactly <line>. This is related to -a but very different.
 #         For example, for --match=nameValueEq, -a will allow the <name> to remain set to any <value>.
 #         Without -a, the <name> setting line must have the <value> specified in <line> but it can vary
-#         in whitespace like '<name>= <value>' vs '<name>=<value>'. 
+#         in whitespace like '<name>= <value>' vs '<name>=<value>'.
 #         With -f <line> will be set in the file as is.
 #    -d : delete. remove the specified line. This is the same as setting line to "" and specifying mutexLineRegEx,
 #         but this option allows you to provide only line and have mutexLineRegEx get created from line.
@@ -1561,7 +1561,7 @@ function cr_configNameNotExists()
 #         -d can be added to any valid call to reserve its affect
 #    -c : consider commented lines that match and matching also. This will remove old commented versions
 #         of the line. It also means that the new line will be set in the same file location as the
-#         first occurance of the matching commented line. To preserve the file order, lines can be 
+#         first occurance of the matching commented line. To preserve the file order, lines can be
 #         commented and uncommented instead of removed and re-added.
 #    --commentOut : if there is an active line, disable it by prefixing it with "# ". It there is no active line
 #         do nothing. Implies -c
@@ -1571,15 +1571,15 @@ function cr_configNameNotExists()
 #    --isAlreadySet : alias for --check that makes it easier to know that true means that its already set this way.
 #    --wouldChangeFile : alias for --check but inverts the return code. this makes scripts easier to read.
 #    --returnTrueIfAlreadySet  : (default) this makes scripts read easier because you know what it means
-#                                if it exits true (no change was made to the file because this <line> is already set)  
+#                                if it exits true (no change was made to the file because this <line> is already set)
 #    --returnTrueIfChanged     : inverts the normal return code so that it reads true if the operation changed the
 #                                file and false if no change was needed
 #    --returnTrueIfSuccessful  : true(0) if the operation is succesful and the file is now compliant
-#    --match=<type> : this determines how the regex expression that matches lines will be created from the 
+#    --match=<type> : this determines how the regex expression that matches lines will be created from the
 #                      <line> and how <mutexLineRegEx> will be interpretted.
 #        ignoreWhitespace : (default if <lineMatchData> is empty). whitespace at the start or end is optional and
 #                           each run of whitespace in the interior of <line> will match one or more whitespace characters
-#        custom           : (default if <lineMatchData> is not empty). <lineMatchData> is taken as <mutexLineRegEx> unchanged. 
+#        custom           : (default if <lineMatchData> is not empty). <lineMatchData> is taken as <mutexLineRegEx> unchanged.
 #        exact            : any regex special characters in <line> are escaped but other than that no modifications
 #                           are made so that only the exact, literal string is matched
 #        nameValueEq      : match only the '^<name>=' part of <line>. whitespace is optional on both sides of <name>
@@ -1602,7 +1602,7 @@ function cr_configNameNotExists()
 function configLineReplace()
 {
 	local filename deleteFlag forceFlag debugFlag anyFlag commentFlag matchIgnoreSpacesFlag matchMode mutexLineRegEx valueMatchRegEx
-	local bgAwkOpMode="--returnTrueIfChanged" returnTrueIfSuccessful commentAction 
+	local bgAwkOpMode="--returnTrueIfChanged" returnTrueIfSuccessful commentAction
 	while [ $# -gt 0 ]; do case $1 in
 		-a) anyFlag="-a" ;;
 		-c) commentFlag="-c" ;;
@@ -1709,7 +1709,7 @@ function configLineReplace()
 	fi
 
 
-	#bgtraceVars -w35 line mutexLineRegEx commentedMutexLineRegEx valueMatchRegEx anyFlag deleteFlag forceFlag commentFlag commentAction knownToContainAMatchingLine 
+	#bgtraceVars -w35 line mutexLineRegEx commentedMutexLineRegEx valueMatchRegEx anyFlag deleteFlag forceFlag commentFlag commentAction knownToContainAMatchingLine
 	bgawk ${debugFlag:--i} $bgAwkOpMode -n \
 		-v mutexLineRegEx="$mutexLineRegEx" \
 		-v valueMatchRegEx="$valueMatchRegEx" \
@@ -1723,7 +1723,7 @@ function configLineReplace()
 		-v knownToContainAMatchingLine="$knownToContainAMatchingLine" \
 		"$awkDataLibrary"'
 
-		# when the algorithm has choosen that its at the file position that the line should be, it 
+		# when the algorithm has choosen that its at the file position that the line should be, it
 		# calls this function to write it out. This function does one of 3 actions
 		#    1) write nothing if the line is being deleted
 		#    2) write the original line ($0) if it is compliant and should stay
@@ -1732,7 +1732,7 @@ function configLineReplace()
 		#   <currentLineType> : indicates what type of line we are on when we decided to write the line.
 		#      "active": its an existing active line that may be overwritten or left
 		#      "comment": its an existing commented out line that could be left, replaced, or commented out.
-		#      "EOF":     we go to the end of file without finding a place to put the line so append it or leave it missing. 
+		#      "EOF":     we go to the end of file without finding a place to put the line so append it or leave it missing.
 		function writeTheLineHere(currentLineType) {
 			#bgtrace("writeTheLineHere  currentLineType="currentLineType"  NR="NR)
 			# dont write the line more than once in the file
@@ -1763,7 +1763,7 @@ function configLineReplace()
 				}
 				print selectedLine
 
-			# if the options and/or patterns say we can keep this line as it is, we just write $0 
+			# if the options and/or patterns say we can keep this line as it is, we just write $0
 			} else if (!forceFlag && currentLineType=="active" && (anyFlag || $0~valueMatchRegEx) ) {
 				print $0
 
@@ -1800,14 +1800,14 @@ function configLineReplace()
 
 					# UNKNOWN: we did not pre scan so we dont know if an active match is coming up
 					#     generally, if comment inclusion is on, we will know, but if not, we need to
-					#     balance two things. 
-					#        1) if we make this the lines position, we may change the value of an active 
+					#     balance two things.
+					#        1) if we make this the lines position, we may change the value of an active
 					#           line later, whose value is differennt from <line> but acceptable
 					#        2) if we dont make this the lines position, we may move the line to the
 					#           end of the file and loose this position that is more organized.
 					#     So the condition below is designed to match the cases where its not likely
 					#     that an active line later on would have a different value that we would keep.
-					#     Remember that as long as the code above does the extra scan to fill in 
+					#     Remember that as long as the code above does the extra scan to fill in
 					#     knownToContainAMatchingLine, this unknown case wont come into play.
 					#     there could be performance reasons where we choose to skip that scan.
 					#     Also, in either case, it will tend to stabalize becauseevery time we run
@@ -1839,13 +1839,13 @@ function configLineReplace()
 	# was changed. this case is not interested in that.
 	[ "$returnTrueIfSuccessful" ] && return 0
 
-	# return whether the file was or would be changed. The sense of the boolean is determined by 
+	# return whether the file was or would be changed. The sense of the boolean is determined by
 	# $bgAwkOpMode
 	return "$result"
 }
 
 # usage: cr_configLine [<options>] <filename> <line> [ <lineRegEx> ]
-# declare that the config file contains exactly one line that matches lineRegEx and is currenly set to <line>. 
+# declare that the config file contains exactly one line that matches lineRegEx and is currenly set to <line>.
 # This uses configLineReplace to do the work. The command line syntax is exactly the same as configLineReplace
 #
 # Params:
@@ -1853,19 +1853,19 @@ function configLineReplace()
 #   <filename> : file to check for the presence of a line of text
 #   <line>     : the literal line of text that will be added if needed
 #   <lineRegEx>: this is typically left blank which causes the function to generate it from <line>
-#                 See the --match=<type> option of configLineReplace for options to control it 
+#                 See the --match=<type> option of configLineReplace for options to control it
 #
 # Options:
 #   See configLineReplace for more details on the options
 #       any of the configLineReplace options are suportted that do not control the check/apply mode and the
-#       meaning of the exit code (ie. not --debug-script --debug-output --checkOnly --isAlreadySet --wouldChangeFile 
+#       meaning of the exit code (ie. not --debug-script --debug-output --checkOnly --isAlreadySet --wouldChangeFile
 #                                 --returnTrueIfChanged --returnTrueIfAlreadySet --returnTrueIfSuccessful )
 #   -a  : any mode. treat <line> like an initial default that is ok to change. It will only set
 #         <line> if there are no matching lines. duplicate matching lines are still removed
 #   -c  : consider commented out lines that would match if the comment prefix were removed for the
 #         purpose of placement location and removing duplicates
 #   -d  : delete the <line>. ignore <line> (except for the purpose of creating <lineRegEx>) and remove
-#         all matching lines. 
+#         all matching lines.
 #   --match=<type> : determine how <lineRegEx> is created from <line>
 #         ignoreWhitespace : whitespace at the start or end is optional and each run of whitespace in the interior
 #                          of <line> will match one or more whitespace characters
@@ -1909,7 +1909,7 @@ function cr_configLine()
 # declare that the config file does not contain any line matching the <lineRegEx>.
 # This is the complementary cr_statement to cr_configLine. Both use configLineReplace to do the real work.
 # The command line syntax is the same as cr_configLine except this cr_statement adds the -d option to
-# configLineReplace to reverse its meaning -- i.e. to delete the line. 
+# configLineReplace to reverse its meaning -- i.e. to delete the line.
 # See Also:
 #    cr_configLine
 #    configLineReplace
@@ -1960,7 +1960,7 @@ function cr_configLineNotExist()
 # Configuration dropins is the pattern where a configuration file includes all the files 'dropped'into
 # a particular folder. Instead of editing the base config file, packages or admin can create snipits
 # of configuration in a dropin file that they can control independent of the rest of the config. We
-# can enable or disable that dropin config by adding or removing the file. Often, a differnt folder 
+# can enable or disable that dropin config by adding or removing the file. Often, a differnt folder
 # adjacent to the dropin folder will contain all the potential dropin files provided from multiple sources
 # and we can enable them by creating a symlink from the real folder to the dropin in the adjacent folder.
 # Implementations:
@@ -1977,9 +1977,9 @@ function cr_configLineNotExist()
 #       both places with different content. This is supported because some dropin folders from existing
 #       projects like apt sources.d and sudo sudoers.d do not track disabled dropin files and its less
 #       intrusive to only create a new .disabled folder to keep track of disabled dropins and leave
-#       enabled dropins to be actual files that those projects and admins familiar with them expect. 
+#       enabled dropins to be actual files that those projects and admins familiar with them expect.
 # Params:
-#     <enabledFolder> : the folder that contains links for any enabeled dropin 
+#     <enabledFolder> : the folder that contains links for any enabeled dropin
 #     <availFolder>   : the folder that conatins all available dropin files
 #     <dropin>        : the name of the dropin file
 #     <command>  : enable|disable|status|edit|list
@@ -1992,15 +1992,15 @@ function cr_configLineNotExist()
 #         enable : change to enabled
 #         disable : change to disabled
 # Options:
-#    --type <pluginType> : a short name for the type. This is used to display the plugin name and is useful when $dropin is not 
+#    --type <pluginType> : a short name for the type. This is used to display the plugin name and is useful when $dropin is not
 #          descriptive wihout the context of what type of config it is. Example: apt, http, etc...  Common types will be gleaned
 #          from the enableFolder
-#    --ext <dropinExt> : a comma separated list of extentions for plugins in this folder. Typically none or one ext 
+#    --ext <dropinExt> : a comma separated list of extentions for plugins in this folder. Typically none or one ext
 #    -t <dropinExt>    : alias for --ext
 #    -s  : status. don't make any change but set the return code to 1 if a change would be make
 #          note that the status *command*'s exit code always reflects 0(true) as enabled. This option
 #          reflects whether the dropin is already in the state specified in $command. This is used to
-#          check to see if the command would do anything if it is called without the -s 
+#          check to see if the command would do anything if it is called without the -s
 #    -S <changeStateVar> : if a change is made, set the variable named <changeStateVar> to "1"
 #    -e  : edit. open the dropin file in the user's prefered editor (see getUserEditor and getUserCmpApp)
 # Exit Code:
@@ -2139,7 +2139,7 @@ function configDropinCntr()
 				setReturnValue "$changeStateVar" "1"
 				[ "$statusFlag" ] && return 1
 
-				# there should not be a file in the availFolder also so we have to deal with that 
+				# there should not be a file in the availFolder also so we have to deal with that
 				# before moving the droping to the availFolder. if its not different, we can just
 				# overwrite it but it its different, we save a backup
 				if [ -e "$availFolder/$dropin" ] && fsIsDifferent "$availFolder/$dropin" "$enabledFolder/$dropin"; then
@@ -2187,7 +2187,7 @@ function configDropinCntr()
 				confirm "
 					the source dropin file exists in both the enable and disable folder. Typically it should be in only one of those
 					and currently '$availFolder/${dropin}' is not currently being used and can be removed but you should confirm that
-					the version of the config that is currently enabled is the version you want to keep. 
+					the version of the config that is currently enabled is the version you want to keep.
 					continue? y/n
 				" || return
 			fi
@@ -2203,7 +2203,7 @@ function configDropinCntr()
 			fi
 
 			;;
-		*) 	assertError -v enabledFolder -v availFolder -v dropin -v command -v dropinMode "unknown command" 
+		*) 	assertError -v enabledFolder -v availFolder -v dropin -v command -v dropinMode "unknown command"
 	esac
 
 	return
@@ -2218,7 +2218,7 @@ function configDropinGleanTypeFromFolder()
 		*/http/*) returnValue "http" "$1" ;;
 		*nginx*)  returnValue "nginx" "$1" ;;
 		*apache*) returnValue "apache" "$1" ;;
-		
+
 	esac
 }
 
@@ -2231,10 +2231,10 @@ function configDropinGleanTypeFromFolder()
 # A dropin file is a config file that is copied to a folder where all compliant files in that folder
 # are included in some program's configuration. (like /etc/apache2/sites-enabled/sites-available)
 # Params:
-#     <enabledFolder> : the folder that contains links for any enabeled dropin 
+#     <enabledFolder> : the folder that contains links for any enabeled dropin
 #     <availFolder>   : the folder that conatins all available dropin files
 #     <dropin>        : the name of the dropin file
-#     <targetState>   : enable|disable. the state of the dropin the dropin should be in after this call  
+#     <targetState>   : enable|disable. the state of the dropin the dropin should be in after this call
 # See Also:
 #    configDropinCntr
 function cr_configDropinCntr()
@@ -2249,7 +2249,7 @@ function cr_configDropinCntr()
 			case $targetState in
 				enable)  displayName="dropin '$dropin' should be enabled" ;;
 				disable) displayName="dropin '$dropin' should be disabled" ;;
-				*) assertError -v enabledFolder -v availFolder -v dropin "expected enable|disable. got '$targetState'" 
+				*) assertError -v enabledFolder -v availFolder -v dropin "expected enable|disable. got '$targetState'"
 			esac
 			;;
 
@@ -2264,7 +2264,7 @@ function cr_configDropinCntr()
 
 
 # usage: cr_configNoEmptyLines [-b] [-m] [-e]  <filename>
-# declare that the file has no blank lines. Default is no blank lines. Any combination of -b -m and -e can be used to 
+# declare that the file has no blank lines. Default is no blank lines. Any combination of -b -m and -e can be used to
 # alter that
 # Params:
 #    <filename> : the file to check
@@ -2326,7 +2326,7 @@ function cr_configNoEmptyLines()
 					if ((beg && '"$begInclude"') || (mid && '"$midInclude"'))
 						for (i=1; i<=blanksCount; i++) print blanks[i]
 
-					# regardless of whether we printed them, remove them from our buffer 
+					# regardless of whether we printed them, remove them from our buffer
 					blanksCount=0
 
 					# always include/print non-blank lines
@@ -2347,7 +2347,7 @@ function cr_configNoEmptyLines()
 }
 
 # usage: cr_configNoCommentLines [-w] <filename>
-# declare that the file has no comment lines starting with #. 
+# declare that the file has no comment lines starting with #.
 # Params:
 #    <filename> : the file to check
 # Options:
