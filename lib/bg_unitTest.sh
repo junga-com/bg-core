@@ -200,7 +200,10 @@ function ut()
 		;;
 
 	  onCmdErrCode)
-		_utRun_lineInfo+="['$2' exitted $1]"
+		# we get the cmd that produced a non-zero code in $2 but we dont display it b/c when the testcase invokes a function that
+		# returns non-zero, the last cmd is the last cmd in the function. That is confusing to the output because it does not match
+		# the cmd that the testcase ran.
+		_utRun_lineInfo+="[exitCode $1]"
 		[ "$_utRun_section" == "setup" ] && ut setupFailed
 		;;
 
@@ -221,28 +224,32 @@ function ut()
 		# will set the ERR trap there
 		set +E;
 
-		# turn off DEBUG trap inheritance globally with set +T and then turn it on just for the utFunc function
-		# the trap will turn on immediately for the process and any functions on the stack will be debugged but any newly launched
-		# function will not be debugged except the utFunc for which we explicitly set the DEBUG inherit flag. DEBUG will fire for
-		# the remainder of this call of 'ut' but the next time 'ut' is called, it wont.
-		set +T; declare -ft "$utFunc"; builtin trap 'bgBASH_debugTrapLINENO=$LINENO; bgBASH_debugTrapFUNCNAME=$FUNCNAME;  _ut_debugTrap' DEBUG
-		_utRun_debugHandlerHack="1" # this telle the debugger's DEBUG handler to call _ut_debugTrap
+		# if not debugging the testcase, set it so that the DEBUG trap will only get called while in the $utFunc to improve performance
+		if [ ! "$_utRun_debugFlag" ]; then
+			# turn off DEBUG trap inheritance globally with set +T and then turn it on just for the utFunc function
+			# DEBUG will fire for the remainder of this call of 'ut' but the next time 'ut' is called, it wont.
+			set +T
+			declare -ft "$utFunc"
+		fi
+		builtin trap 'bgBASH_debugTrapExitCode=$?; bgBASH_debugTrapLINENO=$LINENO; bgBASH_debugTrapFUNCNAME=$FUNCNAME;  _ut_debugTrap' DEBUG
+		_utRun_debugHandlerHack="1" # this tells the debugger's DEBUG handler to call _ut_debugTrap
 
 		echo >&$stdoutFD
 		echo "###############################################################################################################################" >&$stdoutFD
 		echo "## $_utRun_id start" >&$stdoutFD
 		echo "## expect: $_utRun_expect" >&$stdoutFD
+
+
 		;;
 
 	  onFirstTimeInsideUTFunc)
-		# set an ERR trap to monitor non-zero exit codes
-		trap -n unitTests '[ "$FUNCNAME" == "$_utRun_funcName" ] && ut onCmdErrCode "$?" "$BASH_COMMAND"' ERR
+		# set an ERR trap to monitor non-zero exit codes. This has to be set from this event in order to be effective
+		trap -n unitTests '[ "$FUNCNAME" == "$_utRun_funcName" ] && ut onCmdErrCode "$bgBASH_trapStkFrm_exitCode" "$bgBASH_trapStkFrm_lastCMD"' ERR
 		_utRun_errHandlerHack="$(builtin trap -p ERR)"
 
 		if [ "$_utRun_debugFlag" ]; then
 			type -t debuggerOn &>/dev/null || import bg_debugger.sh ;$L1;$L2
 			debugSetTrap --logicalStart+${logicalFrameStart:-1}
-			#debuggerOn
 		fi
 		;;
 
@@ -334,14 +341,17 @@ function _ut_flushLineInfo()
 # the source lineno so we use that to identify the line to print and suppress printing the same line multiple times in a row.
 function _ut_debugTrap()
 {
-	#bgtrace "$bgBASH_debugTrapFUNCNAME | $BASH_COMMAND"
+	#bgtrace "_ut_debugTrap: $bgBASH_debugTrapFUNCNAME | $BASH_COMMAND"
 
 	# we are only interested in DEBUG traps for the target ut_ function but its not possible to turn it on only for it so filter out
 	# the other calls.
-	[[ "$bgBASH_debugTrapFUNCNAME" == ut_* ]] || return 0
+	if [[ "$bgBASH_debugTrapFUNCNAME" != ut_* ]] || [ "$bgBASH_trapStkFrm_signal" ]; then
+		return 0
+	fi
 
-	# The DEBUG trap is called once in the begining of a function call with the BASH_COMMAND set to the command that invoked it
-	# the ERR trap can only be set from that time.
+	# when BASH invokes a function, the DEBUG trap is called once in the begining of a function call with the stack set to the
+	# openning { of the function and with the BASH_COMMAND set to the command that invoked it
+	# We create this onFirstTimeInsideUTFunc because the ERR trap can only be set from that time.
 	[[ "$BASH_COMMAND" == '$utFunc '* ]] && { ut onFirstTimeInsideUTFunc; return 0; }
 
 	# calls to ut setup|test take care of themselves
@@ -460,7 +470,9 @@ function utfRunner_execute()
 
 	if [ "$_utRun_debugFlag" ]; then
 		type -t debuggerOn &>/dev/null || import bg_debugger.sh ;$L1;$L2
-		debuggerOn "" "resume"
+		# we need to start the debugger outside the subshell that we run the testcase in but we dont want to stop here
+		debuggerOn "resume"
+		bgDebuggerStepOverTraps="1"
 	fi
 
 	(

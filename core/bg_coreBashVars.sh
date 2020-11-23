@@ -270,6 +270,8 @@ function setExitCode()
 #   arraryAdd  -- does a similar thing for two arrays (<varRef>+=(<varRef2>))
 #   stringJoin -- -a mode does similar but also adds a separator
 #   http://mywiki.wooledge.org/BashFAQ/048#line-120
+#   https://wiki.bash-hackers.org/scripting/bashchanges?s[]=versions
+#   https://wiki.bash-hackers.org/internals/shell_options
 function setRef() { varSetRef "$@"; }
 function varSetRef()
 {

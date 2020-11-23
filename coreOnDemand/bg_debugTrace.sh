@@ -542,7 +542,7 @@ function bgtraceBreak()
 	if debuggerIsActive; then
 		debugSetTrap --logicalStart+${logicalFrameStart:-1} stepOver
 	else
-		debuggerOn --logicalStart+${logicalFrameStart:-1} "$defaultDbgID" stepOver
+		debuggerOn --logicalStart+${logicalFrameStart:-1} ${defaultDbgID:+--driver="$defaultDbgID"} stepOver
 	fi
 	unset bgtraceBreakRecursionTest
 }

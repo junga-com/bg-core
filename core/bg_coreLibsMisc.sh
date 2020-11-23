@@ -1789,31 +1789,42 @@ function bgExit()
 	fi
 }
 
-# usage: BGTRAPEntry <BASHPID> <signal> <lastBASH_COMMAND>
+# usage: BGTRAPEntry <BASHPID> <signal> <lastBASH_COMMAND> <lastLineno> <lastExitCode>
 # Params:
 #     <BASHPID>
 #     <signal>
 #     <lastBASH_COMMAND>
 # See Also:
 #    bgtrap : documents this function in the header and footer section
-declare -g bgBASH_trapStkFrm_signal bgBASH_trapStkFrm_funcDepth bgBASH_trapStkFrm_lastCMD bgBASH_trapStkFrm_LINENO
+declare -g bgBASH_trapStkFrm_signal bgBASH_trapStkFrm_funcDepth bgBASH_trapStkFrm_lastCMD bgBASH_trapStkFrm_LINENO bgBASH_trapStkFrm_exitCode
 declare -g bgtrapHeaderRegEx="^BGTRAPEntry[[:space:]]([0-9]*)[[:space:]]([A-Z0-9]*)"
 function BGTRAPEntry()
 {
-	bgBASH_trapStkFrm_signal=(    "$2"                          "${bgBASH_trapStkFrm_signal[@]}"    )
-	bgBASH_trapStkFrm_funcDepth=( "$(( ${#BASH_SOURCE[@]}-1 ))" "${bgBASH_trapStkFrm_funcDepth[@]}" )
-	bgBASH_trapStkFrm_lastCMD=(   "$3"                          "${bgBASH_trapStkFrm_lastCMD[@]}"   )
-	# note that LINENO passed to us from the trap handler's first line will reflect the lineno of the handler (1) and not the
-	# interrupted lineno but we record it anyway in anticipation that it make change in a future version of bash
-	bgBASH_trapStkFrm_LINENO=(    "$4"                          "${bgBASH_trapStkFrm_LINENO[@]}"    )
+	local pidOfSetTrap="$1"
+	local signal="$2";              signalNorm "$signal" signal
+	local intrrupttedCmd="$3"
+	local intrrupttedLineno="$4";   [ "$4" == "1" ] && intrrupttedLineno=""
+	local intrrupttedExitCode="$5"; [[ ! "$signal" =~ ^(ERR|DEBUG)$ ]] && intrrupttedExitCode=""
+
+	local intrrupttedFuncDepth=$(( ${#BASH_SOURCE[@]}-1 ))
+
+	#bgtrace "BGTRAPEntry: $pidOfSetTrap $signal interuptedFrame:lineno=$4|$intrrupttedLineno exitCode=$5|$intrrupttedExitCode cmd=$intrrupttedCmd"
+
+	bgBASH_trapStkFrm_signal=(    "$signal"                "${bgBASH_trapStkFrm_signal[@]}"    )
+	bgBASH_trapStkFrm_lastCMD=(   "$intrrupttedCmd"        "${bgBASH_trapStkFrm_lastCMD[@]}"   )
+	bgBASH_trapStkFrm_LINENO=(    "$intrrupttedLineno"     "${bgBASH_trapStkFrm_LINENO[@]}"    )
+	bgBASH_trapStkFrm_exitCode=(  "$intrrupttedExitCode"   "${bgBASH_trapStkFrm_exitCode[@]}"  )
+	bgBASH_trapStkFrm_funcDepth=( "$intrrupttedFuncDepth"  "${bgBASH_trapStkFrm_funcDepth[@]}" )
 }
 
 function BGTRAPExit()
 {
-	bgBASH_trapStkFrm_signal=(    "${bgBASH_trapStkFrm_signal[@]:1}"    )
 	bgBASH_trapStkFrm_funcDepth=( "${bgBASH_trapStkFrm_funcDepth[@]:1}" )
+	bgBASH_trapStkFrm_lastSignal="$bgBASH_trapStkFrm_signal"
+	bgBASH_trapStkFrm_signal=(    "${bgBASH_trapStkFrm_signal[@]:1}"    )
 	bgBASH_trapStkFrm_lastCMD=(   "${bgBASH_trapStkFrm_lastCMD[@]:1}"   )
 	bgBASH_trapStkFrm_LINENO=(    "${bgBASH_trapStkFrm_LINENO[@]:1}"    )
+	bgBASH_trapStkFrm_exitCode=(  "${bgBASH_trapStkFrm_exitCode[@]:1}"  )
 }
 
 
@@ -2120,8 +2131,8 @@ function bgtrap()
 		# the signal but trap -p shows the parent's handler even from a child subshell).
 		# Second, it allows the debugger to detect when the DEBUG trap gets called at the start of a trap
 		# handler.
-		local trapHeader="BGTRAPEntry $BASHPID $signal \"\$BASH_COMMAND\" \"\$LINENO\""
-		local trapFooter="BGTRAPExit $BASHPID $signal"
+		local trapHeader='BGTRAPEntry '"$BASHPID"' '"$signal"' "$BASH_COMMAND" "$LINENO" "$?"'
+		local trapFooter='BGTRAPExit '"$BASHPID"' '"$signal"''
 
 
 		# get the previousScriptPID from the header.
@@ -2323,6 +2334,8 @@ function bgtrap()
 				fi
 				;;
 		esac
+
+		[ "$signal" == "ERR" ] && bgtrap_lastErrHandler="${newScript:-$previousScript}"
 	done
 	return $result
 }
@@ -2898,7 +2911,7 @@ function Try()
 	local tryStateTryStatementLocation; local -A stackFrame=(); bgStackGetFrame "$funcDepthOffset" stackFrame; tryStateTryStatementLocation="${stackFrame[srcLocation]}"
 	local tryStateIFS="$IFS"
 	local tryStateExtdebug="$(shopt -p extdebug)"
-	local debugTrapScript='
+	local debugTrapScript='bgBASH_debugTrapLINENO=$((LINENO))
 		#bgtrace "$FUNCNAME | $BASH_COMMAND"
 		if (( ${#BASH_SOURCE[@]} < '"$tryStateFuncDepth"' )); then
 			IFS='$' \t\n'' # no need to save because we will restore the tryStateIFS copy when we return to user code
@@ -2914,7 +2927,7 @@ function Try()
 			IFS='$' \t\n'' # no need to save because we will restore the tryStateIFS copy when we return to user code
 			bgTrapStack pop DEBUG
 
-			unset bgBASH_debugTrapLINENO bgBASH_prevTrap
+			unset bgBASH_debugTrapLINENO
 			IFS="'"$tryStateIFS"'" # return IFS to the value it had at the try statement
 			'"$tryStateExtdebug"'  # return the extdebug shopt to the value it had in at the try statement
 			bgBASH_tryStackWasThrown[0]="1" # the Catch function will check this to know the context its being called in
@@ -3087,6 +3100,7 @@ function assertDefaultFormatter()
 			[ ${_ae_exitCodeLast:-0} -gt 0 ] && _ae_contextVars+=("exitCode:$_ae_exitCodeLast")
 
 			# glean the variables used in the source line and add them to the _ae_contextVars context
+			# see extractVariableRefsFromSrc() function which does simlar but does not yet identify >$assertOut separately
 			local varExtract="$_ae_msg"
 			local count=0
 			while [[ "$varExtract" =~ '>'[[:space:]]*[$]([^;|&[:space:]]*)|[$][{]?([]@*[a-zA-Z0-9_]*)[}]? ]] && ((count++ <15)); do
@@ -3134,6 +3148,55 @@ function assertDefaultFormatter()
 			}
 		' <<< "$_ae_msg")"
 	fi
+}
+
+# usage: extractVariableRefsFromSrc <srcCode> [<retVar>]
+# This is used by error and debug context code to get a list of context variables from the source code. srcCode could be a single
+# line or multiple lines.
+# 2020-11 the algorithm was copied and modified from a similar one in assertDefaultFormatter but assertDefaultFormatter does not
+#         yet use this function becuase it is also concerned with identifying uniquely variables that are used to redirect output
+#         like cmd >$assertOut and it will take a bit of work to make this generic enough to proved that separately
+function extractVariableRefsFromSrc()
+{
+	local srcCode="$1"
+
+	# this is the term that assertDefaultFormatter would need if it is changed to use this function
+	local reRedirectToVar='>[[:space:]]*[$]([^;|&[:space:]]*)'
+
+	# build the re out of components to make it easier to understand
+	local reVarWithBr='[$][{][!#]?([a-zA-Z0-9_]+)'
+	local reVarWithBrWIdx='[$][{][!#]?([a-zA-Z0-9_]+[[][^]]+[]])'
+	local reVarWOBr='[$]([a-zA-Z0-9_]+)'
+
+	# limit the while loop in case a bug makes it infinite
+	local count=0
+
+	local -A varNames=()
+
+	local srcLine; while IFS="" read -r srcLine; do
+		while [[ "$srcLine" =~ ${reVarWithBr}|${reVarWOBr}|${reVarWithBrWIdx} ]] && ((count++ <150)); do
+
+			local rematch=("${BASH_REMATCH[@]}")
+			srcLine="${srcLine#*"${rematch[0]}"}"
+
+			# reVarWithBrWIdx matches might have additional matches inside them like foo[$bar]. We can just push it bash on the front
+			# because the ${} has been removed so it wont match the primary again
+			[ "${rematch[3]}" ] && srcLine="${rematch[3]} $srcLine"
+
+			# varName can be match by any of the expressions but it ends up in a different rematch locations. There should be exactly
+			# 1 non empty element besides [0] and that match can not include whitespace so this assignment works
+			rematch[0]=""
+			local varName=(${rematch[*]})
+
+			# older bashes had a problem with array index that contain [...]
+			local varNameIndex="${varName//'['/%5B}" #'
+			varNameIndex="${varNameIndex//']'/%5D}" #'
+
+			varNames[$varNameIndex]="$varName"
+		done
+	done <<< $srcCode
+
+	varSetRef --array "$2" "${varNames[@]}"
 }
 
 

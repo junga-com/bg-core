@@ -253,7 +253,7 @@ function import()
 		L1='_importSetErrorCode'
 		L2="_importNOOPWithExitCodePasstrough"
 	else
-		assertError -v bgLibPath "bash library not found by in any system path. Default system path is '/usr/lib'"
+		assertError -v bgLibPath -v scriptName "bash library not found by in any system path. Default system path is '/usr/lib'"
 	fi
 }
 

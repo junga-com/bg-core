@@ -77,7 +77,7 @@ set +o errtrace # extdebug turns this on but unit tests need it off
 #    bgStackSrcLineNo[$frameNo]   : the line number in the bgStackSrcFile
 #    bgStackSrcLocation[$frameNo] : the baseFilename:(line number) together. Note the the path is removed
 #    bgStackSimpleCmd[$frameNo]   : the simple command being exectuted or an approximation
-#                                   for the first logical stack frame during a trap, this is exact b/c bash provides it.
+#                                   for the first logical stack frame, this is exact b/c bash provides it.
 #                                   for higher frames, the simple cmd must be a bash function and the function name
 #                                   is always available but the arguments are only available with shopt -s extdebug
 #    bgStackSrcCode[$frameNo]     : if the --noSrcLookup option is specified, this will be the source code line found at
@@ -172,9 +172,9 @@ function bgStackMakeLogical()
 		# its done, so increment bgStackSize to reflect the new entry
 		((bgStackSize++))
 
-		# we call this when every we know we are on a trap handler transition. It sets the type of the frame we just added but also
-		# sets the type of any unclaimed frames below it. E.G. when we cross the DEBUG trap border, it claims everything up to that
-		# point as part of the DEBUG trap. Then later if we call it for a user trap, then it will claim anything between the DEBUG
+		# cmd==lastFrameOfType:<SIG> is specified when ever we know we are on a trap handler transition. It sets the type of the
+		# frame we just added but also sets the type of any unclaimed frames below it. E.G. when we cross the DEBUG trap border,
+		# it claims everything up to that point as part of the DEBUG trap. Then later if we call it for a user trap, then it will claim anything between the DEBUG
 		# border and that trap's border
 		if [[ "$cmd" =~ ^lastFrameOfType:(.*)$ ]]; then
 			local typeName="${BASH_REMATCH[1]:-UNK_TRAP}"
@@ -182,6 +182,7 @@ function bgStackMakeLogical()
 				[ ! "${bgStackFrameType[$j]}" ] && bgStackFrameType[$j]="$typeName"
 			done
 		fi
+
 	}
 
 	# internal function to construct the simple command from FUNCNAME, BASH_ARGV, and BASH_ARGC
@@ -262,6 +263,10 @@ function bgStackMakeLogical()
 		done
 	fi
 
+	# this indicates when we are in a trap handler other than a DEBUG handler. It is used by the debugger to optionally step over
+	# traps. bg_untiTest.sh uses this feature to not step through ERR and EXIT traps that maintain the testcase run
+	bgStackInUserTrap=""
+
 	# iterate over the bash stack array (BASH_SOURCE, et all) and insert frames into our arrays (bgStack*)
 	local i frmSrcFile frmFunc frmSrcLineNo frmSimpleCmd frmSrcLineText
 	for ((i=0; i<${#BASH_SOURCE[@]}; i++)); do
@@ -271,12 +276,43 @@ function bgStackMakeLogical()
 		local frmSrcFile="" frmFunc="" frmSrcLineNo="" frmSimpleCmd="" frmSrcLineText=""
 
 		# make a summary line of the bash stack vars to aid in debugging this algorithm
-		local bashStkFrmSummary; printf -v bashStkFrmSummary "[%2s]%-20s : %4s : %s" "$i" "${BASH_SOURCE[$i]##*/}" "${BASH_LINENO[$i]}" "${FUNCNAME[$i]}"
+		local bashStkFrmSummary; printf -v bashStkFrmSummary "[%2s]%4s src:%s func:%s" "$i" "${BASH_LINENO[$i]}" "${BASH_SOURCE[$i]##*/}" "${FUNCNAME[$i]}"
 
-		# if one of our trap handlers managed by bgtrap is hinting us that they are active, use that instead of the frame dicontinuity algorithm
-		# NOTE that a DEBUG trap can interrupt another trap so we could have  2 interupts on the stack with 2 dicontinuities in the BASH  function stack
-		local detectedTrapFrame=""; ((i == (${#BASH_SOURCE[@]} - bgBASH_trapStkFrm_funcDepth) )) && detectedTrapFrame="$bgBASH_trapStkFrm_signal"
 
+		### determine if this frame was interupted by a trap handler. This block relies on the BGTRAPEntry/BGTRAPExit calls that
+		#   bgtrap puts in the handlers
+		local detectedTrapFrame=()
+
+		# if we are in the range where BGTRAPEntry/BGTRAPExit has info pushed on the trapStk...
+#		for j in "${!bgBASH_trapStkFrm_funcDepth[@]}"; do
+		for ((j=0; j<${#bgBASH_trapStkFrm_funcDepth[@]}; j++)); do
+			if ((i == (${#BASH_SOURCE[@]} - bgBASH_trapStkFrm_funcDepth[$j]) )); then
+				#detectedTrapFrame="${bgBASH_trapStkFrm_signal[$j]:-$bgBASH_trapStkFrm_lastSignal}"
+				detectedTrapFrame+=("$j")
+			fi
+		done
+
+		# if the handler is in a call to BGTRAPEntry/BGTRAPExit, but outside the range where info is pushed on the trapStk
+		if ((i>0)) && [ ! "$detectedTrapFrame" ] && [ "${FUNCNAME[i-1]}" == "BGTRAPEntry" ]; then
+			local n argcOffset=0; for ((n=0; n<i-1; n++)); do ((argcOffset+=${BASH_ARGC[$n]:-0})); done
+			detectedTrapFrame+=("${BASH_ARGV[argcOffset+3]}")
+		elif ((i>0)) && [ ! "$detectedTrapFrame" ] && [ "${FUNCNAME[i-1]}" == "BGTRAPExit" ]; then
+			detectedTrapFrame+=("$bgBASH_trapStkFrm_lastSignal")
+		fi
+
+		# if this is the debugger transition frame and the interrupted lineno is 1 its almost certain that the debugger interrupted
+		# the first line of a TRAP (other than ERR b/c it preserves the interupted LINENO like DEBUG does). We should probably
+		# add code to rule out this being a sourced file with code on line 1
+		if ((i>0 && (frameIdxOfDEBUGTrap==i) && (bgBASH_debugTrapLINENO==1) )); then
+			detectedTrapFrame+=("UNKTRAP")
+		fi
+
+
+		# OBSOLETE? Now that we alias trap to bgtrap, typical trap handlers will start with BGTRAPEntry and the above code works
+		#           much better than this detection code. This code relies on examining the source to see if the frame matches but
+		#           that is problematic -- notably code that executes a cmd inside a variable like $utFunc ...
+		#           ERR traps have LINENO set to the interrupted LINENO (like DEBUG)
+		#           non-ERR/DEBUG traps have LINENO set to 1 which is unlikely not to be a trap and handled above now
 		# detect if this frame is the start of a TrapHandler.
 		# NOTE: BASH does not record something like a FUNCNAME entry when a signal trap handler starts executing.
 		# The trap handlers that bgtrap and debugger and Try:/Catch: manage gives us the required hints when they are executing.
@@ -303,8 +339,7 @@ function bgStackMakeLogical()
 			# if the src line invokes the referenceText in a variable (like $utFunc ...) then it wont match. We could try to deref
 			# but that var might not be in scope at the point we are running and its probably good enough to assume that its not a trap
 			# if the source does not start the line with $cmd (like [ "$cmd" ] && $cmd) this will be a false positive. We could make a better REGEX but I dont want to do that now.
-			if [[ ! "$frmSrcLineText" =~ $referenceText ]] && [[ ! "$frmSrcLineText" =~ ^[[:space:]]*\"?[$] ]]; then
-				bgtraceVars -1 -l"bgStackMakeLogical:DETECTED INTR Frame " frmSrcLineText referenceText
+			if [[ ! "$frmSrcLineText" = *${referenceText}* ]] && [[ ! "$frmSrcLineText" =~ ^[[:space:]]*\"?[$] ]]; then
 				local sigCandidates="" sigCandidatesCount=0 sigTest
 				for sigTest in "${!trapHandlers[@]}"; do
 					if [[ "${trapHandlersByLineNo[$sigTest:$frmSrcLineNo]}" =~ $referenceText ]]; then
@@ -315,7 +350,8 @@ function bgStackMakeLogical()
 						sigCandidates[$((sigCandidatesCount++))]="${BASH_REMATCH[2]}"
 					fi
 				done
-				detectedTrapFrame="${sigCandidates[*]}"
+				detectedTrapFrame+=("${sigCandidates[*]}")
+				bgtraceVars -1 -l"bgStackMakeLogical:DETECTED INTR Frame " detectedTrapFrame frmSrcLineText referenceText
 
 				# if we did not end up finding trap code, reset frmSrcLineNo before we move on
 				[ "$detectedTrapFrame" ] || frmSrcLineNo=""
@@ -350,7 +386,7 @@ function bgStackMakeLogical()
 		if ((i == frameIdxOfDEBUGTrap)) && [ ! "$detectedTrapFrame" ]; then
 			# synthesize a frame to represent the DEBUG handler script
 			_makeDEBUGTrapFrame
-			_pushLogicalStackEntry DBG1 \
+			_pushLogicalStackEntry T1_DBG \
 				"$frmSrcFile" \
 				"$frmFunc" \
 				"$frmSrcLineNo" \
@@ -361,7 +397,7 @@ function bgStackMakeLogical()
 			bgStackLogicalFramesStart=$((bgStackSize))
 
 			# now add the logical frame for the line of code that the debugger is stopped on.
-			_pushLogicalStackEntry DBG2 \
+			_pushLogicalStackEntry T1_SCR \
 				"${BASH_SOURCE[$i]}" \
 				"${FUNCNAME[$i]}" \
 				"${bgBASH_debugTrapLINENO}" \
@@ -377,9 +413,11 @@ function bgStackMakeLogical()
 		# BASH[$i-1] is the first function of the DEBUG trap that led to this code running.
 		# bgBASH_debugTrapLINENO is LINENO at the moment DEBUG trap started and refers to the lineNo in the UserTrap handler that is running
 		if ((i == frameIdxOfDEBUGTrap)) && [ "$detectedTrapFrame" ]; then
+			bgStackInUserTrap="1"
+
 			# synthesize a frame to represent the DEBUG handler script
 			_makeDEBUGTrapFrame
-			_pushLogicalStackEntry CMB1 \
+			_pushLogicalStackEntry T3_DBG \
 				"$frmSrcFile" \
 				"$frmFunc" \
 				"$frmSrcLineNo" \
@@ -389,51 +427,97 @@ function bgStackMakeLogical()
 			# record that this is the real logical start because in the debugger, this is where execution is stopped
 			bgStackLogicalFramesStart=$((bgStackSize))
 
-			# now add the logical frame for the line of code that the debugger is stopped on
-			# which is a line in the UserTrap handler script.
-			_pushLogicalStackEntry CMB2 \
-				"<TRAP:$detectedTrapFrame>" \
-				"${detectedTrapFrame// /,}Trap" \
-				"${bgBASH_debugTrapLINENO}" \
-				"${BASH_COMMAND}" \
-				"lastFrameOfType:${detectedTrapFrame/ */,...}"
+			# now add the logical frame for the line of code that the debugger is stopped on which is a line in the UserTrap handler script.
+			local detSig detLineno detLastCmd
+			local j="${detectedTrapFrame[@]:0:1}";  detectedTrapFrame=("${detectedTrapFrame[@]:1}")
+			if [[ "$j" =~ ^[0-9]+$ ]]; then
+				detSig="${bgBASH_trapStkFrm_signal[j]}"
+				detLineno="${bgBASH_trapStkFrm_LINENO[j]}"
+				detLastCmd="${bgBASH_trapStkFrm_lastCMD[j]}"
+			else
+				detSig="$j"
+				detLineno=""
+				detLastCmd=""
+			fi
+
+			local modLineNo="$bgBASH_debugTrapLINENO"; [ "${detSig}" == "ERR" ] && modLineNo=$(( modLineNo - ${detLineno:-0} +1 ))
+			local cmb2Cmd="${BASH_COMMAND}"; ((bgBASH_debugTrapLINENO==1)) && cmb2Cmd="<UNK>"
+			_pushLogicalStackEntry T3_TRP \
+				"<handler>" \
+				"${detSig} handler" \
+				"${modLineNo}" \
+				"${cmb2Cmd}" \
+				"lastFrameOfType:${detSig}"
+
+			# if there are more than one trap, we dont know much about the others, except that the intrupted cmds should be valid
+			local z; for ((z=0; z<${#detectedTrapFrame[@]}; z++)); do
+				j=${detectedTrapFrame[z]}
+				local thisCmd="$detLastCmd"
+				if [[ "$j" =~ ^[0-9]+$ ]]; then
+					detSig="${bgBASH_trapStkFrm_signal[j]}"
+					detLineno="${bgBASH_trapStkFrm_LINENO[j]}"
+					detLastCmd="${bgBASH_trapStkFrm_lastCMD[j]}"
+				else
+					detSig="$j"
+					detLineno=""
+					detLastCmd=""
+				fi
+				_pushLogicalStackEntry T3_TRPn \
+					"<handler>" \
+					"${detSig} handler" \
+					"UNK" \
+					"${thisCmd}" \
+					"lastFrameOfType:${detSig}"
+			done
 
 			# now add the logical frame for the line of code that UserTrap interrupted. This is the first proper script line.
 			bgStackGetFunctionLocation "${FUNCNAME[$i]}" frmSrcFile frmSrcLineNo
-			_pushLogicalStackEntry CMB2 \
+			_pushLogicalStackEntry T3_SCR \
 				"${BASH_SOURCE[$i]}" \
 				"${FUNCNAME[$i]}" \
-				"${frmSrcLineNo:-0}" \
-				"${bgBASH_trapStkFrm_lastCMD:-<${FUNCNAME[$i]}() interupted by ${detectedTrapFrame// /,}>}"
+				"${detLineno:-UNK}" \
+				"${detLastCmd:-<${FUNCNAME[$i]}() interupted by ${detectedTrapFrame}>}"
 
 			doDefaultBlock=""
 		fi
 
 
 		# Non-adjacent Frame -- UserTrap transistion to a normal function that it interuptted.
-		# At UserTrap handler which is calling at least one function (b/c we are not alos at the DEBUGTrap frame)
+		# A UserTrap handler which is calling at least one function (b/c we are not also at the DEBUGTrap frame)
 		if ((i != frameIdxOfDEBUGTrap)) && [ "$detectedTrapFrame" ]; then
-			# synthesize a frame to represent the handler script
-			_constructSimpleCommandFromBashStack "$((i-1))" frmSimpleCmd
-			_pushLogicalStackEntry UTR1 \
-				"<TRAP:$detectedTrapFrame>" \
-				"${detectedTrapFrame// /,}Trap" \
-				"${BASH_LINENO[$i-1]}" \
-				"$frmSimpleCmd" \
-				"lastFrameOfType:${detectedTrapFrame/ */,...}"
+			bgStackInUserTrap="1"
 
-			# now add the logical frame for the line of code that the UserTrap interupted
-			# UserTraps always have LINENO set to 1 (not the interrupted value as with DEBUGTrap) so we can not know what line in the
-			# function we interrupted.
-			# Note that our BGTRAPEntry records the value of BASH_COMMAND when its entered which is the last command executed in
-			# the interupted function represented by this frame. We can use that to detect the line number
-			bgStackGetFunctionLocation "${FUNCNAME[$i]}" frmSrcFile frmSrcLineNo
-			# TODO: use bgBASH_trapStkFrm_lastCMD to calculate frmSrcLineNo
-			_pushLogicalStackEntry UTR2 \
+			# synthesize a frame to represent the handler script
+			local detSig detLineno detLastCmd
+			local j="${detectedTrapFrame[@]:0:1}";  detectedTrapFrame=("${detectedTrapFrame[@]:1}")
+			if [[ "$j" =~ ^[0-9]+$ ]]; then
+				detSig="${bgBASH_trapStkFrm_signal[j]}"
+				detLineno="${bgBASH_trapStkFrm_LINENO[j]}"
+				detLastCmd="${bgBASH_trapStkFrm_lastCMD[j]}"
+			else
+				detSig="$j"
+				detLineno=""
+				detLastCmd=""
+			fi
+			_constructSimpleCommandFromBashStack "$((i-1))" frmSimpleCmd
+			local modLineNo="${BASH_LINENO[i-1]}"; [ "${detSig}" == "ERR" ] && modLineNo=$(( modLineNo - ${detLineno:-0} +1 ))
+			_pushLogicalStackEntry T2_TRP \
+				"<handler>" \
+				"${detSig} handler" \
+				"$modLineNo" \
+				"$frmSimpleCmd" \
+				"lastFrameOfType:${detSig}"
+
+			# Note that our BGTRAPEntry records the information about the interupted src line in bgBASH_trapStkFrm_* variables.
+			# but that data might not exist. We could be at the start or end of a trap handler outside the BGTRAPEntry/BGTRAPExit
+			# or we could be in a non-ERR/DEBUG trap that does not have access to the interupted LINENO
+			# TODO: use detLastCmd to calculate detLineno when detLineno==UNK
+			_pushLogicalStackEntry T2_SCR2 \
 				"${BASH_SOURCE[$i]}" \
 				"${FUNCNAME[$i]}" \
-				"${frmSrcLineNo:-${bgBASH_trapStkFrm_LINENO:-0}}" \
-				"${bgBASH_trapStkFrm_lastCMD:-<${FUNCNAME[$i]}() interupted by ${detectedTrapFrame// /,}>}"
+				"${detLineno:-UNK}" \
+				"${detLastCmd:-<${FUNCNAME[$i]}() interupted by ${detSig}>}"
+
 
 			doDefaultBlock=""
 		fi
@@ -484,7 +568,8 @@ function bgStackMakeLogical()
 		"$simpleCommand"
 
 
-	local frameNo; for ((frameNo=0; frameNo<bgStackSize; frameNo++)); do
+	# now loop over the stack creating the composite data
+	local frameNo; for ((frameNo=bgStackSize-1; frameNo>=0; frameNo--)); do
 		local allButLast="1"; ((frameNo==bgStackSize-1)) && allButLast=""
 		printf -v bgStackLine[$frameNo] "%-*s : %s" \
 				"$((bgStackSrcLocationMaxLen+1))" "${bgStackSrcLocation[$frameNo]}:" \
@@ -492,12 +577,13 @@ function bgStackMakeLogical()
 		printf -v bgStackLineWithSimpleCmd[$frameNo] "%-*s : %s" \
 				"$((bgStackSrcLocationMaxLen+1))" "${bgStackSrcLocation[$frameNo]}:" \
 				"${bgStackSimpleCmd[$frameNo]}"
-		# printf -v bgStackLine[$frameNo] "%-*s %-*s: %s" \
-		# 		"$((bgStackSrcLocationMaxLen+1))" "${bgStackSrcLocation[$frameNo]}:" \
-		# 		"$((bgStackFunctionMaxLen+2))"  "${bgStackFunction[$frameNo]}${allButLast:+()}" \
-		# 		"${bgStackSrcCode[$frameNo]}"
+
+		# in addition to the individual arrays, make a composite stk array that has the other attributes tokenized into a string
+		local vLine=""
+		printf -v vLine "%s\b"  "${bgStackFrameType[$frameNo]:-SCRIPT}" "${bgStackSrcFile[$frameNo]}" "${bgStackSrcLineNo[$frameNo]}" "${bgStackSrcLocation[$frameNo]}" "${bgStackSimpleCmd[$frameNo]}" "${bgStackFunction[$frameNo]}"
+		stringToBashToken vLine
+		bgStack+=("${vLine//$'\b'/ }")
 	done
-	#bgStackDump >> $_bgtraceFile
 }
 
 # usage: bgStackPrint
@@ -541,6 +627,8 @@ function bgStackPrint()
 }
 
 
+# OBSOLETE? bgStackMakeLogical now produces bgStack which is similar but does not include some duplicate formatted vars
+#           in any case, even if we want a more complete version it should be made there and not here.
 # usage: bgStackGet <retStack>
 # create a stack trace of the current execution state and return it in an array where each array element is a tokenized string
 # of stack frame attributes
@@ -658,12 +746,13 @@ function bgStackPrintFrame()
 # The typical way to use it is to uncomment the line in assertError that calls it
 function bgStackDump()
 {
-	local argIdx=0
-	printf "%4s %-25s %14s %-25s %s %s\n" "frm#" "FUNCNAME#=$((${#FUNCNAME[@]}-1))"  "BASH_LINENO#=$((${#BASH_LINENO[@]}-1))"  "BASH_SOURCE#=$((${#BASH_SOURCE[@]}-1))"   "BASH_ARGC#=$((${#BASH_ARGC[@]}-1))" "BASH_ARGC#=$((${#BASH_ARGV[@]}))"
-	local frameNo; for frameNo in "${!FUNCNAME[@]}"; do
-		local argList="" j; for ((j=0; j<${BASH_ARGC[$frameNo]}; j++)); do  argList+=" '${BASH_ARGV[$((argIdx++))]}'"; done
+	printf "%4s %-25s %14s %-25s %s %s\n" "frm#" "FUNCNAME#=$((${#FUNCNAME[@]}-1))"  "BASH_LINENO#=$((${#BASH_LINENO[@]}-1))"  "BASH_SOURCE#=$((${#BASH_SOURCE[@]}-1))"   "BASH_ARGC#=$((${#BASH_ARGC[@]}-1))" "BASH_ARGV#=$((${#BASH_ARGV[@]}))"
+	#local frameNo; for frameNo in "${!FUNCNAME[@]}"; do
+	local frameNo; for ((frameNo=${#FUNCNAME[@]}-1; frameNo>=0; frameNo--)); do
+		local n argcOffset=0; for ((n=0; n<frameNo; n++)); do ((argcOffset+=${BASH_ARGC[$n]:-0})); done
+		local argList="" j; for ((j=0; j<${BASH_ARGC[$frameNo]}; j++)); do  argList+=" '${BASH_ARGV[$((argcOffset++))]}'"; done
 		((frameNo>0)) && printf "%4s %-25s %14s %-25s %2s %s\n" "$((frameNo-1))" "${FUNCNAME[$frameNo]}" "${BASH_LINENO[$frameNo]}" "${BASH_SOURCE[$frameNo]##*/}" "${BASH_ARGC[$frameNo]}" "$argList"
 	done
-	printfVars bgBASH_funcDepthDEBUG bgBASH_debugTrapLINENO
-	printfVars ${!bgBASH_trapStkFrm_*}
+#	printfVars bgBASH_funcDepthDEBUG bgBASH_debugTrapLINENO
+#	printfVars ${!bgBASH_trapStkFrm_*}
 }

@@ -1,13 +1,47 @@
 #!/bin/bash
 
 
-# CSI is a notation to refer to ansi escape sequences for terminals
+# Library
+# CSI refers to a standard for escape sequences for terminals. A terminal is something that can be on the other end of a file
+# descriptor. You can open a terminal for reading from the keyboard (and special query like cursor position) or writing charcaters
+# to the terminal's screen display.
+#
+# If a script is ran from a desktop from within a GUI terminal emulator (e.g. gnome_terminal) or from one of the fixed tty (e.g.
+# cntr-alt-[345...]) its stdin(0), stdout(1) and stderr(2) will be set to the tty device by default.
+#
+# When the output of a command goes to a FD that is a terminal, you can send it escape sequences which are out-of-band messages
+# that instruct the terminal to change its internal state which affects how the in-band data is rendered. Most notable are cursor
+# commands that allow drawing at a specific location and font commands that change the color of the text.
+#
+# This library defines a bunch of bash string variables that make it easier to use the escape sequences. To send CSI commands to a
+# terminal you can use echo with the -e option or printf in the format string. printf is the prefered way b/c it separates
+# presentaion and data. CSI sequences in the format string are sent to the terminal but in the data arguments they are not.
+# The typical way to use it is..
+#      printf "Hello ${CSI}${cBlue}%s${CSI}${cNorm}"  "$USER"
+# ${CSI} starts an escape sequence. It is folled by 0,1, or 2 parameters and then the c* code which is a specific command.
+# A long sequence of CSI cmds can be crafted and sent in one printf call which makes it possible that they will be acted on in one
+# atomic operation.
+#
+# The string constants that begin with csi* include the ${CSI} start sequence so they can be used on their own. The ones that start
+# with only a c* do not include the start sequence so they need to be used in a sequence starting wiht ${CSI}. most cmds have both
+# versions so that they can be used simply on their own or be combined with other cmds. Multiple c* commands can follow a single
+# ${CSI}
+#
+# This library also includes some functions starting with cui* that perform some operation on the terminal using escape codes.
+#
+# The history of escape codes is complicated and there are multiple tools for using them. tput is an alternative. At one point, the
+# major issue was that many terminal types existed and a tool like tput had to detect the terminal type and set the correct codes
+# for that terminal. There is now a pretty universal subset of codes.
+#
+# This library also contains some function unrelated to terminals that interact with the user in various way. confirm will prmpt
+# the user for a binary choice and exit true or false. GetUser* are functions that get the user's prefered application for various
+# functions.
+#
+# See Also:
+# see https://wiki.bash-hackers.org/scripting/terminalcodes
 # see http://en.wikipedia.org/wiki/ANSI_escape_code
 # see http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
-# The advantage of using these CSI escape strings instead of tput is that you can create one
-# big printf call that does a lot of stuf and leave the cursor back in the right place. Because it is
-# all in one API call there is a better chance that it will be atomic. Its best to serialize access
-# to the terminal, but since all parties have to cooperate on obtaining the lock, its not always possible
+
 
 # usage: cuiSetTitle <title>
 function cuiSetTitle()
@@ -20,23 +54,39 @@ function cuiSetTitle()
 # If stdin is not a tty, returns 1 and sets the values to 999999. The assumption is that the caller is getting the dimensions to
 # clip or wrap the output so if there is no terminal. the dimensions should be large so that outp is not clipped nor wrapped.
 # if that is not the case, the caller can check the return value
+# Options:
+#    --tty=<tty>  : instead of using the tty identified by stdin, use this one
+#    -q) quiet. if there is no tty, return -1,-1 instead of asserting an error
 function CSIgetScreenDimension() { cuiGetScreenDimension "$@"; }
 function cuiGetTerminalDimension() { cuiGetScreenDimension "$@"; }
 function cuiGetScreenDimension()
 {
-	if cuiHasControllingTerminal; then
-		local scrapVar; read -r "${1:-scrapVar}" "${2:-scrapVar}" < <(stty size)
-		return 0
-	else
-		setReturnValue "$1" "999999"
-		setReturnValue "$2" "999999"
-		return 1
+	local tty quietFlag
+	while [ $# -gt 0 ]; do case $1 in
+		--tty) bgOptionGetOpt val: tty "$@" && shift ;;
+		-q) quietFlag="-q" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	# if not passed in, get the tty of this subshell which should be what stdin points to if its a tty
+	if [ ! "$tty" ]; then
+		tty="$(tty)"
+		if [ ! -e "$tty" ]; then
+			[ ! "$quietFlag" ] && assertError "could not find a tty to get the cursor position of"
+			setReturnValue "$1" "999999"
+			setReturnValue "$2" "999999"
+			return 1
+		fi
 	fi
+
+	local scrapVar
+	read -r "${1:-scrapVar}" "${2:-scrapVar}" < <(stty size <$tty)
+	return 0
 }
 
 
 
-# usage: cuiGetCursor <cLineNumVar> <cColumnNumVar> [< <tty>]
+# usage: cuiGetCursor [--tty=<tty>|/dev/pts/%3A] <cLineNumVar> <cColumnNumVar> [< <tty>]
 # fills in the cLineNum and cColumnNum variable names passed in with the current cursor position
 # of the tty connected to stdin. If stdin is not a tty, it sets <cLineNumVar> <cColumnNumVar> to -1
 # and sets the exit code to 1.
@@ -48,31 +98,49 @@ function cuiGetScreenDimension()
 #    <cColumnNumVar>  : the column (horizontal) cursor position starting with 1 (left edge is 1)
 #    < <tty> (stdin)  : to get the cursor position of a specific tty, redirect the input of this
 #                       function to that tty. Note that the stdout is ignored and not used.
+# Options:
+#    --tty=<tty>  : instead of using the tty identified by stdin, use this one
+#    -q) quiet. if there is no tty, return -1,-1 instead of asserting an error
+#    --preserveRematch) take a little longer to execute in order not to clobble BASH_REMATCH
 function CSIgetCursor() { cuiGetCursor "$@"; }
 function cuiGetCursor()
 {
-	local preserveRematch; [ "$1" == "--preserveRematch" ] && { preserveRematch="--preserveRematch"; shift; }
+	local tty quietFlag preserveRematch
+	while [ $# -gt 0 ]; do case $1 in
+		--preserveRematch) preserveRematch="--preserveRematch" ;;
+		--tty) bgOptionGetOpt val: tty "$@" && shift ;;
+		-q) quietFlag="-q" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local _lineValue="-1"
 	local _colValue="-1"
-	local result="1"
-	if [ -t 0 ]; then
-		local buf; IFS= read -sr -dR -p $'\e[6n' buf
-		#echo "$count: '$buf'" | cat -v >> $_bgtraceFile
-		if [ "$preserveRematch" ]; then
-			read -r _lineValue _colValue < <(
-				[[ "$buf" =~ $'\e['([0-9]*)\;([0-9]*)$ ]] || assertError -Vbuf:"$(echo "$buf" | cat -v)" "failed to read cursor position from the terminal"
-				echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
-			)
-		else
-			[[ "$buf" =~ $'\e['([0-9]*)\;([0-9]*)$ ]] || assertError -Vbuf:"$(echo "$buf" | cat -v)" "failed to read cursor position from the terminal"
-			_lineValue="${BASH_REMATCH[1]}"
-			_colValue="${BASH_REMATCH[2]}"
+
+	# if not passed in, get the tty of this subshell which should be what stdin points to if its a tty
+	if [ ! "$tty" ]; then
+		tty="$(tty)"
+		if [ ! -e "$tty" ]; then
+			[ ! "$quietFlag" ] && assertError "could not find a tty to get the cursor position of"
+			setReturnValue "$1" "$_lineValue"
+			setReturnValue "$2" "$_colValue"
+			return 1
 		fi
-		result=0
+	fi
+
+	# read seems to write the prompt to stderr. redirect 0,1,and 2 to $tty. writing with >&0 does not work b/c &0 is open for readonly
+	local buf; IFS= read -sr -dR -p $'\e[6n' buf <$tty &>$tty
+	if [ "$preserveRematch" ]; then
+		read -r _lineValue _colValue < <(
+			[[ "$buf" =~ $'\e['([0-9]*)\;([0-9]*)$ ]] || assertError -Vbuf:"$(echo "$buf" | cat -v)" "failed to read cursor position from the terminal"
+			echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]}"
+		)
+	else
+		[[ "$buf" =~ $'\e['([0-9]*)\;([0-9]*)$ ]] || assertError -Vbuf:"$(echo "$buf" | cat -v)" "failed to read cursor position from the terminal"
+		_lineValue="${BASH_REMATCH[1]}"
+		_colValue="${BASH_REMATCH[2]}"
 	fi
 	setReturnValue "$1" "$_lineValue"
 	setReturnValue "$2" "$_colValue"
-	return ${result:-0}
+	return 0
 }
 
 # usage: cuiSetScrollRegion <lineStartNum> <lineEndNum>
