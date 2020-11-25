@@ -21,8 +21,74 @@
 #     varToggleRef: ref version of toggle the value of a variable between two constants
 
 
-#######################################################################################################################################
-### From bg_libVar.sh
+
+
+# usage: newHeapVar [-aAilrtux] [-t|--template=<templateStr>] <retVar> [<initData1>..<initDataN>]
+# This 'allocates' a new variable on the conceptual bash heap. Of course a bash script can not access its process's heap but these
+# bash global variables can be used similarly to heap variables because they are in scope across function calls. Techically they
+# are global variables but they have random components to their names so that they should not collide and scripts can allocate and
+# free them.
+#
+# <retVar> is set with the name of the newly created variable. The name is analoguous to a memory address or pointer value.
+# Typically, this 'pointer' to the heap variable is passed around and stored in array elements which is possible because it is a
+# simple bash string. To derefernce the variable, use `local <myVar> -n $<retVar>`
+#
+# Options:
+#    -t|--template=<templateStr>  : a string similar to that used by mktemp. It needs to have one contiguous run of X's that will be
+#                                   replaced by random chars
+#    -a   : to make <retVar> indexed arrays (if supported)
+#    -A   : to make <retVar> associative arrays (if supported)
+#    -x   : to make <retVar> export
+#    -i   : to make <retVar> have the `integer' attribute
+#    -l   : to convert the value of <retVar> to lower case on assignment
+#    -u   : to convert the value of <retVar> to upper case on assignment
+#    -r   : to make <retVar> readonly
+#    -t   : to make <retVar> have the `trace' attribute
+# Params:
+#    <retVar>    : the name of the variable that will receive the name of the new heap variable
+#    <initData1> : the initial value of the variable created. If -a or -A is specified, each bash token will be assigned to a
+#          different array element.
+function newHeapVar() {
+	local _template="heap_XXXXXXXXX" _attributes
+	while [ $# -gt 0 ]; do case $1 in
+		-t*|--template*) bgOptionGetOpt val: _template "$@" && shift ;;
+		-A) _attributes+="A" ;;
+		-a) _attributes+="a" ;;
+		-x) _attributes+="x" ;;
+		-i) _attributes+="i" ;;
+		-l) _attributes+="l" ;;
+		-u) _attributes+="u" ;;
+		-t) _attributes+="t" ;;
+		-r) _attributes+="r" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local _retVar="$1"; shift
+
+	if [[ "$_attributes" =~ [aA] ]]; then
+		local _initialData="("
+		while [ $# -gt 0 ]; do
+			if [[ "$1" =~ ^\s*\[([^]]*)\]=(.*)$ ]]; then
+				_initialData+="['${BASH_REMATCH[1]}']='${BASH_REMATCH[2]}' "; shift
+			else
+				_initialData+="'$1' "; shift
+			fi
+		done
+		_initialData+=")"
+	else
+		local _initialData="$*"
+	fi
+
+	_template="heap_${_attributes:-S}_${_template#heap_}"
+	[[ ! "$_template" =~ X ]] && _template+="_XXXXXXXXX"
+
+	local _instanceName
+	varGenVarname --template=$_template _instanceName
+
+	declare -g$_attributes $_instanceName="$_initialData" 2>$assertOut; [ ! -s "$assertOut" ] || assertError
+	returnValue "$_instanceName" $_retVar
+}
+
+
 
 # usage: varExists <varName> [.. <varNameN>]
 # returns true(0) if all the vars listed on the cmd line exits
@@ -624,30 +690,56 @@ function varToggleRef()
 }
 
 
-
-# usage: varGenVarname <idVarName> [<length>] [<charClass>]
+# usage: varGenVarname  [-t|--template=<templateStr>] [-l|--length=<n>] [-c|--charClass=<n>] <varName>
 # Create a random id (aka name) quickly. The first character will always be 'a' so that using
 # the alnum ch class the result is valid for names that can not start with a number
 # Params:
-#    <idVarName>  : the name of the variable that the result will be returned in. if "", the result is written to stdout
-#    <length>     : default=9 : the number of characters to make the name
-#    <charClass>  : valid characters to use. default="0-9a-zA-Z". specify chars and charRanges w/o brackes like "4-6" and
-#                  char classes with one bracket like "[:xdigit:]"
+#    <varName>  : the name of the variable that the result will be returned in. if "", the result is written to stdout
+# Options:
+#    -t|--template=<templateStr>  : a string similar to that used by mktemp. It needs to have one contiguous run of X's that will be
+#                                   replaced by random chars
+#    -l|--length=<n>  : the length of the returned <varName>. Ignored if --template is provided
+#    -c|--charClass=<n>  : the characters that will be used in the <varName>. The string is the syntaxt that can be inside regex []
+#                        e.g. 'a-z' '[:xdigit:]'  'abc[:digit:]', etc...
 function genRandomIDRef() { varGenVarname "$@"; }
 function genRandomID() { varGenVarname "$@"; }
 function varGenVarname()
 {
+	local _template _length _charClass
+	while [ $# -gt 0 ]; do case $1 in
+		-t*|--template*)  bgOptionGetOpt val: _template  "$@" && shift ;;
+		-l*|--length*)    bgOptionGetOpt val: _length    "$@" && shift ;;
+		-c*|--charClass*) bgOptionGetOpt val: _charClass "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local resultVarName="$1"
-	local length="${2:-9}"
+
+	_length="${_length:-${2:-9}}"
 	# note the character classes like :alnum: are faster but alnum was sometimes returning chars that are not valid bash variable names
 	# the LC_ALL=C should fix that but not sure if it does so to be conservative, we make the default "0-9a-zA-Z"
-	local charClass="${3:-0-9a-zA-Z}"
-	local chunk rNum="a"
-	while [ ${#rNum} -lt $length ]; do
-		read -t1 -N20 chunk </dev/urandom
-		LC_ALL=C rNum="${rNum}${chunk//[^$charClass]}"
+	local _charClass="${_charClass:-${3:-0-9a-zA-Z}}"
+
+	if [ "$_template" ]; then
+		local xes="${_template//[^X]}"
+		_length=${#xes}
+	else
+		((_length--))
+	fi
+
+	declare -gA __varGenVarname_randomBuffer
+	while [ ${#__varGenVarname_randomBuffer[$_charClass]} -lt $_length ]; do
+		local chunk; read -t1 -N20 chunk </dev/urandom
+		LC_ALL=C __varGenVarname_randomBuffer[$_charClass]+="${chunk//[^$_charClass]}"
 	done
-	returnValue "${rNum:0:$length}" "$resultVarName"
+
+	local _randoValue="${__varGenVarname_randomBuffer[$_charClass]:0:$_length}"
+	__varGenVarname_randomBuffer[$_charClass]="${__varGenVarname_randomBuffer[$_charClass]:$_length}"
+
+	if [ "$_template" ]; then
+		returnValue "${_template/$xes/$_randoValue}" $resultVarName
+	else
+		returnValue "a${_randoValue}" $resultVarName
+	fi
 }
 
 

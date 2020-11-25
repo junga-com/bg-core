@@ -113,7 +113,17 @@ function bgOptionsEndLoop()
 	# The bgOptionsOnUnknown and bgOptionsOnUnknownDefault functions handle options that the caller's loop does not. If they do not
 	# recognize it, the default bahavior is to throw the unrecognized option exception. The --eatUnknown option changes that to
 	# suppress the exception and silently ignore unknown options
-	if [[ "$1" =~ ^[+-].?$ ]] || [[ "$1" =~ ^[+-][+-] ]]; then
+
+	# -- means stop option processing
+	# WARNING: this does not work b/c the options loops have been written to only set -- "${bgOptionsExpandedOpts[@]}" when "return 1"
+	#          if we change that idiom we can take advantage of this. In the meantime, each loop needs to support --) shift; break ;;
+	#          if they need it.
+	if [ "$1" == "--" ]; then
+		bgOptionsExpandedOpts=("$@:1")
+		return 0
+
+	# short and long options ... (e.g. -f or --file*)
+	elif [[ "$1" =~ ^[+-].?$ ]] || [[ "$1" =~ ^(--|\+\+) ]]; then
 		bgOptionsExpandedOpts=("$@")
 		local result=1
 		if [ "$(type -t bgOptionsOnUnknown)" == "function" ]; then
@@ -251,15 +261,15 @@ function bgOptionGetOpt()
 			;;
 		opt:) # return the option with arg into the next array position
 			# handle --long-opt=<value>
-			if [[ "$1" =~ ^[+-][+-].*= ]]; then
+			if [[ "$1" =~ ^(--|\+\+).*= ]]; then
 				arrayAdd "$_oga_varNameVar" "$1"
 				return 1
 			# handle "-o <value>"
 			elif [[ "$1" =~ ^[+-].$ ]]; then
 				arrayAdd "$_oga_varNameVar" "${1}${2}"
 				return 0
-			# handle "-long-opt <value>"
-			elif [[ "$1" =~ ^[+-][+-] ]]; then
+			# handle "--long-opt <value>"
+			elif [[ "$1" =~ ^(--|\+\+) ]]; then
 				arrayAdd "$_oga_varNameVar" "${1}=${2}"
 				return 0
 			# handle "-o<value>"
@@ -278,11 +288,16 @@ function bgOptionGetOpt()
 			;;
 		val:) # return the option arg as its value
 			# handle --long-opt=<value>
-			if [[ "$1" =~ ^[+-][+-].*= ]]; then
+			if [[ "$1" =~ ^(--|\+\+)[^=]*= ]]; then
 				returnValue "${1#${BASH_REMATCH[0]}}" "$_oga_varNameVar"
 				return 1
-			# handle "-o <value>" and "-long-opt <value>"
-			elif [[ "$1" =~ ^[+-].$ ]] || [[ "$1" =~ ^[+-][+-] ]]; then
+			# handle "-o <value>"
+			elif [[ "$1" =~ ^[+-].$ ]]; then
+				[[ "$2" =~ ^- ]] && assertError "options loop error. It seems that the option for '$1' is missing the '*'. Should it be '$1*) ...'?"
+				returnValue "$2" "$_oga_varNameVar"
+				return 0
+			# handle  "--long-opt <value>"
+			elif [[ "$1" =~ ^(--|\+\+) ]]; then
 				returnValue "$2" "$_oga_varNameVar"
 				return 0
 			# handle "-o<value>"
@@ -296,7 +311,7 @@ function bgOptionGetOpt()
 			if [[ "$1" =~ ^--.*= ]]; then
 				arrayAdd "$_oga_varNameVar" "${1#${BASH_REMATCH[0]}}"
 				return 1
-			# handle "-o <value>" and "-long-opt <value>"
+			# handle "-o <value>" and "--long-opt <value>"
 			elif [[ "$1" =~ ^-.$ ]] || [[ "$1" =~ ^-- ]]; then
 				arrayAdd "$_oga_varNameVar" "$2"
 				return 0
@@ -2701,7 +2716,7 @@ function assertError()
 	fi
 
 	# for debugging the bgStackMakeLogical function, uncomment this line to dump the raw data to the bgtrace
-	bgStackDump >>$_bgtraceFile
+	#bgStackDump >>$_bgtraceFile
 
 	# write the stack to bgtrace if active
 	# TODO: save the stack trace in assertOut and then have Catch parse and create an e[] object that includes it

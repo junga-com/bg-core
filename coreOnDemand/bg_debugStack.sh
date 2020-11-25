@@ -202,7 +202,7 @@ function bgStackMakeLogical()
 	function _makeDEBUGTrapFrame()
 	{
 		local i=$((i+1)) # since this function call added a BASH stack frame, offest i internally
-		# if the trap handler is invoking _debugEnterDebugger then we assume its our well know debugSetTrap handler
+		# if the trap handler is invoking _debugEnterDebugger then we assume its our well know _debugSetTrap handler
 		_constructSimpleCommandFromBashStack "$((i-1))" frmSimpleCmd
 		if [[ "$frmSimpleCmd" =~ _debugEnterDebugger.*DEBUG-852 ]]; then
 			import --getPath bg_debugger.sh frmSrcFile; assertNotEmpty frmSrcFile --critical
@@ -351,7 +351,7 @@ function bgStackMakeLogical()
 					fi
 				done
 				detectedTrapFrame+=("${sigCandidates[*]}")
-				bgtraceVars -1 -l"bgStackMakeLogical:DETECTED INTR Frame " detectedTrapFrame frmSrcLineText referenceText
+				debuggerIsInBreak && bgtraceVars -1 -l"bgStackMakeLogical:DETECTED INTR Frame " detectedTrapFrame frmSrcLineText referenceText
 
 				# if we did not end up finding trap code, reset frmSrcLineNo before we move on
 				[ "$detectedTrapFrame" ] || frmSrcLineNo=""

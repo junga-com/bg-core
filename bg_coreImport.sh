@@ -230,12 +230,12 @@ function import()
 			L2="_importNOOPWithExitCodePasstrough"
 		fi
 
-		# if we are reloading a lib that had already been sourced, then insert a unique row to
-		# increment the load count. Whether or not the size of the _importedLibraries associative array
-		# changes is how things know whether any libraries have been sourced since the last time they
-		# checked for functions. This is useful for bg_objects that maintains a cache of sourced functions
-		# that match the naming convention to be considered a method of a Class. this allows the method
-		# definitions to be provided by multiple library files which is typical for Class hierarchies
+		# if we are reloading a lib that had already been sourced, then inc _importedLibrariesBumpAdj
+		# the import state ID is the size of the _importedLibraries array plus _importedLibrariesBumpAdj
+		# so if either changes other code will know that potentially new code has been added.
+		# This is useful for bg_objects that maintains a cache of sourced functions that match the naming
+		# convention to be considered a method of a Class. this allows the method definitions to be provided
+		# by multiple library files which is typical for Class hierarchies
 		[ "${_importedLibraries[lib:$scriptName]}" ] && ((_importedLibrariesBumpAdj++))
 		_importedLibraries[lib:$scriptName]=$foundScriptPath
 		return 0

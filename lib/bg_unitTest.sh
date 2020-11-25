@@ -249,7 +249,7 @@ function ut()
 
 		if [ "$_utRun_debugFlag" ]; then
 			type -t debuggerOn &>/dev/null || import bg_debugger.sh ;$L1;$L2
-			debugSetTrap --logicalStart+${logicalFrameStart:-1}
+			_debugSetTrap --logicalStart+${logicalFrameStart:-1}
 		fi
 		;;
 

@@ -5,21 +5,39 @@
 # This library implements an object oriented syntax for bash scripts. It is not meant to make OO the principle for bash script
 # writing. Bash should remain a simple scripting system where plain functions and simple data variables are used for most tasks.
 #
-# This Object and class system provides a relatively efficient, light weight mechanism to organize bash code better when it is used
-# to define operations on something that is one of multiple ocurances on the server, particularly if multiple instancstans of that
-# thing are accesed in one script. In that case this OOP pattern greatly simplifies the high level organization of the code and avoids
-# repeated discovery of the target's attributes. Even though the bash functions called as methods are significantly heavier than
-# normal bash function calls, that is outweighed by a simple pattern for avoiding repeated work that may be much heavier.
+# What this system provides is a way to organize and keep track of bash arrays in a way that they can be created, passed around,
+# nested and eventually destroyed.
 #
-# A script should think about calling 10's of these object syntax method calls per user action and not 100's or thousands.
+# There is a concept of the bash heap (see man(3) newHeapVar) that makes allocating a variable number of bash variables feasable.
+# (i.e. you dont have to mange the names of these variables so that they dont collide in the global namespace). Object associative
+# arrays can be declared explicitly `local -A myobj; ConstructObject ...` or on the heap `local myobj; ConstructObject ...`
+#
+# There is the concept of an <objRef> variable which is like a pointer to an associative array. An <objRef> is a string so it can be
+# passed around to functions and stored in other arrays (things that can not be done with an array variable). There is a whole syntax
+# that is supported with an <objRef> that supports many object oriented concepts and features.
+#
+# An <objRef> and be derenced with `local -n myvar=$($myvarRef.getOID)`. The variable myvar can then be used as either an <objRef>
+# or as a plain bash associative array. Using it as an array, querying and setting elements is as efficient as any bash script.
+#
+# The strategy should be to use bash objects to organize the top level of a complex script and then use straight bash array syntax
+# to work with the data. Low level library functions that might be called many times in a script should not require the use of
+# this bash OO syntax.
+#
+# When a script needs to obtain information about some external concept like a git repo or a project folder, using bash objects
+# can make the spript more efficient by providing a way to obtain the information once and then cache it in an associative array
+# for the remainder of the script instead of each function that operates on the concept having to repeat the process of obtaining
+# the information about the concept.
+#
+# A script author should think about calling 10's of these object syntax method calls per user action and not 100's or thousands.
 #
 # The main benefit to writing a method instead of a regular bash function is that is has access to a special local variable called
-# 'this'. It behaves as if the function declares "local -A this=()" except that it keeps its data from one Method call to the next.
-# and there is a different 'this' array for object instance created.
+# 'this'. It behaves as if the function declares "local -n this=<someArray>" where the particuar <someArray> is determined by how
+# the method is invoked. The algorithm instide the method can be just as efficient as any bash function, access the this array
+# with native bash syntax.
 #
-# Many OO features are supportted.
+# Supported OO features:
 #     * static class data and methods
-#     * virtual functions
+#     * polymorphism -- virtual functions
 #     * dynamic construction
 #     * chaining virtual functions by calling $super.methodName
 #     * overriding virtual mechanism by calling a specific Class version of a function. ($myObject.ClassName::methodName)
@@ -109,16 +127,20 @@
 #     $<className>.<methodName> [<p1> ... <p2>]  eg. $Dog.howMany
 # Calling a method defined in the super class from inside a method...
 #     $super.<methodName>                        eg. $super.resize
+# From inside a method, polymorphism can be overridden for efficiency...
+#     # if jyou know that <methodName> is not virtual in your class, it can be called directly from anoter method in the class as
+#     # efficiently as any function call.
+#     <className>::<methodName> [<p1> ... <p2>]
+#
 #
 # How It Works:
-# This mechanism uses the bash associative array variable type as the object instance. Every object created, regardless of whether
-# its created in a function or at a global scope, gets the this array created in the global scope with a randomly generated name.
-# This is akin to allocating memory on a heap. The name of the array is refered to as its 'OID' (object ID) and is akin to its memory
-# address in a low level language.
+# This mechanism uses the bash associative array variable type as the object instance. That array can be explicitly named and created
+# or 'allocated' dynamically on the 'heap'. Its most common to allocate on the heap. See man(3) newHeapVar
 #
 # An object's attributes are stored in its associtive array. By convention, array entry names that start with '_' are system variables
 # maintained by the Class/Object mechanism and those that do not are logically part of the Object. Some system variables are useful
-# to the script autor, like _CLASS
+# to the script autor, like _CLASS. The script author can make system variables so that they are hidden by default as long as they
+# take care to name them uniquly so that they are not likely to collide with system member variables added in the future.
 #
 # Member functions are declared the same way as any other bash function but with a particular naming convention. By naming the
 # function with the convention <className>::<methodName>, the function will automatically be part of the <className> class and
@@ -126,35 +148,38 @@
 # Example:.
 #    function Dog::speak() { echo "woof"; }
 #
-#   Object references are normal string variables that are initialized with a syntax that is a call to _bgclassCall.
-#   Example:.
+# Object references are normal string variables that are initialized with a syntax that is a call to _bgclassCall.
+# Example object syntax call.
 #      $myPet.speak "$p1"
-#      expands to: '_bgclassCall' '<oid>' '<className>' '<hierarchyCallLevel>' '|.speak' '<valueOfP1>'
-#      myPet is a normal bash variable with the contents "_bgclassCall <oid> <className> <hierarchyCallLevel> |"
-#      where
-#         _bgclassCall is a stub function that uses the first 4 parameters passed to it and the class VMT table to setup the this
-#                      variable and call the speak method associated with the correct class
-#         <oid> is the name od the global associated array for this instance -- something like 'aQoUszTyE'
-#         <className> is the class that the reference is cast as. This is typically the most derived class but can be any of the base
-#                     classes and depends on how the object reference is initialized
-#         <hierarchyCallLevel> is an adjustment to the virtual lookup mechanism to allow refering to a more super class than <className>
-#         '|' is a separator that allows _bgclassCall to know reliably that the <hierarchyCallLevel> will not get accidentally merged
-#                     into the .<methodName> paramter. It could have been any character. It has nothing to do with piping which bash
-#                     processes before this point to separate a line into 'simple commands'
-#      The dot syntax between the object reference and the methodName is a just a visual nicety. A space could have been used just
-#      the same, but it would not have looked as much like an object reference. Any character that is not a valid in a variable name
-#      will cause bash to see '$myPet' as a variable to expand in its 'parameter expansion' stage and then execute the resulting
-#      tokens as a command (_bgclassCall) and parameters (<oid> <className> <hierarchyCallLevel> |.<methodName> <p1> <p2> ...)
-#      No space follows the | so that the 4th parameter will be merged with the | by design. When an object reference variable is
-#      passed around, quotes would be needed to preserve a trailing space so this ensures that object refs can be assigned naturally.
-#      Besides the '.', '=', '[' '+' and '-' are supported as part of various operator syntax. See _bgclassCall for supported syntaxes.
+# expands to: '_bgclassCall' '<oid>' '<className>' '<hierarchyCallLevel>' '|.speak' '<valueOfP1>'
+# myPet can be a normal bash variable with the contents "_bgclassCall <oid> <className> <hierarchyCallLevel> |" or it can be
+# the bash variable of the object's associtive array directly because for an array variable, $myPet is the same as ${myPet[0]}
+# and the [0] element of object arrays contain ObjRef to itself.
+# where
+#    _bgclassCall is a stub function that uses the first 4 parameters passed to it and the class VMT table to setup the this
+#                 variable and call the speak method associated with the correct class
+#    <oid> is the name od the global associated array for this instance -- something like 'aQoUszTyE'
+#    <className> is the class that the reference is cast as. This is typically the most derived class but can be any of the base
+#                classes and depends on how the object reference is initialized
+#    <hierarchyCallLevel> is an adjustment to the virtual lookup mechanism to allow refering to a more super class than <className>
+#    '|' is a separator that allows _bgclassCall to know reliably that the <hierarchyCallLevel> will not get accidentally merged
+#                into the .<methodName> paramter. It could have been any character. It has nothing to do with piping which bash
+#                processes before this point to separate a line into 'simple commands'
+# The dot syntax between the object reference and the methodName is a just a visual nicety. A space could have been used just
+# the same, but it would not have looked as much like an object reference. Any character that is not a valid in a variable name
+# will cause bash to see '$myPet' as a variable to expand in its 'parameter expansion' stage and then execute the resulting
+# tokens as a command (_bgclassCall) and parameters (<oid> <className> <hierarchyCallLevel> |.<methodName> <p1> <p2> ...)
+# No space follows the | so that the 4th parameter will be merged with the | by design. When an object reference variable is
+# passed around, quotes would be needed to preserve a trailing space so this ensures that object refs can be assigned naturally.
+# Besides the '.', '=', '[' '+' and '-' are supported as part of various operator syntax. See _bgclassCall for supported syntaxes.
 #
-#   The DeclareClass function creates an instance of the Class object to contian the VMT and and other information about that particular
-#   class including static variables. The name of the class becomes a global string variable initiated with an object reference to the
-#   class's instance array.
+# The DeclareClass function creates a global associative array with the name of the class that represents the class object.
+# That array contains the static members of the class and the list of non-static member functions.
 #   Example:.
-#      DeclareClass Dog Animal
-#      echo $Dog -> "_bgclassCall au0F8qRDp Class 0 |"
+#      $ import bg_objects.sh ;$L1
+#      $ DeclareClass Animal
+#      $ echo $Animal
+#      _bgclassCall Animal Class 0 |
 #
 #   Maintaining the VMT:.
 #   For a logical organization of code, the DeclareClass statement should be located above the method function definitions of that
@@ -176,17 +201,24 @@
 
 
 # usage: DeclareClass <className> [<baseClass> [<atribName1:val1> .. <atribNameN:valN>]]
-# This brings a new class into existance by creating a global associative array named "<className>"
-# That array store the static variables associated with the class. The optional <atribNameN:valN>'s' will be set in the array.
-# There are no prerequisites. The Member functions (aka Methods) of the class can be defined before or after the class is Declared.
-# Any function named <className>::* will be available as a method to call on object instances of that class or derived classes.
-# Methods are associated with a Class dynamically the first time a reference of that class is used and again after any new libraries
-# are imported
+# This brings a new class into existance by creating a global associative array named "<className>" which, itself is a valid object
+# instance.  The optional <atribNameN:valN>'s' will initialize values in that array.
+#
+# The Member functions (aka Methods) of the class are named <className>::* and can be defined before or after the class is Declared.
+# The first time an instance of <className> is created, the <className> array will be updated with a list of functions in the bash
+# environment at that time whose name starts with <className>::*.  If a new script library is imported after that, the next time
+# a <className> object is referenced, the environment will be rescanned to pick up any new <className>::* functions.
+#
+# Its important for the script author to define the <className>::* functions in the script before any global code that creates an
+# instance of that <className> so that those member functions will be found when the VMT is initially built.
+#
 # Accessing Class Static Member Variables:
-# Inside methods of the Class, the class's array can be refered to as "static"
+# Inside methods of the Class, the class's array can be refered to as "static" which is a -n alias to the <className> global array
 #     example: "static[<attribName>]="<val>", foo="${static[<attribName>]}"
+#
 # Outside of its methods its refered to as <className>
 #     example: "<className>[<attribName>]="<val>", foo="${<className>[<attribName>]}"
+#
 # Params:
 #    <className>       : the name of the new class. By convention it should be capitalized
 #    <baseClassName>   : (default=Object) the name of the class that the new class derives from.
@@ -210,8 +242,8 @@ function DeclareClass()
 }
 
 # usage: DeclareClass <className> [<baseClassName> [<atribName1:val1> .. <atribNameN:valN>]]
-# This is the constructor for objects of type Class. This is called when a DeclareClass is used to bring a new class into existence.
-# A global associative variable named <className> is declared and then this function is used to initialize it.
+# This is the constructor for objects of type Class. When DeclareClass is used to bring a new class into existence it creates the
+# global <className> associative array and then uses this function to fill in its contents.
 function Class::__construct()
 {
 	# TODO: implement a delayed construction mechanism for class obects.
@@ -221,7 +253,7 @@ function Class::__construct()
 	#       used for the first time. An ::onFirstUse method could be added and called by ConstructObject when the <className>[instanceCount]
 	#       is incremented from 0
 
-	# Since each class does not have its own constructor, we allow DeclareClass to specify attributes to assign.
+	# Since each class does not have its own *class* constructor, we allow DeclareClass to specify attributes to assign.
 	# TODO: this makes DeclareClass and plugins_register very similar. They should merge when 10.04 support is completely dropped
 	[ $# -gt 0 ] && parseDebControlFile this "$@"
 
@@ -330,19 +362,29 @@ function NewObject()
 		cmd: 'NewObject $@'
 	"
 	local _OID
-	genRandomIDRef _OID 9 "[:alnum:]"
+	varGenVarname _OID 9 "[:alnum:]"
 	echo "_bgclassCall ${_OID} $_CLASS 0 |"
 }
 
 
 
-# usage: ConstructObject <className> <objRef> [<p1> ... <pN>]
-# usage: ConstructObject <className>::<dynamicConstructionData> <objRef> [<p1> ... <pN>]
+# usage: ConstructObject <className> <objRefVar> [<p1> ... <pN>]
+# usage: ConstructObject <className>::<dynamicConstructionData> <objRefVar> [<p1> ... <pN>]
 # usage: local -A <objRef>; ConstructObject <className> <objRef> [<p1> ... <pN>]
 # usage: local <objRef>;    ConstructObject <className> <objRef> [<p1> ... <pN>]
 # This creates a new Object instance. An object instance is a normal bash associative array that has some special elements filled in
 # Elements whose index name starts with an _ (underscore) are system attributes and are not considered logical member variables.
 # All other elements are considered member variables of the object.
+#
+# An <objRef> is a string variable with a synstax that is a call to _bgclassCall when derefernced. This <objRef> string is set in
+# the [0] element of the object associative array which makes the array variable name a valid <objRef> because bash treats [0] as
+# the default element when an array variable is used as a scalar.
+#
+# This function will result in the <objRefVar> passed in being set with a <objRef> to the new object. If <objRefVar> is a variable
+# name with the -A attribute, it will become the new object with [0] set to its own <objRef>. If it is a regular variable, a new
+# associative array variable will be allocated on the heap (see man(3) newHeapVar) and <objRefVar> will be set with the <objRef> to
+# it.
+#
 # Dynamic Construction Support:
 # Dynamic construction is an OO feature which allows you to create some sub class of <className> based on data passed when constructing
 # an object. For this to work you define a function <className>::ConstructObject() and when using his function to create a new object
@@ -378,22 +420,28 @@ function NewObject()
 #         $objRef.<memberObjectName>[.<memberObjectName>]<anySyntax>
 #     Convert a ObjRef to object's associative array implementation variable (works regardless of whether objRef is already an associative array ref)
 #         local -n objAry=$($objRef.getOID)
-#  ArrayRef Syntax
-#  ArrayRef is a bash native variable that references the associative array that is the object's underlying representation.
-#  all the ObjRef syntax still works b/c [0] contains the ObjRef string and $ary is a synonym for ${ary[0]}
-#  in addition, you can access the member variables directly.
-#     Member Assignment
-#         aryRef[<memberVariableName>]="something"
-#     Member Access
-#         local foo=${aryRef[<memberVariableName>]}
 #
-# How It Works:
-#    The 'magic' that makes it act like an Object is the Object Reference String (ObjRef). If a variable 'objRef' contains an
-#    ObjRef string, a bash command line like "$objRef.methodName" results in $objRef being replaced by the ObjRef string it contains
-#    and then the resultant line being executed as a command. ObjRefs always begin with "_bgclassCall ..." so all object syntax that
-#    begins with $objRef calls that function which then dispatches the method call based on the rest of the line after the .
-#    The '.' is not special in the mechanism. It is just a character that is not valid in variable names so $objRef.something results
-#    in $objRef being expanded and the result concatenated with ".something"
+# Direct Array Reference:
+# The $<objRef>... syntax is convenient but inefficient compared to native bash variable manipulation. Since <objRef> is a string
+# variable, you can pass it to bash functions and store it in other bash array elements.  Then when you want to work with it, you
+# can dereference it into a bassh associative array with the local -n feature.
+#
+#    local -n myObj=$($myObjRef.getOID)
+#    Member Assignment
+#        myObj[<memberVariableName>]="something"
+#    Member Access
+#        local foo=${myObj[<memberVariableName>]}
+#
+# ObjRef string format:
+#    `_bgclassCall <OID> <Class> <hierarchLevel> |`
+# Where
+#    <OID> is the actual bash variable name of the associative array that holds the object data.
+#    <Class> is the type of object that this ObjRef points to. The actual Class of <OID> may be a sub class of <Class>
+#    <hierarchLevel> is an offset that affects how polymorphism chooses the version of a method to call. It is how the super. syntax
+#          is implemented.
+# When command is of the form `$<objRef>.<something...>`, bash will first replace $<objRef> with its content and then parse the line
+# into tokens that are executed. The result is a call to _bgclassCall where <something..> is passed in as the operation to be performed.
+# The range of syntax supported in <something...> is defined by the _bgclassCall function.
 function ConstructObject()
 {
 	[[ "${BASH_VERSION:0:3}" < "4.3" ]] && assertError "classes need the declare -n option which is available in bash 4.3 and above"
@@ -418,22 +466,21 @@ function ConstructObject()
 	# because $varName will resolve to the text of the object ref in both cases. If varName is a simple string var, we set it to the
 	# obj ref text. If its an associative array, we set varName[0] to the obj ref text and $varName is a shortcut for $varName[0]
 
-	# first assume that $2 is the name of an associative array we can use
-	local _OID="$2"; assertNotEmpty _OID "objRefVar is a required parameter"
+	# _objRefVar is a variable name passed to us. It is either the name of an associative array that will be the object or a string
+	# variable that will receive the ObjRef string that points to the new object.
+	# SECURITY: clean _objRefVar by removing all but characters that can be used in a variable name. foo[bar] is a valid name.
+	local _objRefVar="${2//[^a-zA-Z0-9\[\]_]}"; assertNotEmpty _objRefVar "objRefVar is a required parameter as the second argument"
 
-	# The caller typically declares the objRef name passed in $2 as either an associative array (local -A objName) or a plain variable
-	# (local objName), but without assigning it any value because this funciton is meant to initialize it. When you declare a new
-	# variable in bash without assigning it, declare -p will report that its not yet defined. However, the attributes that are
-	# specified in the declaration are remembered and will take effect once its assigned a value. By assigning an empty string to
-	# it, we force it to be declared to the point that we can use declare -p to report the correct attributes. Its valid to assign
-	# a string to an array -- it gets stored in the [0] element.
-	eval $2=\"\"
+	# this fixes a bug in pre 5.x bash where declare -p $2 would report that it does not exist if it has not yet been initialized
+	# The caller can declare an associative array variable to use for this object like `local -A foo; ConstructObject Object foo`
+	# Its valid to assign a string to an array -- it gets stored in the [0] element.
+	eval ${_objRefVar}=\"\"
 
 	# if $2 is not name of an associative array, create one on the heap and use $2 just to store the objRef to that heap object
-	if [[ ! "$(declare -p "$2" 2>/dev/null)" =~ declare\ -[gilnrtux]*A ]]; then
-		genRandomIDRef _OID 9 "[:alnum:]"
-		declare -gA $_OID="()"
-		eval $2=\"_bgclassCall ${_OID} $_CLASS 0 \|\"
+	local _OID="$_objRefVar"
+	if [[ ! "$(declare -p "$_objRefVar" 2>/dev/null)" =~ declare\ -[gilnrtux]*A ]]; then
+		newHeapVar -A  _OID
+		printf -v $_objRefVar "%s" "_bgclassCall ${_OID} $_CLASS 0 |"
 	fi
 	shift 2 # the remainder of parameters are passed to the __construct function
 
@@ -490,7 +537,13 @@ function ConstructObject()
 	true
 }
 
-# usage: _classMakeVMT <objRef>
+# usage: _classMakeVMT
+# update the VMT information in the 'this' array.
+# _classMakeVMT will set all the methods known at this point in the prevailing 'this' array. It records the id of the current
+# sourced library state which is maintained by 'import'. If that ID has not changed snce the last time it built the VMT
+# for this object, it returns quickly. We call this at each method call so that if more libraries are sourced which might
+# have provided more methods that will effect the VMT, they will be included. The script writer can also call the static
+# Class::reloadMethods to cause all VMT to rebuild on their object's next method call.
 # TODO: currently we maintain a separate VMT per object and when a new library is sourced, they all become dirty and
 #       will rebuild on the object's next method invocation. We could now create shared VMT. The full hierarchy string
 #       can be the key. The hierarchy string for each class is constant and when an object is created, the object's
@@ -501,15 +554,11 @@ function ConstructObject()
 #       be changed to store just the name of the VMT associative array. The _bgclassCall function will create a
 #       "local -n _VMT=" pointer and use it instead of "this" for method lookups. Since bash requires that threads be
 #       run in a sub proc which has a copy of the environment, no locking should be needed.
-# _classMakeVMT will set all the methods known at this point in the objects this array. It records the id of the current
-# sourced library state which is maintained by 'import'. If that ID has not changed snce the last time it built the VMT
-# for this object, it returns quickly. We call this at each method call so that if more libraries are sourced which might
-# have provided more methods that will effect the VMT, they will be included. The script writer can also call the static
-# Class::reloadMethods to cause all VMT to rebuild on their object's next method call.
 # See Also:
 #    Class::reloadMethods
 function _classMakeVMT()
 {
+#bgtraceBreak
 	local currentCacheNum; importCntr getRevNumber currentCacheNum
 	[ "${this[_vmtCacheNum]}" == "$currentCacheNum" ] && return
 	[ "${this[_CLASS]}" != "Class" ] && this[_vmtCacheNum]="$currentCacheNum"
@@ -602,15 +651,18 @@ function DeleteObject()
 #    completeObjectSyntax
 function _bgclassCall()
 {
+#bgtraceBreak
+	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
 	# if <oid> does not exist, its because the myObj=$(NewObject <class>) syntax was used to create the
 	# object reference and it had to delay creation because it was in a subshell.
-	local _OID="$1[*]"; if [ ! "${!_OID}" ]; then
+	if ! varIsA array "$1"; then
 		[[ "$1" =~ ^a[[:alnum:]]{8}$ ]] || assertError "bad object reference. The object is out of scope. \nObjRef='_bgclassCall $@'"
 		declare -gA "$1=()"
 		if [[ "$4" =~ ^[._]*construct$ ]]; then
 			local _OID="$1"; shift
 			local _CLASS="$1"; shift
 			ConstructObject "$_CLASS" "$_OID" "$@"
+			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 			return
 		else
 			ConstructObject "$2" "$1"
@@ -625,9 +677,15 @@ function _bgclassCall()
 	local _memberTerm="$1";    shift; _memberTerm="${_memberTerm#|}"
 
 	# its a noop to refer to an object without including a member, like $foo
-	[ "${_memberTerm//[]. []}" ] || return
+	[ "${_memberTerm//[]. []}" ] || {
+		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+		return
+	}
 
-	local -n this=$_OID || assertError -v _OID -v _CLASS -v _memberTermWithParams "could not setup Object calling context '$(declare -p this)'"
+	local -n this=$_OID || {
+		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+		assertError -v _OID -v _CLASS -v _memberTermWithParams "could not setup Object calling context '$(declare -p this)'"
+	}
 	local -n static=$_CLASS
 	local super="_bgclassCall ${_OID} $_CLASS $((_hierarchLevel+1)) |"
 
@@ -672,14 +730,28 @@ function _bgclassCall()
 		[ "${_mnameShort}" ] && unset this[${_mnameShort}]
 	elif [ "$_memberTerm" == ".exists" ]; then
 		[ "${_mnameShort}" ] && [ "${this[${_mnameShort}]+isset}" ]
+		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		return
 	elif [ "$_memberTerm" == ".isA" ]; then
 		# if its not an Object Ref, isA returns false, if it is, set the exit code by callong the isA method.
 		[ "${_memberVal:0:12}" == "_bgclassCall" ] && $_memberVal"$_memberTerm" "$@"
+		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		return
 	elif [ "$_memberTerm" == "=new" ]; then
 		local newObjectClass="${1:-Object}"; shift
-		local newObject; ConstructObject "$newObjectClass" newObject "$@"
+		local newObject
+		# if [ "$newObjectClass" == "BashArray" ]; then
+		# 	genRandomIDRef newObject 9 "[:alnum:]"
+		# 	newObject="BashArray_$newObject"
+		# 	declare -ga $newObject="()"
+		# elif [ "$newObjectClass" == "BashMap" ]; then
+		# 	newObject="BashMap_$newObject"
+		# 	genRandomIDRef newObject 9 "[:alnum:]"
+		# 	declare -gA $newObject="()"
+		# else
+		# 	ConstructObject "$newObjectClass" newObject "$@"
+		# fi
+		ConstructObject "$newObjectClass" newObject "$@"
 		this[${_mnameShort}]="$newObject"
 	elif [ "$_mnameShort" == "static" ]; then
 		$static"$_memberTerm" "$@"
@@ -698,7 +770,10 @@ function _bgclassCall()
 	elif [ "${_memberTerm:0:2}" == "+=" ]; then
 		local sq="'" ssq="'\\''"
 		_memberTerm="${_memberTermWithParams#+=}"
-		assertNotEmpty _mnameShort
+		[ ! "$_mnameShort" ] && {
+			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
+		}
 		eval "this[${_mnameShort}]+='${_memberTerm//$sq/$ssq}'"
 
 	# member variable assignment syntax
@@ -706,19 +781,26 @@ function _bgclassCall()
 	elif [ "${_memberTerm:0:1}" == "=" ]; then
 		local sq="'" ssq="'\\''"
 		_memberTerm="${_memberTermWithParams#=}"
-		assertNotEmpty _mnameShort
+		[ ! "$_mnameShort" ] && {
+			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
+		}
 		eval "this[${_mnameShort}]='${_memberTerm//$sq/$ssq}'"
 
 	# If there is _memberTerm left over at this point, then it must be an object member that has not yet been created.
 	# This block creates a member object of type Object on demand. If we remove or comment out this block the next block
 	# will assert an error in this case
 	elif [ "$_memberTerm" ]; then
-		assertNotEmpty _mnameShort
+		[ ! "$_mnameShort" ] && {
+			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
+		}
 		this[${_mnameShort}]="$(NewObject Object)"
 		${this[${_mnameShort}]}$_memberTerm "$@"
 
 	# If there is _memberTerm left over at this point, then none of the previous cases knew how to handle it so assert an error
 	elif [ "$_memberTerm" ]; then
+		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		assertError -v _memberVal -v _memberTerm -v _mnameShort "'${_mnameShort}' is not an Object reference member of '$_OID'"
 
 	# calling a super class method syntax
@@ -752,7 +834,9 @@ function _bgclassCall()
 		if [ "$superName" ]; then
 			local _METHOD="${superName}::${_mnameShort}"
 			objOnEnterMethod "$@"
+			bgDebuggerPlumbingCode=0
 			$_METHOD "$@"
+			bgDebuggerPlumbingCode=1
 		fi
 
 	# member function with explicit Class syntax
@@ -760,14 +844,18 @@ function _bgclassCall()
 	elif [[ "$_mnameShort" =~ :: ]]; then
 		local _METHOD="$_mnameShort"
 		objOnEnterMethod "$@"
+		bgDebuggerPlumbingCode=0
 		$_METHOD "$@"
+		bgDebuggerPlumbingCode=1
 
 	# member function syntax
 	#   $this.<memberFunct> [<p1> .. p2]
 	elif [ "${this[_method::${_mnameShort}]+isset}" ]; then
 		local _METHOD="${this[_method::${_mnameShort}]}"
 		objOnEnterMethod "$@"
+		bgDebuggerPlumbingCode=0
 		$_METHOD "$@"
+		bgDebuggerPlumbingCode=1
 
 	# member variable read syntax. Its ok to read a non-existing member var, but if parameters were provided, it looks like a method call
 	#   echo $($this.<memberVar>)
@@ -777,8 +865,10 @@ function _bgclassCall()
 
 	# not found error
 	else
+		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		assertError -v _OID -v _memberTermWithParams "member '$_mnameShort' not found for class $_CLASS"
 	fi
+	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 }
 
 
@@ -853,11 +943,18 @@ function GetOID()
 	local oidVal
 	if [ "{$objRef}"  == "" ]; then
 		oidVal="NullObjectInstance"
+
+	# this is the normal case
 	elif [ "${objRef:0:12}"  == "_bgclassCall" ]; then
 		oidVal="${objRef#_bgclassCall }"
 		oidVal="${oidVal%% *}"
+
+	# this is when objRef is a variable that points to an objRef
 	elif [[ "$objRef" =~ ^[[:word:]]*$ ]] && [[ "{$!objRef}"  =~ "^_bgclassCall" ]]; then
 		oidVal="${!objRef}"
+assertError -v oidVal -v objRef "DEVTEST: check that this is correct. I think that we still need to extract teh array name from oidVal "
+
+	# unknown
 	else
 		assertError "unknown object ref '$objRef'"
 	fi
@@ -869,10 +966,7 @@ function GetOID()
 # returns true if <objRef> is a variable whose content matches "^_bgclassCall .*"
 # The <objRef> variable should be deferenced like "IsAnObjRef $myObj" instead of "IsAnObjRef myObj"
 # Params:
-#   <objRef> : the string that refers to an object. For simple bash variables that refer to objects, this is their value.
-#              for bash arrays that refer to objects, it  the value of the [0] element. In either case, you call this
-#              function like
-#                  GetOID $myObj   (or GetOID "$myObj"  -- the double quotes are optional)
+#   <objRef> : the string to be tested
 function IsAnObjRef()
 {
 	local objRef="$*"
@@ -907,7 +1001,7 @@ function ParseObjExpr()
 
 	if [[ "$remainderPartValue" =~ ^\$[[:alnum:]_]+ ]]; then
 		local nextTerm="${BASH_REMATCH}"
-		memberRef="${nextTerm#[$]}"
+		memberRef="${nextTerm#[$]}" #"
 
 		refParts=(${!memberRef})
 
@@ -1027,46 +1121,6 @@ function completeObjectSyntax()
 	fi
 }
 
-
-
-####################################################################################################################
-### bootstrap the leaf instances Object Class "global Class Instances"
-
-# We manually fill in the associative arrays for a few object Instances because when DeclareClass and ConstructObject
-# are called to created the Class and Object class instnaces, they will refer to themselves.
-# these arrays are probably over specified here. When "DeclareClass Class" is called, probably the only thing that it needs is the
-# Class[hierarchy] member to be pre-filled in. It does no harm to fill in the others, but they will be overwritten by
-# DeclareClass so we could leave them out. It was a useful check to print out the Class and Object associative arrays
-# before and after to see if they were consistent.
-
-# this is the Instance of 'Class' that describes 'Class'
-declare -A Class=(
-	[name]="Class"
-	[baseClass]="Object"
-	[classHierarchy]="Object Class"
-	[_OID]="Class"
-	[_classHierarchy]="Object Class"
-)
-# this is the Instance of 'Class' that describes 'Object'
-declare -A Object=(
-	[name]="Object"
-	[baseClass]=""
-	[classHierarchy]="Object"
-	[_OID]="Object"
-	[_classHierarchy]="Object Class"
-)
-
-DeclareClass Class
-DeclareClass Object
-
-# we don't construct the Null Object because the [0],[_Ref] value is an assert instead of the normal format
-# we protect against re-defining it in case we reload the library
-[ ! "${NullObjectInstance[_OID]}" ] && declare -rA NullObjectInstance=(
-	[_OID]="NullObjectInstance"
-	[_classHierarchy]="Object"
-	[0]="assertError Null Object reference called <NULL>"
-	[_Ref]="assertError Null Object reference called <NULL>"
-)
 
 
 ####################################################################################################################
@@ -1308,15 +1362,23 @@ function Object::fromString()
 function Object::toDebControl() { Object::toString "$@"; }
 function Object::toString()
 {
-	local attrib; for attrib in $($this.getIndexes); do
+	local indexes=$($this.getIndexes)
+
+	local labelWidth=0
+	local attrib; for attrib in $indexes; do
+		((labelWidth=(labelWidth<${#attrib}) ?${#attrib} :labelWidth ))
+	done
+
+	local attrib; for attrib in $indexes; do
 		local value="${this[$attrib]}"
 		if [ "${value:0:12}" == "_bgclassCall" ]; then
 			local parts=($value)
-			value="${parts[0]}  <instance>  ${parts[2]}"
-			printf "%-13s: %s\n" "$attrib" "$value" | awk '{if (NR>1) printf("%-13s+ ",""); print $0}'
-			$this.$attrib.toString | wrapLines -w12000 	"$attrib." ""
+			value="<instance> of ${parts[2]}"
+			#value="${parts[0]}  <instance>  ${parts[2]}"
+			printf "%-${labelWidth}s: %s\n" "$attrib" "$value" | awk -v labelWidth="$labelWidth" '{if (NR>1) printf("%-*s+ ", labelWidth, ""); print $0}'
+			${this[$attrib]}.toString | awk -v attrib="$attrib" '{printf("  %s%s%s\n", attrib, ($1~/^[[]/)?"":".", $0)}'
 		else
-			printf "%-13s: %s\n" "$attrib" "$value" | awk '{if (NR>1) printf("%-13s+ ",""); print $0}'
+			printf "%-${labelWidth}s: %s\n" "$attrib" "$value" | awk -v labelWidth="$labelWidth" '{if (NR>1) printf("%-*s+ ", labelWidth, ""); print $0}'
 		fi
 	done
 }
@@ -1445,6 +1507,46 @@ function Object::saveFile()
 	printf "%s %s %s\n" "<Object>" "v1.0" "${fmtType#to}" > "$fileName"
 	$this.to${fmtType#to} >> "$fileName"
 }
+
+####################################################################################################################
+### bootstrap the leaf instances Object Class "global Class Instances"
+
+# We manually fill in the associative arrays for a few object Instances because when DeclareClass and ConstructObject
+# are called to created the Class and Object class instnaces, they will refer to themselves.
+# these arrays are probably over specified here. When "DeclareClass Class" is called, probably the only thing that it needs is the
+# Class[hierarchy] member to be pre-filled in. It does no harm to fill in the others, but they will be overwritten by
+# DeclareClass so we could leave them out. It was a useful check to print out the Class and Object associative arrays
+# before and after to see if they were consistent.
+
+# this is the Instance of 'Class' that describes 'Class'
+declare -A Class=(
+	[name]="Class"
+	[baseClass]="Object"
+	[classHierarchy]="Object Class"
+	[_OID]="Class"
+	[_classHierarchy]="Object Class"
+)
+# this is the Instance of 'Class' that describes 'Object'
+declare -A Object=(
+	[name]="Object"
+	[baseClass]=""
+	[classHierarchy]="Object"
+	[_OID]="Object"
+	[_classHierarchy]="Object Class"
+)
+
+DeclareClass Class
+DeclareClass Object
+
+# we don't construct the Null Object because the [0],[_Ref] value is an assert instead of the normal format
+# we protect against re-defining it in case we reload the library
+[ ! "${NullObjectInstance[_OID]}" ] && declare -rA NullObjectInstance=(
+	[_OID]="NullObjectInstance"
+	[_classHierarchy]="Object"
+	[0]="assertError Null Object reference called <NULL>"
+	[_Ref]="assertError Null Object reference called <NULL>"
+)
+
 
 
 # Class stack
@@ -1609,113 +1711,80 @@ function Array::getValues()
 }
 
 
+function BashArray::__construct()
+{
+	this[_basharray]="${this[_OID]}_array"
+	declare -ga ${this[_basharray]}="()"
+}
+function BashArray::getArray()
+{
+	returnValue "${this[_basharray]}" $1
+}
+function BashArray::toString()
+{
+	local -n _data="${this[_basharray]}"
+	local labelWidth=0
+	local attrib; for attrib in "${!_data[@]}"; do
+		((labelWidth=(labelWidth<${#attrib}) ?${#attrib} :labelWidth ))
+	done
+	for attrib in "${!_data[@]}"; do
+		local value="${_data[$attrib]}"
+		if [ "${value:0:12}" == "_bgclassCall" ]; then
+			local parts=($value)
+			value="<instance> of ${parts[2]}"
+			printf "%-${labelWidth}s: %s\n" "$attrib" "$value" | awk -v labelWidth="$labelWidth" '{if (NR>1) printf("%-*s+ ", labelWidth, ""); print $0}'
+			$value.toString | awk -v attrib="$attrib" '{printf("  %s%s%s\n", attrib, ($1~/^[[]/)?"":".", $0)}'
+		else
+			printf "%-${labelWidth}s: %s\n" "[$attrib]" "$value" | awk -v labelWidth="$labelWidth" '{if (NR>1) printf("%-*s+ ", labelWidth, ""); print $0}'
+		fi
+	done
+}
+function BashArray::bgtrace()
+{
+	bgtraceIsActive || return 0
 
-####################################################################################################################
-### Example Code
+	local level=0 rlevel=100 recurseFlag="-r" attribsOff="" methodsOff="" sysAttrOff="" headersOff=""
+	while [ $# -gt 0 ]; do case $1 in
+		-l*) bgOptionGetOpt val: level "$@" && shift ;;
+		-r)  varToggleRef recurseFlag "-r"  ;;
+		--rlevel*) bgOptionGetOpt val: rlevel "$@" && shift
+			# setting rlevel on the initial call implies that recursion should start on
+			[ ${level:-0} -eq 0 ] && recurseFlag="-r"
+			;;
+		--rstate) recurseFlag="$2"; shift   ;;
+		-h)  varToggleRef headersOff "-h"  ;;
+		-a)  varToggleRef attribsOff "-a" ;;
+		-m)  varToggleRef methodsOff "-m" ;;
+		-s)  varToggleRef sysAttrOff "-s" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	# if we have reached the recursion level limit, set recurseFlag to off
+	[ ${level:-0} -ge ${rlevel:-0} ] && recurseFlag=""
+
+	# $level increases by +1 each recursion but $rlevel keeps it initial value from the first call
+	local pad="$(printf %$((${level}*3))s)"
+
+	#[ ! "$headersOff" ] && bgtrace "${pad}$_CLASS::$_OID :"
+	echo "${pad}$_CLASS::$_OID :" >>$_bgtraceFile
+
+	bgtraceVars "$pad   " :"${this[_basharray]}"
+}
+
+DeclareClass BashArray
 
 
-### Defining a Class
 
-#DeclareClass Equipment
-#
-#function Equipment::oneMeth()
-#{
-#	echo "	Equipment::oneMeth: class: $_CLASS this is this: '$this' $@"
-#	$this.twoMeth "twoing it"
-#   # set is the same as this[ipNum]=172.17.0.33 except that it could be overriden to take other actions when  attributes
-#   # are set.
-#	$this.set ipNum 172.17.0.33
-#}
-#
-#function Equipment::twoMeth()
-#{
-#	echo "	Equipment::twoMeth: class: $class this is this: $this $@    ipNum=${this[ipNum}"
-#}
-#
-#function Equipment::search()
-#{
-#   local attributeNames="$(awkDataCache_getColums equipment)"
-#	local $attributeNames
-#	read -r $attributeNames < <(awkData_lookup all "$@")
-#   local attr; for attr in $attributeNames; do
-#		this[$attr]=${!attr}
-#   done
-#}
-#
-#function Equipment::bgtrace()
-#{
-#	echo  "overrride  super='$super'"
-#
-#   # now call the base class version (if that is desired)
-#	#$super.bgtrace
-#}
+function BashMap::__construct()
+{
+	this[_basharray]="${this[_OID]}_map"
+	declare -gA ${this[_basharray]}="()"
+}
+function BashMap::getArray()
+{
+	returnValue "${this[_basharray]}" $1
+}
+function BashMap::toString()  { BashArray::toString "$@" ; }
+function BashMap::bgtrace()   { BashArray::bgtrace "$@" ; }
 
-
-#### Using an Object
-#
-# creating a local object that lives only for the duration of the function call...
-#function myTest()
-#{
-#   # note that the empty () are important. otherwise bash does not create it until used and
-#   # ConstructObject won't be able to tell that its an existing array
-#	local -A equipObj=()
-#	ConstructObject Equipment equipObj
-#	#declare -p equipObj
-#
-#	$equipObj.search name:waldo
-#   echo "waldo's IP is ${this[ip]}"
-#}
-#
-# creating a 'heap' object that could be passed back from a function
-#function equipGetSelf()
-#{
-#	local equipObj
-#	ConstructObject Equipment equipObj
-#
-#	$equipObj.search name:"$(hostname -s)"
-#   echo "$equipObj"
-#}
-#
-# Optionally, you can declare the object reference to a dynamic (aka heap) object with the -n
-# option (Ubuntu 14.04 and later -- not supported in 12.04). This will result in it becoming a
-# reference to the underlying array. It will work exactly the same for object method calls but
-# it will also allow accessing the array elements directly without using complex sysntax.
-#declare -n equipObj
-#ConstructObject Equipment equipObj
-#$equipObj.bgtrace
-#equipObj[color]="blue"
-#echo "color=${this[color]}"
-#
-#
-#
-#echo "###########################"
-#$equipObj.oneMeth with .
-#
-#echo "my oid =${equipObj[_OID]}"
-#
-#echo "###########################"
-#$equipObj.getOID
-#echo "###########################"
-#$equipObj.getMethods
-#echo "###########################"
-#$equipObj.getAttributes
-#echo "###########################"
-#$equipObj.set color blue
-#echo "###########################"
-#$equipObj.get color
-#echo "###########################"
-#$equipObj.bgtrace
-#
-#function doSome()
-#{
-#	local -n eq1="$1"
-#	local -n eq2="$2"
-#	echo "eq1 -> $($eq1.get ipNum)"
-#	echo "eq2 -> $($eq2.get ipNum)"
-#}
-#
-#declare -n equipObj2
-#ConstructObject Equipment equipObj2
-#$equipObj2.set ipNum "4545"
-#
-#doSome equipObj equipObj2
+DeclareClass BashMap

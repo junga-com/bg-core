@@ -510,7 +510,7 @@ function Object::bgtrace()
 # See Also:
 #     bg-debugCntr : the cmd line command to control the interactive debug environment.
 #     debuggerOn   : if a debugger is not already active for this process, it deferes to this
-#     debugSetTrap : if a debugger active for this process, it deferes to this
+#     _debugSetTrap : if a debugger active for this process, it deferes to this
 #     _debugEnterDebugger : the lower level break (called by DEBUGTrap) which actually initiates the debugger. bgtraceBreak installs the DEBUG trap
 function bgtraceBreak()
 {
@@ -540,7 +540,7 @@ function bgtraceBreak()
 	# stepOver is typically the only reasonable option to call because it goes to the next line at the level maintained by the
 	# logicalFrameStart mechanism.
 	if debuggerIsActive; then
-		debugSetTrap --logicalStart+${logicalFrameStart:-1} stepOver
+		_debugSetTrap --logicalStart+${logicalFrameStart:-1} stepOver
 	else
 		debuggerOn --logicalStart+${logicalFrameStart:-1} ${defaultDbgID:+--driver="$defaultDbgID"} stepOver
 	fi
