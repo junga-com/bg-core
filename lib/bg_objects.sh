@@ -236,14 +236,32 @@ function DeclareClass()
 		"
 
 	declare -gA $className
+	declare -gA ${className}_vmt="()"
 	if ubuntuVersionAtLeast trusty; then
 		ConstructObject Class "$className" "$@"
+
+		# a class author can define <className>::__staticConstruct() function before calling DeclareClass to do special static init
+		# __staticConstruct is the end of the recursive, self defining nature of the Object / Class system
+		# Its similar to the concept of having a sub class of Class to represent each different Class, but
+		# instead of defining a whole new sub class (which itself would need to have a unique class data instance
+		# to represent what it is), we only allow that a staticConstructor be defined. This way the loop ends
+		# and the programmer has a way to define the construction of the particular Class instance.
+		if type -t $className::__staticConstruct &>/dev/null; then
+			# the __staticConstruct is invoked in the context of the particular Class. Since there is no instance of type <className>
+			# 'this' is null. The __staticConstruct should be written to use 'static' as the thing that its constructing.
+			local this="$NullObjectInstance"
+			local -n static="$className"
+			$className::__staticConstruct "$@"
+		fi
 	fi
 }
 
 # usage: DeclareClass <className> [<baseClassName> [<atribName1:val1> .. <atribNameN:valN>]]
 # This is the constructor for objects of type Class. When DeclareClass is used to bring a new class into existence it creates the
 # global <className> associative array and then uses this function to fill in its contents.
+# A particular <className> can preform extra construction on its class object by defining a <className>::__staticConstruct function
+# *before* calling DeclareClass. This Class::__construct() will be called first to init the associative array and then
+# <className>::__staticConstruct will be called with this set to the class object.
 function Class::__construct()
 {
 	# TODO: implement a delayed construction mechanism for class obects.
@@ -259,6 +277,8 @@ function Class::__construct()
 
 	this[name]="$className"
 	this[baseClass]="$baseClass"
+
+	### Iterate the hierarchy to maintain the global _classIsAMap and super and sub class lists in all involved classes
 
 	declare -gA _classIsAMap
 	[ ! "$baseClass" ] && _classIsAMap[$className,Object]=1
@@ -276,8 +296,7 @@ function Class::__construct()
 		this[classHierarchy]="${_cname}${this[classHierarchy]:+ }${this[classHierarchy]}"
 
 		# add ourselves to the list of sub (derived) classes in the super (base) classes list member
-		local baseSubClassesRef="$_cname[subClasses]"
-		stringJoin -a -d " " -e -R "$baseSubClassesRef" "$className"
+		stringJoin -a -d " " -e -R "$_cname[subClasses]" "$className"
 
 		# walk to the next class in the inheritance
 		local _baseClassRef="$_cname[baseClass]"
@@ -288,13 +307,11 @@ function Class::__construct()
 		# TODO: this does not detect complex loops A->B->C->A  use _isAMap or a local map for for this loop to detect it we revisit the same class in this loop
 		[ "$_cname" == "${_baseClassRef}" ] && assertError -v className -v baseClass -v this[classHierarchy] "Inheritance loop detected"
 		_cname="${_baseClassRef}"
-
 	done
 
-	# typically a class's methods defined after the DeclareClass line so we delay this until the first object construction
-	# The Class and Object class's are bootstrapped in a way that their base methods are alreadyset at this point
-	# so we do not want to init it to "" here.
-	#this[methods]=""
+	# typically a class's methods defined after the DeclareClass line so we delay creating the list of methods until the first
+	# object construction
+	#Class::getClassMethods
 }
 
 # usage: <Class>.isA <className>
@@ -309,38 +326,44 @@ function Class::isA()
 #
 function Class::reloadMethods()
 {
-	importCntr bumpRevNumber
+	this[_vmtCacheNum2]=-1
+	#importCntr bumpRevNumber
 }
 
-
+# TODO: this is diconected from the _classMakeVMT/_classUpdateVMT mechaisms -- merge
 # usage: <Class>.getMethods [<retVar>]
-# return a list of methods defined for this class. By default This does not return methods inherited from base
-# classes.
+# return a list of method names defined for this class. By default This does not return methods inherited from base
+# classes. The names do not include the leading <className>:: prefix.
 # Options:
-#    -i : include inherited methods
+#    -i|--includeInherited   : include inherited methods
+#    -d|--delimiter=<delim>  : use <delim> to separate the method names. default is " "
 # Params:
 #    <retVar> : return the result in this variable
 function Class::getClassMethods()
 {
-	local includeInherited retVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-i) includeInherited="-i" ;;
-	esac; shift; done
-	retVar="$1"
+	local includeInherited delim=" "
+	while [ $# -gt 0 ]; do case $1 in
+		-i|--includeInherited) includeInherited="-i" ;;
+		-d*|--delimiter) bgOptionGetOpt val: delim "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local retVar="$1"
+	_classUpdateVMT "${this[name]}"
 
-	local currentCacheNum; importCntr getRevNumber currentCacheNum
+	local -A methods=()
 
-	if [ ! "${this[methods]}" ] || [ "${this[_getClassMethodsCacheNum]}" != "$currentCacheNum" ]; then
-		this[methods]="$(compgen -A function ${this[name]}::)"
-		this[_getClassMethodsCacheNum]="$currentCacheNum"
-		[ "${this[baseClass]}" ] && eval \$${this[baseClass]}.getClassMethods -i ${this[_OID]}[inheritedMethods]
-	fi
+	local method; for method in ${this[methods]//${this[name]}::}; do
+		methods[$method]=1
+	done
 
 	if [ "$includeInherited" ]; then
-		returnValue "${this[methods]} ${this[inheritedMethods]}" $retVar
-	else
-		returnValue "${this[methods]//${this[name]}::/}" $retVar
+		local method; for method in ${this[inheritedMethods]}; do
+			methods[${method#*::}]=1
+		done
 	fi
+
+	local methodList="${!methods[*]}"
+	returnValue "${methodList// /$delim}" $retVar
 }
 
 # DEPRECIATED: use the syntax --  $myObj.myMember.new <className> [<p1> .. <pN>]
@@ -457,15 +480,6 @@ function ConstructObject()
 		return
 	fi
 
-
-	# ConstructObject can either turn an existing associative array passed in by the caller into an object or create a
-	# new, global associative array on the 'heap' (which is a random global namespace) and return a reference to that new
-	# object. Either way, $2 is the name of the variable in the callers scope that will refer to the object.
-	# If the name in $2 is an associative array, it is used directly, otherwise the variable name in $2 is filled in with the reference.
-	# Either way, the caller will be able to use the variable name (lets call it varName) passed in as $2 as an Object reference
-	# because $varName will resolve to the text of the object ref in both cases. If varName is a simple string var, we set it to the
-	# obj ref text. If its an associative array, we set varName[0] to the obj ref text and $varName is a shortcut for $varName[0]
-
 	# _objRefVar is a variable name passed to us. It is either the name of an associative array that will be the object or a string
 	# variable that will receive the ObjRef string that points to the new object.
 	# SECURITY: clean _objRefVar by removing all but characters that can be used in a variable name. foo[bar] is a valid name.
@@ -476,7 +490,7 @@ function ConstructObject()
 	# Its valid to assign a string to an array -- it gets stored in the [0] element.
 	eval ${_objRefVar}=\"\"
 
-	# if $2 is not name of an associative array, create one on the heap and use $2 just to store the objRef to that heap object
+	# if _objRefVar is not the name of an associative array, create one on the heap and use _objRefVar to store the objRef to that heap object
 	local _OID="$_objRefVar"
 	if [[ ! "$(declare -p "$_objRefVar" 2>/dev/null)" =~ declare\ -[gilnrtux]*A ]]; then
 		newHeapVar -A  _OID
@@ -487,126 +501,113 @@ function ConstructObject()
 	local -n this="$_OID"
 	this[_OID]="$_OID"
 	this[_CLASS]="$_CLASS"
+	local -n class="$_CLASS"
 
 	# create the ObjRef string at index [0]. This supports $objRef.methodName syntax where objRef
 	# is the associative array itself. because in bash, $objRef is a shortcut for $objRef[0]
 	this[0]="_bgclassCall ${_OID} $_CLASS 0 |"
 	this[_Ref]="${this[0]}"
 
-	# copy the ordered classHierarchy list from the Class instance to our new Object Instance
-	# note that since $_CLASS is a map variable name, we have to deferference it in two steps
-	this[_classHierarchy]="$_CLASS[classHierarchy]"; this[_classHierarchy]="${!this[_classHierarchy]}" || assertError ""
-
 	# _classMakeVMT will set all the methods known at this point. It records the id of the current
 	# sourced library state which is maintained by 'import'. At each method call we will call it again and
 	# will quickly check to see if more libraries have been sourced which means that it should check to see
 	# if more methods are known
-	_classMakeVMT
+	#_classMakeVMT
+	_classUpdateVMT "${this[_CLASS]}"
+
+	local -n _VMT="${this[_CLASS]}_vmt"
 
 	# invoke the constructors from Object to this class
-	local _cname; for _cname in ${this[_classHierarchy]}; do
+	local _cname; for _cname in ${class[classHierarchy]}; do
 		unset -n static; local -n static="$_cname"
 		type -t $_cname::__construct &>/dev/null && $_cname::__construct "$@"
 	done
 
-	# if this is a Class Object, register and call the Class's __staticConstruct
-	# __staticConstruct is the end of the recursive, self defining nature of the Object - Class system
-	# Its similar to the concept of having a sub class of Class to represent each different Class, but
-	# instead of defining a whole new sub class (which itself would need to have a unique class data instance
-	# to represent what it is), we only allow that a staticConstructor be defined. This way the loop ends
-	# and the programmer has a way to define the construction of the it's particular Class instance.
-	# Class::__construct can also exist to do generic Class Instance construction.
-	if [ "$_CLASS" == "Class" ] && type -t $_OID::__staticConstruct &>/dev/null; then
-		# TODO: move this to the _classMakeVMT function. Here, we will just call it if it exists for this object.
-		this[_method::__staticConstruct]="$_OID::__staticConstruct"
-		# the __staticConstruct is invoked in the context of the particular Class not the "Class Class"
-		# our $this pointer refers to the object of type Class that we are now constructing but in the
-		# context of the class that Class represents, this object is referenced as $static.
-		local this="$NullObjectInstance"
-		unset -n static; local -n static="$_OID"
-		$_OID::__staticConstruct "$@"
-
-		# set $this and $static back to the context of this "Class" Object so that postConstruct (if defined)
-		# will run in the right context. postConstruct does not seem useful for Class Instances because Class
-		# can not have sub classes declared but it is consistent to do this.
-		unset -n this;   local -n this="$_OID"
-		unset -n static; local -n static="$_CLASS"
-	fi
-
-	[ "${this[_method::postConstruct]}" ] && $this.postConstruct
+	[ "${_VMT[_method::postConstruct]}" ] && ${this[_Ref]}.postConstruct
 	true
 }
 
-# usage: _classMakeVMT
-# update the VMT information in the 'this' array.
-# _classMakeVMT will set all the methods known at this point in the prevailing 'this' array. It records the id of the current
-# sourced library state which is maintained by 'import'. If that ID has not changed snce the last time it built the VMT
-# for this object, it returns quickly. We call this at each method call so that if more libraries are sourced which might
-# have provided more methods that will effect the VMT, they will be included. The script writer can also call the static
-# Class::reloadMethods to cause all VMT to rebuild on their object's next method call.
-# TODO: currently we maintain a separate VMT per object and when a new library is sourced, they all become dirty and
-#       will rebuild on the object's next method invocation. We could now create shared VMT. The full hierarchy string
-#       can be the key. The hierarchy string for each class is constant and when an object is created, the object's
-#       hierarchy string is copied from the class. If we allow multiple inheritance and/or runtime mixins, the object's
-#       hierarchy string can become unique. However you arrive at an ordered hierarchy string, it alone determines the
-#       contents of its VMT. Since all the object instances that have the same hierarchy string, have the same methods,
-#       and except for rebuilding the VMT if and when more functions are sourced, the VMT is read only, object refs can
-#       be changed to store just the name of the VMT associative array. The _bgclassCall function will create a
-#       "local -n _VMT=" pointer and use it instead of "this" for method lookups. Since bash requires that threads be
-#       run in a sub proc which has a copy of the environment, no locking should be needed.
+# usage: _classUpdateVMT [-f|--force] <className>
+# update the VMT information for this <className>.
+# If the _vmtCacheNum2 attribute of the class is not equal to the current import revision number, rescan the sourced functions for
+# any matching our class method naming scheme that associated them with this class.
+# Then it visits each class in the hierarchy, starting at the most base class and sets entries in the vmt array for each method in
+# the class. As each class is visited, methods with the same name overwrite methods from previous classes so that in the end, the
+# method implementation from the most derived class will set set for each name.
+#
+# Prarms:
+#    <className> : the class for which to update the VMT.  Each of its base classes will also be updated since it needs to know
+#                  all methods of all base classes to decide which method implementation should be used.
+# Options:
+#    -f|--force  : rescan all the classes in this hierachy even if the import revision number is current.
 # See Also:
 #    Class::reloadMethods
-function _classMakeVMT()
+# usage: _classUpdateVMT [-f|--force] <className>
+function _classUpdateVMT()
 {
-#bgtraceBreak
-	local currentCacheNum; importCntr getRevNumber currentCacheNum
-	[ "${this[_vmtCacheNum]}" == "$currentCacheNum" ] && return
-	[ "${this[_CLASS]}" != "Class" ] && this[_vmtCacheNum]="$currentCacheNum"
+	local forceFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-f|--force)   forceFlag="-f" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local className="$1"; shift; #assertNotEmpty className
+	local -n class="$className"
 
-	# TODO: consider if we do not need _classHierarchy anymore. Every object has a _CLASS which is
-	#       that contains classHierarchy which is the same as _classHierarchy in the object instance.
-	#       We could allow _classHierarchy to be changed at runtime for a specific object. That would be
-	#       like dynamic mixins -- maybe Aspects. If we got rid of _classHierarchy then this function
-	#       would be more simple. It would just use Class::getMethod -i to get the method list (or
-	#       just point to the Class's VMT)
-
-	# register members into the 'this' array for all inherited classes in order of most super (Object) to most sub
-	# so that the children's methods override the parent's
-	# members overwrite the parent's
-	local _cname; for _cname in ${this[_classHierarchy]}; do
-
-		# the list of method names are cached in the Class object but when the class is declared, most
-		# methods have not yet been defined because its more natural to DeclareClass the class and then
-		# follow it with the methods. Also some methods will be provided by later libraries like the Object::bgtrace
-		# This code delays making the method list until the first instance is created and then will also
-		# recreate the list if more libraries have been loaded.
-		local cnameMethodsRef="$_cname[methods]"
-		local cnameMethodCacheNumRef="$_cname[_getMethodCacheNum]"
-
-		if [ ! "${!cnameMethodsRef}" ] || [ "${!cnameMethodCacheNumRef}" != "$currentCacheNum" ]; then
-			printf -v "$cnameMethodsRef"        "%s" "$(compgen -A function $_cname::)" || assertError -v _cname -v currentCacheNum -v this -v this[_classHierarchy] ""
-			printf -v "$cnameMethodCacheNumRef" "%s" "$currentCacheNum"
-		fi
-		local _mname; for _mname in ${!cnameMethodsRef}; do
-			local _mnameShort="${_mname#$_cname::}"
-			this[_method::${_mnameShort}]="$_mname"
+	# force resest the _vmtCacheNum2 attributes of this entire class hierarchy so that the algorithm will rescan them all this run
+	if [ "$forceFlag" ]; then
+		local -n _oneClass; for _oneClass in ${class[classHierarchy]}; do
+			_oneClass[_vmtCacheNum2]="-1"
 		done
-	done
+		unset -n _oneClass
+	fi
 
-	# add one off methods added with Object::addMethod
-	local _mname; for _mname in ${this[_addedMethods]}; do
-		local _mnameShort="${_mname#*::}"
-		this[_method::${_mnameShort}]="$_mname"
-	done
+	local currentCacheNum; importCntr getRevNumber currentCacheNum
+
+	if [ "${class[_vmtCacheNum2]}" != "$currentCacheNum" ]; then
+		class[_vmtCacheNum2]="$currentCacheNum"
+
+		_classScanForClassMethods "$className" class[methods]
+		class[inheritedMethods]=""
+
+		# fill in the vmt in order from most super class to our class so that earlier methods are overwritten by later methods
+		local -n vmt="${className}_vmt"
+		local _oneCname; for _oneCname in ${class[classHierarchy]}; do
+			local -n _oneClass="$_oneCname"
+
+			if [ "${_oneClass[_vmtCacheNum2]}" != "$currentCacheNum" ]; then
+				_classUpdateVMT "$_oneCname"
+			fi
+
+			[ "$_oneCname" != "$className" ] && class[inheritedMethods]+="${class[inheritedMethods]:+$'\n'}${_oneClass[methods]}"
+
+			local _mname; for _mname in ${_oneClass[methods]}; do
+					vmt["_method::${_mname#$_oneCname::}"]="$_mname"
+			done
+		done
+
+		# add one off methods added with Object::addMethod. These methods override any others with the same short name
+		local _mname; for _mname in ${class[addedMethods]}; do
+			vmt[_method::${_mname#*::}]="$_mname"
+		done
+
+		#bgtraceVars className vmt
+	fi
 }
 
+# usage: _classScanForClassMethods <className> <retVar>
+function _classScanForClassMethods()
+{
+	local className="$1"
+	local retVar="$2"
+	returnValue "$(compgen -A function ${className}::)" $retVar
+}
 
 
 # usage: DeleteObject <objRef>
 # destroy the specified object
 # This will invoke the __desctruct method of the object if it exists.
 # Then it unsets the object's array
-# After calling this, and future use of references to this object will asertError
+# After calling this, future use of references to this object will asertError
 function DeleteObject()
 {
 	# TODO: recursively delete members.
@@ -621,7 +622,8 @@ function DeleteObject()
 	[[ "$(declare -p "${parts[1]}" 2>/dev/null)" =~ declare\ -[gilnrtux]*A ]] || assertError "'$objRef' is not a valid object reference"
 
 	local -n this="${parts[1]}"
-	[ "${this[_method::__destruct]}" ] && $this.__destruct "$@"
+	local -n _VMT="${this[_CLASS]}_vmt"
+	[ "${_VMT[_method::__destruct]}" ] && $this.__destruct "$@"
 	unset this
 }
 
@@ -641,6 +643,7 @@ function DeleteObject()
 #     super   : objRef to call the version of a method declared in a super class. Its the same ObjRef as this but with the <hierarchyCallLevel> term incremented
 #     this    : a ref to the associative array that stores the object's state
 #     static  : a ref to the associative array that stores the object's Class information. This can store static variables
+#     _VMT    : a ref to the associative array that is the vmt (virtual method table) for this object
 #     _OID    : name of the associative array that stores the object's state
 #     _CLASS  : name of the class of the object (the highest level class, not the one the method is from)
 #     _METHOD : name of the method(function) being invoked
@@ -686,11 +689,14 @@ function _bgclassCall()
 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		assertError -v _OID -v _CLASS -v _memberTermWithParams "could not setup Object calling context '$(declare -p this)'"
 	}
-	local -n static=$_CLASS
+	local -n static="${this[_CLASS]}"
 	local super="_bgclassCall ${_OID} $_CLASS $((_hierarchLevel+1)) |"
 
 	# _classMakeVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
-	_classMakeVMT
+	#_classMakeVMT
+	_classUpdateVMT "${this[_CLASS]}"
+
+	local -n _VMT="${this[_CLASS]}_vmt"
 
 	# _memberTerm is the expression the caller typed after the objRef. It could be
 	#      1) a method call                      .<methodName> <p1> <p2> ...
@@ -753,6 +759,7 @@ function _bgclassCall()
 		# fi
 		ConstructObject "$newObjectClass" newObject "$@"
 		this[${_mnameShort}]="$newObject"
+
 	elif [ "$_mnameShort" == "static" ]; then
 		$static"$_memberTerm" "$@"
 
@@ -817,14 +824,14 @@ function _bgclassCall()
 	#           I think the performance hit of this will be negligbable.
 	elif [ ${_hierarchLevel:-0} -gt 0 ]; then
 		# This version might be better but needs to be tested
-		#local h=(${this[_classHierarchy]}) superName
+		#local h=(${static[classHierarchy]}) superName
 		#local i=$((${#h[@]}-1)); while [ $_hierarchLevel -gt 0 ] && [ $((--i)) -ge 0 ]; do
 		#	type -t ${h[$i]}::${_mnameShort} &>/dev/null && ((_hierarchLevel--))
 		#done
 		#local _METHOD="${h[$i]}::${_mnameShort}"
 		#[ $_hierarchLevel -eq 0 ] && $_METHOD "$@"
 
-		local h="${this[_classHierarchy]}" superName
+		local h="${static[classHierarchy]}" superName
 		local i=0; while [ "$h" ] && [ $i -lt $_hierarchLevel ]; do
 			[[ ! "$h" =~ \  ]] && h=""
 			h="${h% *}"
@@ -850,8 +857,8 @@ function _bgclassCall()
 
 	# member function syntax
 	#   $this.<memberFunct> [<p1> .. p2]
-	elif [ "${this[_method::${_mnameShort}]+isset}" ]; then
-		local _METHOD="${this[_method::${_mnameShort}]}"
+	elif [ "${_VMT[_method::${_mnameShort}]+isset}" ]; then
+		local _METHOD="${_VMT[_method::${_mnameShort}]}"
 		objOnEnterMethod "$@"
 		bgDebuggerPlumbingCode=0
 		$_METHOD "$@"
@@ -1035,7 +1042,11 @@ function ParseObjExpr()
 		fi
 	done
 
-	[ "$currentOID" ] && local -n currentAry="$currentOID"
+
+	if [ "$currentOID" ]; then
+		local -n currentAry="$currentOID"
+		local -n currentVMT="${currentAry[_CLASS]}_vmt"
+	 fi
 	[ "$remainderPartValue" == ']' ] && remainderPartValue=""
 
 	if    [ ! "$remainderPartValue" ];                                    then  remainderTypeValue="empty"
@@ -1043,7 +1054,7 @@ function ParseObjExpr()
 	elif [[   "$remainderPartValue" =~ ^((.unset)|(.exists)|(=new))$ ]];  then  remainderTypeValue="builtin"
 	elif [[   "$remainderPartValue" =~ ^= ]];                             then  remainderTypeValue="assignment"
 	elif  [   "${currentAry[$memberRef]+exists}" ];                       then  remainderTypeValue="memberVar"
-	elif  [   "${currentAry["_method::$memberRef"]+exists}" ];            then  remainderTypeValue="method"
+	elif  [   "${currentVMT["_method::$memberRef"]+exists}" ];            then  remainderTypeValue="method"
 	else                                                                        remainderTypeValue="unknown"
 	fi
 	[ "$oidPartVar" ]       && printf -v $oidPartVar       "%s" "$oidPartValue"
@@ -1104,7 +1115,7 @@ function completeObjectSyntax()
 			return
 		fi
 		# . completes only methods and [ completes only variables. The user has to start a var with
-		# _ before system vara are offered
+		# _ before system vars are offered
 		local term; for term in "${!currentScope[@]}"; do
 			case $term:$remainderPart in
 				_method::*:.*) echo " .${term#_method::}" ;;
@@ -1208,10 +1219,8 @@ function Object::clone()
 
 function Object::getMethods()
 {
-	local i; for i in "${!this[@]}"; do
-		if [[ "$i" =~ ^_method:: ]]; then
-			echo ${i#_method::}
-		fi
+	local i; for i in "${!_VMT[@]}"; do
+		echo ${i#_method::}
 	done
 }
 
@@ -1219,7 +1228,7 @@ function Object::getMethods()
 # returns true if the object has the specified <methodName>
 function Object::hasMethod()
 {
-	[ "${this[_method::$1]}" ]
+	[ "${_VMT[_method::$1]}" ]
 }
 
 # usage: $obj.addMethod <methodName>
@@ -1229,8 +1238,10 @@ function Object::addMethod()
 	local _mname="$1"
 	local _mnameShort="${_mname#*::}"
 
+	assertError "DEV: this method needs to be updated because the _VMT is now shared amoung instances"
+
 	this[_addedMethods]+=" $_mname"
-	this[_method::${_mnameShort}]="$_mname"
+	_VMT[_method::${_mnameShort}]="$_mname"
 }
 
 
@@ -1524,7 +1535,6 @@ declare -A Class=(
 	[baseClass]="Object"
 	[classHierarchy]="Object Class"
 	[_OID]="Class"
-	[_classHierarchy]="Object Class"
 )
 # this is the Instance of 'Class' that describes 'Object'
 declare -A Object=(
@@ -1532,17 +1542,16 @@ declare -A Object=(
 	[baseClass]=""
 	[classHierarchy]="Object"
 	[_OID]="Object"
-	[_classHierarchy]="Object Class"
 )
+declare -A Object_vmt=()
 
 DeclareClass Class
 DeclareClass Object
 
-# we don't construct the Null Object because the [0],[_Ref] value is an assert instead of the normal format
+# we don't call ConstructObject for the Null Object because the [0],[_Ref] value is an assert instead of the normal format
 # we protect against re-defining it in case we reload the library
 [ ! "${NullObjectInstance[_OID]}" ] && declare -rA NullObjectInstance=(
 	[_OID]="NullObjectInstance"
-	[_classHierarchy]="Object"
 	[0]="assertError Null Object reference called <NULL>"
 	[_Ref]="assertError Null Object reference called <NULL>"
 )
@@ -1651,7 +1660,7 @@ function Stack::isEmpty()
 
 
 
-# OBSOLETE? this seems not very useful now. The intention was to allow a real -a array to be stored but that did not work. Stack is better. We can add a Queue too
+# OBSOLETE? See BashArray and BashMap. The intention was to allow a real -a array to be stored but that did not work. Stack is better. We can add a Queue too
 # An Array is a simple Object that can be used like a numeric array. Arrays are typically only used as member attributes
 # of objects because bash arrays can not be array elements of other arrays (Objects are bash associate arrays where the elements
 # are the member attributes)
