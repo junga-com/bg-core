@@ -28,7 +28,7 @@ dejavue
 stderr> here is some data
 stderr> dejavue
 cmd> exitWithNonZero 45
-['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+[exitCode 45]
 
 ## bg_unitTests.sh:noSections: finished
 ###############################################################################################################################
@@ -50,12 +50,10 @@ stdout data in test section
 cmd> echo stderr data in test section >&2
 stderr> stderr data in test section
 cmd> (exit 2); echo hi; false
-cmd> (exit 2); echo hi; false
 hi
-['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+[exitCode 2][exitCode 1]
 cmd> echo one more thing...
 one more thing...
-['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
 
 ## bg_unitTests.sh:outputNormalTypes: finished
 ###############################################################################################################################
@@ -63,7 +61,7 @@ one more thing...
 
 ###############################################################################################################################
 ## bg_unitTests.sh:setupError1: start
-## expect: testcase to stop and fail when stderror output is seen in setup
+## expect: testcase to stop with an error when stderror output is seen in setup
 
 ##----------
 ## setup
@@ -78,15 +76,14 @@ one more thing...
 
 ###############################################################################################################################
 ## bg_unitTests.sh:setupError2: start
-## expect: testcase to stop and fail when a command in setup section returns non-zero
+## expect: testcase to stop with an error when a command in setup section returns non-zero
 
 ##----------
 ## setup
 ##     | cmd> echo setting up something something...
 ##     | setting up something something...
 ##     | cmd> false
-##     | cmd> 
-##     | ['ut onCmdErrCode "$?" "$BASH_COMMAND"' exitted 0]
+##     | [exitCode 1]
 ** Setup Failed: testcase not finished.  **
 ## bg_unitTests.sh:setupError2: ERROR: setup could not complete
 ###############################################################################################################################
@@ -94,17 +91,19 @@ one more thing...
 
 ###############################################################################################################################
 ## bg_unitTests.sh:setupError3: start
-## expect: testcase to stop and fail when an assert* function is called in a setup section
+## expect: testcase to stop with an error when an assert* function is called in a setup section
 
 ##----------
 ## setup
 ##     | cmd> echo setting up something something...
 ##     | setting up something something...
 ##     | cmd> assertError "bad setup"
+##     | : 
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
    catch_errorCode='36'
-   catch_errorDescription='error: ut_setupError3: bad setup'
+   catch_errorDescription='
+                           error: ut_setupError3: bad setup'
 ** Setup Failed: testcase not finished.  **
 ## bg_unitTests.sh:setupError3: ERROR: setup could not complete
 ###############################################################################################################################
@@ -144,10 +143,11 @@ cmd> exit 2
 ##----------
 ## test
 cmd> assertError "this is an error"
-** Exception thrown by testcase **
+: ** Exception thrown by testcase **
    catch_errorClass='assertError'
    catch_errorCode='36'
-   catch_errorDescription='error: ut_assertInTest: this is an error'
+   catch_errorDescription='
+                           error: ut_assertInTest: this is an error'
 ## bg_unitTests.sh:assertInTest: finished
 ###############################################################################################################################
 

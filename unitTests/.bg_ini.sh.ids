@@ -1,5 +1,5 @@
-getIniParam:1 
-getIniParam:2 
-getIniParam:3 
-getIniParam:4 
-getIniParam:5 
+getIniParam:empty 
+getIniParam:noSections 
+getIniParam:noTopLevel 
+getIniParam:topAndSections 
+getIniParam:colonInSectNames 

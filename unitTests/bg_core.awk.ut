@@ -3,7 +3,7 @@
 source /usr/lib/bg_core.sh
 import bg_unitTest.sh ;$L1;$L2
 
-ut_parserCreateFromDelimList=(
+ut_pathGetCanonStr=(
    [0]="$(cmdLine '
    ../
    ../..
@@ -74,15 +74,16 @@ awkScript='
 	/^[[:space:]]*$/ {print; next}
 	{
 		sub(/^[[:space:]]*/, "")
-		printf("inputFolder:'\''%s'\''\n", $0)
+		printf("inputPath:'\''%s'\''\n", $0)
 		fflush()
-		printf("      plain:'\''%s'\''\n", pathGetCanonStr($0))
+		printf("    plain:'\''%s'\''\n", pathGetCanonStr($0))
 		fflush()
-		printf("      w/env:'\''%s'\''\n", pathGetCanonStr($0, 1))
+		printf("    w/env:'\''%s'\''\n", pathGetCanonStr($0, 1))
 		fflush()
 	}
 '
-ut_parserCreateFromDelimList() {
+ut_pathGetCanonStr() {
+    # expect: the input has one path per line. each will print the original, canonical and canonical using the environment.
 	ut setup
 	echo "$awkScript"
 	export HOME="/home/joeUser"

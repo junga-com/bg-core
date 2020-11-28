@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source /usr/lib/bg_core.sh
+bgtrace "sourceing unitTest.ut '$L1' '$L2'"
 import bg_unitTest.sh ;$L1;$L2
 
 
@@ -65,7 +66,7 @@ function ut_outputNormalTypes()
 
 function ut_setupError1()
 {
-	# expect testcase to stop and fail when stderror output is seen in setup
+	# expect testcase to stop with an error when stderror output is seen in setup
 	ut setup
 	echo something something...
 	echo "some error" >&2
@@ -79,7 +80,7 @@ function ut_setupError1()
 
 function ut_setupError2()
 {
-	# expect testcase to stop and fail when a command in setup section returns non-zero
+	# expect testcase to stop with an error when a command in setup section returns non-zero
 	ut setup
 	echo setting up something something...
 	false
@@ -93,8 +94,9 @@ function ut_setupError2()
 
 function ut_setupError3()
 {
-	# expect testcase to stop and fail when an assert* function is called in a setup section
+	# expect testcase to stop with an error when an assert* function is called in a setup section
 	ut setup
+	ut expectSetupFail
 	echo setting up something something...
 	assertError "bad setup"
 	echo somethingElse somethingElse...

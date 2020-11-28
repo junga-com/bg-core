@@ -621,7 +621,7 @@ function updateIfDifferent(srcFile, dstFile               ,cmd,srcExists,dstExis
 	srcExists=fsExists(srcFile)
 	dstExists=fsExists(dstFile)
 	if (srcExists && fsIsDifferent(srcFile, dstFile)) {
-		print "updating "dstFile
+		#print "updating "dstFile
 		print "cat "srcFile" > "dstFile"; rm "srcFile | "sh"
 		close("sh")
 	} else if (!srcExists && dstExists) {
@@ -632,6 +632,10 @@ function updateIfDifferent(srcFile, dstFile               ,cmd,srcExists,dstExis
 	}
 }
 
+function fsRemove(file) {
+	print "rm -f "file | "sh"
+	close("sh")
+}
 
 #################################################################################################################################
 ### Path functions
@@ -724,7 +728,6 @@ function pathGetCanonStr(path, useEnvFlag                                , parse
 				pathArray[length(pathArray)]=parser["token"]
 		}
 	}
-bgtraceVars2(0,"pathArray", pathArray)
 
 	if ((length(pathArray)==1 && pathArray[0]==""))
 		out="/"

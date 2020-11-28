@@ -93,11 +93,62 @@ function newHeapVar() {
 # usage: varExists <varName> [.. <varNameN>]
 # returns true(0) if all the vars listed on the cmd line exits
 # returns false(1) if any do not exist
+# See Also:
+#     test -v <var>
+#     ${<var>+exists}
 function varExists()
 {
 	# the -p option prints the declaration of the variables named in "$@".
 	# we throw away all output but its return value will indicate whether it succeeded in finding all the variables
 	declare -p "$@" &>/dev/null
+}
+
+# usage: varGetAttributes <varName> [<retVar>]
+# returns the attributes that are set for <varName>.
+#   '-'  If <varName> exists but has none set, '-' is returned.
+#   ''   If <varName> does not exist as a variable, "" is returned
+# Indexed Variables:
+# Indexed variables are array references like foo[idx].
+# If the array part does not exist or idx is not an index in the array "" is returned to indicate that the variable does not exist.
+# If the idx entry does exist, the attributes of the array are returned with 'A' and 'a' removed (because the indexed var is not an
+# array). If 'A' or 'a' are the only attribute, then '-' is returned to indicate that it exists but have no attribute set.
+# Params:
+#    <varName> : can be a direct variable name or an indexed name like foo[idx].
+#
+# See Also:
+#    ${<varName>@a}
+function varGetAttributes()
+{
+	local ret
+
+	# this is no faster than the declare method below (even in cases where eval is not needed)
+	#eval ret='${'"$1"'@a}'
+
+	# normal vars
+	if [[ "$1" =~ ^[a-zA-Z0-9_]*$ ]]; then
+		local _gaGeclaration="$(declare -p "$1" 2>/dev/null)"
+		ret="${_gaGeclaration#declare -}"
+		ret="${ret%% *}"
+
+		if [[ "$ret" =~ n ]]; then
+			if [[ "$_gaGeclaration" =~ -n\ [^=]*=\"([^\"]*)\" ]]; then
+				local _gaRefName="${BASH_REMATCH[1]}"
+				varGetAttributes "$_gaRefName" "$2"
+				return
+			fi
+		fi
+
+	# foo[idx]
+	elif [[ "$1" =~ ^[]a-zA-Z0-9_[]*$ ]]; then
+		eval '[ "${'"$1"'+exists}" ] && ret="-"'
+		if [ "$ret" ]; then
+			local idxRet; varGetAttributes "${1%%\[*}" idxRet
+			ret="${idxRet//[aA]}"
+			ret="${ret:--}"
+		fi
+	fi
+
+	returnValue "$ret" "$2"
 }
 
 # usage: varIsA <type1> [.. <typeN>] <varName>
@@ -415,7 +466,7 @@ function varSet()
 	printf -v "$sr_varRef" "%s" "$*"
 }
 
-# usage: varGet <varName>
+# usage: varGet <varName> [<retVar>]
 # returns the value contained in the simple (string) <varName>. This is a wrapper over the ${!<varName>} sysntax.  For simple
 # variables that syntax is prefered but this function exists for completeness.
 function varGet()
@@ -769,7 +820,7 @@ function varGenVarname()
 function printfVars()
 {
 	local pv_nameColWidth pv_inlineFieldWidth="0" pv_indexColWidth oneLineMode pv_lineEnding="\n"
-	local pv_prefix
+	local pv_prefix pv_noObjectsFlag
 
 	function _printfVars_printValue()
 	{
@@ -779,7 +830,7 @@ function printfVars()
 			# common processing for all oneline:* -- note the ;;&
 			oneline:*)
 				if [[ "$value" =~ $'\n' ]]; then
-					value="${value//$'\n'*/ ...}"
+					value="${value//$'\n'*/ \n...}"
 				fi
 				;;&
 			oneline:nameExits)
@@ -833,6 +884,11 @@ function printfVars()
 			continue
 		fi
 
+		if [ "$pv_term" == "--noObjects" ]; then
+			pv_noObjectsFlag="1"
+			continue
+		fi
+
 		# "" or "\n" means output a newline
 		if [ ! "$pv_term" ] || [ "$pv_term" == "\n" ] ; then
 			printf "\n"
@@ -871,17 +927,21 @@ function printfVars()
 			{ varIsA array ${pv_varname%%[[]*} || [[ "$pv_varname" =~ [[][@*][]]$ ]]; } && pv_type="arrayElement"
 		fi
 
-		# if its not a var name, just print it as an empty var.
+		# the term is not a variable name
 		if [ ! "$pv_type" ]; then
 			if [ "$pv_label" == "$pv_varname" ]; then
-				_printfVars_printValue "$pv_varname" ""
+				# if its a simple token that is not a var name, we used to print it as an empty var because of the bash bug that
+				# uninitialized declared vars would not be detectable as being declared. In circa 5.x, that is fixed so now we
+				# treat it as a literal.
+				_printfVars_printValue "" "${pv_varname}"
 			else
+				# foo:bar where bar is not a variable name
 				_printfVars_printValue "$pv_label" "$pv_varname"
 			fi
 
 		# it its an object reference, invoke its .bgtrace method
-		elif [[ ! "$pv_varname" =~ [[] ]] && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
-			objEval "$pv_varname.toString"
+		elif [ ! "$pv_noObjectsFlag" ] && [[ ! "$pv_varname" =~ [[] ]] && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
+			objEval "$pv_varname.toString --title=${pv_varname}"
 
 		# if its an array, iterate its content
 		elif [[ "$pv_type" =~ ^declare\ -[gilnrtux]*[aA] ]]; then

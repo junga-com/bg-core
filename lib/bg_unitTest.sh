@@ -1,3 +1,5 @@
+#bgtrace "sourceing unitTest"
+
 
 # Library
 # FUNCMAN_NO_FUNCTION_LIST
@@ -100,7 +102,10 @@ for _uttmpSrcname in "${BASH_SOURCE[@]}"; do
 		break
 	fi
 done
+#[ ! "$bgUnitTestScript" ] && bgtraceBreak
 assertNotEmpty bgUnitTestScript
+
+
 
 ##################################################################################################################################
 ### Common Section
@@ -285,10 +290,17 @@ function ut()
 		exec >&$stdoutFD
 		_ut_flushSetupFile
 		printf "** Exception thrown by testcase **\n"
-		catch_errorDescription="${catch_errorDescription##$'\n'}"
-		printfVars "   " ${!catch_*}
-		[ "$_utRun_section" == "setup" ] && ut setupFailed;
+		#catch_errorDescription="${catch_errorDescription##$'\n'}"
+		#printfVars "   " ${!catch_*}
+		printfVars "   " catch_errorClass catch_errorCode catch_errorDescription
+		if [ "$_utRun_section" == "setup" ]; then
+			[ "$_utRun_expectSetupFail"  ] || printfVars catch_stkArray catch_psTree
+		 	ut setupFailed;
+		fi
 		;;
+
+	expectSetupFail) _utRun_expectSetupFail="1" ;;
+
 
 	  onEnd)
 		_ut_flushLineInfo
@@ -413,7 +425,10 @@ function utfRunner_execute()
 	local utID="${utFileID}:${utFunc#ut_}:$utParams"
 
 	# import script if needed and validate that the utFunc exists
-	[ "$(type -t "$utFunc")" == "function" ] || [ "$bgUnitTestMode" == "direct" ] || import "$utFilePath" ;$L1;$L2
+	if [ ! "$(type -t "$utFunc")" == "function" ] && [ "$bgUnitTestMode" != "direct" ]; then
+		#bgtraceBreak
+		import "$utFilePath" ;$L1;$L2
+	fi
 	[ "$(type -t "$utFunc")" == "function" ] || assertError -v utFileID -v utFunc -v utParams "the unit test function is not defined in the unit test file"
 
 	# if utParams is emptyString, invoke with no params. If its '...' use the arguments passed in to this function by the caller,
@@ -455,7 +470,7 @@ function utfRunner_execute()
 		fi
 		if [ $_utRun_srcLineStart -ne 0 ]; then
 			if [[ "${_utRun_srcCode[i]}" =~ ^[[:space:]]*#[[:space:]]*expect ]]; then
-				_utRun_expect="${_utRun_srcCode[i]#*expect }"
+				_utRun_expect="${_utRun_srcCode[i]#*expect[ :]}"
 			fi
 			if [[ ${_utRun_srcCode[i]} =~ ^} ]]; then
 				_utRun_srcLineEnd=$i

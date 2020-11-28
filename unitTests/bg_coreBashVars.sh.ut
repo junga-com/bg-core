@@ -1,0 +1,66 @@
+#!/bin/bash
+
+source /usr/lib/bg_core.sh
+import bg_unitTest.sh ;$L1;$L2
+import bg_objects.sh  ;$L1;$L2
+
+
+ut_printfVars=(
+	[0]="$(cmdline string narray aarray -l"hello world")"
+	[1]="$(cmdline var1:string var2:narray var3:aarray)"
+	[2]="$(cmdline -w20 string narray aarray)"
+	[3]="$(cmdline longStr)"
+	[4]="$(cmdline -1 string narray aarray)"
+	[5]="$(cmdline -1 var1:string var2:narray var3:aarray)"
+	[6]="$(cmdline -1 -w20 string narray aarray)"
+	[7]="$(cmdline -1 -l"one" -l"two" +1 -l"three" -l"four")"
+	[8]="$(cmdline "   " -l"one" -l"two" "      " -l"three" -l"four")"
+	[9]="$(cmdline iDontExist "I dont exist")"
+)
+function ut_printfVars()
+{
+	# expect: the output of different types of variables to show their value
+	ut setup
+	local string="i am a string"
+	local -a narray=(one two three)
+	local -A aarray=(
+		[one]=1
+		[two]=$(dedent '
+			hello
+			world
+		')
+		[three]=3
+	)
+	local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+	ut test
+	echo printfVars "$@"
+	printfVars "$@"
+}
+
+function ut_printfVars_objects()
+{
+	# expect: the output of different types of variables to show their value
+	ut setup
+	DeclareClass Animal
+	Animal::__construct() { this[species]="unk"; }
+	Animal::speak() { echo "i am just a generic animal"; }
+
+	DeclareClass Dog Animal
+	Dog::__construct() { this[species]="dog"; }
+	Dog::speak() { echo "woof"; }
+
+	DeclareClass Cat Animal
+	Cat::__construct() { this[species]="cat"; }
+	Cat::speak() { echo "meow"; }
+
+	local -A myDog=(); ConstructObject Dog myDog
+	local -A myCat=(); ConstructObject Cat myCat
+
+	ut test
+	printfVars Animal "" Dog "" Cat "" myDog "" myCat
+	printfVars --noObjects myCat
+}
+
+# this should be the last line of any ut script
+unitTestCntr "$@"

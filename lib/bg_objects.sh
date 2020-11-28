@@ -50,7 +50,7 @@
 # 	function Animal::whoseAGoodBoy() { echo "I am a ${this[_CLASS]}"; }
 #
 # 	DeclareClass Dog Animal
-# 	function Dog::__construct() { : do Dog init. You dont have to define a __constructor; }
+# 	function Dog::__construct() { : do Dog init. You dont have to define a __construct; }
 # 	function Dog::whoseAGoodBoy() { echo "Is it me? I want to be a good dog."; }
 #
 # 	DeclareClass Cat Animal
@@ -467,6 +467,7 @@ function NewObject()
 # The range of syntax supported in <something...> is defined by the _bgclassCall function.
 function ConstructObject()
 {
+	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
 	[[ "${BASH_VERSION:0:3}" < "4.3" ]] && assertError "classes need the declare -n option which is available in bash 4.3 and above"
 	local _CLASS="$1"; assertNotEmpty _CLASS "className is a required parameter"
 
@@ -477,6 +478,7 @@ function ConstructObject()
 		shift
 		local objName="$1"; shift
 		$_CLASS::ConstructObject "$data" "$objName" "$@"
+		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		return
 	fi
 
@@ -520,10 +522,13 @@ function ConstructObject()
 	# invoke the constructors from Object to this class
 	local _cname; for _cname in ${class[classHierarchy]}; do
 		unset -n static; local -n static="$_cname"
+		bgDebuggerPlumbingCode=0
 		type -t $_cname::__construct &>/dev/null && $_cname::__construct "$@"
+		bgDebuggerPlumbingCode=1
 	done
 
 	[ "${_VMT[_method::postConstruct]}" ] && ${this[_Ref]}.postConstruct
+	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 	true
 }
 
@@ -813,7 +818,7 @@ function _bgclassCall()
 	# calling a super class method syntax
 	#   $super.<method>
 	# TODO: refactor $super. implementation. The current imp only works when initiated from the most subclass because
-	#       it uses _classHierarchy from the start. What it needs to do is always be related from the
+	#       it uses classHierarchy from the start. What it needs to do is always be related from the
 	#       the class that the function its used in is in.
 	#       Option1: the <hierarchyCallLevel> position in an obj ref could become a list of optional flags. the super ref would just have that flag
 	#           set. Hear we would detect that flag, get the calling method's class from the bash call stack, and increment the hierarchy from there.
@@ -919,6 +924,7 @@ function ObjEval()
 	local callExpr="${!oPart}"
 	[ "${callExpr:0:12}" == "_bgclassCall" ] || assertError "invalid object expression '$objExpr'. '\$$oPart' is not an object reference"
 	# TODO: escape $objExpr so that it cant be a compound statement
+	# SECURITY: escape $objExpr so that it cant be a compound statement
 	eval \$$objExpr "$@"
 }
 
@@ -1373,6 +1379,12 @@ function Object::fromString()
 function Object::toDebControl() { Object::toString "$@"; }
 function Object::toString()
 {
+	local titleName
+	while [ $# -gt 0 ]; do case $1 in
+		--title*) bgOptionGetOpt val: titleName "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
 	local indexes=$($this.getIndexes)
 
 	local labelWidth=0
@@ -1380,16 +1392,25 @@ function Object::toString()
 		((labelWidth=(labelWidth<${#attrib}) ?${#attrib} :labelWidth ))
 	done
 
+	#((labelWidth=(labelWidth<6) ?labelWidth : 6))
+
+	local indent="" indentWidth=labelWidth
+	if [ "$titleName" ]; then
+		printf "%s : %s\n" "${titleName}" "${this[_CLASS]}"
+		indent="   "
+		((indentWidth+=3))
+	fi
+
 	local attrib; for attrib in $indexes; do
 		local value="${this[$attrib]}"
 		if [ "${value:0:12}" == "_bgclassCall" ]; then
 			local parts=($value)
 			value="<instance> of ${parts[2]}"
 			#value="${parts[0]}  <instance>  ${parts[2]}"
-			printf "%-${labelWidth}s: %s\n" "$attrib" "$value" | awk -v labelWidth="$labelWidth" '{if (NR>1) printf("%-*s+ ", labelWidth, ""); print $0}'
+			printf "${indent}%-${labelWidth}s: %s\n" "$attrib" "$value" | awk -v indentWidth="$indentWidth" -v indent="$indent" '{if (NR>1) printf("%-*s+ ", indentWidth, ""); print $0}'
 			${this[$attrib]}.toString | awk -v attrib="$attrib" '{printf("  %s%s%s\n", attrib, ($1~/^[[]/)?"":".", $0)}'
 		else
-			printf "%-${labelWidth}s: %s\n" "$attrib" "$value" | awk -v labelWidth="$labelWidth" '{if (NR>1) printf("%-*s+ ", labelWidth, ""); print $0}'
+			printf "${indent}%-${labelWidth}s: %s\n" "$attrib" "$value" | awk -v indentWidth="$indentWidth" -v indent="$indent" '{if (NR>1) printf("%-*s+ ", indentWidth, ""); print $0}'
 		fi
 	done
 }

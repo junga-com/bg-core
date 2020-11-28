@@ -1,0 +1,63 @@
+.TH bgBashIdioms 7 "October 2014" "Junga" "bg-core"
+
+.SH NAME
+bgBashIdioms -- describes some idioms used in bg-core bash programming style
+
+.SH OVERVIEW
+This man page describes a number of idiomatic conventions used in bg-core style bash programming. An idiom is a programming convention that has meaning beyond the literal meaning of the code syntax. Bash is a language where idioms are important because the syntax is not natively friendly to many of the common facilities that programmers enjoy in other languages.
+
+Before the reader knows the idiom, the code can look overly complex and cryptic but after knowing the idiom, the reader looks past the literal code and sees the structure that becomes easy to work with.
+
+.SH Command Line Options Processing
+*nix commands have a convention of passing optional arguments ahead of positional arguments.
+
+Options begin with a "-" character, can have short and long variants, can either require an argument to the option or not, short options without arguments can be concatenated into one token, the required argument to an option can be given in the same token with the option or in the following token, and the "=" character is used to concatenate a long option with its argument but a short option uses no delimiter.
+
+This convention makes it relatively easy to invoke commands but the code to recognize all these variants makes scripts difficult to read. The getopts utility attempts to make it easier but falls short.  
+
+This idiom isolates the declaration of options from the processing so that whether a function or script command accepts an option typically is one line of code that is easy to cut and paste, add or remove.
+
+    (1)    local allFlag filename="/my/default/name"
+    (2)    while [ $# -gt 0 ]; do case $1 in
+    (3)        -a|--all) allFlag="-a" ;;
+    (4)        -f*|--files*) bgOptionGetOpt val: filename "$@" && shift ;;
+    (5)        *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+    (6)    done
+
+Lines 2,5, and 6 are idiomatic. They do not follow good script programming practice and are hard to understand. They combine a while loop and case statement in a strange way. The reason for that is that we want this block of code to be about the other lines of code that are specific to the particular function or command so we pack the rote stuff into a 'beginning' blob and an 'ending' blob. I would have liked to have combined 5 and 6 into a single line but the eye is so used to seeing 'while' terminated with 'done' that I felt it better to keep the ending blob two lines. 
+
+After seeing a similar block of code at the start of most functions and at the start of the main script of commands, your eye should start seeing line 2 as the start of options processing and lines 5 and 6 as the end of options processing and pretty much ignore them.
+
+The eye should focus on lines 3 and 4. Each describes one option and as the function is developed, the set of supported options can grow or shrink as needed by adding and removing lines like these.
+
+Line 3 says that this function accepts a option that has the short form "-a" and the long form "--all". Because they lack the trailing *, they do not have a required argument.
+
+Line 4 is another option with short and long forms that do require an argument because each has a trailing *.
+
+The author can do what ever processing is required in the option's case statement but typically, options will only set a variable which the body of the function will use to affect its behavior. Note that the option without an argument sets its corresponding value to the short form of the option.  This makes is convenient both to check if the option is set (non-empty string) and also to pass that option through to another command that accepts the same option, if needed.
+
+The option with a required argument uses the bgOptionsGetOpt function to retrieve the value. This is a sub-idiom. The only important thing on that lien is the name fo the "filename" variable that is being set with the required argument.
+
+This block supports all the conventions of *nix options and it does it efficiently as runtime so that the author can add as many options as makes sense without adversely affecting performance.  
+
+I never type out lines 2, 5, and 6 nor do I type out the bgOptionsGetOpt call line. Instead, I either copy and paste an option block from a nearby function or use a snippet feature of my editor to fill them in.
+
+My Atom snippets make it so that I start typing "bgoptloop" to insert line 2,5, and 6 and when I add an option with an argument I insert a blank line after line 2 and start typing "bgoptadd".
+
+.SH Renaming functions with Aliases
+When organizing libraries, sometimes you realize that a function should be named differently for various reasons. For example, when a function was written, it was considered to stand alone but now you consider it part of a family of functions that should share a naming convention.
+
+If the library is used by other code, you may not be in the position to change all references to that function in order to rename it.
+
+In this case we can use the function alias idiom to provide an alternate name.
+
+   function insertString() { stringInsert "@"; } # DEPRECIATED:
+   function stringInsert() {
+       ...
+   }
+
+Now the function can be invoked via either name. The prefered name should be the one with the actual function implementation.
+
+If the alias line contains the DEPRECIATED: tag, tools will indicate to users that it should be changed to the preferred name.
+
+Sometimes a function should have multiple names. Possibly it has a longer name that is descriptive but its a common function used in a way that a short idiomatic alias makes the code where it is used more readable. To be explicit that the alias is valid you can tag it with # ALIAS:

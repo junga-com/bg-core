@@ -1408,6 +1408,7 @@ function stringShorten()
 # usage: stringRemoveLeadingIndents <msg>
 # This formatter removes leading tabs similar to <<-EOS .. so that you can pass in multiline text and still indent it
 # with the source code.
+function dedent() { stringRemoveLeadingIndents "$@"; }
 function strRemoveLeadingIndents() { stringRemoveLeadingIndents "$@"; }
 function stringRemoveLeadingIndents()
 {

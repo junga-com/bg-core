@@ -23,6 +23,7 @@
 
 # usage: bgOptionsEndLoop [--firstParam <firstParamVar>] [--eatUnknown] "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"
 # usage: see example code below. This is part of an argument parsing pattern
+# See man(7) bgBashIdioms for a description of the larger idiom that this function is a part of.
 # this supports a pattern of command line parsing that handles all the common option conventions
 #    * single letter flags (-a -b ...)
 #    * long form options (--my-bFlag) which may or may not have single letter alias
@@ -93,6 +94,8 @@
 #        -d)  myDFlag="-d" ;;
 #         *)  bgOptionsEndLoop --firstParam gitFolder "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 #    done
+# See Also:
+#    man(7) bgBashIdioms
 function bgOptionsEndLoop()
 {
 	# extract our options.
@@ -206,6 +209,7 @@ function bgOptionsOnUnknownDefault()
 
 # usage: bgOptionGetOpt val[:]|opt[:]|valArray: <varName> <cmd line ...>
 # usage: bgOptionGetOpt val myoptionName "$@" && shift
+# See man(7) bgBashIdioms for a description of the larger idiom that this function is a part of.
 # This is part of a pattern for command line argument parsing. See bgOptionsEndLoop.
 # This function returns the next option by setting it into the <varName> parameter and returns 0(true)
 # if the caller should call an extra shift to consume two $@ positions in this loop iteration or
@@ -248,6 +252,7 @@ function bgOptionsOnUnknownDefault()
 #
 # See Also:
 #   bgOptionsEndLoop
+#   man(7) bgBashIdioms
 function bgOptionGetOpt()
 {
 	local _oga_type="${1}"; shift

@@ -812,7 +812,7 @@ function wrapLines()
 # version of a program or a text based one.
 function isShellFromSSH()
 {
-	[ "$SSH_TTY" ] || [ "$(who am i | grep "([0-9.]*)")" ]
+	[ "$SSH_TTY" ] || [ "$(who | grep "([0-9.]*)" )" ]
 }
 
 # usage: isGUIViable
@@ -822,7 +822,7 @@ function isShellFromSSH()
 # version of a rpogram or a text based one.
 function isGUIViable()
 {
-	[ ! "$SSH_TTY" ] && [ ! "$(who am i | grep "([0-9.]*)")" ]
+	[ ! "$SSH_TTY" ] && [ ! "$(who | grep "([0-9.]*)")" ]
 }
 
 # usage: wheresTheUserAt userOverridePlace "placesInPrefOrder"
@@ -905,6 +905,21 @@ function getUserCmpApp()
 	__testAndReturnApp "diff" && return
 
 	echo "diff"
+}
+
+# usage: $(getUserTerminalApp)
+# this inspects the environment and finds the command that the user prefers
+# to open a new terminal emulator window. 'gnome-terminal' is the default
+#    BGENV: VISUAL_TERM : gnome-terminal|<programName> : the user's prefered terminal emulator program
+function getUserTerminalApp()
+{
+	__testAndReturnApp "${VISUAL_TERM}" && return
+	__testAndReturnApp "gnome-terminal" && return
+
+	assertError "
+		could not find an installed terminal emulator.
+		See man(3) getUserTerminalApp
+	"
 }
 
 # usage: $(getUserFileManagerApp) <file1> <file2>

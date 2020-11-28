@@ -9,7 +9,7 @@ Learn more in the package's man(7) bg-corePkg.
 
  * import: system for importing (aka sourcing) bash libraries.
    See man(3) import  (you need to specify the section like man -s3 import)
- * options processing: easy, idiomatic options processing syntax that supports short and long options both with and without arguments and short option concatenation.
+ * options processing: easy, idiomatic options processing syntax that supports short and long options both with and without arguments and short option concatenation. Works for functions and commands.
  * in-place cmdline argument completion: your script provides the completion data to bash so that the syntax is maintained in one place
    See man(3) _bgbc-complete-viaCmdDelegation, man(3) oob_printBashCompletion, and man(3) oob_invokeOutOfBandSystem
  * simple text template expansion against the linux environment variables
@@ -492,37 +492,29 @@ Here for brevity I expanded a string literal template but I could have done the 
 
 When writing a full featured script, one comes up against a limitation of bash's concept of data scope. There is no native concept of data structures that can be passed around to functions so its hard to provide a library that operates on something that is a collection of multiple variables.
 
+
 ```bash
-$ import bg_objects.sh ;$L1
-$ DeclareClass Animal
-$ function Animal::__construct() { this[name]="$1"; }
-$ function Animal::whoseAGoodBoy() { echo "I am a ${this[_CLASS]}"; }
-$
-$ DeclareClass Dog Animal
-$ function Dog::__construct() { : do Dog init. You dont have to define a __constructor; }
-$ function Dog::whoseAGoodBoy() { echo "Is it me? I want to be a good dog."; }
-$
-$ DeclareClass Cat Animal
-$ function Cat::whoseAGoodBoy() { echo "Whatever, Cats are girls. Oh BTW, my I need some fresh food"; }
-$
-$ ConstructObject Dog george "George"
-$ $george.wagFrequency="45Htz" # add some more data to this object on the fly...
-$
-$ ConstructObject Cat kes "kes"
-$ $kes.sleepSchedule="22/7"
-$
-$ $george.whoseAGoodBoy
-Is it me? I want to be a good dog.
-$ $kes.whoseAGoodBoy
-Whatever, Cats are girls. Oh BTW, my I need some fresh food
-$
-$ printfVars george
-wagFrequency : 45Htz
-name         : George
-$
-$ printfVars kes
-name         : kes
-sleepSchedule: 22/7
+$ cat - >/tmp/test7.sh
+#!/usr/bin/env bash
+source /usr/lib/bg_core.sh
+import bg_objects.sh ;$L1
+DeclareClass MyData
+function MyData::__construct() {
+    this[filename]="$1"
+    this[quantity]="$2"
+}
+function MyData::process() {
+    (( ${this[quantity]}-- ))
+    echo "one of ${this[name]}"
+}
+
+
+<cntr-d>
+$ chmod a+x /tmp/test7.sh
+```
+
+```bash
+
 ```
 
 

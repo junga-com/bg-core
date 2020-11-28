@@ -58,12 +58,12 @@ honey=good
 ###################################################################################################
 ### Unit Tests
 
-ut_getIniParam=(
-	[1]="$(cmdline "$iniFileData_empty")"
-	[2]="$(cmdline "$iniFileData_noSections")"
-	[3]="$(cmdline "$iniFileData_noTopLevel")"
-	[4]="$(cmdline "$iniFileData_topAndSections")"
-	[5]="$(cmdline "$iniFileData_colonInSectNames")"
+declare -A ut_getIniParam=(
+	[empty]="$(cmdline "$iniFileData_empty")"
+	[noSections]="$(cmdline "$iniFileData_noSections")"
+	[noTopLevel]="$(cmdline "$iniFileData_noTopLevel")"
+	[topAndSections]="$(cmdline "$iniFileData_topAndSections")"
+	[colonInSectNames]="$(cmdline "$iniFileData_colonInSectNames")"
 )
 function ut_getIniParam()
 {

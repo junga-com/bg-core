@@ -350,19 +350,13 @@ function bgStackMakeLogical()
 						sigCandidates[$((sigCandidatesCount++))]="${BASH_REMATCH[2]}"
 					fi
 				done
-				detectedTrapFrame+=("${sigCandidates[*]}")
-				debuggerIsInBreak && bgtraceVars -1 -l"bgStackMakeLogical:DETECTED INTR Frame " detectedTrapFrame frmSrcLineText referenceText
-
-				# if we did not end up finding trap code, reset frmSrcLineNo before we move on
-				[ "$detectedTrapFrame" ] || frmSrcLineNo=""
-
-				# 2020-11 commented out this block b/c we have false positives when a cmd is invoked from a variable and not at the
-				# start of the source line. (like [ "$cmd" ] && $cmd). If we did not find a trap source then maybe its not a trap after all
-				# if [ ! "$detectedTrapFrame" ]; then
-				# 	if ((frameIdxOfDEBUGTrap != i)); then
-				# 		detectedTrapFrame="TRAP"
-				# 	fi
-				# fi
+				if [ "${sigCandidates[*]}" ]; then
+					detectedTrapFrame+=("${sigCandidates[*]}")
+					bgtraceVars -1 -l"bgStackMakeLogical:DETECTED INTR Frame " detectedTrapFrame frmSrcLineText referenceText
+				else
+					# if we did not end up finding trap code, reset frmSrcLineNo before we move on
+					frmSrcLineNo=""
+				fi
 			fi
 		fi
 

@@ -1,0 +1,414 @@
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:0 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars string narray aarray -lhello world
+cmd> printfVars "$@"
+string='i am a string'
+narray[]
+      [0]='one'
+      [1]='two'
+      [2]='three'
+aarray[]
+      [two  ]='hello
+      [     ] +world'
+      [three]='3'
+      [one  ]='1'
+hello world
+
+## bg_coreBashVars.sh:printfVars:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:1 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars var1:string var2:narray var3:aarray
+cmd> printfVars "$@"
+var1='i am a string'
+var2[]
+    [0]='one'
+    [1]='two'
+    [2]='three'
+var3[]
+    [two  ]='hello
+    [     ] +world'
+    [three]='3'
+    [one  ]='1'
+
+## bg_coreBashVars.sh:printfVars:1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:2 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars -w20 string narray aarray
+cmd> printfVars "$@"
+string              ='i am a string'
+narray              []
+                    [0]='one'
+                    [1]='two'
+                    [2]='three'
+aarray              []
+                    [two  ]='hello
+                    [     ] +world'
+                    [three]='3'
+                    [one  ]='1'
+
+## bg_coreBashVars.sh:printfVars:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:3 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars longStr
+cmd> printfVars "$@"
+longStr='now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country'
+
+## bg_coreBashVars.sh:printfVars:3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:4 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars -1 string narray aarray
+cmd> printfVars "$@"
+string='i am a string' narray[]       [0]='one' 
+      [1]='two' 
+      [2]='three' 
+aarray[]       [two]='hello
+      [] +world' 
+      [three]='3' 
+      [one]='1' 
+
+
+## bg_coreBashVars.sh:printfVars:4 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:5 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars -1 var1:string var2:narray var3:aarray
+cmd> printfVars "$@"
+var1='i am a string' var2[]     [0]='one' 
+    [1]='two' 
+    [2]='three' 
+var3[]     [two]='hello
+    [] +world' 
+    [three]='3' 
+    [one]='1' 
+
+
+## bg_coreBashVars.sh:printfVars:5 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:6 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars -1 -w20 string narray aarray
+cmd> printfVars "$@"
+string='i am a string'      narray[]       [0]='one' 
+      [1]='two' 
+      [2]='three' 
+aarray[]       [two]='hello
+      [] +world' 
+      [three]='3' 
+      [one]='1' 
+
+
+## bg_coreBashVars.sh:printfVars:6 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:7 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars -1 -lone -ltwo +1 -lthree -lfour
+cmd> printfVars "$@"
+one two 
+three
+four
+
+## bg_coreBashVars.sh:printfVars:7 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:8 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars     -lone -ltwo        -lthree -lfour
+cmd> printfVars "$@"
+   one
+   two
+      three
+      four
+
+## bg_coreBashVars.sh:printfVars:8 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:9 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars iDontExist I dont exist
+cmd> printfVars "$@"
+iDontExist
+I dont exist
+
+## bg_coreBashVars.sh:printfVars:9 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars_objects: start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> DeclareClass Animal
+##     | cmd> DeclareClass Dog Animal
+##     | cmd> DeclareClass Cat Animal
+##     | cmd> local -A myDog=(); ConstructObject Dog myDog
+##     | cmd> local -A myCat=(); ConstructObject Cat myCat
+
+##----------
+## test
+cmd> printfVars Animal "" Dog "" Cat "" myDog "" myCat
+Animal : Class
+   baseClass       : Object
+   classHierarchy  : Object Animal
+   methods         : Animal::__construct
+                   + Animal::speak
+   subClasses      : Dog Cat
+   name            : Animal
+   inheritedMethods: Object::addMethod
+                   + Object::bgtrace
+                   + Object::clear
+                   + Object::clone
+                   + Object::eval
+                   + Object::exists
+                   + Object::fromDebControl
+                   + Object::fromFlatINI
+                   + Object::fromINI
+                   + Object::fromString
+                   + Object::get
+                   + Object::getAttributes
+                   + Object::getIndexes
+                   + Object::getMethods
+                   + Object::getOID
+                   + Object::getRef
+                   + Object::getSize
+                   + Object::getValues
+                   + Object::hasMethod
+                   + Object::isA
+                   + Object::restoreFile
+                   + Object::saveFile
+                   + Object::set
+                   + Object::toDebControl
+                   + Object::toFlatINI
+                   + Object::toString
+                   + Object::unset
+
+Dog : Class
+   baseClass       : Animal
+   classHierarchy  : Object Animal Dog
+   methods         : Dog::__construct
+                   + Dog::speak
+   name            : Dog
+   inheritedMethods: Object::addMethod
+                   + Object::bgtrace
+                   + Object::clear
+                   + Object::clone
+                   + Object::eval
+                   + Object::exists
+                   + Object::fromDebControl
+                   + Object::fromFlatINI
+                   + Object::fromINI
+                   + Object::fromString
+                   + Object::get
+                   + Object::getAttributes
+                   + Object::getIndexes
+                   + Object::getMethods
+                   + Object::getOID
+                   + Object::getRef
+                   + Object::getSize
+                   + Object::getValues
+                   + Object::hasMethod
+                   + Object::isA
+                   + Object::restoreFile
+                   + Object::saveFile
+                   + Object::set
+                   + Object::toDebControl
+                   + Object::toFlatINI
+                   + Object::toString
+                   + Object::unset
+                   + Animal::__construct
+                   + Animal::speak
+
+Cat : Class
+   baseClass       : Animal
+   classHierarchy  : Object Animal Cat
+   methods         : Cat::__construct
+                   + Cat::speak
+   name            : Cat
+   inheritedMethods: Object::addMethod
+                   + Object::bgtrace
+                   + Object::clear
+                   + Object::clone
+                   + Object::eval
+                   + Object::exists
+                   + Object::fromDebControl
+                   + Object::fromFlatINI
+                   + Object::fromINI
+                   + Object::fromString
+                   + Object::get
+                   + Object::getAttributes
+                   + Object::getIndexes
+                   + Object::getMethods
+                   + Object::getOID
+                   + Object::getRef
+                   + Object::getSize
+                   + Object::getValues
+                   + Object::hasMethod
+                   + Object::isA
+                   + Object::restoreFile
+                   + Object::saveFile
+                   + Object::set
+                   + Object::toDebControl
+                   + Object::toFlatINI
+                   + Object::toString
+                   + Object::unset
+                   + Animal::__construct
+                   + Animal::speak
+
+myDog : Dog
+   species: dog
+
+myCat : Cat
+   species: cat
+cmd> printfVars --noObjects myCat
+myCat[]
+     [_CLASS ]='Cat'
+     [_Ref   ]='_bgclassCall myCat Cat 0 |'
+     [0      ]='_bgclassCall myCat Cat 0 |'
+     [species]='cat'
+     [_OID   ]='myCat'
+
+## bg_coreBashVars.sh:printfVars_objects: finished
+###############################################################################################################################
+

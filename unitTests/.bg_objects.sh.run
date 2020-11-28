@@ -1,0 +1,237 @@
+
+###############################################################################################################################
+## bg_objects.sh:initialState:0 start
+## expect:  shows the classes that ae initially created and their content
+
+##----------
+## setup
+
+##----------
+## test
+cmd> echo Object ${Object[subClasses]}
+Object Class Stack Array BashArray BashMap
+cmd> local class; for class in Object ${Object[subClasses]}; do
+cmd> showClass "$class"
+#
+#
+#------------------ Object --------------------
+global array vars: Object Object_vmt
+Object[]
+      [baseClass       ]=''
+      [_CLASS          ]='Class'
+      [_Ref            ]='_bgclassCall Object Class 0 |'
+      [0               ]='_bgclassCall Object Class 0 |'
+      [classHierarchy  ]='Object'
+      [methods         ]='Object::addMethod
+      [                ] +Object::bgtrace
+      [                ] +Object::clear
+      [                ] +Object::clone
+      [                ] +Object::eval
+      [                ] +Object::exists
+      [                ] +Object::fromDebControl
+      [                ] +Object::fromFlatINI
+      [                ] +Object::fromINI
+      [                ] +Object::fromString
+      [                ] +Object::get
+      [                ] +Object::getAttributes
+      [                ] +Object::getIndexes
+      [                ] +Object::getMethods
+      [                ] +Object::getOID
+      [                ] +Object::getRef
+      [                ] +Object::getSize
+      [                ] +Object::getValues
+      [                ] +Object::hasMethod
+      [                ] +Object::isA
+      [                ] +Object::restoreFile
+      [                ] +Object::saveFile
+      [                ] +Object::set
+      [                ] +Object::toDebControl
+      [                ] +Object::toFlatINI
+      [                ] +Object::toString
+      [                ] +Object::unset'
+      [_vmtCacheNum2   ]='26'
+      [subClasses      ]='Class Stack Array BashArray BashMap'
+      [name            ]='Object'
+      [inheritedMethods]=''
+      [_OID            ]='Object'
+#     
+Object_vmt[]
+      [_method::fromFlatINI   ]='Object::fromFlatINI'
+      [_method::getValues     ]='Object::getValues'
+      [_method::getOID        ]='Object::getOID'
+      [_method::getRef        ]='Object::getRef'
+      [_method::hasMethod     ]='Object::hasMethod'
+      [_method::getAttributes ]='Object::getAttributes'
+      [_method::isA           ]='Object::isA'
+      [_method::toFlatINI     ]='Object::toFlatINI'
+      [_method::restoreFile   ]='Object::restoreFile'
+      [_method::getSize       ]='Object::getSize'
+      [_method::fromDebControl]='Object::fromDebControl'
+      [_method::getMethods    ]='Object::getMethods'
+      [_method::eval          ]='Object::eval'
+      [_method::fromINI       ]='Object::fromINI'
+      [_method::saveFile      ]='Object::saveFile'
+      [_method::getIndexes    ]='Object::getIndexes'
+      [_method::clone         ]='Object::clone'
+      [_method::toString      ]='Object::toString'
+      [_method::addMethod     ]='Object::addMethod'
+      [_method::toDebControl  ]='Object::toDebControl'
+      [_method::fromString    ]='Object::fromString'
+      [_method::set           ]='Object::set'
+      [_method::bgtrace       ]='Object::bgtrace'
+      [_method::get           ]='Object::get'
+      [_method::clear         ]='Object::clear'
+      [_method::exists        ]='Object::exists'
+      [_method::unset         ]='Object::unset'
+
+cmd> local class; for class in Object ${Object[subClasses]}; do
+cmd> showClass "$class"
+#
+#
+#------------------ Class --------------------
+global array vars: Class Class_vmt
+Class[]
+     [baseClass       ]='Object'
+     [_CLASS          ]='Class'
+     [_Ref            ]='_bgclassCall Class Class 0 |'
+     [0               ]='_bgclassCall Class Class 0 |'
+     [classHierarchy  ]='Object Class'
+     [methods         ]='Class::__construct
+     [                ] +Class::getClassMethods
+     [                ] +Class::isA
+     [                ] +Class::reloadMethods'
+     [_vmtCacheNum2   ]='26'
+     [name            ]='Class'
+     [inheritedMethods]='Object::addMethod
+     [                ] +Object::bgtrace
+     [                ] +Object::clear
+     [                ] +Object::clone
+     [                ] +Object::eval
+     [                ] +Object::exists
+     [                ] +Object::fromDebControl
+     [                ] +Object::fromFlatINI
+     [                ] +Object::fromINI
+     [                ] +Object::fromString
+     [                ] +Object::get
+     [                ] +Object::getAttributes
+     [                ] +Object::getIndexes
+     [                ] +Object::getMethods
+     [                ] +Object::getOID
+     [                ] +Object::getRef
+     [                ] +Object::getSize
+     [                ] +Object::getValues
+     [                ] +Object::hasMethod
+     [                ] +Object::isA
+     [                ] +Object::restoreFile
+     [                ] +Object::saveFile
+     [                ] +Object::set
+     [                ] +Object::toDebControl
+     [                ] +Object::toFlatINI
+     [                ] +Object::toString
+     [                ] +Object::unset'
+     [_OID            ]='Class'
+#    
+Class_vmt[]
+     [_method::fromFlatINI    ]='Object::fromFlatINI'
+     [_method::getValues      ]='Object::getValues'
+     [_method::getOID         ]='Object::getOID'
+     [_method::getRef         ]='Object::getRef'
+     [_method::hasMethod      ]='Object::hasMethod'
+     [_method::getAttributes  ]='Object::getAttributes'
+     [_method::isA            ]='Class::isA'
+     [_method::toFlatINI      ]='Object::toFlatINI'
+     [_method::restoreFile    ]='Object::restoreFile'
+     [_method::getClassMethods]='Class::getClassMethods'
+     [_method::getSize        ]='Object::getSize'
+     [_method::__construct    ]='Class::__construct'
+     [_method::fromDebControl ]='Object::fromDebControl'
+     [_method::getMethods     ]='Object::getMethods'
+     [_method::eval           ]='Object::eval'
+     [_method::fromINI        ]='Object::fromINI'
+     [_method::saveFile       ]='Object::saveFile'
+     [_method::getIndexes     ]='Object::getIndexes'
+     [_method::clone          ]='Object::clone'
+     [_method::toString       ]='Object::toString'
+     [_method::addMethod      ]='Object::addMethod'
+     [_method::toDebControl   ]='Object::toDebControl'
+     [_method::fromString     ]='Object::fromString'
+     [_method::set            ]='Object::set'
+     [_method::bgtrace        ]='Object::bgtrace'
+     [_method::get            ]='Object::get'
+     [_method::reloadMethods  ]='Class::reloadMethods'
+     [_method::clear          ]='Object::clear'
+     [_method::exists         ]='Object::exists'
+     [_method::unset          ]='Object::unset'
+
+cmd> local class; for class in Object ${Object[subClasses]}; do
+cmd> showClass "$class"
+#
+#
+#------------------ Stack --------------------
+global array vars: Stack Stack_vmt
+Stack[]
+     [baseClass     ]='Object'
+     [_CLASS        ]='Class'
+     [_Ref          ]='_bgclassCall Stack Class 0 |'
+     [0             ]='_bgclassCall Stack Class 0 |'
+     [classHierarchy]='Object Stack'
+     [name          ]='Stack'
+     [_OID          ]='Stack'
+#    
+Stack_vmt[]
+
+cmd> local class; for class in Object ${Object[subClasses]}; do
+cmd> showClass "$class"
+#
+#
+#------------------ Array --------------------
+global array vars: Array Array_vmt
+Array[]
+     [baseClass     ]='Object'
+     [_CLASS        ]='Class'
+     [_Ref          ]='_bgclassCall Array Class 0 |'
+     [0             ]='_bgclassCall Array Class 0 |'
+     [classHierarchy]='Object Array'
+     [name          ]='Array'
+     [_OID          ]='Array'
+#    
+Array_vmt[]
+
+cmd> local class; for class in Object ${Object[subClasses]}; do
+cmd> showClass "$class"
+#
+#
+#------------------ BashArray --------------------
+global array vars: BashArray BashArray_vmt
+BashArray[]
+         [baseClass     ]='Object'
+         [_CLASS        ]='Class'
+         [_Ref          ]='_bgclassCall BashArray Class 0 |'
+         [0             ]='_bgclassCall BashArray Class 0 |'
+         [classHierarchy]='Object BashArray'
+         [name          ]='BashArray'
+         [_OID          ]='BashArray'
+#        
+BashArray_vmt[]
+
+cmd> local class; for class in Object ${Object[subClasses]}; do
+cmd> showClass "$class"
+#
+#
+#------------------ BashMap --------------------
+global array vars: BashMap BashMap_vmt
+BashMap[]
+       [baseClass     ]='Object'
+       [_CLASS        ]='Class'
+       [_Ref          ]='_bgclassCall BashMap Class 0 |'
+       [0             ]='_bgclassCall BashMap Class 0 |'
+       [classHierarchy]='Object BashMap'
+       [name          ]='BashMap'
+       [_OID          ]='BashMap'
+#      
+BashMap_vmt[]
+
+
+## bg_objects.sh:initialState:0 finished
+###############################################################################################################################
+

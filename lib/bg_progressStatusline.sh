@@ -202,8 +202,6 @@ function _readProgressMsgLoop()
 				;;
 		esac
 	done;
-
-	bgtraceVars skipCount
 }
 
 
