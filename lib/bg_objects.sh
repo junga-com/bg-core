@@ -47,7 +47,7 @@
 #
 # 	DeclareClass Animal
 # 	function Animal::__construct() { this[name]="$1"; }
-# 	function Animal::whoseAGoodBoy() { echo "I am a ${this[_CLASS]}"; }
+# 	function Animal::whoseAGoodBoy() { echo "I am a ${_this[_CLASS]}"; }
 #
 # 	DeclareClass Dog Animal
 # 	function Dog::__construct() { : do Dog init. You dont have to define a __construct; }
@@ -219,6 +219,17 @@
 # Outside of its methods its refered to as <className>
 #     example: "<className>[<attribName>]="<val>", foo="${<className>[<attribName>]}"
 #
+# Attributes:
+# A class author can add whatever attributes they want and then use them in various ways. The object system also recognizes some
+# attributes that affect the core behavior.
+#    defaultIndex:on|off   : default is on. If defaultIndex:off is set in a class, when objects of that class are constructed, the
+#          default index [0] will not be set with that object's ObjRef string. This is useful for BashArray or any object that uses
+#          <obj>[0] as a logical member variable.  The consequence is that object's array references can not be used for object
+#          syntax like $<obj>.<member term...>.  Instead use OOCall(<obj>.<member term...>)
+#    oidAttributes:[a|A|...] : default is A. If set, these attributes will be used to create the main array variable that holds the
+#          object's member variables. If this is 'a', the member variables of such an object can only be numbers or system variables
+#          stored in a separate _sys array. It forces the creation of a separate _sys array even when <objRef> passed to
+#          ConstructObject is an array variable.
 # Params:
 #    <className>       : the name of the new class. By convention it should be capitalized
 #    <baseClassName>   : (default=Object) the name of the class that the new class derives from.
@@ -328,11 +339,10 @@ function Class::isA()
 #
 function Class::reloadMethods()
 {
-	this[_vmtCacheNum2]=-1
+	_this[_vmtCacheNum2]=-1
 	#importCntr bumpRevNumber
 }
 
-# TODO: this is diconected from the _classMakeVMT/_classUpdateVMT mechaisms -- merge
 # usage: <Class>.getMethods [<retVar>]
 # return a list of method names defined for this class. By default This does not return methods inherited from base
 # classes. The names do not include the leading <className>:: prefix.
@@ -493,6 +503,8 @@ function ConstructObject()
 		return
 	fi
 
+	local -n class="$_CLASS"
+
 	# _objRefVar is a variable name passed to us so strip out any unallowed characters for security.
 	# SECURITY: clean _objRefVar by removing all but characters that can be used in a variable name. foo[bar] is a valid name.
 	local _objRefVar="${2//[^a-zA-Z0-9\[\]_]}"; assertNotEmpty _objRefVar "objRefVar is a required parameter as the second argument"
@@ -507,46 +519,66 @@ function ConstructObject()
 	# would mess it up. In 5.x, _objRefVarAttributes will be 'n'
 	[ ! "$_objRefVarAttributes" ] && { eval ${_objRefVar}=\"\"; varGetAttributes "$_objRefVar" _objRefVarAttributes; }
 
-	# if _objRefVar is not the name of an associative array, create one on the heap and use _objRefVar to store the objRef to that
-	# heap object. If its not an A array, it can be a string or a -n nameRef.
+	# based on how the caller declared <objRef>, set this and _this
 	local _OID
-	local -n this
+	local -n this _this
 	# its an unitialized -n nameRef
 	if [ "$_objRefVarAttributes" == "n" ]; then
-		newHeapVar -A  _OID
+		newHeapVar -"${class[oidAttributes]:-A}"  _OID
 		printf -v $_objRefVar "%s" "${_OID}"
 		this="$_OID"
 
-	# its an A (associative) array that we can use as our object
+		declare -gA ${_OID}_sys="()" 2>$assertOut; [ ! -s "$assertOut" ] || assertError
+		_this="${_OID}_sys"
+
+	# its an 'A' (associative) array that we can use as our object
 	elif [[ "$_objRefVarAttributes" =~ A ]]; then
 		_OID="$_objRefVar"
 		this="$_objRefVar"
+		_this="$_objRefVar"
+
+	# its an 'a' (numeric) array that we can use as our object
+	# Note that this case is problematic and maybe should assert an error because there is no way to create the _sys array in the
+	# same scope that the caller created the OID array. We create a "${_OID}_sys" global array but that polutes the global namespace
+	# and can collide with other object instances.
+	elif [[ "$_objRefVarAttributes" =~ a ]]; then
+		assertError "Test this case more before using..."
+		_OID="$_objRefVar"
+		this="$_objRefVar"
+		declare -gA ${_OID}_sys="()" 2>$assertOut; [ ! -s "$assertOut" ] || assertError
+		_this="${_OID}_sys"
 
 	# its a plain string variable
 	else
-		newHeapVar -A  _OID
-		printf -v $_objRefVar "%s" "_bgclassCall ${_OID} $_CLASS 0 |"
+		newHeapVar -"${class[oidAttributes]:-A}"  _OID
+		printf -v "$_objRefVar" "%s" "_bgclassCall ${_OID} $_CLASS 0 |"
 		this="$_OID"
+
+		declare -gA ${_OID}_sys="()" 2>$assertOut; [ ! -s "$assertOut" ] || assertError
+		_this="${_OID}_sys"
 	fi
 	shift 2 # the remainder of parameters are passed to the __construct function
 
-	this[_OID]="$_OID"
-	this[_CLASS]="$_CLASS"
-	local -n class="$_CLASS"
+	_this[_OID]="$_OID"
+	_this[_CLASS]="$_CLASS"
 
-	# create the ObjRef string at index [0]. This supports $objRef.methodName syntax where objRef
-	# is the associative array itself. because in bash, $objRef is a shortcut for $objRef[0]
-	this[0]="_bgclassCall ${_OID} $_CLASS 0 |"
-	this[_Ref]="${this[0]}"
+	_this[_Ref]="_bgclassCall ${_OID} $_CLASS 0 |"
 
-	# _classMakeVMT will set all the methods known at this point. It records the id of the current
+	# create the ObjRef string at index [0]. This supports $objRef.methodName syntax where objRef is the associative array itself
+	# This is always available in the $_this.. but some Classes of objects (like Array and Map) do not set [0] in the $this array
+	_this[0]="${_this[_Ref]}"
+	if [ "${class[defaultIndex]:-on}" == "on" ]; then
+		this[0]="${_this[_Ref]}"
+	fi
+
+	# _classUpdateVMT will set all the methods known at this point. It records the id of the current
 	# sourced library state which is maintained by 'import'. At each method call we will call it again and
 	# will quickly check to see if more libraries have been sourced which means that it should check to see
 	# if more methods are known
-	#_classMakeVMT
-	_classUpdateVMT "${this[_CLASS]}"
+	_classUpdateVMT "${_this[_CLASS]}"
 
-	local -n _VMT="${this[_CLASS]}_vmt"
+	# each object can point to its own VMT if its had dynamic methods added, but the typical case is that it uses it's classes VMT
+	local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
 
 	# invoke the constructors from Object to this class
 	local _cname; for _cname in ${class[classHierarchy]}; do
@@ -556,7 +588,7 @@ function ConstructObject()
 		_resultCode="$?"; bgDebuggerPlumbingCode=1
 	done
 
-	[ "${_VMT[_method::postConstruct]}" ] && ${this[_Ref]}.postConstruct
+	[ "${_VMT[_method::postConstruct]}" ] && ${_this[_Ref]}.postConstruct
 	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 	true
 }
@@ -659,13 +691,13 @@ function DeleteObject()
 	[[ "$(declare -p "${parts[1]}" 2>/dev/null)" =~ declare\ -[gilnrtux]*A ]] || assertError "'$objRef' is not a valid object reference"
 
 	local -n this="${parts[1]}"
-	local -n _VMT="${this[_CLASS]}_vmt"
+	local -n _VMT="${_this[_CLASS]}_vmt"
 
 	# local -n subObj; for subObj in $(VisitObjectMembers this); do
 	# 	DeleteObject "$subObj"
 	# done
 
-	[ "${_VMT[_method::__destruct]}" ] && $this.__destruct
+	[ "${_VMT[_method::__destruct]}" ] && $_this.__destruct
 	unset this
 }
 
@@ -725,18 +757,41 @@ function _bgclassCall()
 		return
 	}
 
-	local -n this=$_OID || {
+	local -n refClass="$_CLASS"
+
+	local -n this="$_OID" || {
 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		assertError -v _OID -v _CLASS -v _memberTermWithParams "could not setup Object calling context '$(declare -p this)'"
 	}
-	local -n static="${this[_CLASS]}"
+
+	# the array where we store system member variables (that start with '_') may or may not be the same as the main object array
+	# If ConstructObject puts _CLASS in the main array, then we use it. Otherwise we expect there to be a _sys version of the OID
+	if { [[ ! "${refClass[oidAttributes]:-A}" =~ A ]] || [ ! "${this[_CLASS]+exists}" ]; } && varExists "${_OID}_sys"; then
+		local -n _this="${_OID}_sys"
+		local _separateSys="1"
+	else
+		local -n _this="${_OID}"
+		local _separateSys=""
+	fi
+
+	local -n static="${_this[_CLASS]}"
 	local super="_bgclassCall ${_OID} $_CLASS $((_hierarchLevel+1)) |"
 
-	# _classMakeVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
-	#_classMakeVMT
-	_classUpdateVMT "${this[_CLASS]}"
+	if [ "$_separateSys" ] && [[ "${static[oidAttributes]:-A}" =~ A ]]; then
+		for _memberVarName in "${!this[@]}"; do
+			[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
+			if IsAnObjRef "${this[$_memberVarName]}"; then
+				declare -n $_memberVarName; GetOID "${this[$_memberVarName]}" "$_memberVarName"
+			else
+				declare -n $_memberVarName="this[$_memberVarName]"
+			fi
+		done
+	fi
 
-	local -n _VMT="${this[_CLASS]}_vmt"
+	# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
+	_classUpdateVMT "${_this[_CLASS]}"
+
+	local -n _VMT="${_this[_CLASS]}_vmt"
 
 	# _memberTerm is the expression the caller typed after the objRef. It could be
 	#      1) a method call                      .<methodName> <p1> <p2> ...
@@ -884,7 +939,7 @@ function _bgclassCall()
 			objOnEnterMethod "$@"
 			bgDebuggerPlumbingCode=0
 			$_METHOD "$@"
-			_resultCode="$?"; bgDebuggerPlumbingCode=1; return "$_resultCode"
+			_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
 		fi
 
 	# member function with explicit Class syntax
@@ -894,7 +949,7 @@ function _bgclassCall()
 		objOnEnterMethod "$@"
 		bgDebuggerPlumbingCode=0
 		$_METHOD "$@"
-		_resultCode="$?"; bgDebuggerPlumbingCode=1; return "$_resultCode"
+		_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
 
 	# member function syntax
 	#   $this.<memberFunct> [<p1> .. p2]
@@ -903,7 +958,7 @@ function _bgclassCall()
 		objOnEnterMethod "$@"
 		bgDebuggerPlumbingCode=0
 		$_METHOD "$@"
-		_resultCode="$?"; bgDebuggerPlumbingCode=1; bgtraceVars _resultCode; return "$_resultCode"
+		_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
 
 	# member variable read syntax. Its ok to read a non-existing member var, but if parameters were provided, it looks like a method call
 	#   echo $($this.<memberVar>)
@@ -934,7 +989,7 @@ this='assertThisRefError '
 function objOnEnterMethod()
 {
 	# if the _traceMethods system attrib is set, trace the function call
-	case ${this[_traceMethods]:-0} in
+	case ${_this[_traceMethods]:-0} in
 		1) [ "$_CLASS" != "Object" ] && bgtrace "$_CLASS::$_METHOD" ;;
 		2) bgtrace "$_CLASS::$_METHOD $@" ;;
 		3) bgtrace "$_CLASS::_OID.$_METHOD $@" ;;
@@ -990,7 +1045,10 @@ function GetOID()
 		-R) goid_retVar="$(bgetopt "$@")" && shift ;;
 	esac; shift; done
 
-	local objRef="$*"
+	local objRef="$1"; shift
+	[ ! "$goid_retVar" ] && { goid_retVar="$1"; shift; }
+	[ $# -eq 0 ] || assertError "too many arguments. did you forget to put the <objRef> in quotes?"
+
 	local oidVal
 	if [ "{$objRef}"  == "" ]; then
 		oidVal="NullObjectInstance"
@@ -1169,7 +1227,8 @@ function completeObjectSyntax()
 				*)             echo " [${term}]%3A" ;;
 			esac
 		done
-		[[ "$remainderPart" =~ ^[[] ]] && echo " [static]%3A"
+		[[ "$remainderPart" =~ ^[[] ]] && echo " [static]%3A"  # "
+
 		local term; for term in "=new" ".unset" ".exists" ".isA"; do
 			echo " ${term}%3A"
 		done
@@ -1184,13 +1243,13 @@ function completeObjectSyntax()
 
 function Object::getOID()
 {
-	echo "$_OID"
+	returnValue "$_OID" $1
 }
 
 function Object::getRef()
 {
-	# its also in ${this[0]} but [0] is more at risk of being accidentally overwritten
-	echo "${this[_Ref]}"
+	# this is typically also in ${this[0]} but not always so use the system attribute that is always present
+	returnValue "${_this[_Ref]}" $1
 }
 
 # usage: $obj.isA <className>
@@ -1211,7 +1270,7 @@ function Object::eval()
 
 	# if : is not prefixed, cmd's are run the $this content (i.e. member functions)
 	else
-		$this.$cmdLine "$@"
+		$_this.$cmdLine "$@"
 	fi
 }
 
@@ -1238,7 +1297,7 @@ function Object::clone()
 	local newRefVar="$1"
 	local newOID
 	genRandomIDRef newOID 9 "[:alnum:]"
-	[ "$newRefVar" ] && eval $newRefVar=\${this[_Ref]/${this[_OID]}/$newOID}
+	[ "$newRefVar" ] && eval $newRefVar=\${_this[_Ref]/${_this[_OID]}/$newOID}
 
 	# declStr is the complete bash serialized state of $this
 	local declStr="$(declare -p "$_OID")"
@@ -1263,9 +1322,11 @@ function Object::clone()
 
 function Object::getMethods()
 {
+	local _retValue
 	local i; for i in "${!_VMT[@]}"; do
-		echo ${i#_method::}
+		_retValue+="${i#_method::} "
 	done
+	returnValue "$_retValue" $1
 }
 
 # usage: $obj.hasMethod <methodName>
@@ -1284,7 +1345,7 @@ function Object::addMethod()
 
 	assertError "DEV: this method needs to be updated because the _VMT is now shared amoung instances"
 
-	this[_addedMethods]+=" $_mname"
+	_this[_addedMethods]+=" $_mname"
 	_VMT[_method::${_mnameShort}]="$_mname"
 }
 
@@ -1296,41 +1357,69 @@ function Object::getAttributes()
 
 function Object::getIndexes()
 {
-	local i; for i in "${!this[@]}"; do
-		if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
-			echo $i
-		fi
-	done
+	local _retValue
+
+	if [ "$_separateSys" ] && [ "${static[defaultIndex]:-on}" != "on" ]; then
+		_retValue=" ${!this[@]} "
+	else
+		[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && _retValue="0 "
+
+		local i; for i in "${!this[@]}"; do
+			if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
+				_retValue+="$i "
+			fi
+		done
+	fi
+
+	returnValue "$_retValue" $1
 }
 
 function Object::getValues()
 {
-	local i; for i in "${!this[@]}"; do
-		if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
-			echo ${this[$i]}
-		fi
-	done
+	local _retValue
+
+	if [ "$_separateSys" ] && [ "${static[defaultIndex]:-on}" != "on" ]; then
+		_retValue=" ${this[*]} "
+	else
+		[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && _retValue="${this[0]} "
+
+		local i; for i in "${!this[@]}"; do
+			if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
+				_retValue+="${this[$i]} "
+			fi
+		done
+	fi
+	returnValue "$_retValue" $1
 }
 
 function Object::getSize()
 {
 	local size=0
+	[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && ((size++))
 	local i; for i in "${!this[@]}"; do
 		if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
 			((size++))
 		fi
 	done
-	echo $size
+	returnValue "$size" $1
 }
 
 function Object::get()
 {
-	echo "${this[$1]}"
+	if [[ "$1" =~ ^_ ]]; then
+		returnValue "${_this[$1]}" $2
+	else
+		returnValue "${this[$1]}" $2
+	fi
 }
 
 function Object::set()
 {
-	this[$1]="$2"
+	if [[ "$1" =~ ^_ ]]; then
+		_this[$1]="$2"
+	else
+		this[$1]="$2"
+	fi
 }
 
 function Object::exists()
@@ -1340,7 +1429,7 @@ function Object::exists()
 
 function Object::unset()
 {
-	DeleteObject $this[0]
+	DeleteObject "${_this[_Ref]}"
 }
 
 function Object::clear()
@@ -1350,6 +1439,7 @@ function Object::clear()
 			unset this[$i]
 		fi
 	done
+	[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && unset this[0]
 }
 
 # usage: $obj.fromString [<str>]
@@ -1385,7 +1475,7 @@ function Object::fromString()
 			fi
 
 			if [[ "$name" =~ [.[] ]]; then
-				$this.$name="$value"
+				$_this.$name="$value"
 			else
 				this[$name]="${value//\\n/$'\n'}"
 			fi
@@ -1423,7 +1513,7 @@ function Object::toString()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	local indexes=$($this.getIndexes)
+	local indexes=$($_this.getIndexes)
 
 	local labelWidth=0
 	local attrib; for attrib in $indexes; do
@@ -1434,7 +1524,7 @@ function Object::toString()
 
 	local indent="" indentWidth=labelWidth
 	if [ "$titleName" ]; then
-		printf "%s : %s\n" "${titleName}" "${this[_CLASS]}"
+		printf "%s : %s\n" "${titleName}" "${_this[_CLASS]}"
 		indent="   "
 		((indentWidth+=3))
 	fi
@@ -1488,7 +1578,7 @@ function Object::fromFlatINI()
 			value="$(trimString "$value")"
 
 			if [[ "$name" =~ [.[] ]]; then
-				$this.$name="${value//\\n/$'\n'}"
+				$_this.$name="${value//\\n/$'\n'}"
 			else
 				this[$name]="${value//\\n/$'\n'}"
 			fi
@@ -1517,10 +1607,10 @@ function Object::toFlatINI()
 		-s) scope="$2"; shift ;;
 	esac; shift; done
 
-	local attrib; for attrib in $($this.getIndexes); do
+	local attrib; for attrib in $($_this.getIndexes); do
 		local value="${this[$attrib]}"
 		if [ "${value:0:12}" == "_bgclassCall" ]; then
-			$this.$attrib.toFlatINI -s ${scope}${scope:+.}$attrib
+			$_this.$attrib.toFlatINI -s ${scope}${scope:+.}$attrib
 		else
 			printf "%s=%s\n" "${scope}${scope:+.}$attrib" "${value//$'\n'/\\n}"
 		fi
@@ -1541,7 +1631,7 @@ function Object::toFlatINI()
 function Object::restoreFile()
 {
 	local fileName="$1"; assertFileExists "$fileName"
-	$this.clear
+	$_this.clear
 
 	# the exec line opens a new file handle that reads the  file and stores the file handle in $fd
 	local fd; exec {fd}<"$fileName"
@@ -1551,7 +1641,7 @@ function Object::restoreFile()
 	[ "$fileType" == "<Object>" ] || assertError "unknonw file type. first line is not a known header"
 
 	# read the rest of the input stream
-	$this.from$fmtType <&$fd
+	$_this.from$fmtType <&$fd
 
 	# close file handle
 	exec {fd}<&-
@@ -1575,7 +1665,7 @@ function Object::saveFile()
 	local fileName="$1"; assertNotEmpty fileName
 
 	printf "%s %s %s\n" "<Object>" "v1.0" "${fmtType#to}" > "$fileName"
-	$this.to${fmtType#to} >> "$fileName"
+	$_this.to${fmtType#to} >> "$fileName"
 }
 
 ####################################################################################################################
@@ -1618,40 +1708,28 @@ DeclareClass Object
 
 
 # Class stack
-# Stack is an Object that can push and pop strings. Since object references are strings, you can store
-# objects in the stack
+# Stack is an Object that can push and pop values
 # Members:
 #    length : number of elements in the stack
 #    e<N>   : stack element N  (the e is added so not to conflict with [0] which needs to be the object ref)
+# See Also:
+#    class Array
+#    class Map
 DeclareClass Stack
 function Stack::__construct()
 {
 	this[length]=0
 }
 
-# usage: $obj.getSize [-R <retVar>]
+# usage: $obj.getSize [<retVar>]
 # returns the number of elements in the stack on stdout or <retVar>
-# Options:
-#     -R <retVar> : return the result in this variable instead of stdout
-function Stack::getSize()
-{
-	local retVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-R) retVar="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
-
-	returnValue "${this[length]}" $retVar
-}
+function Stack::getSize() { returnValue "${this[length]}" $1; }
 
 # usage: $obj.push <stringValue ...>
 # add a new element to the end of the stack.
-function Stack::push()
-{
-	this[e${this[length]}]="$@"
-	((this[length]++))
-}
+function Stack::push() { this[e$((this[length]++))]="$@"; }
 
-# usage: $obj.pop [-R <retVar>]
+# usage: $obj.pop [<retVar>]
 # returns the last element and removes it from the stack.
 # Options:
 #     -R <retVar> : return the result in this variable instead of stdout
@@ -1660,18 +1738,10 @@ function Stack::push()
 #    1 : false. the stack was empty so no item was returned
 function Stack::pop()
 {
-	local retVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-R) retVar="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
-
-	(( this[length] <=0 )) && return 1
-
-	((this[length]--))
-	local element="${this[e${this[length]}]}"
+	(( this[length] <= 0 )) && return 1
+	local _elementValue="${this[e$((--this[length]))]}"
 	unset this[e${this[length]}]
-
-	returnValue "$element" $retVar
+	returnValue "$_elementValue" $1
 }
 
 # usage: $obj.peek [-R <retVar>] [<countFromEnd>]
@@ -1683,17 +1753,14 @@ function Stack::pop()
 #     -R <retVar> : return the result in this variable instead of stdout
 function Stack::peek()
 {
-	local retVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-R) retVar="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
-	local countFromEnd="${1:-0}"
+	local countFromEnd=0; [[ "$1" =~ ^[0-9][0-9]*$ ]] && { countFromEnd="$1"; shift; }
 
 	local index=$(( this[length] -1 - countFromEnd ))
-	(( index < 0 )) && return 1
+	(( index < 0 )) && {
+		return 1
+	}
 
-	local element="${this[e$index]}"
-	returnValue "$element" $retVar
+	returnValue "${this[e$index]}" $1
 }
 
 # usage: $obj.clear
@@ -1701,8 +1768,7 @@ function Stack::peek()
 function Stack::clear()
 {
 	while (( this[length] > 0 )); do
-		((this[length]--))
-		unset this[e${this[length]}]
+		unset this[e$((--this[length]))]
 	done
 	return 0
 }
@@ -1719,140 +1785,24 @@ function Stack::isEmpty()
 
 
 
-# OBSOLETE? See BashArray and BashMap. The intention was to allow a real -a array to be stored but that did not work. Stack is better. We can add a Queue too
-# An Array is a simple Object that can be used like a numeric array. Arrays are typically only used as member attributes
-# of objects because bash arrays can not be array elements of other arrays (Objects are bash associate arrays where the elements
-# are the member attributes)
-# This underlying implementation uses an associative Array like all Objects but the difference is that...
-#    1) the [0] does not contain the object reference. This means that a bash variable ref to the implementation
-#       associative Array can not be used like an Object ref (i.e. $myArray.<method> does not work)
-#       However, when an Array is referenced as a member attribute of a parent Object, Object call syntax works fine.
-#       (i.e. $myObject.myArray.getIndexes works).
-#       Scripts should use real bash arrays most of the time. Array is useful when you need a member of an Object to
-#       be act like a numberic array. For a member that acts like an associate array, just use Object.
-#    2) the Object methods that work on member attributes only recognize numeric indexes as array elements.
-#       It not ilegal to set and reference non numeric attributes, but the getSize, getIndexes, and getAttributes methods
-#       will ignore them.
-DeclareClass Array
-function Array::__construct()
-{
-	this[0]=""
-	this[_length]=0
-}
+# An Array is a simple Object that can be used like a numeric array. This is particularly useful for making arrays within arrays.
+# no system variables are stored in the main object array and the main object array is declared -a instead of -A
+# See Also:
+#    class Stack
+#    class Map
+function Array::getSize()       { returnValue "${#this[*]}" $1; }
+function Array::getAttributes() { returnValue "${!this[*]}" $1; }
+function Array::getIndexes()    { returnValue "${!this[*]}" $1; }
+function Array::getValues()     { returnValue "${this[*]}" $1; }
+DeclareClass Array defaultIndex:off oidAttributes:a
 
-function Array::getSize()
-{
-	local size=0
-	local i; for i in "${!this[@]}"; do
-		if [[ "$i" =~ ^[0-9]*$ ]]; then
-			((size++))
-		fi
-	done
-	echo $size
-}
-
-function Array::getAttributes()
-{
-	local i; for i in "${!this[@]}"; do
-		if [[ "$i" =~ ^[0-9]*$ ]]; then
-			echo $i
-		fi
-	done
-}
-
-function Array::getIndexes()
-{
-	local i; for i in "${!this[@]}"; do
-		if [[ "$i" =~ ^[0-9]*$ ]]; then
-			echo $i
-		fi
-	done
-}
-
-function Array::getValues()
-{
-	local i; for i in "${!this[@]}"; do
-		if [[ "$i" =~ ^[0-9]*$ ]]; then
-			echo ${this[$i]}
-		fi
-	done
-}
-
-
-function BashArray::__construct()
-{
-	this[_basharray]="${this[_OID]}_array"
-	declare -ga ${this[_basharray]}="()"
-}
-function BashArray::getArray()
-{
-	returnValue "${this[_basharray]}" $1
-}
-function BashArray::toString()
-{
-	local -n _data="${this[_basharray]}"
-	local labelWidth=0
-	local attrib; for attrib in "${!_data[@]}"; do
-		((labelWidth=(labelWidth<${#attrib}) ?${#attrib} :labelWidth ))
-	done
-	for attrib in "${!_data[@]}"; do
-		local value="${_data[$attrib]}"
-		if [ "${value:0:12}" == "_bgclassCall" ]; then
-			local parts=($value)
-			value="<instance> of ${parts[2]}"
-			printf "%-${labelWidth}s: %s\n" "$attrib" "$value" | awk -v labelWidth="$labelWidth" '{if (NR>1) printf("%-*s+ ", labelWidth, ""); print $0}'
-			$value.toString | awk -v attrib="$attrib" '{printf("  %s%s%s\n", attrib, ($1~/^[[]/)?"":".", $0)}'
-		else
-			printf "%-${labelWidth}s: %s\n" "[$attrib]" "$value" | awk -v labelWidth="$labelWidth" '{if (NR>1) printf("%-*s+ ", labelWidth, ""); print $0}'
-		fi
-	done
-}
-function BashArray::bgtrace()
-{
-	bgtraceIsActive || return 0
-
-	local level=0 rlevel=100 recurseFlag="-r" attribsOff="" methodsOff="" sysAttrOff="" headersOff=""
-	while [ $# -gt 0 ]; do case $1 in
-		-l*) bgOptionGetOpt val: level "$@" && shift ;;
-		-r)  varToggleRef recurseFlag "-r"  ;;
-		--rlevel*) bgOptionGetOpt val: rlevel "$@" && shift
-			# setting rlevel on the initial call implies that recursion should start on
-			[ ${level:-0} -eq 0 ] && recurseFlag="-r"
-			;;
-		--rstate) recurseFlag="$2"; shift   ;;
-		-h)  varToggleRef headersOff "-h"  ;;
-		-a)  varToggleRef attribsOff "-a" ;;
-		-m)  varToggleRef methodsOff "-m" ;;
-		-s)  varToggleRef sysAttrOff "-s" ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-	done
-
-	# if we have reached the recursion level limit, set recurseFlag to off
-	[ ${level:-0} -ge ${rlevel:-0} ] && recurseFlag=""
-
-	# $level increases by +1 each recursion but $rlevel keeps it initial value from the first call
-	local pad="$(printf %$((${level}*3))s)"
-
-	#[ ! "$headersOff" ] && bgtrace "${pad}$_CLASS::$_OID :"
-	echo "${pad}$_CLASS::$_OID :" >>$_bgtraceFile
-
-	bgtraceVars "$pad   " :"${this[_basharray]}"
-}
-
-DeclareClass BashArray
-
-
-
-function BashMap::__construct()
-{
-	this[_basharray]="${this[_OID]}_map"
-	declare -gA ${this[_basharray]}="()"
-}
-function BashMap::getArray()
-{
-	returnValue "${this[_basharray]}" $1
-}
-function BashMap::toString()  { BashArray::toString "$@" ; }
-function BashMap::bgtrace()   { BashArray::bgtrace "$@" ; }
-
-DeclareClass BashMap
+# A Map is a simple Object that can be used like an associative array. This is particularly useful for making arrays within arrays.
+# no system variables are stored in the main object array
+# See Also:
+#    class Array
+#    class Stack
+function Map::getSize()       { returnValue "${#this[*]}" $1; }
+function Map::getAttributes() { returnValue "${!this[*]}" $1; }
+function Map::getIndexes()    { returnValue "${!this[*]}" $1; }
+function Map::getValues()     { returnValue "${this[*]}" $1; }
+DeclareClass Map defaultIndex:off

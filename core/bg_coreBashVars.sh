@@ -399,20 +399,11 @@ function varSetRef()
 		--string)    _sr_varType="--string" ;;
 		--array)     _sr_varType="--array" ;;
 		--set)       _sr_varType="--set" ;;
-		--echo)      shift; echo "$*"; return 0 ;;
+		--echo)      _sr_varType="--echo" ;;
 	esac; shift; done
 	local sr_varRef="$1"; shift
 
 	[ ! "$sr_varRef" ] && [ "$_sr_varType" != "--echo" ] && return 0
-
-	# # in development mode, check for for common errors
-	# # 2020-10 commented this out because it added 8 seconds to bg-makeManifest on bg-lib project (1100 man3 pages)
-	# if bgtraceIsActive; then
-	# 	if [[ "$sr_varRef" =~ [[][^-0-9] ]]; then
-	# 		local sr_arrayName="${sr_varRef%%[[]*}"
-	# 		varIsAMapArray $sr_arrayName || assertError -v $sr_arrayName -v varRef:sr_varRef -V "valueBeingSet:$*" "'$sr_arrayName' is being used as an associative array (or Object) when it is not one. Maybe it went out of scope"
-	# 	fi
-	# fi
 
 	case ${_sr_varType:---string}:$_sr_appendFlag in
 		--set:*)
@@ -430,7 +421,7 @@ function varSetRef()
 		--string:)   printf -v "$sr_varRef" "%s" "$*" ;;
 		--string:-a) printf -v "$sr_varRef" "%s%s" "${!sr_varRef}" "$*" ;;
 
-		--echo:*)    echo "$*"
+		--echo:*) echo "$*" ;;
 	esac || assertError
 	true
 }
@@ -926,8 +917,9 @@ function printfVars()
 
 		# assume its a variable name and get its declaration. Should be "" if its not a var name
 		# if its a referenece (-n) var, get the reference of the var that it points to
-		local pv_type="$(declare -p "$pv_varname" 2>/dev/null)"
-		[[ "$pv_type" =~ -n\ [^=]*=\"(.*)\" ]] && pv_type="$(declare -p "${BASH_REMATCH[1]}" 2>/dev/null)"
+		local pv_type; varGetAttributes "$pv_varname" pv_type
+		# local pv_type="$(declare -p "$pv_varname" 2>/dev/null)"
+		# [[ "$pv_type" =~ -n\ [^=]*=\"(.*)\" ]] && pv_type="$(declare -p "${BASH_REMATCH[1]}" 2>/dev/null)"
 		if [ ! "$pv_type" ]; then
 			{ varIsA array ${pv_varname%%[[]*} || [[ "$pv_varname" =~ [[][@*][]]$ ]]; } && pv_type="arrayElement"
 		fi
@@ -949,7 +941,7 @@ function printfVars()
 			objEval "$pv_varname.toString --title=${pv_varname}"
 
 		# if its an array, iterate its content
-		elif [[ "$pv_type" =~ ^declare\ -[gilnrtux]*[aA] ]]; then
+		elif [[ "$pv_type" =~ [aA] ]]; then
 			pv_nameColWidth="${pv_nameColWidth:-${#pv_label}}"
 			printf "${pv_prefix}%-*s[]${pv_lineEnding}" ${pv_nameColWidth:-0} "$pv_label"
 			eval local indexes='("${!'"$pv_varname"'[@]}")'

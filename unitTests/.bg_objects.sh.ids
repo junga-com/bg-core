@@ -3,3 +3,7 @@ isA:
 getClassMethods: 
 ConstructObject: 
 _classUpdateVMT: 
+Array: 
+Map: 
+Stack: 
+nestedObjects: 

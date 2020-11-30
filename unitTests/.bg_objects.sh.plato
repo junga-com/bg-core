@@ -9,7 +9,7 @@
 ##----------
 ## test
 cmd> echo Object ${Object[subClasses]}
-Object Class Stack Array BashArray BashMap
+Object Class Stack Array Map
 cmd> local class; for class in Object ${Object[subClasses]}; do
 cmd> showClass "$class"
 #
@@ -19,8 +19,8 @@ global array vars: Object Object_vmt
 Object[]
       [baseClass       ]=''
       [_CLASS          ]='Class'
-      [_Ref            ]='_bgclassCall Object Class 0 |'
       [0               ]='_bgclassCall Object Class 0 |'
+      [_Ref            ]='_bgclassCall Object Class 0 |'
       [classHierarchy  ]='Object'
       [methods         ]='Object::addMethod
       [                ] +Object::bgtrace
@@ -50,7 +50,7 @@ Object[]
       [                ] +Object::toString
       [                ] +Object::unset'
       [_vmtCacheNum2   ]='26'
-      [subClasses      ]='Class Stack Array BashArray BashMap'
+      [subClasses      ]='Class Stack Array Map'
       [name            ]='Object'
       [inheritedMethods]=''
       [_OID            ]='Object'
@@ -93,8 +93,8 @@ global array vars: Class Class_vmt
 Class[]
      [baseClass       ]='Object'
      [_CLASS          ]='Class'
-     [_Ref            ]='_bgclassCall Class Class 0 |'
      [0               ]='_bgclassCall Class Class 0 |'
+     [_Ref            ]='_bgclassCall Class Class 0 |'
      [classHierarchy  ]='Object Class'
      [methods         ]='Class::__construct
      [                ] +Class::getClassMethods
@@ -172,8 +172,8 @@ global array vars: Stack Stack_vmt
 Stack[]
      [baseClass     ]='Object'
      [_CLASS        ]='Class'
-     [_Ref          ]='_bgclassCall Stack Class 0 |'
      [0             ]='_bgclassCall Stack Class 0 |'
+     [_Ref          ]='_bgclassCall Stack Class 0 |'
      [classHierarchy]='Object Stack'
      [name          ]='Stack'
      [_OID          ]='Stack'
@@ -189,9 +189,11 @@ global array vars: Array Array_vmt
 Array[]
      [baseClass     ]='Object'
      [_CLASS        ]='Class'
-     [_Ref          ]='_bgclassCall Array Class 0 |'
      [0             ]='_bgclassCall Array Class 0 |'
+     [_Ref          ]='_bgclassCall Array Class 0 |'
+     [oidAttributes ]='a'
      [classHierarchy]='Object Array'
+     [defaultIndex  ]='off'
      [name          ]='Array'
      [_OID          ]='Array'
 #    
@@ -201,35 +203,19 @@ cmd> local class; for class in Object ${Object[subClasses]}; do
 cmd> showClass "$class"
 #
 #
-#------------------ BashArray --------------------
-global array vars: BashArray BashArray_vmt
-BashArray[]
-         [baseClass     ]='Object'
-         [_CLASS        ]='Class'
-         [_Ref          ]='_bgclassCall BashArray Class 0 |'
-         [0             ]='_bgclassCall BashArray Class 0 |'
-         [classHierarchy]='Object BashArray'
-         [name          ]='BashArray'
-         [_OID          ]='BashArray'
-#        
-BashArray_vmt[]
-
-cmd> local class; for class in Object ${Object[subClasses]}; do
-cmd> showClass "$class"
-#
-#
-#------------------ BashMap --------------------
-global array vars: BashMap BashMap_vmt
-BashMap[]
-       [baseClass     ]='Object'
-       [_CLASS        ]='Class'
-       [_Ref          ]='_bgclassCall BashMap Class 0 |'
-       [0             ]='_bgclassCall BashMap Class 0 |'
-       [classHierarchy]='Object BashMap'
-       [name          ]='BashMap'
-       [_OID          ]='BashMap'
-#      
-BashMap_vmt[]
+#------------------ Map --------------------
+global array vars: Map Map_vmt
+Map[]
+   [baseClass     ]='Object'
+   [_CLASS        ]='Class'
+   [0             ]='_bgclassCall Map Class 0 |'
+   [_Ref          ]='_bgclassCall Map Class 0 |'
+   [classHierarchy]='Object Map'
+   [defaultIndex  ]='off'
+   [name          ]='Map'
+   [_OID          ]='Map'
+#  
+Map_vmt[]
 
 
 ## bg_objects.sh:initialState: finished
@@ -302,33 +288,35 @@ pet
 ##----------
 ## test
 cmd> local pet; ConstructObject Animal pet
-cmd> local petOID="$(GetOID $pet)"
+cmd> local petOID="$(GetOID "$pet")"
 cmd> eval 'local petOIDVars="${!'"$petOID"'*}"'
 cmd> echo "global vars for this object = ${petOIDVars}" | heapNameAnon
-global vars for this object = heap_A_<redacted>
+global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet $petOIDVars | heapNameAnon
 pet='_bgclassCall heap_A_<redacted> Animal 0 |'
 heap_A_<redacted>
-                [_CLASS  ]='Animal'
-                [_Ref    ]='_bgclassCall heap_A_<redacted> Animal 0 |'
                 [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
                 [legCount]='unk'
                 [species ]='unk'
                 [family  ]='unk'
-                [_OID    ]='heap_A_<redacted>
+heap_A_<redacted>_sys[]
+                [_CLASS]='Animal'
+                [0     ]='_bgclassCall heap_A_<redacted> Animal 0 |'
+                [_Ref  ]='_bgclassCall heap_A_<redacted> Animal 0 |'
+                [_OID  ]='heap_A_<redacted>
 
 ##----------
 ## test
 cmd> local -A pet2; ConstructObject Animal pet2
-cmd> local pet2OID="$(GetOID $pet2)"
+cmd> local pet2OID="$(GetOID "$pet2")"
 cmd> eval 'local pet2OIDVars="${!'"$pet2OID"'*}"'
 cmd> echo "vars for this object = ${pet2OIDVars}" | heapNameAnon
 vars for this object = pet2 pet2OID
 cmd> printfVars --noObjects $pet2OIDVars | heapNameAnon
 pet2[]
     [_CLASS  ]='Animal'
-    [_Ref    ]='_bgclassCall pet2 Animal 0 |'
     [0       ]='_bgclassCall pet2 Animal 0 |'
+    [_Ref    ]='_bgclassCall pet2 Animal 0 |'
     [legCount]='unk'
     [species ]='unk'
     [family  ]='unk'
@@ -338,27 +326,26 @@ pet2OID='pet2'
 ##----------
 ## test
 cmd> local -n pet3; ConstructObject Animal pet3
-cmd> local pet3OID="$(GetOID $pet3)"
+cmd> local pet3OID="$(GetOID "$pet3")"
 cmd> eval 'local pet3OIDVars="${!'"$pet3OID"'*}"'
 cmd> echo "global vars for this object = ${pet3OIDVars}" | heapNameAnon
-global vars for this object = heap_A_<redacted>
+global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet3 $pet3OIDVars | heapNameAnon
 pet3[]
-    [_CLASS  ]='Animal'
-    [_Ref    ]='_bgclassCall heap_A_<redacted> Animal 0 |'
     [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
     [legCount]='unk'
     [species ]='unk'
     [family  ]='unk'
-    [_OID    ]='heap_A_<redacted>
 heap_A_<redacted>
-    [_CLASS  ]='Animal'
-    [_Ref    ]='_bgclassCall heap_A_<redacted> Animal 0 |'
     [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
     [legCount]='unk'
     [species ]='unk'
     [family  ]='unk'
-    [_OID    ]='heap_A_<redacted>
+heap_A_<redacted>_sys[]
+    [_CLASS]='Animal'
+    [0     ]='_bgclassCall heap_A_<redacted> Animal 0 |'
+    [_Ref  ]='_bgclassCall heap_A_<redacted> Animal 0 |'
+    [_OID  ]='heap_A_<redacted>
 
 ## bg_objects.sh:ConstructObject: finished
 ###############################################################################################################################
@@ -370,17 +357,202 @@ heap_A_<redacted>
 
 ##----------
 ## setup
+##     | cmd> DeclareClass Animal
+##     | cmd> $Animal.getClassMethods
 ##     | speak
 
 ##----------
 ## test
 # expect that pet and feed are not in this list
+cmd> echo "${Animal[methods]}"
 Animal::speak
+cmd> _classUpdateVMT -f "Animal"
 # expect that now pet and feed are in this list
+cmd> echo "${Animal[methods]}"
 Animal::feed
 Animal::pet
 Animal::speak
 
 ## bg_objects.sh:_classUpdateVMT: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Array: start
+## expect: 
+
+##----------
+## test
+cmd> local -n a1; ConstructObject Array a1
+cmd> printfVars a1
+a1[]
+cmd> a1=(one two three)
+cmd> printfVars a1
+a1[]
+  [0]='one'
+  [1]='two'
+  [2]='three'
+
+##----------
+## test
+cmd> local a2; ConstructObject Array a2
+cmd> $a2.getOID | heapNameAnon
+heap_a_<redacted>
+cmd> local -n a2OID; $a2.getOID a2OID
+cmd> printfVars a2
+a2 : Array
+cmd> a2OID=(one two three)
+cmd> printfVars a2
+a2 : Array
+   0: one
+   1: two
+   2: three
+cmd> $a2.getSize
+3
+
+## bg_objects.sh:Array: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Map: start
+## expect: 
+
+##----------
+## test
+cmd> local -n a1; ConstructObject Map a1
+cmd> printfVars a1
+a1[]
+cmd> a1=([one]=1 [two]=2 [three]=3)
+cmd> printfVars a1
+a1[]
+  [two  ]='2'
+  [three]='3'
+  [one  ]='1'
+
+##----------
+## test
+cmd> local a2; ConstructObject Map a2
+cmd> $a2.getOID | heapNameAnon
+heap_A_<redacted>
+cmd> printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
+heap_A_<redacted>
+heap_A_<redacted>_sys[]
+                [_CLASS]='Map'
+                [0     ]='_bgclassCall heap_A_<redacted> Map 0 |'
+                [_Ref  ]='_bgclassCall heap_A_<redacted> Map 0 |'
+                [_OID  ]='heap_A_<redacted>
+cmd> local -n a2OID; $a2.getOID a2OID
+cmd> printfVars a2
+a2 : Map
+cmd> a2OID=([one]=1 [two]=2 [three]=3)
+cmd> $a2.getIndexes
+two three one
+cmd> printfVars a2
+a2 : Map
+   two  : 2
+   three: 3
+   one  : 1
+cmd> printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
+heap_A_<redacted>
+                [two  ]='2'
+                [three]='3'
+                [one  ]='1'
+heap_A_<redacted>_sys[]
+                [_CLASS]='Map'
+                [0     ]='_bgclassCall heap_A_<redacted> Map 0 |'
+                [_Ref  ]='_bgclassCall heap_A_<redacted> Map 0 |'
+                [_OID  ]='heap_A_<redacted>
+cmd> $a2.getSize
+3
+
+## bg_objects.sh:Map: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Stack: start
+## expect: 
+
+##----------
+## test
+cmd> local -n a1; ConstructObject Stack a1
+cmd> printfVars a1
+a1 : Stack
+   length: 0
+cmd> $a1.push one
+cmd> $a1.push two
+cmd> $a1.push three
+cmd> $a1.getSize
+3
+cmd> printfVars a1
+a1 : Stack
+   length: 3
+   e2    : three
+   e0    : one
+   e1    : two
+cmd> for ((i=0; i<$($a1.getSize); i++)); do $a1.peek $i; done
+three
+two
+one
+cmd> local element
+cmd> while $a1.pop element; do printfVars element; done
+element='three'
+element='two'
+element='one'
+
+##----------
+## test
+cmd> local a2; ConstructObject Stack a2
+cmd> printfVars a2
+a2 : Stack
+   length: 0
+cmd> $a2.push one
+cmd> $a2.push two
+cmd> $a2.push three
+cmd> $a2.getSize
+3
+cmd> printfVars a2
+a2 : Stack
+   length: 3
+   e2    : three
+   e0    : one
+   e1    : two
+cmd> for ((i=0; i<$($a2.getSize); i++)); do $a2.peek $i; done
+three
+two
+one
+cmd> local element
+cmd> while $a2.pop element; do printfVars element; done
+element='three'
+element='two'
+element='one'
+
+## bg_objects.sh:Stack: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:nestedObjects: start
+## expect:  the DataFile::read() method refer to "filename" and "data" directly without using the array notation this[filename]
+
+##----------
+## setup
+##     | one fish
+##     | two fish
+##     | red fish
+##     | blue fish
+
+##----------
+## test
+datafile : DataFile
+   filename: /tmp/bgmktemp.<redacted>
+   data    : <instance> of Array
+  data.0: one fish
+  data.1: two fish
+  data.2: red fish
+  data.3: blue fish
+
+## bg_objects.sh:nestedObjects: finished
 ###############################################################################################################################
 

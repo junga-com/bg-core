@@ -87,7 +87,7 @@ function findInPaths()
 		--no-scriptFolder:*) addScriptFolderFlag="" ;;
 		--debug:*)           debug="1"; preCmd="echo " ;;
 		--return-relative:*) findPrintFmt="%P" ;;
-		-R*|--retVar*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--array --append) ;;
+		-R*|--retVar*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
 
 		# first positional param is the filespec
 		[^-]*:1) fileSpec="$1"; ((posCwords++)) ;;
@@ -162,7 +162,8 @@ function bgGetDataFolder()
 	local pName=${1:-$projectName}
 
 	# search in bgDataPath to honor virtually installed packages
-	local dataFolder="$(findInPaths  ".$pName" -r "data" "$bgDataPath" -r "" "/usr/share/$pName")"
+
+	local dataFolder; findInPaths -R dataFolder  ".$pName" -r "data" "$bgDataPath" -r "" "/usr/share/$pName"
 	dataFolder="${dataFolder%/*}"
 
 	# if no existing folder was found, set it to the system path even if it does not yet exist.

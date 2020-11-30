@@ -98,7 +98,6 @@ one more thing...
 ##     | cmd> echo setting up something something...
 ##     | setting up something something...
 ##     | cmd> assertError "bad setup"
-##     | : 
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
    catch_errorCode='36'
@@ -143,7 +142,7 @@ cmd> exit 2
 ##----------
 ## test
 cmd> assertError "this is an error"
-: ** Exception thrown by testcase **
+** Exception thrown by testcase **
    catch_errorClass='assertError'
    catch_errorCode='36'
    catch_errorDescription='

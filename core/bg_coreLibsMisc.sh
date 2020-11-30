@@ -1058,6 +1058,12 @@ function utEsc()
 	params=("${params[@]//$'\t'/%09}")
 	params=("${params[@]//$'\n'/%0A}")
 	params=("${params[@]//$'\r'/%0D}")
+
+	local i; for i in "${!params[@]}"; do
+		[ "${params[$i]}" == "--" ] && params[$i]="%2D%2D"
+		params[$i]="${params[$i]:---}"
+	done
+
 	echo "${params[*]}"
 }
 
@@ -1068,6 +1074,13 @@ function utUnEsc()
 {
 	local -n _params="$1"; shift
 	_params=("$@")
+
+	local i; for i in "${!params[@]}"; do
+		[ "${params[$i]}" == "--" ] && params[$i]=""
+		[ "${params[$i]}" == "%2D%2D" ] && params[$i]="--"
+	done
+
+
 	_params=("${_params[@]//%20/ }")
 	_params=("${_params[@]//%09/$'\t'}")
 	_params=("${_params[@]//%0A/$'\n'}")

@@ -7,6 +7,11 @@ function heapNameAnon()
 	sed 's/heap_\([^_]*\)_\([^_ ]*\)/heap_\1_<redacted>/g'
 }
 
+function tempFileAnon()
+{
+	sed 's|bgmktemp\.\([^ ]*\)|bgmktemp\.<redacted>|g'
+}
+
 function ut_initialState()
 {
 	# expect: shows the classes that ae initially created and their content
@@ -78,21 +83,21 @@ function ut_ConstructObject()
 
 	ut test
 	local pet; ConstructObject Animal pet
-	local petOID="$(GetOID $pet)"
+	local petOID="$(GetOID "$pet")"
 	eval 'local petOIDVars="${!'"$petOID"'*}"'
 	echo "global vars for this object = ${petOIDVars}" | heapNameAnon
 	printfVars --noObjects pet $petOIDVars | heapNameAnon
 
 	ut test
 	local -A pet2; ConstructObject Animal pet2
-	local pet2OID="$(GetOID $pet2)"
+	local pet2OID="$(GetOID "$pet2")"
 	eval 'local pet2OIDVars="${!'"$pet2OID"'*}"'
 	echo "vars for this object = ${pet2OIDVars}" | heapNameAnon
 	printfVars --noObjects $pet2OIDVars | heapNameAnon
 
 	ut test
 	local -n pet3; ConstructObject Animal pet3
-	local pet3OID="$(GetOID $pet3)"
+	local pet3OID="$(GetOID "$pet3")"
 	eval 'local pet3OIDVars="${!'"$pet3OID"'*}"'
 	echo "global vars for this object = ${pet3OIDVars}" | heapNameAnon
 	printfVars --noObjects pet3 $pet3OIDVars | heapNameAnon
@@ -118,4 +123,105 @@ function ut__classUpdateVMT()
 
 	ut expect: that now pet and feed are in this list
 	echo "${Animal[methods]}"
+}
+
+
+function ut_Array()
+{
+	ut test
+	local -n a1; ConstructObject Array a1
+	printfVars a1
+	a1=(one two three)
+	printfVars a1
+
+	ut test
+	local a2; ConstructObject Array a2
+	$a2.getOID | heapNameAnon
+	local -n a2OID; $a2.getOID a2OID
+	printfVars a2
+	a2OID=(one two three)
+	printfVars a2
+	$a2.getSize
+}
+
+
+function ut_Map()
+{
+	ut test
+	local -n a1; ConstructObject Map a1
+	printfVars a1
+	a1=([one]=1 [two]=2 [three]=3)
+	printfVars a1
+
+	ut test
+	local a2; ConstructObject Map a2
+	$a2.getOID | heapNameAnon
+	printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
+	local -n a2OID; $a2.getOID a2OID
+	printfVars a2
+	a2OID=([one]=1 [two]=2 [three]=3)
+	$a2.getIndexes
+	printfVars a2
+	printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
+	$a2.getSize
+}
+
+
+function ut_Stack()
+{
+	ut test
+	local -n a1; ConstructObject Stack a1
+	printfVars a1
+	$a1.push one
+	$a1.push two
+	$a1.push three
+	$a1.getSize
+	printfVars a1
+
+	for ((i=0; i<$($a1.getSize); i++)); do $a1.peek $i; done
+
+	local element
+	while $a1.pop element; do printfVars element; done
+
+	ut test
+	local a2; ConstructObject Stack a2
+	printfVars a2
+	$a2.push one
+	$a2.push two
+	$a2.push three
+	$a2.getSize
+	printfVars a2
+
+	for ((i=0; i<$($a2.getSize); i++)); do $a2.peek $i; done
+
+	local element
+	while $a2.pop element; do printfVars element; done
+}
+
+function ut_nestedObjects()
+{
+	# expect: the DataFile::read() method refer to "filename" and "data" directly without using the array notation this[filename]
+	ut setup
+	DeclareClass DataFile
+	DataFile::__construct() {
+		this[filename]="$1"; shift
+		$_this.data=new Array
+		$_this.read
+	}
+	DataFile::read() {
+		if [ -f "$filename" ]; then
+			mapfile -t data <"$filename"
+		fi
+	}
+	local tmpFile; bgmktemp tmpFile
+	echo "$(dedent '
+		one fish
+		two fish
+		red fish
+		blue fish
+	')" | tee "$tmpFile"
+
+	ut test
+	ConstructObject DataFile datafile "$tmpFile"
+	printfVars datafile  | tempFileAnon
 }

@@ -275,6 +275,78 @@ I dont exist
 
 
 ###############################################################################################################################
+## bg_coreBashVars.sh:printfVars:10 start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+##----------
+## test
+cmd> echo printfVars "$@"
+printfVars narray narray[2] aarray aarray[two]
+cmd> printfVars "$@"
+narray[]
+      [0]='one'
+      [1]='two'
+      [2]='three'
+narray[2]='three'
+aarray[]
+      [two  ]='hello
+      [     ] +world'
+      [three]='3'
+      [one  ]='1'
+aarray[two]='hello
+             world'
+
+## bg_coreBashVars.sh:printfVars:10 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:printfVars_nameRefs: start
+## expect:  the output of different types of variables to show their value
+
+##----------
+## setup
+##     | cmd> local string="i am a string"
+##     | cmd> local -a narray=(one two three)
+##     | cmd> local -A aarray=(
+##     | cmd> local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+##     | cmd> local -n nr_string=string
+##     | cmd> local -n nr_narray=narray
+##     | cmd> local -n nr_narray_2="narray[2]"
+##     | cmd> local -n nr_aarray=aarray
+##     | cmd> local -n nr_aarray_two="aarray[two]"
+##     | cmd> local -n nr_longStr=longStr
+
+##----------
+## test
+cmd> printfVars nr_string nr_narray nr_narray_2 nr_aarray nr_aarray_two nr_longStr
+nr_string='i am a string'
+nr_narray[]
+         [0]='one'
+         [1]='two'
+         [2]='three'
+nr_narray_2='three'
+nr_aarray[]
+         [two  ]='hello
+         [     ] +world'
+         [three]='3'
+         [one  ]='1'
+nr_aarray_two='hello
+               world'
+nr_longStr='now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country'
+
+## bg_coreBashVars.sh:printfVars_nameRefs: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
 ## bg_coreBashVars.sh:printfVars_objects: start
 ## expect:  the output of different types of variables to show their value
 
@@ -404,8 +476,8 @@ myCat : Cat
 cmd> printfVars --noObjects myCat
 myCat[]
      [_CLASS ]='Cat'
-     [_Ref   ]='_bgclassCall myCat Cat 0 |'
      [0      ]='_bgclassCall myCat Cat 0 |'
+     [_Ref   ]='_bgclassCall myCat Cat 0 |'
      [species]='cat'
      [_OID   ]='myCat'
 

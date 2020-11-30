@@ -490,33 +490,68 @@ Here for brevity I expanded a string literal template but I could have done the 
 
 ## Object Oriented Bash
 
-When writing a full featured script, one comes up against a limitation of bash's concept of data scope. There is no native concept of data structures that can be passed around to functions so its hard to provide a library that operates on something that is a collection of multiple variables.
+When writing a full featured script, one comes up against a limitation of bash's concept of data scope. There is no native concept of data structures that can be passed around to functions and nested inside each other so its hard to write all but the most simple data structures and functions that work with them.
 
+The reason for the bg_objects.sh library is to alleviate this data structure shortcoming. The OO syntax is just a nice side affect.
 
 ```bash
 $ cat - >/tmp/test7.sh
 #!/usr/bin/env bash
 source /usr/lib/bg_core.sh
 import bg_objects.sh ;$L1
+
 DeclareClass MyData
 function MyData::__construct() {
     this[filename]="$1"
-    this[quantity]="$2"
+    $this.data=new Array
 }
-function MyData::process() {
-    (( ${this[quantity]}-- ))
-    echo "one of ${this[name]}"
+function MyData::read() {
+    mapfile -t data < "$filename"
 }
 
+function process() {
+    local -n dataFile="$1"
+    echo "processing $($dataFile.data[2])"
+    $dataFile.data[2]="done"
+}
+
+ConstructObject MyData d1 /tmp/data
+$d1.read
+printfVars d1
+
+process d1
+printfVars d1
 
 <cntr-d>
 $ chmod a+x /tmp/test7.sh
 ```
 
 ```bash
-
+$ /tmp/test7.sh
+d1 : MyData
+   filename: /tmp/data
+   data    : <instance> of Array
+      [0]: one fish
+      [1]: two fish
+      [2]: red fish
+      [3]: blue fish
+processing red fish
+d1 : MyData
+   filename: /tmp/data
+   data    : <instance> of Array
+      [0]: one fish
+      [1]: two fish
+      [2]: done
+      [3]: blue fish
+$
 ```
 
+The most important thing is that we can not easily create bash arrays within arrays.
+
+See
+* man(7) bg_objects.sh
+* man(3) DeclareClass
+* man(3) ConstructObject
 
 
 ## Project Folder structure and naming

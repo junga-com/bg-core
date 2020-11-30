@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# gaurd against multiple sourcing since this is the only file that does not get sourced with import 
-[ "${_importedLibraries[lib:bg_coreImport.sh]}" ] && return 0
+# gaurd against multiple sourcing since this is the only file that does not get sourced with import
+[[ "${_importedLibraries@a}" =~ A ]] && [ "${_importedLibraries["lib:bg_coreImport.sh"]}" ] && return 0
 
 set +e
 

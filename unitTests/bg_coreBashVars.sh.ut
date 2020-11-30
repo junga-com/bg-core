@@ -16,6 +16,7 @@ ut_printfVars=(
 	[7]="$(cmdline -1 -l"one" -l"two" +1 -l"three" -l"four")"
 	[8]="$(cmdline "   " -l"one" -l"two" "      " -l"three" -l"four")"
 	[9]="$(cmdline iDontExist "I dont exist")"
+	[10]="$(cmdline narray narray[2] aarray aarray[two] )"
 )
 function ut_printfVars()
 {
@@ -36,6 +37,34 @@ function ut_printfVars()
 	ut test
 	echo printfVars "$@"
 	printfVars "$@"
+}
+
+
+function ut_printfVars_nameRefs()
+{
+	# expect: the output of different types of variables to show their value
+	ut setup
+	local string="i am a string"
+	local -a narray=(one two three)
+	local -A aarray=(
+		[one]=1
+		[two]=$(dedent '
+			hello
+			world
+		')
+		[three]=3
+	)
+	local longStr="now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country"
+
+	local -n nr_string=string
+	local -n nr_narray=narray
+	local -n nr_narray_2="narray[2]"
+	local -n nr_aarray=aarray
+	local -n nr_aarray_two="aarray[two]"
+	local -n nr_longStr=longStr
+
+	ut test
+	printfVars nr_string nr_narray nr_narray_2 nr_aarray nr_aarray_two nr_longStr
 }
 
 function ut_printfVars_objects()

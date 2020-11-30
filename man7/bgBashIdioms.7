@@ -1,19 +1,21 @@
 .TH bgBashIdioms 7 "October 2014" "Junga" "bg-core"
 
 .SH NAME
-bgBashIdioms -- describes some idioms used in bg-core bash programming style
+bgBashIdioms -- describes some idioms and patterns used in bg-core bash programming style
 
 .SH OVERVIEW
 This man page describes a number of idiomatic conventions used in bg-core style bash programming. An idiom is a programming convention that has meaning beyond the literal meaning of the code syntax. Bash is a language where idioms are important because the syntax is not natively friendly to many of the common facilities that programmers enjoy in other languages.
 
 Before the reader knows the idiom, the code can look overly complex and cryptic but after knowing the idiom, the reader looks past the literal code and sees the structure that becomes easy to work with.
 
+
+
 .SH Command Line Options Processing
 *nix commands have a convention of passing optional arguments ahead of positional arguments.
 
 Options begin with a "-" character, can have short and long variants, can either require an argument to the option or not, short options without arguments can be concatenated into one token, the required argument to an option can be given in the same token with the option or in the following token, and the "=" character is used to concatenate a long option with its argument but a short option uses no delimiter.
 
-This convention makes it relatively easy to invoke commands but the code to recognize all these variants makes scripts difficult to read. The getopts utility attempts to make it easier but falls short.  
+This convention makes it relatively easy to invoke commands but the code to recognize all these variants makes scripts difficult to read. The getopts utility attempts to make it easier but falls short.
 
 This idiom isolates the declaration of options from the processing so that whether a function or script command accepts an option typically is one line of code that is easy to cut and paste, add or remove.
 
@@ -24,7 +26,7 @@ This idiom isolates the declaration of options from the processing so that wheth
     (5)        *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
     (6)    done
 
-Lines 2,5, and 6 are idiomatic. They do not follow good script programming practice and are hard to understand. They combine a while loop and case statement in a strange way. The reason for that is that we want this block of code to be about the other lines of code that are specific to the particular function or command so we pack the rote stuff into a 'beginning' blob and an 'ending' blob. I would have liked to have combined 5 and 6 into a single line but the eye is so used to seeing 'while' terminated with 'done' that I felt it better to keep the ending blob two lines. 
+Lines 2,5, and 6 are idiomatic. They do not follow good script programming practice and are hard to understand. They combine a while loop and case statement in a strange way. The reason for that is that we want this block of code to be about the other lines of code that are specific to the particular function or command so we pack the rote stuff into a 'beginning' blob and an 'ending' blob. I would have liked to have combined 5 and 6 into a single line but the eye is so used to seeing 'while' terminated with 'done' that I felt it better to keep the ending blob two lines.
 
 After seeing a similar block of code at the start of most functions and at the start of the main script of commands, your eye should start seeing line 2 as the start of options processing and lines 5 and 6 as the end of options processing and pretty much ignore them.
 
@@ -38,11 +40,41 @@ The author can do what ever processing is required in the option's case statemen
 
 The option with a required argument uses the bgOptionsGetOpt function to retrieve the value. This is a sub-idiom. The only important thing on that lien is the name fo the "filename" variable that is being set with the required argument.
 
-This block supports all the conventions of *nix options and it does it efficiently as runtime so that the author can add as many options as makes sense without adversely affecting performance.  
+This block supports all the conventions of *nix options and it does it efficiently as runtime so that the author can add as many options as makes sense without adversely affecting performance.
 
 I never type out lines 2, 5, and 6 nor do I type out the bgOptionsGetOpt call line. Instead, I either copy and paste an option block from a nearby function or use a snippet feature of my editor to fill them in.
 
 My Atom snippets make it so that I start typing "bgoptloop" to insert line 2,5, and 6 and when I add an option with an argument I insert a blank line after line 2 and start typing "bgoptadd".
+
+
+
+
+
+.SH Shortcut Evaluation Flow Control
+Bash is not a pretty language. The if statement is awkward and verbose so its common to use the fact that conditions are only evaluated up to the point that the total expression's value is known to implement a shorter verion of the if statement.
+
+These are all the same
+   if [ ! "$quietFlag" ]; then
+       echo "hi there"
+   fi
+
+   [ "$quietFlag" ] || echo "hi there"
+
+   [ ! "$quietFlag" ] && echo "hi there"
+
+   [ ! "$quietFlag" ] && {
+      echo "hi there"
+   }
+
+A series of "and" conditions can be chained resulting in the command at the end executing only if all the conditions are true.
+   [ -f "$file" ] && [[ "$file" =~ .ut$ ]] && echo "this file exists and matches our pattern to do something"
+
+A series of "or" conditions can be chained resulting in the command at the end executing only if all the conditions are false.
+   [ -f "$file" ] || [ ! "$fileIsNeeded" ] || assertError "we need this file but it does not exist"
+
+If there are more that one command to execute they can be surrounded by {}. Note that spaces around the brackets and that last ; are important
+   [ ! "$something" ] && { something="$1"; shift; }
+
 
 .SH Renaming functions with Aliases
 When organizing libraries, sometimes you realize that a function should be named differently for various reasons. For example, when a function was written, it was considered to stand alone but now you consider it part of a family of functions that should share a naming convention.
@@ -56,8 +88,74 @@ In this case we can use the function alias idiom to provide an alternate name.
        ...
    }
 
-Now the function can be invoked via either name. The prefered name should be the one with the actual function implementation.
+Now the function can be invoked via either name. The preferred name should be the one with the actual function implementation.
 
 If the alias line contains the DEPRECIATED: tag, tools will indicate to users that it should be changed to the preferred name.
 
 Sometimes a function should have multiple names. Possibly it has a longer name that is descriptive but its a common function used in a way that a short idiomatic alias makes the code where it is used more readable. To be explicit that the alias is valid you can tag it with # ALIAS:
+
+
+.SH Pattern: Use returnValue in Library Functions
+Shell functions typically return a value to the caller by writing the value on stdout so that the caller runs the function in a subshell to capture the value like foo="$(myFunc)".
+
+This works well for typical scripts but when making a script library with functions that can be called 100's of times per user interaction, the overhead of that sub shell adds up and its better to return the value by setting a variable whose name the caller passes in as a parameter.
+
+However, its often less convenient for the caller to pass in a variable name.
+
+This pattern allows writing a library function that can efficiently work both ways so that its up to the caller whether to use the more convenient stdout capture or the more efficient variable passing.
+
+In the function, returnValue is used like this...
+   returnValue "some calculated information"  $retVar
+
+If retVar is empty, then the value is written to stdout. Otherwise the value is assigned to the variable named in retVar.
+
+There are two common patterns for how to pass retVar to the function.
+
+If the function only returns one value and it does not support a variable list of positional parameters, then the last parameter can be the optional [<retVar>]. Often such functions will shift its positional parameters so that the statement looks liek `returnValue "$myValue" $1` so that if there is a variable name left on the cmdline, it will be used, otherwise it will use stdout.
+
+If more than one return value is supported or the positional parameters syntax does not allow supporting an optional last parameter, an option is  added to pass the return value(s)
+   usage: myFunc [-R|--myFirstRet=<retVar1>] [-S|--myFirstRet=<retVar2>] <p1>..<pN>
+   ...
+      returnValue "$value1" $retVar1
+      returnValue -q "$value2" $retVar2
+
+By convention, options that pass in return values are often upper case. R is often used.
+
+The -q|--quiet option to returnValue suppresses the writing the value to stdout is <retVar> is empty. In the last example, the <retVar1> will be written to stdout if the caller does not provide the -R option but <retVar2> will be ignored unless the caller provides the -S option.
+
+`varSetRef <retVar> <value...>` is similar to returnValue. It has the semantics of an assignment statement and it more flexible in how the output variable is set. <retVar> can be a bash numeric or associative array and the returned value can be a single token or multiple tokens, and can replace the <retVar> or append to it and can be assigned to the indexes so that it has set semantics to eliminate duplicates.
+
+Here is an example code snippet from a function that allows the caller to receive its return value(s) in many ways. By default they will be written to stdout.
+
+    local retArgs=(--echo "")
+    while [ $# -gt 0 ]; do case "$1" in
+       --string*)      bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--string "$retVar") ;;
+       --stringAppend*)bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --string "$retVar") ;;
+       --set*)         bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--set "$retVar") ;;
+       --array*)       bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--array "$retVar") ;;
+       --arrayAppend*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
+       *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+    done
+    ...
+    varSetRef "${retArgs[@]}" "<val1>" "<var2...>"
+
+
+
+.SH Pattern: Passing Variables by Reference
+Bash does not have a native mechanism to pass variables by reference so that they can be modified by a function as an output variable. We can get pretty close however by passing the name of a variable to the function and having the function set a value in that variable.
+
+The major problem with this is that if the function declares a local variable with the same name as the variable the caller passes, the attempt to set the returned value will set the function's local variable by that name, leaving the caller's variable unchanged. The 'local -n nameRef' variable attribute does not fix this problem.
+
+There is a popular upvars pattern that solves it well but results in a complicated syntax that I find unacceptable.
+
+The pattern I use is that a function that returns values in passed in variable names needs to name its variables which a convention that makes it unlikely that the caller will use any of those names in the variables that are passed in. Note that no other mainstream language has this problem (aside from shells) so typical programming naming conventions in practice tend to ensure that a collision will happen. i.e. both the caller and the function might name a variable "file" if each deals with just one file variable so that its clear what file "file" refers to.
+
+There are several naming conventions that you will see in bg-core library functions that return values in variables.
+
+* local vars start with '_'  (often combined with other conventions)
+* local vars end in *Value or *Var like fileValue for the calculated value and fileVar for the name of the variable that will receive the value
+* local vars prefixed with _<functionInitials>*  where <functionInitials> are 3 or three initial from the function name.
+
+When a function is in a very low level library which is likely to be called from other library functions, the strongest convention (_<functionInitials>*) is used. When a function is higher level, only uses one return value then the weakest convention (_*) can be used.
+
+The bg_coreBashVars.sh library has a number of functions starting with var* that help getting and setting values of bash variables by name.

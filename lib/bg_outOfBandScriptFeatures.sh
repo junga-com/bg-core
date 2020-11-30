@@ -313,7 +313,6 @@ function bgBCParse()
 
 	local -A syntaxSpec=()
 	bgMakeUsageSpec "$optSpecs" syntaxSpec
-bgtraceVars syntaxSpec
 
 	cur="${words[$cword]}"
 	((cword>1)) && prev="${words[$(( $cword-1 ))]}"
