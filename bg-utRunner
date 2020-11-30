@@ -1,0 +1,30 @@
+#!/bin/bash
+
+source /usr/lib/bg_core.sh
+
+declare -gx bgUnitTestScript="$1"; shift
+
+import bg_unitTest.sh ;$L1;$L2
+
+source "$bgUnitTestScript"
+
+#exec -a "$bgUnitTestScript"
+
+#echo "$0"
+#while [ $# -gt 0 ]; do
+#	echo "'$1'"; shift
+#done
+
+unitTestCntr "$@"
+
+
+# Command
+# usage bg-utRunner <utFile> list|run|debug [<utSpec>]
+# usage #!/usr/bin/env bg-utRunner
+# This runs a unit test library script directly, as opposed to inside the bg-dev system which runs them to save their output and
+# update the results in the project.
+#
+# Typically, you never run this command directly but instead set it as the shebang script processor of script library files so
+# that they can be ran directly as commands themselves to directly test the output.
+#
+ 

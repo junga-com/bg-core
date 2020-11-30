@@ -2763,22 +2763,26 @@ function assertError()
 			;;
 
 		catch)
-			## fill in pidsToKill which each pid between us and  tryStatePID which is the pid that will catch the exception
-
 			local tryStatePID="${bgBASH_tryStackPID[@]:0:1}"
+			local throwingStatePID="$BASHPID"
+
+			## fill in pidsToKill with each pid between where the assert is being thrown (throwingStatePID) and where it will be
+			# caught (tryStatePID)
 			local pidsToKill=()
-			local pid="$(ps -o ppid= --pid $BASHPID)"
-			while (( pid != 0 )) && (( pid != tryStatePID )) && (( pid != $$ )); do
-				pidsToKill+=("$pid")
-				pid="$(ps -o ppid= --pid $pid)"
-			done
-			(( pid != tryStatePID )) && assertError --critical --allStack  -v pstreeOfTry__ -v pstreeOfCatch "
-				Try/Catch Logic Failed. PID of Try block($tryStatePID) is not a parent of PID of asserting exception($BASHPID)"
+			if [ "$throwingStatePID" != "$tryStatePID" ]; then
+				local pid="$(ps -o ppid= --pid "$throwingStatePID")"
+				while (( pid != 0 )) && (( pid != tryStatePID )) && (( pid != $$ )); do
+					pidsToKill+=("$pid")
+					pid="$(ps -o ppid= --pid $pid)"
+				done
+				(( pid != tryStatePID )) && assertError --critical --allStack  -v pstreeOfTry:"-l$(bgGetPSTree "$tryStatePID")" -v pstreeOfThrow:"-l$(bgGetPSTree "$throwingStatePID")" "
+					Try/Catch Logic Failed. PID of Try block($tryStatePID) is not a parent of PID of asserting exception($BASHPID)"
+			fi
 
 			## Record the state at this point that the exception is being raised
 
 			declare -ag _catch_stkArrayRaw catch_stkArray; bgStackGet _catch_stkArrayRaw catch_stkArray
-			declare -g catch_psTree; bgGetPSTree catch_psTree
+			declare -g catch_psTree; bgGetPSTree "$$" catch_psTree
 			declare -gx	catch_errorCode="$_ae_exitCode"
 			declare -gx	catch_errorClass="$_ae_assertFunctionName"
 			declare -gx	catch_errorDescription="$(cat $assertOut.catchDescription)"
@@ -2795,7 +2799,7 @@ function assertError()
 					echo "$_ae_stkFrame" >>$assertOut.stkArrayRaw
 				done
 
-				bgGetPSTree >>$assertOut.psTree
+				bgGetPSTree "$$" >>$assertOut.psTree
 
 				echo "$catch_errorCode $catch_errorClass" >>$assertOut.errorInfo
 			else

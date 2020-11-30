@@ -93,10 +93,10 @@
 #    man(1) bg-dev-tests.ut
 
 # bgUnitTestMode=utRuntime|direct
-declare -g bgUnitTestMode="utRuntime"; [[ "$bgLibExecCmd" =~ [.]ut$ ]] && bgUnitTestMode="direct"
+declare -g bgUnitTestMode="utRuntime"; [[ "$bgLibExecCmd" =~ ([.]ut)|(bg-utRunner)$ ]] && bgUnitTestMode="direct"
 
-declare -g bgUnitTestScript=
-for _uttmpSrcname in "${BASH_SOURCE[@]}"; do
+declare -g bgUnitTestScript
+[ ! "$bgUnitTestScript" ] && for _uttmpSrcname in "${BASH_SOURCE[@]}"; do
 	if [[ "$_uttmpSrcname" =~ [.]ut$ ]]; then
 		bgUnitTestScript="$_uttmpSrcname"
 		break
@@ -189,6 +189,12 @@ function ut()
 		echo "## $event" >&$stdoutFD
 		_utRun_section="$event"
 		;;
+
+	  expect|expect:)
+		echo "# expect $*"
+		;;
+
+	  expectSetupFail) _utRun_expectSetupFail="1" ;;
 
 	  onBeforeSrcLine)
 		local lineNo="$1"
@@ -298,9 +304,6 @@ function ut()
 		 	ut setupFailed;
 		fi
 		;;
-
-	expectSetupFail) _utRun_expectSetupFail="1" ;;
-
 
 	  onEnd)
 		_ut_flushLineInfo

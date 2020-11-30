@@ -226,7 +226,8 @@
 function DeclareClass()
 {
 	local className="$1"; shift
-	local baseClass; [[ ! "$1" =~ : ]] && { baseClass="$1" ; shift; }
+	[ "$1" == ":" ] && shift  # the colon is optional syntax sugar
+	local baseClass; [[ ! "$1" =~ : ]] && { baseClass="$1" ; shift; }  # attributes must have a : so if there is none, its baseclass
 	[ "$className" != "Object" ] && baseClass="${baseClass:-Object}"
 
 	[ "$baseClass" == "Class" ] && assertError "
@@ -282,6 +283,7 @@ function Class::__construct()
 
 	declare -gA _classIsAMap
 	[ ! "$baseClass" ] && _classIsAMap[$className,Object]=1
+	_classIsAMap[$className,$className]=1
 
 	local _cname="$baseClass";
 	this[classHierarchy]="$className"
@@ -319,7 +321,7 @@ function Class::__construct()
 function Class::isA()
 {
 	local className="$1"
-	[ "${_classIsAMap[${this[name]},$className]}" ]
+	[ "${_classIsAMap[${this[name]},$className]+exists}" ]
 }
 
 # usage: <Class>.reloadMethods
@@ -394,19 +396,28 @@ function NewObject()
 # usage: ConstructObject <className> <objRefVar> [<p1> ... <pN>]
 # usage: ConstructObject <className>::<dynamicConstructionData> <objRefVar> [<p1> ... <pN>]
 # usage: local -A <objRef>; ConstructObject <className> <objRef> [<p1> ... <pN>]
+# usage: local -n <objRef>; ConstructObject <className> <objRef> [<p1> ... <pN>]
 # usage: local <objRef>;    ConstructObject <className> <objRef> [<p1> ... <pN>]
-# This creates a new Object instance. An object instance is a normal bash associative array that has some special elements filled in
-# Elements whose index name starts with an _ (underscore) are system attributes and are not considered logical member variables.
-# All other elements are considered member variables of the object.
+# This creates a new Object instance assigned to <objRef>.
 #
-# An <objRef> is a string variable with a synstax that is a call to _bgclassCall when derefernced. This <objRef> string is set in
-# the [0] element of the object associative array which makes the array variable name a valid <objRef> because bash treats [0] as
-# the default element when an array variable is used as a scalar.
+# An object instance is a normal bash associative array that has some special elements filled in. The term OID is used to refer to
+# that array. Elements in the OID whose index name starts with an _ (underscore) are system attributes and are not considered
+# logical member variables. The element [0] also starts out as a system variable but if [0] is unset or reassigned, it will no
+# longer treated as a system attribute. All other elements are considered member variables of the object.
 #
-# This function will result in the <objRefVar> passed in being set with a <objRef> to the new object. If <objRefVar> is a variable
-# name with the -A attribute, it will become the new object with [0] set to its own <objRef>. If it is a regular variable, a new
-# associative array variable will be allocated on the heap (see man(3) newHeapVar) and <objRefVar> will be set with the <objRef> to
-# it.
+# An <objRef> is a string variable formatted such that when derefernced, it will make an method call on the object. This <objRef>
+# string is initially set in the [0] element of the object associative array which makes the array variable name a valid <objRef>
+# because bash treats [0] as the default element when an array variable is used as a scalar.
+#
+# The caller should declare <objRefVar> before calling ConstructObject and the attributes with which it is declared will affect how
+# the object is created.
+#     local -A <objRefVar>;...  #  the local array <objRefVar> will be the object and no other variable will be created so that when
+#             <objRefVar> passes out of scope, <objRefVar> will no longer exist. The destructor will not be called automatically.
+#     local -n <objRefVar>;...  #  the object will be created as a heap variable (see man(3) newHeapVar) and <objRefVar> will be
+#             set to that OID. Its important the the caller does not initialize <objRefVar> at all.
+#     local <objRefVar>; ...  # the object will be created as a heap variable (see man(3) newHeapVar) and <objRefVar> will be set
+#             with an ObjRef string that points to the new OID. The -n version is prefered to this, but this version allows
+#              <objRefVar> to be an array entry which can not be a -n nameRef
 #
 # Dynamic Construction Support:
 # Dynamic construction is an OO feature which allows you to create some sub class of <className> based on data passed when constructing
@@ -482,25 +493,43 @@ function ConstructObject()
 		return
 	fi
 
-	# _objRefVar is a variable name passed to us. It is either the name of an associative array that will be the object or a string
-	# variable that will receive the ObjRef string that points to the new object.
+	# _objRefVar is a variable name passed to us so strip out any unallowed characters for security.
 	# SECURITY: clean _objRefVar by removing all but characters that can be used in a variable name. foo[bar] is a valid name.
 	local _objRefVar="${2//[^a-zA-Z0-9\[\]_]}"; assertNotEmpty _objRefVar "objRefVar is a required parameter as the second argument"
 
+	# query the type attributes of _objRefVar. we support _objRefVar being declared in several different ways which affects whether
+	# it will be the object array or it will be a pointer to a new heap object array.
+	local _objRefVarAttributes; varGetAttributes "$_objRefVar" _objRefVarAttributes
+
 	# this fixes a bug in pre 5.x bash where declare -p $2 would report that it does not exist if it has not yet been initialized
 	# The caller can declare an associative array variable to use for this object like `local -A foo; ConstructObject Object foo`
-	# Its valid to assign a string to an array -- it gets stored in the [0] element.
-	eval ${_objRefVar}=\"\"
+	# Its valid to assign a string to both a -A and -a array -- it gets stored in the [0] element. If _objRefVar is a nameRef, this
+	# would mess it up. In 5.x, _objRefVarAttributes will be 'n'
+	[ ! "$_objRefVarAttributes" ] && { eval ${_objRefVar}=\"\"; varGetAttributes "$_objRefVar" _objRefVarAttributes; }
 
-	# if _objRefVar is not the name of an associative array, create one on the heap and use _objRefVar to store the objRef to that heap object
-	local _OID="$_objRefVar"
-	if [[ ! "$(declare -p "$_objRefVar" 2>/dev/null)" =~ declare\ -[gilnrtux]*A ]]; then
+	# if _objRefVar is not the name of an associative array, create one on the heap and use _objRefVar to store the objRef to that
+	# heap object. If its not an A array, it can be a string or a -n nameRef.
+	local _OID
+	local -n this
+	# its an unitialized -n nameRef
+	if [ "$_objRefVarAttributes" == "n" ]; then
+		newHeapVar -A  _OID
+		printf -v $_objRefVar "%s" "${_OID}"
+		this="$_OID"
+
+	# its an A (associative) array that we can use as our object
+	elif [[ "$_objRefVarAttributes" =~ A ]]; then
+		_OID="$_objRefVar"
+		this="$_objRefVar"
+
+	# its a plain string variable
+	else
 		newHeapVar -A  _OID
 		printf -v $_objRefVar "%s" "_bgclassCall ${_OID} $_CLASS 0 |"
+		this="$_OID"
 	fi
 	shift 2 # the remainder of parameters are passed to the __construct function
 
-	local -n this="$_OID"
 	this[_OID]="$_OID"
 	this[_CLASS]="$_CLASS"
 	local -n class="$_CLASS"
@@ -524,7 +553,7 @@ function ConstructObject()
 		unset -n static; local -n static="$_cname"
 		bgDebuggerPlumbingCode=0
 		type -t $_cname::__construct &>/dev/null && $_cname::__construct "$@"
-		bgDebuggerPlumbingCode=1
+		_resultCode="$?"; bgDebuggerPlumbingCode=1
 	done
 
 	[ "${_VMT[_method::postConstruct]}" ] && ${this[_Ref]}.postConstruct
@@ -615,11 +644,14 @@ function _classScanForClassMethods()
 # After calling this, future use of references to this object will asertError
 function DeleteObject()
 {
-	# TODO: recursively delete members.
+	# if the caller passes in the contents of an ObjRef string with or without quotes, "$*" will be that string
 	local objRef="$*"
 	local -a parts=( $objRef )
+
+	# if the caller passed in the name of a variable that contains an ObjRef string, there will be only one part.
+	# note that this is different from $# because the ObjRef could have been quoted
 	if [ ${#parts[@]} -eq 1 ]; then
-		unset -n objRef; local -n objRef="$1"
+		unset objRef; local -n objRef="$1"
 		parts=( $objRef )
 	fi
 
@@ -628,11 +660,14 @@ function DeleteObject()
 
 	local -n this="${parts[1]}"
 	local -n _VMT="${this[_CLASS]}_vmt"
-	[ "${_VMT[_method::__destruct]}" ] && $this.__destruct "$@"
+
+	# local -n subObj; for subObj in $(VisitObjectMembers this); do
+	# 	DeleteObject "$subObj"
+	# done
+
+	[ "${_VMT[_method::__destruct]}" ] && $this.__destruct
 	unset this
 }
-
-
 
 
 # usage: _bgclassCall <oid> <className> <hierarchyCallLevel> |.<methodName> p1 p2 ... pN
@@ -733,6 +768,7 @@ function _bgclassCall()
 
 	#bgtraceVars -1 _memberTerm _memberVal _mnameShort
 
+	local _resultCode
 
 	# some hard coded methods that can be called on a member even if that member is not an object or does not exist
 	# When these methods are called directly on an object (not in a chained member reference), they are invoked normally and do not hit this case
@@ -848,7 +884,7 @@ function _bgclassCall()
 			objOnEnterMethod "$@"
 			bgDebuggerPlumbingCode=0
 			$_METHOD "$@"
-			bgDebuggerPlumbingCode=1
+			_resultCode="$?"; bgDebuggerPlumbingCode=1; return "$_resultCode"
 		fi
 
 	# member function with explicit Class syntax
@@ -858,7 +894,7 @@ function _bgclassCall()
 		objOnEnterMethod "$@"
 		bgDebuggerPlumbingCode=0
 		$_METHOD "$@"
-		bgDebuggerPlumbingCode=1
+		_resultCode="$?"; bgDebuggerPlumbingCode=1; return "$_resultCode"
 
 	# member function syntax
 	#   $this.<memberFunct> [<p1> .. p2]
@@ -867,7 +903,7 @@ function _bgclassCall()
 		objOnEnterMethod "$@"
 		bgDebuggerPlumbingCode=0
 		$_METHOD "$@"
-		bgDebuggerPlumbingCode=1
+		_resultCode="$?"; bgDebuggerPlumbingCode=1; bgtraceVars _resultCode; return "$_resultCode"
 
 	# member variable read syntax. Its ok to read a non-existing member var, but if parameters were provided, it looks like a method call
 	#   echo $($this.<memberVar>)
@@ -929,26 +965,28 @@ function ObjEval()
 }
 
 
-# usage: GetOID [-R <retVar>] <objRef>
+# usage: GetOID <objRef> [<retVar>]
 # usage: local -n obj=$(GetOID <objRef>)
-# This returns the name of the underlying array embedded in an objRef. An objRef is a string that allows
-# calling methods and accessing members of an obj like $objRef.<member>
-# An array variable that has been constructed as an Object acts like an objRef b/c the [0] element of the
-# array is the objRef string that points to that same array and an array used without a [] will return the value
-# of [0].
-# This function is typically used to make a local array reference to the underlying array. An array reference
-# can be used for anything that an objRef can but in addition, the array elements can be accessed directly too.
+# usage: local -n obj; GetOID obj
+# This returns the name of the underlying array name embedded in an objRef. The result is similar to $objRef.getOID except this is
+# more efficient because it simply parses the <objRef> instead of invoking a method call.
+#
+# An <objRef> is a string that points to an object instance such as what is returned by ConstructObject.
+#
+# This function is typically used to make a local array reference to the underlying array. An array reference can be used for
+# anything that an objRef can but in addition, the member variables can be accessed directly as bash array elements
+#
 # Params:
 #   <objRef> : the string that refers to an object. For simple bash variables that refer to objects, this is their value.
 #              for bash arrays that refer to objects, it  the value of the [0] element. In either case, you call this
 #              function like
 #                  GetOID $myObj   (or GetOID "$myObj"  -- the double quotes are optional)
-# Options:
-#     -R <retVar> : return the OID in this var instead of on stdout
+#   <retVar> : return the OID in this var instead of on stdout
 function GetOID()
 {
 	local goid_retVar=""
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		# DEPRECIATED: -R is supported for legacy code
 		-R) goid_retVar="$(bgetopt "$@")" && shift ;;
 	esac; shift; done
 

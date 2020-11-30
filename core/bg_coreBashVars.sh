@@ -48,6 +48,7 @@
 #    <retVar>    : the name of the variable that will receive the name of the new heap variable
 #    <initData1> : the initial value of the variable created. If -a or -A is specified, each bash token will be assigned to a
 #          different array element.
+function varNewHeapVar() { newHeapVar "$@"; }  # ALIAS:
 function newHeapVar() {
 	local _template="heap_XXXXXXXXX" _attributes
 	while [ $# -gt 0 ]; do case $1 in
@@ -398,7 +399,7 @@ function varSetRef()
 		--string)    _sr_varType="--string" ;;
 		--array)     _sr_varType="--array" ;;
 		--set)       _sr_varType="--set" ;;
-		--echo)      _sr_varType="--echo" ;;
+		--echo)      shift; echo "$*"; return 0 ;;
 	esac; shift; done
 	local sr_varRef="$1"; shift
 
@@ -917,6 +918,10 @@ function printfVars()
 		if [[ "$pv_term" =~ ^[^[]*: ]]; then
 			pv_varname="${pv_varname##*:}"
 			pv_label="${pv_label%:*}"
+			if [[ "$pv_varname" =~ ^-l ]]; then
+				_printfVars_printValue "$pv_label" "${pv_varname#-l}"
+				continue
+			fi
 		fi
 
 		# assume its a variable name and get its declaration. Should be "" if its not a var name

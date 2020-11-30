@@ -679,11 +679,12 @@ function bgGetPSTree()
 		-*) bgOptionGetOpt opt passThruOpts "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+	local thePID="${1:-$$}"; shift
 	local retVar="${1:---echo}"
 
-	printf "%s: " "$label"
+	[ "$label" ] && printf "%s: " "$label"
 	if which pstree &>/dev/null; then
-		varSetRef $retVar "$(pstree -pl "${passThruOpts[@]}" $$)"
+		varSetRef $retVar "$(pstree -pl "${passThruOpts[@]}" "$thePID")"
 	else
 		varSetRef $retVar "bgtracePSTree: error: pstree not installed. install it to get process tree information"
 	fi

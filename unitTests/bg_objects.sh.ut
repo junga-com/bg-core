@@ -1,12 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bg-utRunner
 
-source /usr/lib/bg_core.sh
-import bg_unitTest.sh ;$L1;$L2
 import bg_objects.sh  ;$L1;$L2
 
-ut_initialState=(
-	[0]=""
-)
+function heapNameAnon()
+{
+	sed 's/heap_\([^_]*\)_\([^_ ]*\)/heap_\1_<redacted>/g'
+}
+
 function ut_initialState()
 {
 	# expect: shows the classes that ae initially created and their content
@@ -25,5 +25,97 @@ function ut_initialState()
 	done
 }
 
-# this should be the last line of any ut script
-unitTestCntr "$@"
+function ut_isA()
+{
+	# expect: that true tests indicate true and false tests indicate false
+	ut setup
+	DeclareClass Animal
+	DeclareClass Dog : Animal
+
+	ut test
+	ut expect "these to be true"
+	$Dog.isA "Animal"       && echo yes || echo no
+	$Animal.isA "Animal"    && echo yes || echo no
+	$Dog.isA "Object"       && echo yes || echo no
+
+	echo
+	ut expect "these to be false"
+	$Animal.isA "Dog"       && echo yes || echo no
+	$Animal.isA "Dog" # to document the return code
+	$Animal.isA "Car"       && echo yes || echo no
+}
+
+
+function ut_getClassMethods()
+{
+	# expect: the correct set of methods to be printed to stdout. -i includes inherited, -d changes the delimiter between methods
+	ut setup
+	DeclareClass Animal
+	Animal::speak() { echo "I am just an animal"; }
+	Animal::pet() { echo "that's nice"; }
+	Animal::feed() { echo "now that's more like it!"; }
+
+	ut test
+	$Animal.getClassMethods
+	$Animal.getClassMethods -i
+	$Animal.getClassMethods -d$'\n'
+}
+
+
+function ut_ConstructObject()
+{
+	# expect: the state after constructing a object 3 different ways is all consistent with each other
+	ut setup
+	DeclareClass Animal
+	Animal::__construct() {
+		this[species]="unk"
+		this[family]="unk"
+		this[legCount]="unk"
+	}
+	Animal::speak() { echo "I am just an animal"; }
+	Animal::pet() { echo "that's nice"; }
+	Animal::feed() { echo "now that's more like it!"; }
+
+	ut test
+	local pet; ConstructObject Animal pet
+	local petOID="$(GetOID $pet)"
+	eval 'local petOIDVars="${!'"$petOID"'*}"'
+	echo "global vars for this object = ${petOIDVars}" | heapNameAnon
+	printfVars --noObjects pet $petOIDVars | heapNameAnon
+
+	ut test
+	local -A pet2; ConstructObject Animal pet2
+	local pet2OID="$(GetOID $pet2)"
+	eval 'local pet2OIDVars="${!'"$pet2OID"'*}"'
+	echo "vars for this object = ${pet2OIDVars}" | heapNameAnon
+	printfVars --noObjects $pet2OIDVars | heapNameAnon
+
+	ut test
+	local -n pet3; ConstructObject Animal pet3
+	local pet3OID="$(GetOID $pet3)"
+	eval 'local pet3OIDVars="${!'"$pet3OID"'*}"'
+	echo "global vars for this object = ${pet3OIDVars}" | heapNameAnon
+	printfVars --noObjects pet3 $pet3OIDVars | heapNameAnon
+}
+
+
+function ut__classUpdateVMT()
+{
+	# expect:
+	ut setup
+	DeclareClass Animal
+	Animal::speak() { echo "I am just an animal"; }
+	$Animal.getClassMethods
+
+	ut test
+	Animal::pet() { echo "that's nice"; }
+	Animal::feed() { echo "now that's more like it!"; }
+
+	ut expect: that pet and feed are not in this list
+	echo "${Animal[methods]}"
+
+	_classUpdateVMT -f "Animal"
+
+	ut expect: that now pet and feed are in this list
+	echo "${Animal[methods]}"
+}
