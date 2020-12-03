@@ -88,7 +88,7 @@ function setSecureEnv()
 	declare -grx $varName="$value" &>/dev/null || [ "${!varName}" == "$value" ] || earlyAssert -e 3 "can not run an installed script with $varName='${!varName}'. It is expected to be '$value' in this environment. Is $varName set readonly in this shell ENV?"
 }
 
-
+setSecureEnv bgWS $' \t\n'
 
 ### Set the bgProductionMode variable
 # This security only protects scripts that are installed in a hosts system folder via a package management from a trusted repository

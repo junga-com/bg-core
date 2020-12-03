@@ -77,7 +77,6 @@ function importCntr()
 	declare -gA _importedLibraries
 	declare -g  _importedLibrariesBumpAdj
 	local cmd="$1"; shift
-	L1=""
 	case $cmd in
 		traceOn)   _importedLibraries[_tracingOn]=1 ;;
 		traceOff)  _importedLibraries[_tracingOn]="" ;;
@@ -91,7 +90,7 @@ function importCntr()
 				fi
 			done
 			# 2020-10 these seems like it does nothuing b/c L1 is an 'import ... ;$L2' thing, not an importCntr thing
-			[ ${_importedLibrariesBumpAdj:-0} -gt 1 ] && L1="source $(import --getPath bg_coreImport.sh)"
+			#[ ${_importedLibrariesBumpAdj:-0} -gt 1 ] && L1="source $(import --getPath bg_coreImport.sh)"
 			;;
 		reloadAll)
 			declare -g _importedLibrariesTimeRefTmpFile

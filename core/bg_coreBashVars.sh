@@ -921,7 +921,7 @@ function printfVars()
 		# local pv_type="$(declare -p "$pv_varname" 2>/dev/null)"
 		# [[ "$pv_type" =~ -n\ [^=]*=\"(.*)\" ]] && pv_type="$(declare -p "${BASH_REMATCH[1]}" 2>/dev/null)"
 		if [ ! "$pv_type" ]; then
-			{ varIsA array ${pv_varname%%[[]*} || [[ "$pv_varname" =~ [[][@*][]]$ ]]; } && pv_type="arrayElement"
+			{ varIsA array ${pv_varname%%[[]*} || [[ "$pv_varname" =~ [[][@*][]]$ ]]; } && pv_type="-"
 		fi
 
 		# the term is not a variable name
@@ -938,7 +938,15 @@ function printfVars()
 
 		# it its an object reference, invoke its .bgtrace method
 		elif [ ! "$pv_noObjectsFlag" ] && [[ ! "$pv_varname" =~ [[] ]] && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
-			objEval "$pv_varname.toString --title=${pv_varname}"
+			Try:
+				objEval "$pv_varname.toString --title=${pv_varname}"
+			Catch: && {
+				# Note that a bug prevents this Catch from getting called when stepping through the debugger. It seems that the
+				# catch resumes after the objEval.
+				# in debugger when the watch window printfVars sees an object reference that has been created with NewObject,
+				# toString failed on that object. added this try/catch but the catch did not execute.
+				_printfVars_printValue "$pv_label" "<error in Object::toString call>"
+			}
 
 		# if its an array, iterate its content
 		elif [[ "$pv_type" =~ [aA] ]]; then

@@ -191,6 +191,8 @@ function ut()
 		;;
 
 	  expect|expect:)
+		_ut_flushLineInfo
+		echo
 		echo "# expect $*"
 		;;
 
@@ -367,7 +369,10 @@ function _ut_debugTrap()
 	# when BASH invokes a function, the DEBUG trap is called once in the begining of a function call with the stack set to the
 	# openning { of the function and with the BASH_COMMAND set to the command that invoked it
 	# We create this onFirstTimeInsideUTFunc because the ERR trap can only be set from that time.
-	[[ "$BASH_COMMAND" == '$utFunc '* ]] && { ut onFirstTimeInsideUTFunc; return 0; }
+	[[ "$BASH_COMMAND" == '$utFunc '* ]] && {
+		ut onFirstTimeInsideUTFunc;
+		return 0;
+	}
 
 	# calls to ut setup|test take care of themselves
 	[[ "$BASH_COMMAND" == 'ut '* ]] && return 0
@@ -429,7 +434,6 @@ function utfRunner_execute()
 
 	# import script if needed and validate that the utFunc exists
 	if [ ! "$(type -t "$utFunc")" == "function" ] && [ "$bgUnitTestMode" != "direct" ]; then
-		#bgtraceBreak
 		import "$utFilePath" ;$L1;$L2
 	fi
 	[ "$(type -t "$utFunc")" == "function" ] || assertError -v utFileID -v utFunc -v utParams "the unit test function is not defined in the unit test file"
@@ -453,8 +457,9 @@ function utfRunner_execute()
 	# variable from the parent's scope b/c its not yet a local variable.
 	local _utRun_id="$utID"
 	local _utRun_funcName="$utFunc"
-	local _utRun_srcLineEnd=("${_utRun_srcLineEnd[@]}")  # maybe we dont need to copy the src file array? just comment out this line
+	#local _utRun_srcCode=("${_utRun_srcLineEnd[@]}")  # maybe we dont need to copy the src file array? just comment out this line
 	local _utRun_srcLineStart=${_utRun_srcLineStart:-0}
+	local _utRun_expect="${_utRun_expect}"
 	local _utRun_srcLineEnd=${_utRun_srcLineEnd:-0}
 	local _utRun_section=""  # default is 'test'. init to "" allows us to distinguish the case were no section is declared
 	local _utRun_curLineNo=0
@@ -467,7 +472,7 @@ function utfRunner_execute()
 	fi
 
 	# if the caller has not already filled these in,  get the start line, end line and expect data from the src
-	[ ${_utRun_srcLineStart:-0} -eq 0 ] && for ((i=1; i<${#_utRun_srcCode[@]}; i++)); do
+	[ ${_utRun_srcLineStart:-0} -eq 0 ] && for ((i=1; i<=${#_utRun_srcCode[@]}; i++)); do
 		if [ $_utRun_srcLineStart -eq 0 ] && [[ ${_utRun_srcCode[i]} =~ ^[[:space:]]*(function)?[[:space:]]*$utFunc'()' ]]; then
 			_utRun_srcLineStart=$i
 		fi
@@ -481,6 +486,7 @@ function utfRunner_execute()
 			fi
 		fi
 	done
+	[ ${_utRun_srcLineStart:-0} -lt ${_utRun_srcLineEnd:-0} ] || { assertError; }
 
 
 	local setupOut; bgmktemp setupOut

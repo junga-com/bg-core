@@ -361,118 +361,118 @@ nr_longStr='now is the time that all good men should come to the aid of their co
 ##----------
 ## test
 cmd> printfVars Animal "" Dog "" Cat "" myDog "" myCat
-Animal : Class
-   baseClass       : Object
-   classHierarchy  : Object Animal
-   methods         : Animal::__construct
-                   + Animal::speak
-   subClasses      : Dog Cat
-   name            : Animal
-   inheritedMethods: Object::addMethod
-                   + Object::bgtrace
-                   + Object::clear
-                   + Object::clone
-                   + Object::eval
-                   + Object::exists
-                   + Object::fromDebControl
-                   + Object::fromFlatINI
-                   + Object::fromINI
-                   + Object::fromString
-                   + Object::get
-                   + Object::getAttributes
-                   + Object::getIndexes
-                   + Object::getMethods
-                   + Object::getOID
-                   + Object::getRef
-                   + Object::getSize
-                   + Object::getValues
-                   + Object::hasMethod
-                   + Object::isA
-                   + Object::restoreFile
-                   + Object::saveFile
-                   + Object::set
-                   + Object::toDebControl
-                   + Object::toFlatINI
-                   + Object::toString
-                   + Object::unset
+Animal : <instance> of Class
+  baseClass       =Object
+  classHierarchy  =Object Animal
+  methods         =Animal::__construct
+                  + Animal::speak
+  subClasses      =Dog Cat
+  name            =Animal
+  inheritedMethods=Object::addMethod
+                  + Object::bgtrace
+                  + Object::clear
+                  + Object::clone
+                  + Object::eval
+                  + Object::exists
+                  + Object::fromDebControl
+                  + Object::fromFlatINI
+                  + Object::fromINI
+                  + Object::fromString
+                  + Object::get
+                  + Object::getAttributes
+                  + Object::getIndexes
+                  + Object::getMethods
+                  + Object::getOID
+                  + Object::getRef
+                  + Object::getSize
+                  + Object::getValues
+                  + Object::hasMethod
+                  + Object::isA
+                  + Object::restoreFile
+                  + Object::saveFile
+                  + Object::set
+                  + Object::toDebControl
+                  + Object::toFlatINI
+                  + Object::toString
+                  + Object::unset
 
-Dog : Class
-   baseClass       : Animal
-   classHierarchy  : Object Animal Dog
-   methods         : Dog::__construct
-                   + Dog::speak
-   name            : Dog
-   inheritedMethods: Object::addMethod
-                   + Object::bgtrace
-                   + Object::clear
-                   + Object::clone
-                   + Object::eval
-                   + Object::exists
-                   + Object::fromDebControl
-                   + Object::fromFlatINI
-                   + Object::fromINI
-                   + Object::fromString
-                   + Object::get
-                   + Object::getAttributes
-                   + Object::getIndexes
-                   + Object::getMethods
-                   + Object::getOID
-                   + Object::getRef
-                   + Object::getSize
-                   + Object::getValues
-                   + Object::hasMethod
-                   + Object::isA
-                   + Object::restoreFile
-                   + Object::saveFile
-                   + Object::set
-                   + Object::toDebControl
-                   + Object::toFlatINI
-                   + Object::toString
-                   + Object::unset
-                   + Animal::__construct
-                   + Animal::speak
+Dog : <instance> of Class
+  baseClass       =Animal
+  classHierarchy  =Object Animal Dog
+  methods         =Dog::__construct
+                  + Dog::speak
+  name            =Dog
+  inheritedMethods=Object::addMethod
+                  + Object::bgtrace
+                  + Object::clear
+                  + Object::clone
+                  + Object::eval
+                  + Object::exists
+                  + Object::fromDebControl
+                  + Object::fromFlatINI
+                  + Object::fromINI
+                  + Object::fromString
+                  + Object::get
+                  + Object::getAttributes
+                  + Object::getIndexes
+                  + Object::getMethods
+                  + Object::getOID
+                  + Object::getRef
+                  + Object::getSize
+                  + Object::getValues
+                  + Object::hasMethod
+                  + Object::isA
+                  + Object::restoreFile
+                  + Object::saveFile
+                  + Object::set
+                  + Object::toDebControl
+                  + Object::toFlatINI
+                  + Object::toString
+                  + Object::unset
+                  + Animal::__construct
+                  + Animal::speak
 
-Cat : Class
-   baseClass       : Animal
-   classHierarchy  : Object Animal Cat
-   methods         : Cat::__construct
-                   + Cat::speak
-   name            : Cat
-   inheritedMethods: Object::addMethod
-                   + Object::bgtrace
-                   + Object::clear
-                   + Object::clone
-                   + Object::eval
-                   + Object::exists
-                   + Object::fromDebControl
-                   + Object::fromFlatINI
-                   + Object::fromINI
-                   + Object::fromString
-                   + Object::get
-                   + Object::getAttributes
-                   + Object::getIndexes
-                   + Object::getMethods
-                   + Object::getOID
-                   + Object::getRef
-                   + Object::getSize
-                   + Object::getValues
-                   + Object::hasMethod
-                   + Object::isA
-                   + Object::restoreFile
-                   + Object::saveFile
-                   + Object::set
-                   + Object::toDebControl
-                   + Object::toFlatINI
-                   + Object::toString
-                   + Object::unset
-                   + Animal::__construct
-                   + Animal::speak
+Cat : <instance> of Class
+  baseClass       =Animal
+  classHierarchy  =Object Animal Cat
+  methods         =Cat::__construct
+                  + Cat::speak
+  name            =Cat
+  inheritedMethods=Object::addMethod
+                  + Object::bgtrace
+                  + Object::clear
+                  + Object::clone
+                  + Object::eval
+                  + Object::exists
+                  + Object::fromDebControl
+                  + Object::fromFlatINI
+                  + Object::fromINI
+                  + Object::fromString
+                  + Object::get
+                  + Object::getAttributes
+                  + Object::getIndexes
+                  + Object::getMethods
+                  + Object::getOID
+                  + Object::getRef
+                  + Object::getSize
+                  + Object::getValues
+                  + Object::hasMethod
+                  + Object::isA
+                  + Object::restoreFile
+                  + Object::saveFile
+                  + Object::set
+                  + Object::toDebControl
+                  + Object::toFlatINI
+                  + Object::toString
+                  + Object::unset
+                  + Animal::__construct
+                  + Animal::speak
 
-myDog : Dog
-   species: dog
+myDog : <instance> of Dog
+  species=dog
 
-myCat : Cat
-   species: cat
+myCat : <instance> of Cat
+  species=cat
 cmd> printfVars --noObjects myCat
 myCat[]
      [_CLASS ]='Cat'

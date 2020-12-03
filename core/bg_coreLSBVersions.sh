@@ -39,6 +39,7 @@ function lsbLoadInfo()
 	ubuntuNames["16.04"]="xenial"
 	ubuntuNames["16.10"]="yakkety"
 	ubuntuNames["17.40"]="zesty"
+	local i
 	for i in "${!ubuntuNames[@]}"; do { ubuntuNumbers[$i]="$i"; ubuntuNumbers[${ubuntuNames[$i]}]="$i"; }; done
 	for i in "${!ubuntuNames[@]}"; do ubuntuNames[${ubuntuNames[$i]}]="${ubuntuNames[$i]}"; done
 

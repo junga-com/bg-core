@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+source /usr/lib/bg_core.sh
+
+import bg_objects.sh  ;$L1;$L2
+
+
+DeclareClass Widget1
+Widget1::__construct() {
+	this[count]=0
+	this[type]="i am a widget"
+	$_this.data=new Array
+}
+Widget1::reset() {
+	count=0
+	data=()
+}
+Widget1::doFun() {
+	data+=("$@")
+}
+
+DeclareClass Container1
+Container1::__construct() {
+	this[type]="i am a container"
+	$_this.wA=new Widget1
+	$_this.wB=new Widget1
+}
+Container1::process() {
+	$_this.wA.doFun yo
+	$_this.wB.doFun hello world
+}
+
+
+DeclareClass Top1
+Top1::__construct() {
+	this[type]="i am a top"
+	$_this.contain1=new Container1
+	$_this.contain2=new Container1
+}
+Top1::start() {
+	$_this.contain1.process
+}
+Top1::end() {
+	$_this.contain1.process
+}
+
+ConstructObject Top1 top1
+
+#printfVars top1
+
+startingOOCount="$_bgclassCallCount"
+bgtimerStart
+
+for ((i=0; i<100; i++)); do
+	$top1.start
+	$top1.contain1.wA.reset
+	$top1.contain1.wA.foo.bar="happy birthday"
+	$top1.contain1.wA.foo.bar.unset
+	$top1.contain1.wA.foo.exists || assertError "should still exist"
+	$top1.contain1.wA.foo.isA "Object"  || assertError "should be Object"
+	$top1.contain1.wA.foo.unset
+	$top1.contain1.wA.foo.exists && assertError "should not still exist"
+	$top1.contain1.wA.isA "Widget1"  || assertError "should be Widget1"
+done
+
+((iterationCount=_bgclassCallCount-startingOOCount))
+printfVars -l"Object Calls" count:iterationCount
+bgtimerGetNano -R totalNano
+bgtimerPrint
+bgNanoToSec -R perOOCall $((totalNano / iterationCount))  6
+printf "time per oo call = %s\n" "$perOOCall"
+
+
+
+
+
+
+echo
+DeclareClass Foo
+Foo::noop() {
+	local p1
+}
+ConstructObject Foo obj
+bgtimerStart
+for ((i=0; i<$iterationCount; i++)); do
+	$obj.noop
+done
+printfVars -l"NOOP OO Calls" iterationCount
+bgtimerGetNano -R totalNano
+bgtimerPrint
+bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
+printf "time per normal call = %s\n" "$perNormCall"
+
+
+
+
+
+
+
+
+echo
+function doSomething() {
+	while [ $# -gt 0 ]; do case $1 in
+		-a)  myAFlag="-a" ;;
+		-b | --my-bFlag) myBFlag="-b" ;;
+		-c*) bgOptionGetOpt val: myCOptWithArg "$@" && shift ;;
+		-T*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
+		-t)  bgOptionGetOpt opt  passThruOpts "$@" && shift ;;
+		-d)  myDFlag="-d" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local p1="$1"; shift
+	returnValue "hello" $p1
+}
+bgtimerStart
+for ((i=0; i<$iterationCount; i++)); do
+	doSomething foobar
+done
+printfVars -l"Normal Calls" iterationCount
+bgtimerGetNano -R totalNano
+bgtimerPrint
+bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
+printf "time per normal call = %s\n" "$perNormCall"
+
+
+
+
+
+
+
+
+echo
+function noopCall() {
+	local p1
+}
+bgtimerStart
+for ((i=0; i<$iterationCount; i++)); do
+	noopCall foobar
+done
+printfVars -l"NOOP Normal Calls" iterationCount
+bgtimerGetNano -R totalNano
+bgtimerPrint
+bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
+printf "time per normal call = %s\n" "$perNormCall"
+
+#printfVars top1

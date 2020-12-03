@@ -12,6 +12,37 @@ function tempFileAnon()
 	sed 's|bgmktemp\.\([^ ]*\)|bgmktemp\.<redacted>|g'
 }
 
+declare -A ut__parseObjSyntax=(
+	[pOfEmptyOp0]="$(cmdline ".foo")"
+	[pOfEmptyOp1]="$(cmdline ".bar.foo")"
+	[pOfEmptyOp2]="$(cmdline ".foo p1")"
+	[pOfEmptyOp3]="$(cmdline ".bar.foo p1")"
+
+	[pOfUnsetOp0]="$(cmdline ".unset")"
+	[pOfUnsetOp1]="$(cmdline ".foo.unset")"
+	[pOfUnsetOp2]="$(cmdline ".unset p1")"
+	[pOfUnsetOp3]="$(cmdline ".foo.unset p1")"
+
+	[pOfNewOp0]="$(cmdline "=new")"
+	[pOfNewOp1]="$(cmdline ".foo=new")"
+	[pOfNewOp2]="$(cmdline "=new p1")"
+	[pOfNewOp3]="$(cmdline ".foo=new p1")"
+
+	[pOfAssignOp0]="$(cmdline "=")"
+	[pOfAssignOp1]="$(cmdline ".foo=")"
+	[pOfAssignOp2]="$(cmdline "= p1")"
+	[pOfAssignOp3]="$(cmdline "=p1")"
+	[pOfAssignOp4]="$(cmdline ".foo= p1")"
+	[pOfAssignOp5]="$(cmdline ".foo=p1")"
+)
+function ut__parseObjSyntax() {
+	ut setup
+	local memberChain memberOp argsV
+	ut test
+	echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+}
+
+
 function ut_initialState()
 {
 	# expect: shows the classes that ae initially created and their content
@@ -224,4 +255,134 @@ function ut_nestedObjects()
 	ut test
 	ConstructObject DataFile datafile "$tmpFile"
 	printfVars datafile  | tempFileAnon
+}
+
+function ut_Object_unset() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	ut test
+	obj[foo]="hello"
+	ut expect that foo is present
+	printfVars obj
+	$obj.foo.unset
+
+	ut expect that foo is not present
+	printfVars obj
+}
+
+function ut_Object_exists() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	ut test
+	ut expect that foo does not exist
+	$obj.foo.exists && echo true || echo false
+
+	obj[foo]="hello"
+	ut expect that foo exists now
+	$obj.foo.exists && echo true || echo false
+}
+
+function ut_Object_isA() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	ut test
+	ut expect that only isA object will be true
+	$obj.isA Object && echo true || echo false
+	$obj.isA Array  && echo true || echo false
+	$obj.isA Foo    && echo true || echo false
+}
+
+function ut_Object_assignNewOp() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	ut test
+	$obj.foo=new Array
+	printfVars obj
+}
+
+function ut_Object_staticCallSyntax() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	ut test
+	ut expect that the Object class object is printed
+	$obj.static.toString
+}
+
+function ut_Object_chainCallSyntax() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	$obj.foo=new Map
+	$obj.foo[bar]="hello world"
+	ut test
+	ut expect "that foo member's toString method is called"
+	$obj.foo.toString
+
+	ut expect "that object members can be created on demand"
+	$obj.foo[one].two="yoyo"
+	printfVars obj
+}
+
+function ut_Object_equalsOp() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	$obj.num=5
+	$obj.str="hello"
+
+	ut test
+	ut expect "that the new values are appended. This documents whether num is appended as a string or added"
+	$obj.num+=10
+	$obj.str+=" world"
+	$obj.toString
+
+	ut expect "equal to replace the previous value"
+	$obj.num=10
+	$obj.str="goodbye"
+	$obj.toString
+}
+
+function ut_Object_virtualCallSyntax() {
+	ut setup
+	DeclareClass Base
+	Base::one() { echo "Base::one"; }
+	Base::two() { echo "Base::two"; }
+	DeclareClass Derived : Base
+	Derived::one() { echo "Derived::one"; $super.one; }
+	Derived::two() { echo "Derived::two"; }
+	local -n obj; ConstructObject Derived obj
+
+	ut test
+	ut expect "normal polymorphism -- to see only msg from Derived::two"
+	$obj.two
+
+	ut expect "explicit call -- to see only msg from Base::two"
+	$obj.Base::two
+
+	ut expect "polymorphism with super -- to see msg from Derived::one and then from Base:one"
+	$obj.one
+}
+
+function ut_Object_memberVarReadAccess() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	$obj.foo="hello world"
+	ut test
+	ut expect "to see what happens when we reference an attribute that exists"
+	$obj.foo
+	$obj[foo]
+	ut expect "to see what happens when we reference an attribute that does not exist"
+	$obj.bar
+	$obj[bar]
+	ut expect "to see what happens when we reference a method that does not exist (because it has arguments)"
+	Try:
+		$obj.doit p1 p2 p3
+	Catch: && {
+		echo "** Exception thrown and caught"
+		printfVars catch_errorClass catch_errorCode catch_errorDescription | heapNameAnon
+	}
+	Try:
+		$obj[doit] p1 p2 p3
+	Catch: && {
+		echo "** Exception thrown and caught"
+		printfVars catch_errorClass catch_errorCode catch_errorDescription | heapNameAnon
+	}
 }

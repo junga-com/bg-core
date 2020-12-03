@@ -1018,6 +1018,7 @@ function bgGetLoginuid()
 #######################################################################################################################################
 ### From bg_cui.sh
 
+# FUNCMAN_SKIP
 # this is a stub function that will load the bg_cui.sh and the real progress function if its called
 function progress()
 {
@@ -1026,6 +1027,7 @@ function progress()
 		progress "$@"
 	fi
 }
+# FUNCMAN_SKIP
 function progressCntr()
 {
 	if [[ ! "$progressCntrDisplayType" =~ ^(none|null|off)$ ]]; then
@@ -1038,6 +1040,7 @@ function progressCntr()
 #######################################################################################################################################
 ### From bg_unitTest.sh
 
+# FUNCMAN_SKIP
 function unitTestCntr()
 {
 	import bg_unitTest.sh ;$L1;$L2 || assertError
@@ -2406,9 +2409,11 @@ function bgTrapStack()
 			local handler="$(builtin trap -p $sig)"
 			handler="${handler#*\'}"
 			handler="${handler%\'*}"
-			handler="${handler//"'\''"/\'}"
+			handler="${handler//"'\''"/\'}" # trap -p returns escaped single quotes like 'bob'\''s fine'
 
-			declare -ag $stackVar'=( '\'"${handler}"\'' "${'"$stackVar"'[@]}" )'
+			# we push in two steps because handler might have single quotes which would mess up  the array element parsing
+			declare -ag $stackVar'=( "" "${'"$stackVar"'[@]}" )'
+			printf -v $stackVar[0] "%s" "$handler"
 			builtin trap "${newHandler:--}" "$sig"
 			;;
 	esac
@@ -2687,16 +2692,22 @@ function assertError()
 	# _ae_stackFrameStart will control where the stack print will start. We want that to include the first assert function so we -1
 	# --frameOffest (_ae_frameOffset) allows the caller declare the some number of functions on the stack should be skipped too
 	# --allStack (_ea_allStack) makes the render algorithm ignore _ae_frameOffset and show everything including this function
-	local _ae_failingFunctionName="" _ae_assertFunctionName
-	local i; for i in "${!FUNCNAME[@]}"; do
-		if [ ! "$_ae_failingFunctionName" ] && [[ ! "${FUNCNAME[$i]}" =~ ^[aA]ssert|^[a-zA-Z][a-z]*Assert|^_ ]]; then
-			_ae_failingFunctionName="${FUNCNAME[$i]}"
-			break
-		fi
-	done
+	local i _ae_failingFunctionName="" _ae_assertFunctionName
+
+# # this loop now seems defunct because _ae_failingFunctionName is overwritten right after it
+# 	local i; for i in "${!FUNCNAME[@]}"; do
+# 		if [ ! "$_ae_failingFunctionName" ] && [[ ! "${FUNCNAME[$i]}" =~ ^[aA]ssert|^[a-zA-Z][a-z]*Assert|^_ ]]; then
+# 			_ae_failingFunctionName="${FUNCNAME[$i]}"
+# 			break
+# 		fi
+# 	done
 	local _ae_stackFrameStart=$(( (i+_ae_frameOffset-1<0)?0:i+_ae_frameOffset-1 ))
 	_ae_failingFunctionName="${FUNCNAME[_ae_stackFrameStart+1]}"
 	_ae_assertFunctionName="${FUNCNAME[_ae_stackFrameStart]}"
+
+	# 'main' is a fine label for the stack traces but for the name we display in errors, we need to be in the context of people who
+	# run scripts
+	[ "$_ae_failingFunctionName" == "main" ] && _ae_failingFunctionName="in top level script"
 
 	# the action on the top of the stack tells us what environment we are being called in and therefore how we should behave
 	# The Try() function sets this to 'catch'. The default is 'abort'
@@ -2951,7 +2962,7 @@ function Try()
 	local debugTrapScript='bgBASH_debugTrapLINENO=$((LINENO))
 		#bgtrace "$FUNCNAME | $BASH_COMMAND"
 		if (( ${#BASH_SOURCE[@]} < '"$tryStateFuncDepth"' )); then
-			IFS='$' \t\n'' # no need to save because we will restore the tryStateIFS copy when we return to user code
+			IFS="$bgWS" # no need to save because we will restore the tryStateIFS copy when we return to user code
 			assertError --critical "For Try block located at '"$tryStateTryStatementLocation"' no Catch block was found in the same Function. Check that code in the Try block did not skip the Catch by returning\n" >&2
 
 		elif (( ${#BASH_SOURCE[@]} > '"$tryStateFuncDepth"' )); then
@@ -2961,7 +2972,7 @@ function Try()
 			(exit 1) # set exit code to not run BASH_COMMAND, go to the next command
 
 		else # bingo. BASH_COMMAND == Catch: at this funcDepth
-			IFS='$' \t\n'' # no need to save because we will restore the tryStateIFS copy when we return to user code
+			IFS="$bgWS" # no need to save because we will restore the tryStateIFS copy when we return to user code
 			bgTrapStack pop DEBUG
 
 			unset bgBASH_debugTrapLINENO
@@ -3195,6 +3206,11 @@ function assertDefaultFormatter()
 #         like cmd >$assertOut and it will take a bit of work to make this generic enough to proved that separately
 function extractVariableRefsFromSrc()
 {
+	local existsFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-e|--exists) existsFlag='-e' ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local srcCode="$1"
 
 	# this is the term that assertDefaultFormatter would need if it is changed to use this function
@@ -3224,6 +3240,8 @@ function extractVariableRefsFromSrc()
 			# 1 non empty element besides [0] and that match can not include whitespace so this assignment works
 			rematch[0]=""
 			local varName=(${rematch[*]})
+
+			[ "$existsFlag" ] &&  ! varExists "$varName" && continue
 
 			# older bashes had a problem with array index that contain [...]
 			local varNameIndex="${varName//'['/%5B}" #'
@@ -3570,6 +3588,7 @@ function fsExpandFiles()
 #######################################################################################################################################
 ### From bg_coreTimer.sh
 
+# FUNCMAN_SKIP
 # this is a stub function that will load the bg_coreTimer.sh and the real bgtimerStart if its called
 function bgtimerStart()
 {
@@ -3584,6 +3603,7 @@ function bgtimerStart()
 #######################################################################################################################################
 ### From bg_coreDaemon.sh
 
+# FUNCMAN_SKIP
 # this is a stub function that will load the bg_coreDaemon.sh and the real daemonDeclare if its called
 function daemonDeclare()
 {

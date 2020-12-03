@@ -71,8 +71,8 @@ function bgtimerConfig()
 # usage: bgtimerIsPast [-T <timerVar>] <timePeriod>
 # checks whether the specified amount of time has past since the start of the timer
 # Exit Codes:
-#     0 (true)  : the current value of the timer is greater than <timePeriod> 
-#     1 (false) : the current value of the timer is less than <timePeriod> 
+#     0 (true)  : the current value of the timer is greater than <timePeriod>
+#     1 (false) : the current value of the timer is less than <timePeriod>
 function bgtimerIsPast()
 {
 	local timerVar_start="bgtimerGlobalTimer[0]"
@@ -102,7 +102,7 @@ function bgtimerIsPast()
 	(( delta > timePeriodInNS ))
 }
 
-# usage: bgtimerGet [-T <timerVar>] [-p <precision>] [-R <retVar>] [-F <retForksVar>] 
+# usage: bgtimerGet [-T <timerVar>] [-p <precision>] [-R <retVar>] [-F <retForksVar>]
 # get current elapsed time from the last time bgtimerStart was called
 function bgtimerGet()
 {
@@ -130,6 +130,37 @@ function bgtimerGet()
 	local delta="$(( $(date +"%s%N") - ${!timerVar_start:-0} ))"
 	local results; bgNanoToSec -R results $delta $prec
 	returnValue "$results" "$retVar"
+
+	[ "$retForksVar" ] &&  printf -v "$retForksVar"   "%s" "$(( ${_forkCnt:-0}-${!timerVar_forkStart:-0} ))"
+}
+
+# usage: bgtimerGetNano [-T <timerVar>] [-R <retVar>] [-F <retForksVar>]
+# get current elapsed time from the last time bgtimerStart was called
+function bgtimerGetNano()
+{
+	local timerVar_start="bgtimerGlobalTimer[0]"
+	local timerVar_lap="bgtimerGlobalTimer[1]"
+	local timerVar_forkStart="bgtimerGlobalTimer[2]"
+	local timerVar_forkLap="bgtimerGlobalTimer[3]"
+	local timerVar_indent="bgtimerGlobalTimer[4]"
+	local prec=3 retVar retForksVar
+	while [[ "$1" =~ ^- ]]; do case $1 in
+		-p) prec="$(bgetopt "$@")" && shift ;;
+		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
+			timerVar_start="$tname[0]"
+			timerVar_lap="$tname[1]"
+			timerVar_forkStart="$tname[2]"
+			timerVar_forkLap="$tname[3]"
+			timerVar_indent="$tname[4]"
+			;;
+		-R)  retVar="$2"; shift ;;
+		-F)  retForksVar="$2"; shift ;;
+	esac; shift; done
+
+	[ "${!timerVar_start}" ] || bgtimerStart
+
+	local delta="$(( $(date +"%s%N") - ${!timerVar_start:-0} ))"
+	returnValue "$delta" "$retVar"
 
 	[ "$retForksVar" ] &&  printf -v "$retForksVar"   "%s" "$(( ${_forkCnt:-0}-${!timerVar_forkStart:-0} ))"
 }
@@ -171,7 +202,7 @@ function bgtimerLapGet()
 
 # usage: bgtimerLapPrint [-T <timerVar>] [-p <precision>] [<description>]
 # mark the current lap and print the lap time
-# the notion of a lap is that each lap is a separate part of the whole. If you add up all the lap times 
+# the notion of a lap is that each lap is a separate part of the whole. If you add up all the lap times
 # since the start, you get the total elapsed time. This facilitates printing the intermediate lap times and the
 # overall elapsed time
 function bgtimerLapPrint()
@@ -251,16 +282,16 @@ function bgtimerPrint()
 
 
 # usage: bgtimePeriodConvert [-s|-m|-h|-d|-w|-y|-ms|-us|-ns]  <timePeriod>
-# takes <timePeriod> in the long format and returns an integer in seconds or the unit specified by 
-# one of the options. If the input has more precision than the output unit, it is rounded down. The 
-# output will not contain a unit character. It will only be a integer value. 
+# takes <timePeriod> in the long format and returns an integer in seconds or the unit specified by
+# one of the options. If the input has more precision than the output unit, it is rounded down. The
+# output will not contain a unit character. It will only be a integer value.
 #
 # Signs and Addition Subtraction:
 # The default sign of the timePeriod starts as positive (+). Plus(+) and minus(-) characters can appear
 # in front of any component term. If it has a +- prefix, the : is optional to delimit that term from
 # its preceeding term. Each + will set the default sign to positive. Each - will negate the default
 # sign so that positive becomes negative and negative becomes positive. The new default will apply to
-# the current term and any that follow it until other +- are encountered. Its ok if multiple plus and 
+# the current term and any that follow it until other +- are encountered. Its ok if multiple plus and
 # minus characters appear one right after another in front of one term.
 #
 # This has the effect that timePeriods can be negative by adding a minus(-) character in front of it
@@ -269,12 +300,12 @@ function bgtimerPrint()
 # that can be passed to this function as long as timePeriod1 and timePeriod2 are both valid. Subtracting
 # a negative timePeriod will behave the same as normal arithmitic. The number returned by this function
 # may or may not be negative.
-# 
+#
 # Params:
-#    <timePeriod> : a time period like 1d:3h:30m:10s:990ms:0us or 3d or 30s. Any of the components 
+#    <timePeriod> : a time period like 1d:3h:30m:10s:990ms:0us or 3d or 30s. Any of the components
 #           could be missing. If a component does not have a unit, it is taken as being seconds.
 #           the time from all the components are added together. Typically each unit would only
-#           appear once but if it is repeated it the values will be summed taking into account the 
+#           appear once but if it is repeated it the values will be summed taking into account the
 #           sign of the term.
 # Options:
 #    note: none of these options are case sensitive
@@ -347,7 +378,7 @@ function bgtimePeriodConvert()
 # usage: timeExprNormalize [-f <formatStr>] [-Z <inputTimezone>] [-z <outputTimezone>] <dateTimeExpr>
 # returns the normalized, fully qualified expression for the date expression
 # If a time zone is not explicitly stated in the input it will be taken as the TZ of the session (which is typically the host's TZ)
-# If the expression is relative to now and a time zone is included or the -Z option changes the input zone, the date util returns a 
+# If the expression is relative to now and a time zone is included or the -Z option changes the input zone, the date util returns a
 # misleading value so avoid that. E.G. If its 3am now in $TZ, then "5 minutes ago UTC" would return what time it was in $TZ when it was 2:55am UTC"
 # Params:
 #     <dateTimeExpr> : this can be any expression that the linux 'data' utility accepts. See 'info date' for details
@@ -356,7 +387,7 @@ function bgtimePeriodConvert()
 #     -f <formatStr> : specify the output of the result. can be any string accepted by the date +<formatStr> option.
 #                      default is %Y-%m-%d %H:%M:%S
 #     -Z <inputTimezone> : If the <dateTimeExpr> does not specify the timezone, it will be interpreted as being in this time zone
-#                      default is $TZ environment var. 
+#                      default is $TZ environment var.
 #                      WARNING: if you do not know that the <dateTimeExpr> does not use any times relative to "now", do not use this option
 #     -z <outputTimezone> : the result will be in this zimezone requardless of whether the formatStr includes time zone phrase (i.e. %z)
 #                      default is UTC
@@ -370,7 +401,7 @@ function timeExprNormalize()
 	esac; shift; done
 
 	local dateTimeExpr="$1"
-	normExpr="$(TZ="${inputTimezone:-$TZ}" date +"%Y-%m-%d %H:%M:%S %z" -d "$dateTimeExpr" 2>/dev/null)" 
+	normExpr="$(TZ="${inputTimezone:-$TZ}" date +"%Y-%m-%d %H:%M:%S %z" -d "$dateTimeExpr" 2>/dev/null)"
 	[ ! "$normExpr" ] && assertError "invalid date/time expression '$endTimeValue'" >&2
 
 	# this second call to date only converts from the expressions's time zone to UTC. We do not do that in the first call because
@@ -509,9 +540,9 @@ function bgTimePeriodFromLabel()
 #   tense can be "ago" (positive time periods) or "from now" (negative time periods)
 # Params:
 #   <seconds> : the time period in seconds. This typically comes from subtracting two timestaps
-#               in linux epoch time $(( $(date +"%s") - $timeStampInEpoch )) 
+#               in linux epoch time $(( $(date +"%s") - $timeStampInEpoch ))
 # Options:
-#   -t : tense. include a suffix "ago"(positive period) or "from now"(negative) to indicate whether 
+#   -t : tense. include a suffix "ago"(positive period) or "from now"(negative) to indicate whether
 #        the period is in the past or future. This is appropriate for time periods calulated like
 #         $((  $now - $timestamp ))
 # See Also:
@@ -533,9 +564,9 @@ function bgTimePeriodToLabel()
 		posSec="${posSec:1}"
 		tenseLabel="from now"
 	fi
-	local mins=$(( posSec / 60 )); posSec=$(( posSec % 60 )); 
-	local hours=$(( mins / 60 )); mins=$(( mins % 60 )); 
-	local days=$(( hours / 24 )); hours=$(( hours % 24 )); 
+	local mins=$(( posSec / 60 )); posSec=$(( posSec % 60 ));
+	local hours=$(( mins / 60 )); mins=$(( mins % 60 ));
+	local days=$(( hours / 24 )); hours=$(( hours % 24 ));
 	local label
 	if [ ${days:-0} -gt 5000 ]; then
 		label="never"

@@ -1,5 +1,375 @@
 
 ###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfEmptyOp0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo'
+memberChain='.foo'
+memberOp=''
+argsV[]
+
+## bg_objects.sh:_parseObjSyntax:pOfEmptyOp0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfEmptyOp1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.bar.foo'
+memberChain='.bar.foo'
+memberOp=''
+argsV[]
+
+## bg_objects.sh:_parseObjSyntax:pOfEmptyOp1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfEmptyOp2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo p1'
+memberChain='.foo'
+memberOp=''
+argsV[]
+     [0]='p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfEmptyOp2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfEmptyOp3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.bar.foo p1'
+memberChain='.bar.foo'
+memberOp=''
+argsV[]
+     [0]='p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfEmptyOp3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfUnsetOp0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.unset'
+memberChain=''
+memberOp='.unset'
+argsV[]
+
+## bg_objects.sh:_parseObjSyntax:pOfUnsetOp0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfUnsetOp1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo.unset'
+memberChain='.foo'
+memberOp='.unset'
+argsV[]
+
+## bg_objects.sh:_parseObjSyntax:pOfUnsetOp1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfUnsetOp2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.unset p1'
+memberChain=''
+memberOp='.unset'
+argsV[]
+     [0]='p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfUnsetOp2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfUnsetOp3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo.unset p1'
+memberChain='.foo'
+memberOp='.unset'
+argsV[]
+     [0]='p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfUnsetOp3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfNewOp0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'=new'
+memberChain=''
+memberOp='=new'
+argsV[]
+
+## bg_objects.sh:_parseObjSyntax:pOfNewOp0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfNewOp1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo=new'
+memberChain='.foo'
+memberOp='=new'
+argsV[]
+
+## bg_objects.sh:_parseObjSyntax:pOfNewOp1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfNewOp2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'=new p1'
+memberChain=''
+memberOp='=new'
+argsV[]
+     [0]='p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfNewOp2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfNewOp3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo=new p1'
+memberChain='.foo'
+memberOp='=new'
+argsV[]
+     [0]='p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfNewOp3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'='
+memberChain=''
+memberOp='='
+argsV[]
+
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo='
+memberChain='.foo'
+memberOp='='
+argsV[]
+
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'= p1'
+memberChain=''
+memberOp='='
+argsV[]
+     [0]=' p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'=p1'
+memberChain=''
+memberOp='='
+argsV[]
+     [0]='p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp4 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo= p1'
+memberChain='.foo'
+memberOp='='
+argsV[]
+     [0]=' p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp4 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp5 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local memberChain memberOp argsV
+
+##----------
+## test
+cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+'.foo=p1'
+memberChain='.foo'
+memberOp='='
+argsV[]
+     [0]='p1'
+
+## bg_objects.sh:_parseObjSyntax:pOfAssignOp5 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
 ## bg_objects.sh:initialState: start
 ## expect:  shows the classes that ae initially created and their content
 
@@ -168,7 +538,7 @@ cmd> showClass "$class"
 #
 #
 #------------------ Stack --------------------
-global array vars: Stack Stack_vmt
+global array vars: Stack
 Stack[]
      [baseClass     ]='Object'
      [_CLASS        ]='Class'
@@ -185,7 +555,7 @@ cmd> showClass "$class"
 #
 #
 #------------------ Array --------------------
-global array vars: Array Array_vmt
+global array vars: Array
 Array[]
      [baseClass     ]='Object'
      [_CLASS        ]='Class'
@@ -204,7 +574,7 @@ cmd> showClass "$class"
 #
 #
 #------------------ Map --------------------
-global array vars: Map Map_vmt
+global array vars: Map
 Map[]
    [baseClass     ]='Object'
    [_CLASS        ]='Class'
@@ -233,6 +603,7 @@ Map_vmt[]
 
 ##----------
 ## test
+
 # expect these to be true
 cmd> $Dog.isA "Animal"       && echo yes || echo no
 yes
@@ -241,6 +612,7 @@ yes
 cmd> $Dog.isA "Object"       && echo yes || echo no
 yes
 cmd> echo
+
 
 # expect these to be false
 cmd> $Animal.isA "Dog"       && echo yes || echo no
@@ -363,10 +735,12 @@ heap_A_<redacted>_sys[]
 
 ##----------
 ## test
+
 # expect that pet and feed are not in this list
 cmd> echo "${Animal[methods]}"
 Animal::speak
 cmd> _classUpdateVMT -f "Animal"
+
 # expect that now pet and feed are in this list
 cmd> echo "${Animal[methods]}"
 Animal::feed
@@ -400,13 +774,13 @@ cmd> $a2.getOID | heapNameAnon
 heap_a_<redacted>
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
-a2 : Array
+a2 : <instance> of Array
 cmd> a2OID=(one two three)
 cmd> printfVars a2
-a2 : Array
-   0: one
-   1: two
-   2: three
+a2 : <instance> of Array
+  [0]=one
+  [1]=two
+  [2]=three
 cmd> $a2.getSize
 3
 
@@ -444,15 +818,15 @@ heap_A_<redacted>_sys[]
                 [_OID  ]='heap_A_<redacted>
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
-a2 : Map
+a2 : <instance> of Map
 cmd> a2OID=([one]=1 [two]=2 [three]=3)
 cmd> $a2.getIndexes
 two three one
 cmd> printfVars a2
-a2 : Map
-   two  : 2
-   three: 3
-   one  : 1
+a2 : <instance> of Map
+  two  =2
+  three=3
+  one  =1
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
 heap_A_<redacted>
                 [two  ]='2'
@@ -478,19 +852,19 @@ cmd> $a2.getSize
 ## test
 cmd> local -n a1; ConstructObject Stack a1
 cmd> printfVars a1
-a1 : Stack
-   length: 0
+a1 : <instance> of Stack
+  length=0
 cmd> $a1.push one
 cmd> $a1.push two
 cmd> $a1.push three
 cmd> $a1.getSize
 3
 cmd> printfVars a1
-a1 : Stack
-   length: 3
-   e2    : three
-   e0    : one
-   e1    : two
+a1 : <instance> of Stack
+  length=3
+  e2    =three
+  e0    =one
+  e1    =two
 cmd> for ((i=0; i<$($a1.getSize); i++)); do $a1.peek $i; done
 three
 two
@@ -505,19 +879,19 @@ element='one'
 ## test
 cmd> local a2; ConstructObject Stack a2
 cmd> printfVars a2
-a2 : Stack
-   length: 0
+a2 : <instance> of Stack
+  length=0
 cmd> $a2.push one
 cmd> $a2.push two
 cmd> $a2.push three
 cmd> $a2.getSize
 3
 cmd> printfVars a2
-a2 : Stack
-   length: 3
-   e2    : three
-   e0    : one
-   e1    : two
+a2 : <instance> of Stack
+  length=3
+  e2    =three
+  e0    =one
+  e1    =two
 cmd> for ((i=0; i<$($a2.getSize); i++)); do $a2.peek $i; done
 three
 two
@@ -538,6 +912,9 @@ element='one'
 
 ##----------
 ## setup
+##     | cmd> DeclareClass DataFile
+##     | cmd> local tmpFile; bgmktemp tmpFile
+##     | cmd> ')" | tee "$tmpFile"
 ##     | one fish
 ##     | two fish
 ##     | red fish
@@ -545,14 +922,297 @@ element='one'
 
 ##----------
 ## test
-datafile : DataFile
-   filename: /tmp/bgmktemp.<redacted>
-   data    : <instance> of Array
-  data.0: one fish
-  data.1: two fish
-  data.2: red fish
-  data.3: blue fish
+cmd> ConstructObject DataFile datafile "$tmpFile"
+cmd> printfVars datafile  | tempFileAnon
+datafile : <instance> of DataFile
+  filename=/tmp/bgmktemp.<redacted>
+  data : <instance> of Array
+    [0]=one fish
+    [1]=two fish
+    [2]=red fish
+    [3]=blue fish
 
 ## bg_objects.sh:nestedObjects: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_unset: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+
+##----------
+## test
+cmd> obj[foo]="hello"
+
+# expect that foo is present
+cmd> printfVars obj
+obj : <instance> of Object
+  foo=hello
+cmd> $obj.foo.unset
+
+# expect that foo is not present
+cmd> printfVars obj
+obj : <instance> of Object
+
+## bg_objects.sh:Object_unset: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_exists: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+
+##----------
+## test
+
+# expect that foo does not exist
+cmd> $obj.foo.exists && echo true || echo false
+false
+cmd> obj[foo]="hello"
+
+# expect that foo exists now
+cmd> $obj.foo.exists && echo true || echo false
+true
+
+## bg_objects.sh:Object_exists: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_isA: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+
+##----------
+## test
+
+# expect that only isA object will be true
+cmd> $obj.isA Object && echo true || echo false
+true
+cmd> $obj.isA Array  && echo true || echo false
+false
+cmd> $obj.isA Foo    && echo true || echo false
+false
+
+## bg_objects.sh:Object_isA: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_assignNewOp: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+
+##----------
+## test
+cmd> $obj.foo=new Array
+cmd> printfVars obj
+obj : <instance> of Object
+  foo : <instance> of Array
+
+## bg_objects.sh:Object_assignNewOp: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_staticCallSyntax: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+
+##----------
+## test
+
+# expect that the Object class object is printed
+cmd> $obj.static.toString
+baseClass       =
+classHierarchy  =Object
+methods         =Object::addMethod
++ Object::bgtrace
++ Object::clear
++ Object::clone
++ Object::eval
++ Object::exists
++ Object::fromDebControl
++ Object::fromFlatINI
++ Object::fromINI
++ Object::fromString
++ Object::get
++ Object::getAttributes
++ Object::getIndexes
++ Object::getMethods
++ Object::getOID
++ Object::getRef
++ Object::getSize
++ Object::getValues
++ Object::hasMethod
++ Object::isA
++ Object::restoreFile
++ Object::saveFile
++ Object::set
++ Object::toDebControl
++ Object::toFlatINI
++ Object::toString
++ Object::unset
+subClasses      =Class Stack Array Map
+name            =Object
+inheritedMethods=
+
+## bg_objects.sh:Object_staticCallSyntax: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_chainCallSyntax: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+##     | cmd> $obj.foo=new Map
+##     | cmd> $obj.foo[bar]="hello world"
+
+##----------
+## test
+
+# expect that foo member's toString method is called
+cmd> $obj.foo.toString
+bar=hello world
+
+# expect that object members can be created on demand
+cmd> $obj.foo[one].two="yoyo"
+cmd> printfVars obj
+obj : <instance> of Object
+  foo : <instance> of Map
+    bar=hello world
+    one : <instance> of Object
+      two=yoyo
+
+## bg_objects.sh:Object_chainCallSyntax: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_equalsOp: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+##     | cmd> $obj.num=5
+##     | cmd> $obj.str="hello"
+
+##----------
+## test
+
+# expect that the new values are appended. This documents whether num is appended as a string or added
+cmd> $obj.num+=10
+cmd> $obj.str+=" world"
+cmd> $obj.toString
+str=hello world
+num=510
+
+# expect equal to replace the previous value
+cmd> $obj.num=10
+cmd> $obj.str="goodbye"
+cmd> $obj.toString
+str=goodbye
+num=10
+
+## bg_objects.sh:Object_equalsOp: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_virtualCallSyntax: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> DeclareClass Base
+##     | cmd> DeclareClass Derived : Base
+##     | cmd> local -n obj; ConstructObject Derived obj
+
+##----------
+## test
+
+# expect normal polymorphism -- to see only msg from Derived::two
+cmd> $obj.two
+Derived::two
+
+# expect explicit call -- to see only msg from Base::two
+cmd> $obj.Base::two
+Base::two
+
+# expect polymorphism with super -- to see msg from Derived::one and then from Base:one
+cmd> $obj.one
+Derived::one
+Base::one
+
+## bg_objects.sh:Object_virtualCallSyntax: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_memberVarReadAccess: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+##     | cmd> $obj.foo="hello world"
+
+##----------
+## test
+
+# expect to see what happens when we reference an attribute that exists
+cmd> $obj.foo
+hello world
+cmd> $obj[foo]
+hello world
+
+# expect to see what happens when we reference an attribute that does not exist
+cmd> $obj.bar
+
+[exitCode 1]
+cmd> $obj[bar]
+
+[exitCode 1]
+
+# expect to see what happens when we reference a method that does not exist (because it has arguments)
+cmd> Try:
+cmd> $obj.doit p1 p2 p3
+** Exception thrown and caught
+catch_errorClass='assertError'
+catch_errorCode='36'
+catch_errorDescription='
+                        error: _bgclassCall: member 'doit' not found for class Object
+                            _OID='heap_A_<redacted>
+                            memberExpression='.doit p1 p2 p3''
+** Exception thrown and caught
+catch_errorClass='assertError'
+catch_errorCode='36'
+catch_errorDescription='
+                        error: _bgclassCall: member 'doit' not found for class Object
+                            _OID='heap_A_<redacted>
+                            memberExpression='[doit] p1 p2 p3''
+
+## bg_objects.sh:Object_memberVarReadAccess: finished
 ###############################################################################################################################
 
