@@ -198,6 +198,11 @@ function ut()
 
 	  expectSetupFail) _utRun_expectSetupFail="1" ;;
 
+	  filter)
+	  	printf "ut filter '%s'\n" "$1" 
+		;;
+
+
 	  onBeforeSrcLine)
 		local lineNo="$1"
 		local srcLine="$2"
@@ -620,7 +625,7 @@ function utfDirectScriptRun()
 		list)   directUT_listContainedUtIDs ;;
 		run)    directUT_runTestCases "$@" ;;
 		debug)  directUT_runTestCases "--debug" "$@" ;;
-		*)      assertError -v cmd -v bgUnitTestScript "unkown cmd. expeting list run or debug"
+		*)      assertError -v cmd -v bgUnitTestScript "unkown cmd. expecting list run or debug"
 	esac
 }
 

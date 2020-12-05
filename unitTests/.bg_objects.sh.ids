@@ -17,7 +17,7 @@ _parseObjSyntax:pOfAssignOp3
 _parseObjSyntax:pOfAssignOp4 
 _parseObjSyntax:pOfAssignOp5 
 initialState: 
-isA: 
+isDerivedFrom: 
 getClassMethods: 
 ConstructObject: 
 _classUpdateVMT: 
@@ -28,6 +28,10 @@ nestedObjects:
 Object_unset: 
 Object_exists: 
 Object_isA: 
+Object_getType: 
+Object_getOID: 
+Object_getRef: 
+Object_toString: 
 Object_assignNewOp: 
 Object_staticCallSyntax: 
 Object_chainCallSyntax: 

@@ -286,7 +286,7 @@ function bgtraceVars(s) {
 	printfVars("-o"_bgtraceFile" "s)
 	fflush(_bgtraceFile)
 }
-function bgtraceVars2(level, varName, varValue, optionsStr) {
+function bgtraceVars2(level, varName, varValue, optionsStr                                     ,i) {
 	if (!bgtraceIsActive()) return
 	printfVars2(level, varName, varValue, optionsStr" -o"_bgtraceFile)
 	fflush(_bgtraceFile)

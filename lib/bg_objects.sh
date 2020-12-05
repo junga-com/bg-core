@@ -328,9 +328,9 @@ function Class::__construct()
 	#Class::getClassMethods
 }
 
-# usage: <Class>.isA <className>
+# usage: <Class>.isDerivedFrom <className>
 # returns true if this class has <className> as a base class either directly or indirectly
-function Class::isA()
+function Class::isDerivedFrom()
 {
 	local className="$1"
 	[ "${_classIsAMap[${this[name]},$className]+exists}" ]
@@ -691,7 +691,7 @@ function _classScanForClassMethods()
 # destroy the specified object
 # This will invoke the __desctruct method of the object if it exists.
 # Then it unsets the object's array
-# After calling this, future use of references to this object will asertError
+# After calling this, future use of references to this object will assertError
 function DeleteObject()
 {
 	# if the caller passes in the contents of an ObjRef string with or without quotes, "$*" will be that string
@@ -717,6 +717,236 @@ function DeleteObject()
 
 	[ "${_VMT[_method::__destruct]}" ] && $_this.__destruct
 	unset this
+}
+
+
+
+
+# man(5) bgBashObjectsSyntax
+# This is the bash object oriented syntax implemented by the _parseObjSyntax function in the bg_objects.sh library.
+# Object Syntax:
+#     $<chainedObjOrMember><memberOp>[<p1> .. <pN>]
+#     <chainedObjOrMember> := <objOrMember>
+#                          := <chainedObjOrMember>.<objOrMember>
+#                          := <chainedObjOrMember>[<attributeMember>]
+#     <objOrMember> = [_a-zA-Z][_a-zA-Z0-9]*
+#                   = static
+#                   = <className>::[_a-zA-Z][_a-zA-Z0-9]*
+#    <attributeMember> = [_a-zA-Z0-9]*
+#     <memberOp>  := <break>            # invoke a method or echo an attribute's value (based on what <chainedObjOrMember> is)
+#                 := .unset<break>      # unset an attribute or throw excetion if its a method
+#                 := .exists<break>     # set exit code to 0(true) or 1(false) if the attribute or method exists
+#                 := .isA<break>        # set exit code to 0(true) or 1(false) based on the type of <chainedObjOrMember>
+#                 := .getType<break>    # return the type of <chainedObjOrMember>
+#                 := .getOID<break>     # return the name of the object's array variable
+#                 := .getRef<break>     # return the ObjRef that points to the object
+#                 := .toString<break>   # print the state of <chainedObjOrMember>. this is an operator so that it can be used on primitives
+#                 := =new<break>        # create a new object and set its reference in <chainedObjOrMember>
+#                 := +=                 # append to <chainedObjOrMember>
+#                 := =                  # replace the value of <chainedObjOrMember>
+#     <break> := \s
+#             := $
+#     # <chainedObjOrMember> will describe an entity that can be one of...
+#          :<className>  (Object, ...)
+#          :primitive    (q bash string var)
+#          :method       (a function)
+#          :null         (nothing exists at this <chainedObjOrMember>. null can happen at any point in the <chainedObjOrMember>)
+#          :self         (the base object, itself -- not a member)
+#     # <memberOp> is the action that will be performed on the <chainedObjOrMember> and depends on the type of the <chainedObjOrMember>
+function _parseObjSyntax() {
+	local testFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-t|--test) testFlag="-t"  ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	local chainedObjOrMemberVar="$1"; shift
+	local memberOpVar="$1"; shift
+	local argsVVar="$1"; shift
+
+	local reExp='((\.unset|\.exists|\.isA|\.getType|\.getOID|\.getRef|\.toString|=new|)[[:space:]]|\+?=)(.*)?$'
+
+	# This commented block is used to build reExp from an easier to understand but less runtime efficient format
+	# un-comment it and run the function and then copy the displayed string into reExp
+	# local reChained=".*"
+	# local reBreak="[[:space:]]"
+	# local reOpWBr="(\.unset|\.exists|\.isA|\.getType|\.getOID|\.getRef|\.toString|=new|)$reBreak"
+	# local reOpNBr="\+?="
+	# local reOp="$reOpWBr|$reOpNBr"
+	# local reArgs=".*"
+	# local reExp="($reOp)($reArgs)?$"
+	# bgtraceVars reExp
+
+	[ "$testFlag" ] && printfVars reExp
+
+	expression="${expression} "
+
+	# at this point these assignments may not be correct. We need to remove the operator, if any from the chainedObjOrMember
+	# and the += and = operators may contain one argV token stuck to it that needs to be moved to argV
+	local _mem="${1#|} "; shift
+	local _args=("$@")
+
+	[[ "$_mem" =~ $reExp ]] || assertError -v expression "invalid object syntax"
+	local rematch=("${BASH_REMATCH[@]}")
+	local _op="${rematch[1]}"
+	_mem="${_mem%%$_op*}"
+	[[ "${rematch[3]}" =~ [^[:space:]] ]] && _args=( "${rematch[3]% }" "${_args[@]}")
+	_op="${_op% }"  # we need to capture the empty operator as a " " in the regex but return it as ""
+
+	returnValue "$_op" $memberOpVar
+	returnValue "$_mem" $chainedObjOrMemberVar
+	varSetRef --array "$argsVVar" "${_args[@]}"
+}
+
+# _resolveMemberChain "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName
+# null:noGlobal
+# null:chain
+# null:method
+# null:memberVar
+# null:either
+function _resolveMemberChain()
+{
+	local forceFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-f|--force) forceFlag="-f" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local oidIn="$1"
+	local exprIn="$2"
+	local finalOIDVar="$3"
+	local finalTypeVar="$4"
+	local finalMemberVar="$5"
+
+	local finalOIDValue finalTypeValue finalMemberValue
+
+	# validate exprIn for illegal characters
+	[[ "$exprIn" =~ [^].:_a-zA-Z0-9[] ]] && { varSetRef "$finalOIDVar"  ""; varSetRef "$finalTypeVar"  "invalidExpression:invalid charcter in expression"; varSetRef "$finalMemberVar"  ""; return 101; }
+
+	# parse the member chain expression into parts. By replacing '[' with '.' all the terms are separated by '.' and those that used
+	# the [<term>] syntax will have a trailing ']' so we can still distinguish them
+	local expr="${exprIn//\[/.}"
+	local parts sIFS; sIFS="$IFS"; IFS='.'; parts=(${expr}); IFS="$sIFS"
+
+	local _objRefV
+
+	# if <oid> was not passed in, the expression starts at the global scope so use the first part as the starting oid
+	if [ ! "$oidIn" ]; then
+		finalOIDValue="${part[0]}"; parts=("${parts[@]:1}")
+		_objRefV="${!finalOIDValue}"
+		local _oidParts=($_objRefV)
+		[ "${_oidParts[0]}" == "_bgclassCall" ] || { varSetRef "$finalOIDVar"  ""; varSetRef "$finalTypeVar"  "null:noGlobal"; varSetRef "$finalMemberVar"  ""; return 101; }
+		finalOIDValue="${_oidParts[1]}"
+	else
+		# "$obj.something.." produces an empty first part but  "$obj something..." does not
+		[ "${part[0]}" == "" ] && parts=("${parts[@]:1}")
+		finalOIDValue="$oidIn"
+	fi
+
+	### unless its 'static' remove the last term, leaving parts with just the chained parts that we need to traaverse
+	[ ${#parts[@]} -gt 0 ] && [ "${parts[@]: -1}" != "static" ] && { finalMemberValue="${parts[@]: -1}"; parts=("${parts[@]:0: ${#parts[@]}-1}"); }
+
+	# .foo can be a membervar or method but [foo] can only be a memberVar and .::foo can only be a method. .<class>::foo is also a method
+	local finalMemberValueSyntax;
+	if [[ "${finalMemberValue}" =~ []]$ ]]; then
+		finalMemberValueSyntax="memberVar"
+		finalMemberValue="${finalMemberValue%]}"
+	elif [[ "${finalMemberValue}" =~ : ]]; then
+		finalMemberValueSyntax="method"
+		# if 1 or 2 ':' are at the start, its just a way for the caller to declare that the term must be a method so we can remove them now
+		finalMemberValue="${finalMemberValue#:}"; finalMemberValue="${finalMemberValue#:}"
+	fi
+	varSetRef "$finalMemberVar" "${finalMemberValue}"
+
+
+
+
+	### follow the 'middle' chained parts which, by syntax, should all be objects. We already removed the last part so this loop is the chaining mechaism
+	local -n _pthis
+	local nextPart; for nextPart in "${parts[@]}"; do
+		local nextPartSyntax="${finalMemberValue:+dot}"; [[ "${finalMemberValue}" =~ []]$ ]] && nextPartSyntax="memberVar"
+		nextPart="${nextPart%]}"
+		[ "$nextPart" ] || { varSetRef "$finalOIDVar"  ""; varSetRef "$finalTypeVar"  "invalidExpression:empty member chain part. "; return 101; }
+
+		unset -n _pthis; local -n _pthis="$finalOIDValue"
+		local _oidType="${_pthis@a}"; _oidType="${_oidType//[^aA]}"
+
+		[ "$_oidType" ] || { varSetRef "$finalOIDVar"  ""; varSetRef "$finalTypeVar"  "invalidExpression:'$finalOIDValue' should be an OID but it has neither 'a' nor 'A' array attribute"; return 101; }
+
+		if  [ "$nextPart" == "static" ]; then
+			local -n _pThisSys; { [ "$_oidType" == A ] && [ "${_pthis[_CLASS]+exists}" ]; } && _pThisSys="$finalOIDValue" || _pThisSys="${finalOIDValue}_sys"
+			finalOIDValue="${_pThisSys[_CLASS]}"
+			continue
+		fi
+
+		{ [ "$_oidType" == "a" ] && [[ ! "$nextPart" =~ ^[0-9]*$ ]]; } && { varSetRef "$finalOIDVar"  ""; varSetRef "$finalTypeVar"  "invalidExpression:this expression is dereferencing a numeric array with a non-numeric key '$nextPart'"; return 101; }
+
+		# terms with ':' in them must be methods (like <BaseClass>::doit)
+		[[ "$nextPart" =~ : ]] && { varSetRef "$finalOIDVar"  ""; varSetRef "$finalTypeVar"  "invalidExpression:this expression contains a method '$nextPart' that is not at the end of the expression"; return 101; }
+
+		if  [ "${_pthis[$nextPart]+exists}" ]; then
+			_objRefV="${_pthis[$nextPart]}"
+
+		elif  [ "$forceFlag" ]; then
+			ConstructObject Object _pthis[$nextPart]
+			_objRefV="${_pthis[$nextPart]}"
+
+		else
+			{ varSetRef "$finalOIDVar" ""; varSetRef "$finalTypeVar" "null:chain"; return 1; }
+		fi
+
+		local _oidParts=($_objRefV)
+		[ "${_oidParts[0]}" == "_bgclassCall" ] || { varSetRef "$finalOIDVar" ""; varSetRef "$finalTypeVar" "invalidExpression:dereferencing a primitive at $finalOIDValue[$nextPart]"; return 1; }
+		finalOIDValue="${_oidParts[1]}"
+	done
+
+
+
+	### now determine the type of what we ended up pointing at
+	if [ ! "$finalMemberValue" ]; then
+		finalTypeValue="self"
+	else
+		unset -n _pthis; local -n _pthis="$finalOIDValue"
+		local _oidType="${_pthis@a}"; _oidType="${_oidType//[^aA]}"
+
+		# glean a little more about the syntax now that we know what kind of array
+		if [ ! "$finalMemberValueSyntax" ] && [ "$_oidType" == "a" ] && [[ ! "$finalMemberValue" =~ ^[0-9]*$ ]]; then
+			finalMemberValueSyntax="method"
+		fi
+
+		# query member var information
+		local _memberVarInfo="${_pthis[$finalMemberValue]+primitive}"
+		if [ "$_memberVarInfo" ] && [[ "${_pthis[$finalMemberValue]}" =~ ^[[:space:]]*_bgclassCall ]]; then
+			local _oidParts=(${_pthis[$finalMemberValue]})
+			_memberVarInfo="object:${_oidParts[2]}"
+		fi
+
+		# query member var information
+		local _methodExists _methodType
+		if [ "$finalMemberValue" == "memberVar" ]; then
+			:
+		elif [[ "$finalMemberValue" =~ .:: ]]; then
+			type -t "$finalMemberValue" &>/dev/null && _methodExists="exists"
+			_methodType=":explicit"
+		else
+			local -n _pThisSys; { [ "$_oidType" == A ] && [ "${_pthis[_CLASS]+exists}" ]; } && _pThisSys="$finalOIDValue" || _pThisSys="${finalOIDValue}_sys"
+			local -n _VMT="${_pThisSys[_VMT]:-${_pThisSys[_CLASS]}_vmt}"
+			[ "${_VMT[_method::$finalMemberValue]+exists}" ] && _methodExists="exists"
+		fi
+
+		# now classify the type
+		case ${finalMemberValueSyntax:-unknown}:${_methodExists:-noMethod}:${_memberVarInfo:-nullVar} in
+			method:noMethod:*)        finalTypeValue="null:method" ;;
+			method:exists:*)          finalTypeValue="method$_methodType" ;;
+			memberVar:*:nullVar)      finalTypeValue="null:memberVar" ;;
+			memberVar:*:*)            finalTypeValue="$_memberVarInfo" ;;
+			unknown:noMethod:nullVar) finalTypeValue="null:either" ;;
+			unknown:*:nullVar)        finalTypeValue="method$_methodType" ;;
+			unknown:noMethod:*)       finalTypeValue="$_memberVarInfo" ;;
+		esac
+	fi
+
+	varSetRef "$finalOIDVar"    "$finalOIDValue"
+	varSetRef "$finalTypeVar"   "$finalTypeValue"
 }
 
 
@@ -762,9 +992,13 @@ function DeleteObject()
 #        h
 #        i
 # TODO: consider rewriting this using the ParseObjExpr function. It is more simple and maybe more efficient and needs to be in sync with the choices made in this function.
+#
+# Object Syntax:
+# See man(5) which is created by comments above the _parseObjSyntax function
 # See Also:
 #    ParseObjExpr
 #    completeObjectSyntax
+#    man(5) bgBashObjectsSyntax
 function _bgclassCall()
 {
 	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
@@ -791,219 +1025,490 @@ function _bgclassCall()
 	local _CLASS="$1";         shift
 	local _hierarchLevel="$1"; shift
 	local _memberExpression="$*"; _memberExpression="${_memberExpression#|}"
-	local _memberTerm="$1";    shift; _memberTerm="${_memberTerm#|}"
 
-	# its a noop to refer to an object without including a member, like $foo
-	[ "${_memberTerm//[]. []}" ] || {
-		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-		return 0
-	}
+	local _chainedObjOrMember _memberOp _argsV
+	_parseObjSyntax _chainedObjOrMember _memberOp _argsV "$@"
+	#bgtraceVars "" "" -l"$*"
 
-	local -n refClass="$_CLASS"
+	set -- "${_argsV[@]}"
 
-	local -n this="$_OID" || {
-		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-		assertError -v _OID -v _CLASS -v _memberExpression "could not setup Object calling context '$(declare -p this)'"
-	}
-
-	# the array where we store system member variables (that start with '_') may or may not be the same as the main object array
-	# If ConstructObject puts _CLASS in the main array, then we use it. Otherwise we expect there to be a _sys version of the OID
-	local _OID_sys="${_OID}"
-	if { [[ ! "${refClass[oidAttributes]:-A}" =~ A ]] || [ ! "${this[_CLASS]+exists}" ]; } && varExists "${_OID}_sys"; then
-		_OID_sys+="_sys"
-	fi
-	local -n _this="${_OID_sys}"
-
-	local -n static="${_this[_CLASS]}"
-	local super="_bgclassCall ${_OID} $_CLASS $((_hierarchLevel+1)) |"
-
-	# create local nameRefs for each logical member variable that has a valid var name not starting with an '_'
-	if [ "$_OID_sys" != "$_OID" ] && [[ "${static[oidAttributes]:-A}" =~ A ]]; then
-		for _memberVarName in "${!this[@]}"; do
-			[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
-			if IsAnObjRef "${this[$_memberVarName]}"; then
-				declare -n $_memberVarName; GetOID "${this[$_memberVarName]}" "$_memberVarName"
-			else
-				declare -n $_memberVarName="this[$_memberVarName]"
-			fi
-		done
-	fi
-
-	# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
-	_classUpdateVMT "${_this[_CLASS]}"
-
-	local -n _VMT="${_this[_CLASS]}_vmt"
-
-	# _memberTerm is the expression the caller typed after the objRef. It could be
-	#      1) a method call                      .<methodName> <p1> <p2> ...
-	#      2) a member var reference             .<memberVar> or [<memberVar>]
-	#      3) a member var assignment            .<memberVar>=<expresion> or [<memberVar>]=<expresion>
-	#      4) a chained member object reference  .<m1>.<m2>.<m3>... or [<m1>]<m2>.<m3>
-	# _mnameShort will be the first attribute name in _memberTerm
-	# _memberVal is the current value of the this[$_mnameShort]
-	local _mnameShort
-	case ${_memberTerm:0:1} in
-		[)	_mnameShort="${_memberTerm:1}"
-			_mnameShort="${_mnameShort%%[]]*}"
-			_memberTerm="${_memberTerm#*]}"
-			_memberExpression="${_memberExpression#*]}"
-			;;
-		.)	_mnameShort="${_memberTerm:1}"
-			_mnameShort="${_mnameShort%%[].+=[]*}"
-			_memberTerm="${_memberTerm#*$_mnameShort}"
-			_memberExpression="${_memberExpression#*$_mnameShort}"
-			;;
-		*)	_mnameShort="${_memberTerm%%[].+=[]*}"
-			_memberTerm="${_memberTerm#*$_mnameShort}"
-			_memberExpression="${_memberExpression#*$_mnameShort}"
-			;;
+	case ${_memberOp:-defaultOp} in
+		defaultOp|=new|+=|=) _resolveMemberChain -f "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName ;;
+		*)                   _resolveMemberChain    "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName ;;
 	esac
 
-	local _memberVal
-	[ "${_mnameShort}" ] && _memberVal="${this[${_mnameShort}]}"
+	[[ "$_rsvMemberType" =~ ^invalidExpression ]] && assertError -v expression:_memberExpression -v errorType:_rsvMemberType -v _OID -v memberExpr:_chainedObjOrMember  "invalid object expression. The <memberExpr> can not be interpretted relative to the <oid>"
 
-	#bgtraceVars -1 _memberTerm _memberVal _mnameShort
+	if [ "$_rsvOID" ]; then
+		local _OID="$_rsvOID"
+		local -n this="$_OID"
 
-	local _resultCode
+		local _OID_sys="${_OID}"
+		varExists "${_OID}_sys" && _OID_sys+="_sys"
+		local -n _this="${_OID_sys}"
 
-	## some hard coded methods that can be called on a member even if that member is not an object or does not exist
-	# When these methods are called directly on an object (not in a chained member reference), they are invoked normally and do not hit this case
+		local -n static="${_this[_CLASS]}"
+	fi
 
-	# .unset
-	if [ "$_memberTerm" == ".unset" ]; then
-		[ "${_memberVal:0:12}" == "_bgclassCall" ] && DeleteObject "$_memberVal"
-		[ "${_mnameShort}" ] && unset this[${_mnameShort}]
+	#bgtraceVars "" _chainedObjOrMember _memberOp _argsV _rsvOID _rsvMemberType _rsvMemberName -l"${_memberOp:-defaultOp}:${_rsvMemberType}"
+	case ${_memberOp:-defaultOp}:${_rsvMemberType} in
+		defaultOp:primitive)
+			returnValue "${this[$_rsvMemberName]}" $1
+			;;
 
-	# .exists
-	elif [ "$_memberTerm" == ".exists" ]; then
-		[ "${_mnameShort}" ] && [ "${this[${_mnameShort}]+isset}" ]
+		defaultOp:self)
+			[ "$_rsvOID" ] && Object::toString "$@"
+			;;
 
-	# .isA
-	elif [ "$_memberTerm" == ".isA" ]; then
-		# if its not an Object Ref, isA returns false, if it is, set the exit code by calling the isA method.
-		[ "${_memberVal:0:12}" == "_bgclassCall" ] && $_memberVal"$_memberTerm" "$@"
+		defaultOp:null:noGlobal)  false  ;;
+		defaultOp:null:chain)     false  ;;
+		defaultOp:null:method*)   assertError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found" ;;
+		defaultOp:null:memberVar) false  ;;
+		defaultOp:null:either)
+			# in this ambiguous case, if the the caller provided an argument, it looks more like a method call except if its only
+			# one and it is the name of a variable (that the member value would be returned in)
+			if [ $# -ge 2 ] || { [ "$1" ] && ! varExists "$1"; }; then
+				assertError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found"
+			fi
+			false
+			;;
 
-	# =new
-	elif [ "$_memberTerm" == "=new" ]; then
-		local newObjectClass="${1:-Object}"; shift
-		local newObject; ConstructObject "$newObjectClass" newObject "$@"
-		this[${_mnameShort}]="$newObject"
+		defaultOp:object:*)
+			${this[$_rsvMemberName]}.toString "$@"
+			;;
 
-	# static...
-	elif [ "$_mnameShort" == "static" ]; then
-		$static"$_memberTerm" "$@"
+		defaultOp:method*)
+			local -n refClass="$_CLASS"
 
-	# member chaining syntax
-	#    $foo.bar.doIt p1 p2
-	#    $foo[bar].doIt p1 p2
-	elif [ "${_memberVal:0:12}" == "_bgclassCall" ]; then
-		$_memberVal"$_memberTerm" "$@"
+			# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
+			_classUpdateVMT "${_this[_CLASS]}"
 
-	# member variable appending assignment syntax
-	#   $this.<classVarName>+=<newValue>
-	elif [ "${_memberTerm:0:2}" == "+=" ]; then
-		local sq="'" ssq="'\\''"
-		_memberTerm="${_memberExpression#+=}"
-		[ ! "$_mnameShort" ] && {
-			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
-		}
-		varSetRef -a this[${_mnameShort}] "${_memberTerm}"
-		#eval "this[${_mnameShort}]+='${_memberTerm//$sq/$ssq}'"
+			# find the _VMT taking into account super calls
+			if [ ${_hierarchLevel:-0} -eq 0 ]; then
+				local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
+			else
+				local -n _VMT="${refClass[baseClass]}_vmt"
+			fi
 
-	# member variable assignment syntax
-	#   $this.<classVarName>=<newValue>
-	elif [ "${_memberTerm:0:1}" == "=" ]; then
-		local sq="'" ssq="'\\''"
-		_memberTerm="${_memberExpression#=}"
-		[ ! "$_mnameShort" ] && {
-			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
-		}
-		varSetRef  this[${_mnameShort}] "${_memberTerm}"
-		#eval "this[${_mnameShort}]='${_memberTerm//$sq/$ssq}'"
+			if [[ "${_rsvMemberName}" =~ .:: ]]; then
+				local _METHOD="${_rsvMemberName}"
+			else
+				local _METHOD="${_VMT[_method::${_rsvMemberName}]}"
+			fi
 
-	# member chaining syntax (cont) -- member does not exist so create an Object on Demand
-	elif [ "$_memberTerm" ]; then
-		[ ! "$_mnameShort" ] && {
-			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
-		}
-		local newObject; ConstructObject "$newObjectClass" newObject "$@"
-		this[${_mnameShort}]="$newObject"
-		${this[${_mnameShort}]}$_memberTerm "$@"
+			# its a noop to call $super.somthing when there is no super.something. We know it exists in the object's class
+			# because _resolveMemberChain told us so
+			[ "$_METHOD" ] || break
 
-	# member chaining syntax (cont) -- member does not exist so fail
-	# Note that if the the previous condition is not commented out, this will never be reached  
-	elif [ "$_memberTerm" ]; then
-		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-		assertError -v _memberVal -v _memberTerm -v _mnameShort "'${_mnameShort}' is not an Object reference member of '$_OID'"
+			# create local nameRefs for each logical member variable that has a valid var name not starting with an '_'
+			if [ "$_OID_sys" != "$_OID" ] && [[ "${static[oidAttributes]:-A}" =~ A ]]; then
+				local _memberVarName; for _memberVarName in "${!this[@]}"; do
+					[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
+					if IsAnObjRef "${this[$_memberVarName]}"; then
+						declare -n $_memberVarName; GetOID "${this[$_memberVarName]}" "$_memberVarName"
+					else
+						declare -n $_memberVarName="this[$_memberVarName]"
+					fi
+				done
+			fi
 
-	# calling a super class method syntax
-	#   $super.<method>
-	# TODO: refactor $super. implementation. The current imp only works when initiated from the most subclass because
-	#       it uses classHierarchy from the start. What it needs to do is always be related from the
-	#       the class that the function its used in is in.
-	#       Option1: the <hierarchyCallLevel> position in an obj ref could become a list of optional flags. the super ref would just have that flag
-	#           set. Hear we would detect that flag, get the calling method's class from the bash call stack, and increment the hierarchy from there.
-	#       Option2: Set the super ref just before calling each method. At that time we can extract the methods' class and change the class position in the
-	#           the super ref to be set to the base class of the method's class. This seems more correct but takes a small performance hit on every method call.
-	#           Also we would need to change this function to respect the class in the ref over the class in the object's instance array. That also seems more
-	#           correct. That would require moving the VMT from the object instance arrays to the class arrays. That was something that I was considering anyway.
-	#           I think the performance hit of this will be negligbable.
-	elif [ ${_hierarchLevel:-0} -gt 0 ]; then
-		# This version might be better but needs to be tested
-		#local h=(${static[classHierarchy]}) superName
-		#local i=$((${#h[@]}-1)); while [ $_hierarchLevel -gt 0 ] && [ $((--i)) -ge 0 ]; do
-		#	type -t ${h[$i]}::${_mnameShort} &>/dev/null && ((_hierarchLevel--))
-		#done
-		#local _METHOD="${h[$i]}::${_mnameShort}"
-		#[ $_hierarchLevel -eq 0 ] && $_METHOD "$@"
+			# super is relative to the the class of the polymorphic method we are executing
+			local super="_bgclassCall ${_OID} ${_METHOD%%::*} 1 |"
 
-		local h="${static[classHierarchy]}" superName
-		local i=0; while [ "$h" ] && [ $i -lt $_hierarchLevel ]; do
-			[[ ! "$h" =~ \  ]] && h=""
-			h="${h% *}"
-			superName="${h##* }"
-			type -t ${superName}::${_mnameShort} &>/dev/null && ((i++))
-		done
-		if [ "$superName" ]; then
-			local _METHOD="${superName}::${_mnameShort}"
 			objOnEnterMethod "$@"
 			bgDebuggerPlumbingCode=0
 			$_METHOD "$@"
-#			_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
-		fi
+			;;
 
-	# member function with explicit Class syntax
-	#   $this.<class>::<memberFunct> [<p1> .. p2]
-	elif [[ "$_mnameShort" =~ :: ]]; then
-		local _METHOD="$_mnameShort"
-		objOnEnterMethod "$@"
-		bgDebuggerPlumbingCode=0
-		$_METHOD "$@"
+		.unset:self)
+			# unset on the base object is a noop -- maybe it should assert?
+			;;
+		.unset:primitive)
+			unset this[$_rsvMemberName]
+			;;
+		.unset:null*|.unset:method*)
+			;;
+		.unset:object:*) # member objects are left over after the other cases
+			DeleteObject "${this[$_rsvMemberName]}"
+			unset this[$_rsvMemberName]
+			;;
 
-	# member function syntax
-	#   $this.<memberFunct> [<p1> .. p2]
-	elif [ "${_VMT[_method::${_mnameShort}]+isset}" ]; then
-		local _METHOD="${_VMT[_method::${_mnameShort}]}"
-		objOnEnterMethod "$@"
-		bgDebuggerPlumbingCode=0
-		$_METHOD "$@"
+		# set exit code to 0(true) or 1(false) if the attribute or method or self exists
+		.exists:self)
+			[ "$_rsvOID" ]
+			;;
+		.exists:*)
+			[[ ! "${_rsvMemberType#object:}" =~ ^null ]]
+			;;
 
-	# member variable read syntax. Its ok to read a non-existing member var, but if parameters were provided, it looks like a method call
-	#   echo $($this.<memberVar>)
-	elif [ ! "$*" ]; then
-		echo "${this[${_mnameShort}]}"
-		[ "${this[${_mnameShort}]+test}" == "test" ]
+		# set exit code to 0(true) or 1(false) based on the type of <chainedObjOrMember>
+		.isA:self)
+			[ "$_rsvOID" ] && [ "${_classIsAMap[${_this[_CLASS]},$1]+exists}" ]
+			;;
+		.isA:object:*)
+			[ "${_classIsAMap[${_rsvMemberType#object:},$1]+exists}" ]
+			;;
+		.isA:primitive|.isA:null*|.isA:method*|.isA:*)
+			[ "${_rsvMemberType%%:*}" == "$1" ]
+			;;
 
-	# member not found error
-	else
-		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-		assertError -v _OID -v memberExpression:"$_mnameShort $_memberExpression" "member '$_mnameShort' not found for class $_CLASS"
-	fi
+		# return the type of <chainedObjOrMember>
+		.getType:self)
+			returnValue "${_this[_CLASS]}" $1
+			;;
+		.getType:*)
+			local _retType="${_rsvMemberType#object:}"
+			returnValue "${_retType%%:*}" $1
+			;;
+
+		# return the name of the object array of <chainedObjOrMember>
+		.getOID:self)
+			returnValue "$_OID" $1
+			;;
+		.getOID:*)
+			local _oidParts=(${this[$_rsvMemberName]})
+			if [ "${_oidParts[0]}" == "_bgclassCall" ]; then
+				returnValue "${_oidParts[1]}" $1
+			else
+				false
+			fi
+			;;
+
+		# return the ObjRef of <chainedObjOrMember> -- like "_bgclassCall <oid> <class> <hierarchy> |"
+		.getRef:self)
+			returnValue "${_this[_Ref]}" $1
+			;;
+		.getRef:*)
+			if [[ "${this[${_rsvMemberName:-empty%#}]}" =~ ^_bgclassCall ]]; then
+				returnValue "${this[$_rsvMemberName]}" $1
+			else
+				false
+			fi
+			;;
+
+		.toString:self)
+			Object::toString "$@"
+			;;
+		#
+		.toString:object:*)
+			${this[$_rsvMemberName]}.toString "$@"
+			;;
+		#
+		#.isA:primitive|.isA:null*|.isA:method*|.isA:*)
+		.toString:primitive)
+			Primitive::toString --name="$_rsvMemberName" --value="${this[$_rsvMemberName]}" "$@"
+			;;
+		#
+		.toString:null*)
+			Primitive::toString --name="$_rsvMemberName" --value="${_rsvMemberType%:either}" "$@"
+			;;
+		#
+		.toString:method*)
+			local -n refClass="$_CLASS"
+
+			# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
+			_classUpdateVMT "${_this[_CLASS]}"
+
+			# find the _VMT taking into account super calls
+			if [ ${_hierarchLevel:-0} -eq 0 ]; then
+				local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
+			else
+				local -n _VMT="${refClass[baseClass]}_vmt"
+			fi
+
+			if [[ "${_rsvMemberName}" =~ .:: ]]; then
+				local _METHOD="${_rsvMemberName}"
+			else
+				local _METHOD="${_VMT[_method::${_rsvMemberName}]}"
+			fi
+			Primitive::toString --name="$_rsvMemberName" --value="method<$_METHOD()>" "$@"
+			;;
+		#
+
+
+		# create a new object and set its reference in <chainedObjOrMember>
+		=new:self) assertError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		=new:*)
+			local _className="$1"; shift
+			local _newObject; ConstructObject "${_className:-Object}" _newObject "$@"
+			[[ "$_rsvMemberType" =~ ^object: ]] && DeleteObject "${this[$_rsvMemberName]}"
+			this[$_rsvMemberName]="$_newObject"
+			;;
+
+		# append to <chainedObjOrMember>
+		+=:self) assertError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		+=:*)
+			[[ "$_rsvMemberType" =~ ^object: ]] && DeleteObject "${this[$_rsvMemberName]}"
+			this[$_rsvMemberName]+="$*"
+			;;
+
+		# replace the value of <chainedObjOrMember>
+		=:self) assertError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		=:*)
+			[[ "$_rsvMemberType" =~ ^object: ]] && DeleteObject "${this[$_rsvMemberName]}"
+			this[$_rsvMemberName]="$*"
+			;;
+
+		*) assertError -v _memberOp -v _rsvMemberType "case block for object syntax operators by target type is missing this case"
+	esac
+
 	_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# function _bgclassCall()
+# {
+# 	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
+# 	# if <oid> does not exist, its because the myObj=$(NewObject <class>) syntax was used to create the
+# 	# object reference and it had to delay creation because it was in a subshell.
+# 	if ! varIsA array "$1"; then
+# 		[[ "$1" =~ ^heap_[aAixrnlut]*_ ]] || assertError "bad object reference. The object is out of scope. \nObjRef='_bgclassCall $@'"
+# 		declare -gA "$1=()"
+# 		if [[ "$4" =~ ^[._]*construct$ ]]; then
+# 			local _OID="$1"; shift
+# 			local _CLASS="$1"; shift
+# 			ConstructObject "$_CLASS" "$_OID" "$@"
+# 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+# 			return
+# 		else
+# 			ConstructObject "$2" "$1"
+# 		fi
+# 	fi
+#
+# 	((_bgclassCallCount++))
+#
+# 	# the local variables we declare in this function will be available to access in the method function
+# 	local _OID="$1";           shift
+# 	local _CLASS="$1";         shift
+# 	local _hierarchLevel="$1"; shift
+# 	local _memberExpression="$*"; _memberExpression="${_memberExpression#|}"
+# 	local _memberTerm="$1";    shift; _memberTerm="${_memberTerm#|}"
+#
+# 	# its a noop to refer to an object without including a member, like $foo
+# 	[ "${_memberTerm//[]. []}" ] || {
+# 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+# 		return 0
+# 	}
+#
+# 	local -n refClass="$_CLASS"
+#
+# 	local -n this="$_OID" || {
+# 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+# 		assertError -v _OID -v _CLASS -v _memberExpression "could not setup Object calling context '$(declare -p this)'"
+# 	}
+#
+# 	# the array where we store system member variables (that start with '_') may or may not be the same as the main object array
+# 	# If ConstructObject puts _CLASS in the main array, then we use it. Otherwise we expect there to be a _sys version of the OID
+# 	local _OID_sys="${_OID}"
+# 	if { [[ ! "${refClass[oidAttributes]:-A}" =~ A ]] || [ ! "${this[_CLASS]+exists}" ]; } && varExists "${_OID}_sys"; then
+# 		_OID_sys+="_sys"
+# 	fi
+# 	local -n _this="${_OID_sys}"
+#
+# 	local -n static="${_this[_CLASS]}"
+# 	local super="_bgclassCall ${_OID} $_CLASS $((_hierarchLevel+1)) |"
+#
+# 	# create local nameRefs for each logical member variable that has a valid var name not starting with an '_'
+# 	if [ "$_OID_sys" != "$_OID" ] && [[ "${static[oidAttributes]:-A}" =~ A ]]; then
+# 		for _memberVarName in "${!this[@]}"; do
+# 			[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
+# 			if IsAnObjRef "${this[$_memberVarName]}"; then
+# 				declare -n $_memberVarName; GetOID "${this[$_memberVarName]}" "$_memberVarName"
+# 			else
+# 				declare -n $_memberVarName="this[$_memberVarName]"
+# 			fi
+# 		done
+# 	fi
+#
+# 	# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
+# 	_classUpdateVMT "${_this[_CLASS]}"
+#
+# 	local -n _VMT="${_this[_CLASS]}_vmt"
+#
+# 	# _memberTerm is the expression the caller typed after the objRef. It could be
+# 	#      1) a method call                      .<methodName> <p1> <p2> ...
+# 	#      2) a member var reference             .<memberVar> or [<memberVar>]
+# 	#      3) a member var assignment            .<memberVar>=<expression> or [<memberVar>]=<expression>
+# 	#      4) a chained member object reference  .<m1>.<m2>.<m3>... or [<m1>]<m2>.<m3>
+# 	# _mnameShort will be the first attribute name in _memberTerm
+# 	# _memberVal is the current value of the this[$_mnameShort]
+# 	local _mnameShort
+# 	case ${_memberTerm:0:1} in
+# 		[)	_mnameShort="${_memberTerm:1}"
+# 			_mnameShort="${_mnameShort%%[]]*}"
+# 			_memberTerm="${_memberTerm#*]}"
+# 			_memberExpression="${_memberExpression#*]}"
+# 			;;
+# 		.)	_mnameShort="${_memberTerm:1}"
+# 			_mnameShort="${_mnameShort%%[].+=[]*}"
+# 			_memberTerm="${_memberTerm#*$_mnameShort}"
+# 			_memberExpression="${_memberExpression#*$_mnameShort}"
+# 			;;
+# 		*)	_mnameShort="${_memberTerm%%[].+=[]*}"
+# 			_memberTerm="${_memberTerm#*$_mnameShort}"
+# 			_memberExpression="${_memberExpression#*$_mnameShort}"
+# 			;;
+# 	esac
+#
+# 	local _memberVal
+# 	[ "${_mnameShort}" ] && _memberVal="${this[${_mnameShort}]}"
+#
+# 	#bgtraceVars -1 _memberTerm _memberVal _mnameShort
+#
+# 	local _resultCode
+#
+# 	## some hard coded methods that can be called on a member even if that member is not an object or does not exist
+# 	# When these methods are called directly on an object (not in a chained member reference), they are invoked normally and do not hit this case
+#
+# 	# .unset
+# 	if [ "$_memberTerm" == ".unset" ]; then
+# 		[ "${_memberVal:0:12}" == "_bgclassCall" ] && DeleteObject "$_memberVal"
+# 		[ "${_mnameShort}" ] && unset this[${_mnameShort}]
+#
+# 	# .exists
+# 	elif [ "$_memberTerm" == ".exists" ]; then
+# 		[ "${_mnameShort}" ] && [ "${this[${_mnameShort}]+isset}" ]
+#
+# 	# .isA
+# 	elif [ "$_memberTerm" == ".isA" ]; then
+# 		# if its not an Object Ref, isA returns false, if it is, set the exit code by calling the isA method.
+# 		[ "${_memberVal:0:12}" == "_bgclassCall" ] && $_memberVal"$_memberTerm" "$@"
+#
+# 	# =new
+# 	elif [ "$_memberTerm" == "=new" ]; then
+# 		local newObjectClass="${1:-Object}"; shift
+# 		local newObject; ConstructObject "$newObjectClass" newObject "$@"
+# 		this[${_mnameShort}]="$newObject"
+#
+# 	# static...
+# 	elif [ "$_mnameShort" == "static" ]; then
+# 		$static"$_memberTerm" "$@"
+#
+# 	# member chaining syntax
+# 	#    $foo.bar.doIt p1 p2
+# 	#    $foo[bar].doIt p1 p2
+# 	elif [ "${_memberVal:0:12}" == "_bgclassCall" ]; then
+# 		$_memberVal"$_memberTerm" "$@"
+#
+# 	# member variable appending assignment syntax
+# 	#   $this.<classVarName>+=<newValue>
+# 	elif [ "${_memberTerm:0:2}" == "+=" ]; then
+# 		local sq="'" ssq="'\\''"
+# 		_memberTerm="${_memberExpression#+=}"
+# 		[ ! "$_mnameShort" ] && {
+# 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+# 			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
+# 		}
+# 		varSetRef -a this[${_mnameShort}] "${_memberTerm}"
+# 		#eval "this[${_mnameShort}]+='${_memberTerm//$sq/$ssq}'"
+#
+# 	# member variable assignment syntax
+# 	#   $this.<classVarName>=<newValue>
+# 	elif [ "${_memberTerm:0:1}" == "=" ]; then
+# 		local sq="'" ssq="'\\''"
+# 		_memberTerm="${_memberExpression#=}"
+# 		[ ! "$_mnameShort" ] && {
+# 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+# 			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
+# 		}
+# 		varSetRef  this[${_mnameShort}] "${_memberTerm}"
+# 		#eval "this[${_mnameShort}]='${_memberTerm//$sq/$ssq}'"
+#
+# 	# member chaining syntax (cont) -- member does not exist so create an Object on Demand
+# 	elif [ "$_memberTerm" ]; then
+# 		[ ! "$_mnameShort" ] && {
+# 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+# 			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
+# 		}
+# 		local newObject; ConstructObject Object newObject "$@"
+# 		this[${_mnameShort}]="$newObject"
+# 		${this[${_mnameShort}]}$_memberTerm "$@"
+#
+# 	# member chaining syntax (cont) -- member does not exist so fail
+# 	# Note that if the the previous condition is not commented out, this will never be reached
+# 	elif [ "$_memberTerm" ]; then
+# 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+# 		assertError -v _memberVal -v _memberTerm -v _mnameShort "'${_mnameShort}' is not an Object reference member of '$_OID'"
+#
+# 	# calling a super class method syntax
+# 	#   $super.<method>
+# 	# TODO: refactor $super. implementation. The current imp only works when initiated from the most subclass because
+# 	#       it uses classHierarchy from the start. What it needs to do is always be related from the
+# 	#       the class that the function its used in is in.
+# 	#       Option1: the <hierarchyCallLevel> position in an obj ref could become a list of optional flags. the super ref would just have that flag
+# 	#           set. Hear we would detect that flag, get the calling method's class from the bash call stack, and increment the hierarchy from there.
+# 	#       Option2: Set the super ref just before calling each method. At that time we can extract the methods' class and change the class position in the
+# 	#           the super ref to be set to the base class of the method's class. This seems more correct but takes a small performance hit on every method call.
+# 	#           Also we would need to change this function to respect the class in the ref over the class in the object's instance array. That also seems more
+# 	#           correct. That would require moving the VMT from the object instance arrays to the class arrays. That was something that I was considering anyway.
+# 	#           I think the performance hit of this will be negligbable.
+# 	elif [ ${_hierarchLevel:-0} -gt 0 ]; then
+# 		# This version might be better but needs to be tested
+# 		#local h=(${static[classHierarchy]}) superName
+# 		#local i=$((${#h[@]}-1)); while [ $_hierarchLevel -gt 0 ] && [ $((--i)) -ge 0 ]; do
+# 		#	type -t ${h[$i]}::${_mnameShort} &>/dev/null && ((_hierarchLevel--))
+# 		#done
+# 		#local _METHOD="${h[$i]}::${_mnameShort}"
+# 		#[ $_hierarchLevel -eq 0 ] && $_METHOD "$@"
+#
+# 		local h="${static[classHierarchy]}" superName
+# 		local i=0; while [ "$h" ] && [ $i -lt $_hierarchLevel ]; do
+# 			[[ ! "$h" =~ \  ]] && h=""
+# 			h="${h% *}"
+# 			superName="${h##* }"
+# 			type -t ${superName}::${_mnameShort} &>/dev/null && ((i++))
+# 		done
+# 		if [ "$superName" ]; then
+# 			local _METHOD="${superName}::${_mnameShort}"
+# 			objOnEnterMethod "$@"
+# 			bgDebuggerPlumbingCode=0
+# 			$_METHOD "$@"
+# #			_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
+# 		fi
+#
+# 	# member function with explicit Class syntax
+# 	#   $this.<class>::<memberFunct> [<p1> .. p2]
+# 	elif [[ "$_mnameShort" =~ :: ]]; then
+# 		local _METHOD="$_mnameShort"
+# 		objOnEnterMethod "$@"
+# 		bgDebuggerPlumbingCode=0
+# 		$_METHOD "$@"
+#
+# 	# member function syntax
+# 	#   $this.<memberFunct> [<p1> .. p2]
+# 	elif [ "${_VMT[_method::${_mnameShort}]+isset}" ]; then
+# 		local _METHOD="${_VMT[_method::${_mnameShort}]}"
+# 		objOnEnterMethod "$@"
+# 		bgDebuggerPlumbingCode=0
+# 		$_METHOD "$@"
+#
+# 	# member variable read syntax. Its ok to read a non-existing member var, but if parameters were provided, it looks like a method call
+# 	#   echo $($this.<memberVar>)
+# 	elif [ ! "$*" ]; then
+# 		echo "${this[${_mnameShort}]}"
+# 		[ "${this[${_mnameShort}]+test}" == "test" ]
+#
+# 	# member not found error
+# 	else
+# 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+# 		assertError -v _OID -v memberExpression:"$_mnameShort $_memberExpression" "member '$_mnameShort' not found for class $_CLASS"
+# 	fi
+# 	_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
+# }
 
 
 
@@ -1212,7 +1717,7 @@ function ParseObjExpr()
 
 
 # usage: completeObjectSyntax "<partialExpression>"
-# Bash command line completion routine for object expressions. The actual supported boject syntax is
+# Bash command line completion routine for object expressions. The actual supported oject syntax is
 # defined in two places -- ParseObjExpr and _bgclassCall.
 # Object Syntax:
 #  Informal: $<objRef><memberRef>[...<memberRef>] [<p1> .. <pN>]
@@ -1286,24 +1791,7 @@ function completeObjectSyntax()
 ### Defining the Object::methods
 
 
-function Object::getOID()
-{
-	returnValue "$_OID" $1
-}
 
-function Object::getRef()
-{
-	# this is typically also in ${this[0]} but not always so use the system attribute that is always present
-	returnValue "${_this[_Ref]}" $1
-}
-
-# usage: $obj.isA <className>
-# returns true if this $obj has <className> as a base class either directly or indirectly
-function Object::isA()
-{
-	local className="$1"
-	[ "${_classIsAMap[${_CLASS},$className]}" ]
-}
 
 function Object::eval()
 {
@@ -1467,16 +1955,6 @@ function Object::set()
 	fi
 }
 
-function Object::exists()
-{
-	return 0
-}
-
-function Object::unset()
-{
-	DeleteObject "${_this[_Ref]}"
-}
-
 function Object::clear()
 {
 	local i; for i in "${!this[@]}"; do
@@ -1563,6 +2041,24 @@ function Object::fromString() {
 	assertError "Object::fromString was an alias to Object::fromDebControl but they diverged so now fromString needs to be written"
 }
 
+
+
+function Primitive::toString() {
+	local doTitle title name value
+	while [ $# -gt 0 ]; do case $1 in
+		--title*) bgOptionGetOpt val: title "$@" && shift; doTitle=1 ;;
+		--name*)  bgOptionGetOpt val: name  "$@" && shift ;;
+		--value*) bgOptionGetOpt val: value "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local toString_fmtExtraLines='{if (NR>1) printf("%-*s+ ", 0, ""); print $0}'
+	if [ "$doTitle" ]; then
+		printf "%s=%s\n" "${title:-$name}" "$value" | awk "$toString_fmtExtraLines"
+	else
+		printf "%s\n" "$value" | awk "$toString_fmtExtraLines"
+	fi
+}
+
 # usage: $obj.toString
 # Write the object's attributes to stdout
 # See Also:
@@ -1598,16 +2094,17 @@ function Object::toString()
 	else
 		local fmtString="${indent}%-${labelWidth}s=%s\n"
 	fi
-	local fmtExtraLines='{if (NR>1) printf("%-*s+ ", '"$indentWidth"', ""); print $0}'
+
+	local toString_fmtExtraLines='{if (NR>1) printf("%-*s+ ", '"$indentWidth"', ""); print $0}'
 
 	local attrib; for attrib in $indexes; do
 		local value="${this[$attrib]}"
 		if [ "${value:0:12}" == "_bgclassCall" ]; then
 			local parts=($value)
-			printf "${indent}%s : <instance> of %s\n" "$attrib" "${parts[2]}" | awk "$fmtExtraLines"
+			printf "${indent}%s : <instance> of %s\n" "$attrib" "${parts[2]}" | awk "$toString_fmtExtraLines"
 			${this[$attrib]}.toString | awk '{print "'"$indent"'  " $0}'
 		else
-			printf "$fmtString" "$attrib" "$value" | awk "$fmtExtraLines"
+			printf "$fmtString" "$attrib" "$value" | awk "$toString_fmtExtraLines"
 		fi
 	done
 }

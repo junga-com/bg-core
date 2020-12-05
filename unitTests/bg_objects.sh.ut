@@ -61,7 +61,7 @@ function ut_initialState()
 	done
 }
 
-function ut_isA()
+function ut_isDerivedFrom()
 {
 	# expect: that true tests indicate true and false tests indicate false
 	ut setup
@@ -70,15 +70,15 @@ function ut_isA()
 
 	ut test
 	ut expect "these to be true"
-	$Dog.isA "Animal"       && echo yes || echo no
-	$Animal.isA "Animal"    && echo yes || echo no
-	$Dog.isA "Object"       && echo yes || echo no
+	$Dog.isDerivedFrom "Animal"       && echo yes || echo no
+	$Animal.isDerivedFrom "Animal"    && echo yes || echo no
+	$Dog.isDerivedFrom "Object"       && echo yes || echo no
 
 	echo
 	ut expect "these to be false"
-	$Animal.isA "Dog"       && echo yes || echo no
-	$Animal.isA "Dog" # to document the return code
-	$Animal.isA "Car"       && echo yes || echo no
+	$Animal.isDerivedFrom "Dog"       && echo yes || echo no
+	$Animal.isDerivedFrom "Dog" # to document the return code
+	$Animal.isDerivedFrom "Car"       && echo yes || echo no
 }
 
 
@@ -292,6 +292,79 @@ function ut_Object_isA() {
 	$obj.isA Foo    && echo true || echo false
 }
 
+function ut_Object_getType() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	$obj.foo=5
+	$obj.array=new Array
+
+	ut test
+	$obj.getType
+	local type; $obj.getType type; printfVars type
+	$obj.foo.getType
+	$obj.array.getType
+	$obj.getIndexes.getType
+	$obj.dontExist.getType
+}
+
+function ut_Object_getOID() {
+	ut setup
+	ut filter 'heap_([^_]*)_([^_ ]*)###heap_\1_<redacted>'
+	local -n obj; ConstructObject Object obj
+	$obj.foo=5
+	$obj.array=new Array
+
+	ut test
+	$obj.getOID
+	local type; $obj.getOID type; printfVars type
+	$obj.foo.getOID
+	$obj.array.getOID
+	$obj.getIndexes.getOID
+	$obj.dontExist.getOID
+}
+
+function ut_Object_getRef() {
+	ut setup
+	ut filter 'heap_([^_]*)_([^_ ]*)###heap_\1_<redacted>'
+	local -n obj; ConstructObject Object obj
+	$obj.foo=5
+	$obj.array=new Array
+
+	ut test
+	$obj.getRef
+	local type; $obj.getRef type; printfVars --noObjects type
+	$obj.foo.getRef
+	$obj.array.getRef
+	$obj.getIndexes.getRef
+	$obj.dontExist.getRef
+}
+
+function ut_Object_toString() {
+	ut setup
+	local -n obj; ConstructObject Object obj
+	$obj.foo=5
+	$obj.array=new Array
+
+	ut test
+	$obj.toString
+	$obj.foo.toString
+	$obj.foo.toString --title
+	$obj.foo.toString --title=
+	$obj.foo.toString --title=foo
+	$obj.foo.toString --title=DifferentLable
+	$obj.array.toString
+	$obj.array.toString --title
+	$obj.array[0]="hiya"
+	$obj.array.toString
+	$obj.getIndexes.toString
+	$obj.getIndexes.toString
+	$obj.dontExist.toString --title
+	$obj.dontExist.toString 
+	$obj[dontExist].toString
+	$obj.::dontExist.toString
+	$obj.Object::dontExist.toString
+}
+
 function ut_Object_assignNewOp() {
 	ut setup
 	local -n obj; ConstructObject Object obj
@@ -366,21 +439,22 @@ function ut_Object_memberVarReadAccess() {
 	local -n obj; ConstructObject Object obj
 	$obj.foo="hello world"
 	ut test
-	ut expect "to see what happens when we reference an attribute that exists"
+	ut expect "to see what happens when we reference an attribute that exists with no operator"
 	$obj.foo
 	$obj[foo]
-	ut expect "to see what happens when we reference an attribute that does not exist"
+	ut expect "that all of these syntax will be interpreted as a missing member var when it does not exist"
 	$obj.bar
 	$obj[bar]
-	ut expect "to see what happens when we reference a method that does not exist (because it has arguments)"
+	$obj[doit] p1 # this would look like a method call except the [] means that doit has to be a member var
+	ut expect "that these two syntax will be interpreted as a missing method when it does not exist"
 	Try:
-		$obj.doit p1 p2 p3
+		$obj.::doit
 	Catch: && {
 		echo "** Exception thrown and caught"
 		printfVars catch_errorClass catch_errorCode catch_errorDescription | heapNameAnon
 	}
 	Try:
-		$obj[doit] p1 p2 p3
+		$obj.doit p1 p2 p3
 	Catch: && {
 		echo "** Exception thrown and caught"
 		printfVars catch_errorClass catch_errorCode catch_errorDescription | heapNameAnon

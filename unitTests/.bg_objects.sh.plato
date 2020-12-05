@@ -406,12 +406,9 @@ Object[]
       [                ] +Object::getAttributes
       [                ] +Object::getIndexes
       [                ] +Object::getMethods
-      [                ] +Object::getOID
-      [                ] +Object::getRef
       [                ] +Object::getSize
       [                ] +Object::getValues
       [                ] +Object::hasMethod
-      [                ] +Object::isA
       [                ] +Object::restoreFile
       [                ] +Object::saveFile
       [                ] +Object::set
@@ -428,11 +425,8 @@ Object[]
 Object_vmt[]
       [_method::fromFlatINI   ]='Object::fromFlatINI'
       [_method::getValues     ]='Object::getValues'
-      [_method::getOID        ]='Object::getOID'
-      [_method::getRef        ]='Object::getRef'
       [_method::hasMethod     ]='Object::hasMethod'
       [_method::getAttributes ]='Object::getAttributes'
-      [_method::isA           ]='Object::isA'
       [_method::toFlatINI     ]='Object::toFlatINI'
       [_method::restoreFile   ]='Object::restoreFile'
       [_method::getSize       ]='Object::getSize'
@@ -468,7 +462,7 @@ Class[]
      [classHierarchy  ]='Object Class'
      [methods         ]='Class::__construct
      [                ] +Class::getClassMethods
-     [                ] +Class::isA
+     [                ] +Class::isDerivedFrom
      [                ] +Class::reloadMethods'
      [_vmtCacheNum2   ]='26'
      [name            ]='Class'
@@ -486,12 +480,9 @@ Class[]
      [                ] +Object::getAttributes
      [                ] +Object::getIndexes
      [                ] +Object::getMethods
-     [                ] +Object::getOID
-     [                ] +Object::getRef
      [                ] +Object::getSize
      [                ] +Object::getValues
      [                ] +Object::hasMethod
-     [                ] +Object::isA
      [                ] +Object::restoreFile
      [                ] +Object::saveFile
      [                ] +Object::set
@@ -504,11 +495,8 @@ Class[]
 Class_vmt[]
      [_method::fromFlatINI    ]='Object::fromFlatINI'
      [_method::getValues      ]='Object::getValues'
-     [_method::getOID         ]='Object::getOID'
-     [_method::getRef         ]='Object::getRef'
      [_method::hasMethod      ]='Object::hasMethod'
      [_method::getAttributes  ]='Object::getAttributes'
-     [_method::isA            ]='Class::isA'
      [_method::toFlatINI      ]='Object::toFlatINI'
      [_method::restoreFile    ]='Object::restoreFile'
      [_method::getClassMethods]='Class::getClassMethods'
@@ -529,6 +517,7 @@ Class_vmt[]
      [_method::bgtrace        ]='Object::bgtrace'
      [_method::get            ]='Object::get'
      [_method::reloadMethods  ]='Class::reloadMethods'
+     [_method::isDerivedFrom  ]='Class::isDerivedFrom'
      [_method::clear          ]='Object::clear'
      [_method::exists         ]='Object::exists'
      [_method::unset          ]='Object::unset'
@@ -593,7 +582,7 @@ Map_vmt[]
 
 
 ###############################################################################################################################
-## bg_objects.sh:isA: start
+## bg_objects.sh:isDerivedFrom: start
 ## expect:  that true tests indicate true and false tests indicate false
 
 ##----------
@@ -605,24 +594,24 @@ Map_vmt[]
 ## test
 
 # expect these to be true
-cmd> $Dog.isA "Animal"       && echo yes || echo no
+cmd> $Dog.isDerivedFrom "Animal"       && echo yes || echo no
 yes
-cmd> $Animal.isA "Animal"    && echo yes || echo no
+cmd> $Animal.isDerivedFrom "Animal"    && echo yes || echo no
 yes
-cmd> $Dog.isA "Object"       && echo yes || echo no
+cmd> $Dog.isDerivedFrom "Object"       && echo yes || echo no
 yes
 cmd> echo
 
 
 # expect these to be false
-cmd> $Animal.isA "Dog"       && echo yes || echo no
+cmd> $Animal.isDerivedFrom "Dog"       && echo yes || echo no
 no
-cmd> $Animal.isA "Dog" # to document the return code
+cmd> $Animal.isDerivedFrom "Dog" # to document the return code
 [exitCode 1]
-cmd> $Animal.isA "Car"       && echo yes || echo no
+cmd> $Animal.isDerivedFrom "Car"       && echo yes || echo no
 no
 
-## bg_objects.sh:isA: finished
+## bg_objects.sh:isDerivedFrom: finished
 ###############################################################################################################################
 
 
@@ -639,7 +628,7 @@ no
 cmd> $Animal.getClassMethods
 speak feed pet
 cmd> $Animal.getClassMethods -i
-unset get speak hasMethod fromINI getOID getRef addMethod getAttributes toDebControl fromFlatINI restoreFile exists clear fromString bgtrace fromDebControl toString set eval toFlatINI getValues getSize getMethods isA saveFile feed getIndexes clone pet
+unset get speak hasMethod fromINI addMethod getAttributes toDebControl fromFlatINI restoreFile exists clear fromString bgtrace fromDebControl toString set eval toFlatINI getValues getSize getMethods saveFile feed getIndexes clone pet
 cmd> $Animal.getClassMethods -d$'\n'
 speak
 feed
@@ -1010,6 +999,144 @@ false
 
 
 ###############################################################################################################################
+## bg_objects.sh:Object_getType: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+##     | cmd> $obj.foo=5
+##     | cmd> $obj.array=new Array
+
+##----------
+## test
+cmd> $obj.getType
+Object
+cmd> local type; $obj.getType type; printfVars type
+type='Object'
+cmd> $obj.foo.getType
+primitive
+cmd> $obj.array.getType
+Array
+cmd> $obj.getIndexes.getType
+method
+cmd> $obj.dontExist.getType
+null
+
+## bg_objects.sh:Object_getType: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_getOID: start
+## expect: 
+
+##----------
+## setup
+##     | ut filter 'heap_([^_<redacted>_([^_ ]*)###heap_\1_<redacted>
+##     | cmd> local -n obj; ConstructObject Object obj
+##     | cmd> $obj.foo=5
+##     | cmd> $obj.array=new Array
+
+##----------
+## test
+cmd> $obj.getOID
+heap_A_<redacted>
+cmd> local type; $obj.getOID type; printfVars type
+type='heap_A_<redacted>
+cmd> $obj.foo.getOID
+[exitCode 1]
+cmd> $obj.array.getOID
+heap_a_<redacted>
+cmd> $obj.getIndexes.getOID
+[exitCode 1]
+cmd> $obj.dontExist.getOID
+[exitCode 1]
+
+## bg_objects.sh:Object_getOID: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_getRef: start
+## expect: 
+
+##----------
+## setup
+##     | ut filter 'heap_([^_<redacted>_([^_ ]*)###heap_\1_<redacted>
+##     | cmd> local -n obj; ConstructObject Object obj
+##     | cmd> $obj.foo=5
+##     | cmd> $obj.array=new Array
+
+##----------
+## test
+cmd> $obj.getRef
+_bgclassCall heap_A_<redacted> Object 0 |
+cmd> local type; $obj.getRef type; printfVars --noObjects type
+type='_bgclassCall heap_A_<redacted> Object 0 |'
+cmd> $obj.foo.getRef
+[exitCode 1]
+cmd> $obj.array.getRef
+_bgclassCall heap_a_<redacted> Array 0 |
+cmd> $obj.getIndexes.getRef
+[exitCode 1]
+cmd> $obj.dontExist.getRef
+[exitCode 1]
+
+## bg_objects.sh:Object_getRef: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:Object_toString: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n obj; ConstructObject Object obj
+##     | cmd> $obj.foo=5
+##     | cmd> $obj.array=new Array
+
+##----------
+## test
+cmd> $obj.toString
+foo=5
+array : <instance> of Array
+cmd> $obj.foo.toString
+5
+cmd> $obj.foo.toString --title
+foo=5
+cmd> $obj.foo.toString --title=
+foo=5
+cmd> $obj.foo.toString --title=foo
+foo=5
+cmd> $obj.foo.toString --title=DifferentLable
+DifferentLable=5
+cmd> $obj.array.toString
+cmd> $obj.array.toString --title
+cmd> $obj.array[0]="hiya"
+cmd> $obj.array.toString
+[0]=hiya
+cmd> $obj.getIndexes.toString
+method<Object::getIndexes()>
+cmd> $obj.getIndexes.toString
+method<Object::getIndexes()>
+cmd> $obj.dontExist.toString --title
+dontExist=null
+cmd> $obj.dontExist.toString
+null
+cmd> $obj[dontExist].toString
+null:memberVar
+cmd> $obj.::dontExist.toString
+null:method
+cmd> $obj.Object::dontExist.toString
+null:method
+
+## bg_objects.sh:Object_toString: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
 ## bg_objects.sh:Object_assignNewOp: start
 ## expect: 
 
@@ -1057,12 +1184,9 @@ methods         =Object::addMethod
 + Object::getAttributes
 + Object::getIndexes
 + Object::getMethods
-+ Object::getOID
-+ Object::getRef
 + Object::getSize
 + Object::getValues
 + Object::hasMethod
-+ Object::isA
 + Object::restoreFile
 + Object::saveFile
 + Object::set
@@ -1181,37 +1305,39 @@ Base::one
 ##----------
 ## test
 
-# expect to see what happens when we reference an attribute that exists
+# expect to see what happens when we reference an attribute that exists with no operator
 cmd> $obj.foo
 hello world
 cmd> $obj[foo]
 hello world
 
-# expect to see what happens when we reference an attribute that does not exist
+# expect that all of these syntax will be interpreted as a missing member var when it does not exist
 cmd> $obj.bar
-
 [exitCode 1]
 cmd> $obj[bar]
-
+[exitCode 1]
+cmd> $obj[doit] p1 # this would look like a method call except the [] means that doit has to be a member var
 [exitCode 1]
 
-# expect to see what happens when we reference a method that does not exist (because it has arguments)
+# expect that these two syntax will be interpreted as a missing method when it does not exist
 cmd> Try:
-cmd> $obj.doit p1 p2 p3
+cmd> $obj.::doit
 ** Exception thrown and caught
 catch_errorClass='assertError'
 catch_errorCode='36'
 catch_errorDescription='
-                        error: _bgclassCall: member 'doit' not found for class Object
-                            _OID='heap_A_<redacted>
-                            memberExpression='.doit p1 p2 p3''
+                        error: _bgclassCall: object method not found
+                            class='Object'
+                            methodName='doit'
+                            objectExpression='.::doit''
 ** Exception thrown and caught
 catch_errorClass='assertError'
 catch_errorCode='36'
 catch_errorDescription='
-                        error: _bgclassCall: member 'doit' not found for class Object
-                            _OID='heap_A_<redacted>
-                            memberExpression='[doit] p1 p2 p3''
+                        error: _bgclassCall: object method not found
+                            class='Object'
+                            methodName='doit'
+                            objectExpression='.doit p1 p2 p3''
 
 ## bg_objects.sh:Object_memberVarReadAccess: finished
 ###############################################################################################################################
