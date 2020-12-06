@@ -45,60 +45,11 @@ Top1::end() {
 
 ConstructObject Top1 top1
 
-#printfVars top1
-
-startingOOCount="$_bgclassCallCount"
-bgtimerStart
-
-for ((i=0; i<100; i++)); do
-	$top1.start
-	$top1.contain1.wA.reset
-	$top1.contain1.wA.foo.bar="happy birthday"
-	$top1.contain1.wA.foo.bar.unset
-	$top1.contain1.wA.foo.exists || assertError "should still exist"
-	$top1.contain1.wA.foo.isA "Object"  || assertError "should be Object"
-	$top1.contain1.wA.foo.unset
-	$top1.contain1.wA.foo.exists && assertError "should not still exist"
-	$top1.contain1.wA.isA "Widget1"  || assertError "should be Widget1"
-done
-
-((iterationCount=_bgclassCallCount-startingOOCount))
-printfVars -l"Object Calls" count:iterationCount
-bgtimerGetNano -R totalNano
-bgtimerPrint
-bgNanoToSec -R perOOCall $((totalNano / iterationCount))  6
-printf "time per oo call = %s\n" "$perOOCall"
-
-
-
-
-
-
-echo
 DeclareClass Foo
 Foo::noop() {
 	local p1
 }
-ConstructObject Foo obj
-bgtimerStart
-for ((i=0; i<$iterationCount; i++)); do
-	$obj.noop
-done
-printfVars -l"NOOP OO Calls" iterationCount
-bgtimerGetNano -R totalNano
-bgtimerPrint
-bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
-printf "time per normal call = %s\n" "$perNormCall"
-
-
-
-
-
-
-
-
-echo
-function doSomething() {
+Foo::doSomething() {
 	while [ $# -gt 0 ]; do case $1 in
 		-a)  myAFlag="-a" ;;
 		-b | --my-bFlag) myBFlag="-b" ;;
@@ -111,35 +62,133 @@ function doSomething() {
 	local p1="$1"; shift
 	returnValue "hello" $p1
 }
+
+ConstructObject Foo obj
+
+#printfVars top1
+
+
+startingOOCount="$_bgclassCallCount"
+
 bgtimerStart
-for ((i=0; i<$iterationCount; i++)); do
-	doSomething foobar
-done
-printfVars -l"Normal Calls" iterationCount
-bgtimerGetNano -R totalNano
-bgtimerPrint
-bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
-printf "time per normal call = %s\n" "$perNormCall"
+if true; then
+	for ((i=0; i<100; i++)); do
+		$top1.start
+		$top1.contain1.wA.reset
+		$top1.contain1.wA.foo.bar="happy birthday"
+		$top1.contain1.wA.foo.bar.unset
+		$top1.contain1.wA.foo.exists || assertError "should still exist"
+		$top1.contain1.wA.foo.isA "Object"  || assertError "should be Object"
+		$top1.contain1.wA.foo.unset
+		$top1.contain1.wA.foo.exists && assertError "should not still exist"
+		$top1.contain1.wA.isA "Widget1"  || assertError -V waType:"$($top1.contain1.wA.getType)" "should be Widget1"
+	done
 
+	((iterationCount=_bgclassCallCount-startingOOCount))
+	printfVars -l"Object Calls -- mix" count:iterationCount
+	bgtimerGetNano -R totalNano
+	bgtimerPrint
+	bgNanoToSec -R perOOCall $((totalNano / iterationCount))  6
+	printf "time per oo call = %s\n" "$perOOCall"
 
-
-
+	printfVars msCP1 msCP2 msCP3 msCP4 msTotal
+else
+	iterationCount=1200
+fi
 
 
 
 
 echo
-function noopCall() {
-	local p1
-}
+msCP1=0; msCP2=0; msCP3=0; msCP4=0; msTotal=0
 bgtimerStart
 for ((i=0; i<$iterationCount; i++)); do
-	noopCall foobar
+	$obj[noopVar]
 done
-printfVars -l"NOOP Normal Calls" iterationCount
+printfVars -l"OO Calls null var" iterationCount
 bgtimerGetNano -R totalNano
 bgtimerPrint
 bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
 printf "time per normal call = %s\n" "$perNormCall"
+printfVars msCP1 msCP2 msCP3 msCP4 msTotal
+
+
+
+echo
+msCP1=0; msCP2=0; msCP3=0; msCP4=0; msTotal=0
+bgtimerStart
+for ((i=0; i<$iterationCount; i++)); do
+	$obj.noop
+done
+printfVars -l"OO Calls noop method" iterationCount
+bgtimerGetNano -R totalNano
+bgtimerPrint
+bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
+printf "time per normal call = %s\n" "$perNormCall"
+printfVars msCP1 msCP2 msCP3 msCP4 msTotal
+
+
+
+echo
+msCP1=0; msCP2=0; msCP3=0; msCP4=0; msTotal=0
+bgtimerStart
+for ((i=0; i<$iterationCount; i++)); do
+	$obj.doSomething foobar
+done
+printfVars -l"OO Calls -- doSomething()" iterationCount
+bgtimerGetNano -R totalNano
+bgtimerPrint
+bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
+printf "time per normal call = %s\n" "$perNormCall"
+printfVars msCP1 msCP2 msCP3 msCP4 msTotal
+
+
+
+if true; then
+	echo
+	function doSomething() {
+		while [ $# -gt 0 ]; do case $1 in
+			-a)  myAFlag="-a" ;;
+			-b | --my-bFlag) myBFlag="-b" ;;
+			-c*) bgOptionGetOpt val: myCOptWithArg "$@" && shift ;;
+			-T*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
+			-t)  bgOptionGetOpt opt  passThruOpts "$@" && shift ;;
+			-d)  myDFlag="-d" ;;
+			*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+		done
+		local p1="$1"; shift
+		returnValue "hello" $p1
+	}
+	bgtimerStart
+	for ((i=0; i<$iterationCount; i++)); do
+		Foo::doSomething foobar
+	done
+	printfVars -l"Normal Calls - Foo::doSomething()" iterationCount
+	bgtimerGetNano -R totalNano
+	bgtimerPrint
+	bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
+	printf "time per normal call = %s\n" "$perNormCall"
+fi
+
+
+
+
+
+
+if true; then
+	echo
+	function noopCall() {
+		local p1
+	}
+	bgtimerStart
+	for ((i=0; i<$iterationCount; i++)); do
+		noopCall foobar
+	done
+	printfVars -l"Normal Calls - empty function" iterationCount
+	bgtimerGetNano -R totalNano
+	bgtimerPrint
+	bgNanoToSec -R perNormCall $((totalNano / iterationCount))  6
+	printf "time per normal call = %s\n" "$perNormCall"
+fi
 
 #printfVars top1

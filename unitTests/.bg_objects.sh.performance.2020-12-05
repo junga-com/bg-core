@@ -1,0 +1,50 @@
+Ran on Intel Core i7-10710U
+Object Calls -- mix
+count='1200'
+total: 2.575 : 
+time per oo call = 0.002144
+msCP1='195172'    # after __parseObjSyntax
+msCP2='793609'    # after __resolveMemberChain
+msCP3='93331'     # after setting 5 -n vars (this and others...)
+msCP4='1455650'   # after operator case (incuding whatever is invoked)
+msTotal='2552209' # after
+
+OO Calls null var
+iterationCount='1200'
+total: 1.749 : 
+time per normal call = 0.001456
+msCP1='198334'
+msCP2='390927'
+msCP3='89650'
+msCP4='27846'
+msTotal='720950'
+
+OO Calls noop method
+iterationCount='1200'
+total: 2.062 : 
+time per normal call = 0.001717
+msCP1='207927'
+msCP2='383416'
+msCP3='87748'
+msCP4='391206'
+msTotal='1088508'
+
+OO Calls -- doSomething()
+iterationCount='1200'
+total: 2.204 : 
+time per normal call = 0.001836
+msCP1='208605'
+msCP2='384799'
+msCP3='87975'
+msCP4='523520'
+msTotal='1223441'
+
+Normal Calls - Foo::doSomething()
+iterationCount='1200'
+total: 0.127 : 
+time per normal call = 0.000105
+
+Normal Calls - empty function
+iterationCount='1200'
+total: 0.016 : 
+time per normal call = 0.000012

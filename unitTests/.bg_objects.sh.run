@@ -397,7 +397,6 @@ Object[]
       [                ] +Object::clear
       [                ] +Object::clone
       [                ] +Object::eval
-      [                ] +Object::exists
       [                ] +Object::fromDebControl
       [                ] +Object::fromFlatINI
       [                ] +Object::fromINI
@@ -414,8 +413,7 @@ Object[]
       [                ] +Object::set
       [                ] +Object::toDebControl
       [                ] +Object::toFlatINI
-      [                ] +Object::toString
-      [                ] +Object::unset'
+      [                ] +Object::toString'
       [_vmtCacheNum2   ]='26'
       [subClasses      ]='Class Stack Array Map'
       [name            ]='Object'
@@ -445,8 +443,6 @@ Object_vmt[]
       [_method::bgtrace       ]='Object::bgtrace'
       [_method::get           ]='Object::get'
       [_method::clear         ]='Object::clear'
-      [_method::exists        ]='Object::exists'
-      [_method::unset         ]='Object::unset'
 
 cmd> local class; for class in Object ${Object[subClasses]}; do
 cmd> showClass "$class"
@@ -471,7 +467,6 @@ Class[]
      [                ] +Object::clear
      [                ] +Object::clone
      [                ] +Object::eval
-     [                ] +Object::exists
      [                ] +Object::fromDebControl
      [                ] +Object::fromFlatINI
      [                ] +Object::fromINI
@@ -488,8 +483,7 @@ Class[]
      [                ] +Object::set
      [                ] +Object::toDebControl
      [                ] +Object::toFlatINI
-     [                ] +Object::toString
-     [                ] +Object::unset'
+     [                ] +Object::toString'
      [_OID            ]='Class'
 #    
 Class_vmt[]
@@ -519,8 +513,6 @@ Class_vmt[]
      [_method::reloadMethods  ]='Class::reloadMethods'
      [_method::isDerivedFrom  ]='Class::isDerivedFrom'
      [_method::clear          ]='Object::clear'
-     [_method::exists         ]='Object::exists'
-     [_method::unset          ]='Object::unset'
 
 cmd> local class; for class in Object ${Object[subClasses]}; do
 cmd> showClass "$class"
@@ -628,7 +620,7 @@ no
 cmd> $Animal.getClassMethods
 speak feed pet
 cmd> $Animal.getClassMethods -i
-unset get speak hasMethod fromINI addMethod getAttributes toDebControl fromFlatINI restoreFile exists clear fromString bgtrace fromDebControl toString set eval toFlatINI getValues getSize getMethods saveFile feed getIndexes clone pet
+get speak hasMethod fromINI addMethod getAttributes toDebControl fromFlatINI restoreFile clear fromString bgtrace fromDebControl toString set eval toFlatINI getValues getSize getMethods saveFile feed getIndexes clone pet
 cmd> $Animal.getClassMethods -d$'\n'
 speak
 feed
@@ -1175,7 +1167,6 @@ methods         =Object::addMethod
 + Object::clear
 + Object::clone
 + Object::eval
-+ Object::exists
 + Object::fromDebControl
 + Object::fromFlatINI
 + Object::fromINI
@@ -1193,7 +1184,6 @@ methods         =Object::addMethod
 + Object::toDebControl
 + Object::toFlatINI
 + Object::toString
-+ Object::unset
 subClasses      =Class Stack Array Map
 name            =Object
 inheritedMethods=
