@@ -47,6 +47,8 @@ function ut_initialState()
 {
 	# expect: shows the classes that ae initially created and their content
 	ut setup
+	ut filter '([[]_vmtCacheNum2[[:space:]]*[]]=).[0-9]*.###\1<redacted>'
+	#ut filter '(^\\s*\\[_vmtCacheNum2\\s*\\]=.)[0-9]*.###\1<redacted>'"'"
 	function showClass() {
 		local class="$1"
 		printf "#\n#\n#------------------ $class --------------------\n"
@@ -359,7 +361,7 @@ function ut_Object_toString() {
 	$obj.getIndexes.toString
 	$obj.getIndexes.toString
 	$obj.dontExist.toString --title
-	$obj.dontExist.toString 
+	$obj.dontExist.toString
 	$obj[dontExist].toString
 	$obj.::dontExist.toString
 	$obj.Object::dontExist.toString

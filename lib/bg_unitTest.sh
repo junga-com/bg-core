@@ -1,4 +1,3 @@
-#bgtrace "sourceing unitTest"
 
 
 # Library
@@ -102,7 +101,6 @@ declare -g bgUnitTestScript
 		break
 	fi
 done
-#[ ! "$bgUnitTestScript" ] && bgtraceBreak
 assertNotEmpty bgUnitTestScript
 
 
@@ -199,7 +197,8 @@ function ut()
 	  expectSetupFail) _utRun_expectSetupFail="1" ;;
 
 	  filter)
-	  	printf "ut filter '%s'\n" "$1" 
+		[ "$_utRun_section" == "setup" ] || assertError "ut filter statements must be placed inside the ut setup section"
+		printf "ut filter '%s'\n" "$1"
 		;;
 
 
@@ -506,8 +505,12 @@ function utfRunner_execute()
 
 	(
 		# require an extra config to keep tracing on for tests because they can have many exceptions printing stack traces
+		# when ran directly, bgTracingTestRunner is set to on so this only affects running from bg-dev tests ...
 		# see bg-debugCntr trace tests:on|off
-		[ "$bgTracingTestRunner" == "on" ] || [ "$_utRun_debugFlag" ] || bgtraceCntr off
+		[ "$bgTracingTestRunner" == "on" ] || [ "$_utRun_debugFlag" ] || {
+			bgtraceCntr off
+			bgAssertErrorInhibitTrace=1
+		}
 
 		ut onStart "$utID"
 
@@ -637,6 +640,10 @@ function directUT_runTestCases()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local spec="$1"; shift
+
+	# when running directly, we want to see any traces produced
+	# see bg-debugCntr trace tests:on|off
+	bgTracingTestRunner="on"
 
 	# load this ut_ function's source into an array
 	local line i=1; while IFS= read -r line; do

@@ -95,7 +95,11 @@ If the alias line contains the DEPRECIATED: tag, tools will indicate to users th
 Sometimes a function should have multiple names. Possibly it has a longer name that is descriptive but its a common function used in a way that a short idiomatic alias makes the code where it is used more readable. To be explicit that the alias is valid you can tag it with # ALIAS:
 
 
-.SH Pattern: Use returnValue in Library Functions
+
+
+
+
+.SH Pattern: Library Functions with Optional Output Variable Semantics
 Shell functions typically return a value to the caller by writing the value on stdout so that the caller runs the function in a subshell to capture the value like foo="$(myFunc)".
 
 This works well for typical scripts but when making a script library with functions that can be called 100's of times per user interaction, the overhead of that sub shell adds up and its better to return the value by setting a variable whose name the caller passes in as a parameter.
@@ -109,9 +113,11 @@ In the function, returnValue is used like this...
 
 If retVar is empty, then the value is written to stdout. Otherwise the value is assigned to the variable named in retVar.
 
-There are two common patterns for how to pass retVar to the function.
+There are several common patterns for how to pass retVar to the function.
 
-If the function only returns one value and it does not support a variable list of positional parameters, then the last parameter can be the optional [<retVar>]. Often such functions will shift its positional parameters so that the statement looks liek `returnValue "$myValue" $1` so that if there is a variable name left on the cmdline, it will be used, otherwise it will use stdout.
+**returnValue pattern**
+
+If the function only returns one value and it does not support a variable list of positional parameters, then the last parameter can be the optional [<retVar>]. Often such functions will shift its positional parameters so that the statement looks like `returnValue "$myValue" $1` so that if there is a variable name left on the cmdline, it will be used, otherwise it will use stdout.
 
 If more than one return value is supported or the positional parameters syntax does not allow supporting an optional last parameter, an option is  added to pass the return value(s)
    usage: myFunc [-R|--myFirstRet=<retVar1>] [-S|--myFirstRet=<retVar2>] <p1>..<pN>
@@ -119,9 +125,11 @@ If more than one return value is supported or the positional parameters syntax d
       returnValue "$value1" $retVar1
       returnValue -q "$value2" $retVar2
 
-By convention, options that pass in return values are often upper case. R is often used.
+By convention, options that pass in return values are often upper case. R is often used for string values.
 
 The -q|--quiet option to returnValue suppresses the writing the value to stdout is <retVar> is empty. In the last example, the <retVar1> will be written to stdout if the caller does not provide the -R option but <retVar2> will be ignored unless the caller provides the -S option.
+
+**varSetRef pattern**
 
 `varSetRef <retVar> <value...>` is similar to returnValue. It has the semantics of an assignment statement and it more flexible in how the output variable is set. <retVar> can be a bash numeric or associative array and the returned value can be a single token or multiple tokens, and can replace the <retVar> or append to it and can be assigned to the indexes so that it has set semantics to eliminate duplicates.
 
@@ -139,12 +147,41 @@ Here is an example code snippet from a function that allows the caller to receiv
     ...
     varSetRef "${retArgs[@]}" "<val1>" "<var2...>"
 
+.SH Pattern: Functions with Output to Stdout Semantics
+This pattern is related to "Pattern: Library Functions with Optional Output Variable Semantics"
+
+Unix utilities typically print their output to stdout which allows it to be piped into another command and eventually displayed or redirected to a file.
+
+Bash functions can follow that convention but with functions there is also the opportunity to assign the output directly to a variable.  
+
+A function can accept options that redirect the stdout output to a bash variable in various ways. Functions that follow this pattern can call other functions that follow this pattern, passing through the option that relates to the the return.
+
+The `outputValue [<option>] <value(s)>...` can be used to support this pattern. When no option is specified, the value is written to stdout. The standard return options are ...
+
+    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no effect with --set or stdout
+    -R|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
+    -A|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
+    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
 
 
-.SH Pattern: Passing Variables by Reference
-Bash does not have a native mechanism to pass variables by reference so that they can be modified by a function as an output variable. We can get pretty close however by passing the name of a variable to the function and having the function set a value in that variable.
+.SH Idiom: Calling Functions to get a Value
+The natural and more readable way to use a function to retrieve a value is ...
+   local manifestFile="$(manifestGetHostManifest)"
 
-The major problem with this is that if the function declares a local variable with the same name as the variable the caller passes, the attempt to set the returned value will set the function's local variable by that name, leaving the caller's variable unchanged. The 'local -n nameRef' variable attribute does not fix this problem.
+... but you will see this variation in library function often because it avoids the subshell
+   local manifestFile; manifestGetHostManifest manifestInstalledPath
+
+In this example, manifestGetHostManifest uses the pattern "Library Functions with Optional Output Variable Semantics"
+
+Unfortunately, this looks to the casual eye a lot like we are declaring 3 local variables but actually we are declaring only one and setting its value with a call to manifestGetHostManifest.
+
+Developers writing the top level script should feel free to use the first, more readable form but be aware of the second form when looking to see what library functions do.
+
+
+.SH Pattern: Naming of Function Local variables
+Bash does not have a native mechanism to pass variables by reference so that they can be modified by a function as an output variable.
+
+We can get pretty close however by passing the name of a variable to the function and having the function set a value in that variable. The major problem with this is that if the function declares a local variable with the same name as the variable the caller passes, the attempt to set the returned value will set the function's local variable by that name, leaving the caller's variable unchanged. The 'local -n nameRef' variable attribute does not fix this problem.
 
 There is a popular upvars pattern that solves it well but results in a complicated syntax that I find unacceptable.
 
@@ -157,5 +194,7 @@ There are several naming conventions that you will see in bg-core library functi
 * local vars prefixed with _<functionInitials>*  where <functionInitials> are 3 or three initial from the function name.
 
 When a function is in a very low level library which is likely to be called from other library functions, the strongest convention (_<functionInitials>*) is used. When a function is higher level, only uses one return value then the weakest convention (_*) can be used.
+
+Its a bit unpalatable that this naming convention is subjective and not guaranteed to avoid conflicts but in practice I find it not that hard to avoid conflicts because the programming environment provided by bg-core and bg-dev supports an agile, iterative dev cycle where its apparent quickly it there is a naming conflict.   
 
 The bg_coreBashVars.sh library has a number of functions starting with var* that help getting and setting values of bash variables by name.

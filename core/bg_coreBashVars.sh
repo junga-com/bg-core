@@ -274,10 +274,10 @@ function varUnMarshalToGlobal()
 #    --strset : treat <value> as a string containing space separated array elements
 #    -q       : quiet. if <varRef> is not given, do not print <value> to stdout
 # See Also:
-#   setReturnValue -- similar but the order of the var and value are reversed and the value is ignored
-#                     instead of written to stdout if var name is not passed in
+#   man(3) varSetRef
+#   man(3) varOutput
+#   man(3) setReturnValue
 #   local -n <variable> (for ubuntu 14.04 and beyond, bash supports reference variables)
-#   arrayCopy  -- does a similar thing for returning arrays
 function returnValue()
 {
 	local _rv_inType="string" _rv_outType="stdout" quietFlag
@@ -305,6 +305,80 @@ function returnValue()
 	esac
 	true
 }
+
+
+# usage: varOutput [<options>] <value>[..<valueN>]
+# output the <value> in a way that is controlled by <options>. This is similar to varSetRef but the call syntax is different.
+# This function has the semantics of "echo <value>" but an option can redirect the output from stdout to assigning it to <retVar>
+#
+# Options:
+#    -R|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
+#    -A|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
+#    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
+#    --echo               : (default behavior). echo <value> to stdout.
+#    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no affect with --set or --echo
+#    -d|--delim=<delim>   : default is the first character of IFS. This is the delimeter used between multiple <valueN> and between
+#                           the first <value1> and the existing value in <retVar> if --append is specified.  Has no affect with
+#                           --array or --set.
+# See Also:
+#    man(3) varSetRef
+#    man(3) returnValue
+function outputValue() { varOutput "$@"; } # ALIAS:
+function varOutput()
+{
+	local _sr_appendFlag _sr_varType="--echo" _sr_varRef _sr_delim=${IFS:0:1}
+	while [ $# -gt 0 ]; do case $1 in
+		+1)               _sr_delim=$'\n' ;;
+		-a|--append)      _sr_appendFlag="-a" ;;
+		-R*|--string*)    _sr_varType="--string";   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
+		-A*|--array*)     _sr_varType="--array" ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
+		-S*|--set*)       _sr_varType="--set"   ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
+		-e|--echo)        _sr_varType="--echo"  ;;
+		-d*|--delim*)     bgOptionGetOpt val: _sr_delim "$@" && shift ;;
+		--) shift; break ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	[ ! "$_sr_varRef" ] && [ "$_sr_varType" != "--echo" ] && return 0
+
+	case ${_sr_varType:---string}:${_sr_appendFlag}:${_sr_delim} in
+		--set:*)
+			[ "$_sr_appendFlag" ] || { local -n _sr_varRefNR="$_sr_varRef"; _sr_varRefNR=(); }
+			local i; for i in "$@"; do
+				printf -v "$_sr_varRef[$i]" "%s" ""
+			done
+			;;
+
+		# these use the -n syntax now because they used to use eval. If we need to be compaitble with older bashes, this will have
+		# to change
+		--array::*)   local -n __sr_varRef="$_sr_varRef"; __sr_varRef=("$@") ;;
+		--array:-a:*) local -n __sr_varRef="$_sr_varRef"; __sr_varRef+=("$@") ;;
+
+		--string::" ")   printf -v "$_sr_varRef" "%s" "$*" ;;
+		--string:-a:" ") printf -v "$_sr_varRef" "%s%s%s" "${!_sr_varRef}" "${!_sr_varRef:+ }" "$*" ;;
+		--string:*:*)
+			[ "$_sr_appendFlag" ] || printf -v "$_sr_varRef" "%s" ""
+			local _sr_sep="${!_sr_varRef:+$_sr_delim}"
+			local i; for i in "$@"; do
+				printf -v "$_sr_varRef" "%s%s%s" "${!_sr_varRef}" "$_sr_sep" "$i"
+				_sr_sep=$_sr_delim
+			done
+			;;
+
+		--echo:*:" ") echo "$*" ;;
+		--echo:*:*)
+			local _sr_sep=
+			local i; for i in "$@"; do
+				printf "%s%s" "$_sr_sep" "$i"
+				_sr_sep=$_sr_delim
+			done
+			echo
+			;;
+	esac || assertError
+	true
+}
+
+
 
 # usage: setReturnValue <varRef> <value>
 # Assign a value to an output variable that was passed into a function. If the variable name is empty,
@@ -381,8 +455,11 @@ function setExitCode()
 #                  W/o -a it replaces existing elements.
 #    --set       : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
 #    --echo      : dont assign to foo. Instead, echo to stdout. This supports functions that may return in a variable or may write to stdout
+#
 # See Also:
-#   returnValue -- does a similar thing with semantics of a return <val> statement
+#   man(3) varOutput
+#   man(3) setReturnValue
+#   man(3) returnValue
 #   local -n <variable>=<varRef> (for ubuntu 14.04 and beyond) allows direct manipulation of the varRef
 #   arrayCopy  -- does a similar thing for two arrays (<varRef>=(<varRef2>))
 #   arraryAdd  -- does a similar thing for two arrays (<varRef>+=(<varRef2>))
@@ -415,7 +492,7 @@ function varSetRef()
 
 		# these use the -n syntax now because they used to use eval. If we need to be compaitble with older bashes, this will have
 		# to change
-		--array:)    local -n _sr_varRef="$sr_varRef"; _sr_varRef=("$@") ;;
+		--array:)    local -n _sr_varRef="$sr_varRef"; _sr_varRef=("$@")  ;;
 		--array:-a)  local -n _sr_varRef="$sr_varRef"; _sr_varRef+=("$@") ;;
 
 		--string:)   printf -v "$sr_varRef" "%s" "$*" ;;

@@ -11,3 +11,5 @@ printfVars:9
 printfVars:10 
 printfVars_nameRefs: 
 printfVars_objects: 
+varOutput:oneValue 
+varOutput:multipleValues 

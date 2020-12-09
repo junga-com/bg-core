@@ -134,7 +134,7 @@ function bgOptionsEndLoop()
 			[ ${result:-0} -eq 0 ] && return 1
 		fi
 		[ ${result:-0} -eq 1 ] && bgOptionsOnUnknownDefault "$@" && return 1
-		[ ! "$eatUnknown" ] && assertError --frameOffest=1 "unknown option '$1'"
+		[ ! "$eatUnknown" ] && assertError --frameOffest=2 "unknown option '$1'"
 
 	# maybe its a set of combined options so split of the first one. Note we know that the fist one
 	# is not an option with an argument because the scripts author's cases would have matched it.
@@ -767,7 +767,7 @@ function bgsudo()
 #    -r <file> : the <cmd> will access <file> in read mode so set the privilege adjustment accordingly
 #    <other options> : other sudo or bgsudo options can be specified and they will be passed through
 # See Also:
-#     bgsudo : a wrapper over sudo that supports priviledge adjustment and other additional features
+#     bgsudo : a wrapper over sudo that supports priviledge adjustment and other additional features "
 function bgsudoAdjustPriv()
 {
 	# this function is unusual in that it requires the positional parameter <sudoOptsVar> to appear before the options.
@@ -2752,10 +2752,11 @@ function assertError()
 	#       for the Catch block to access.
 	# We write the stack to bgtrace even if we are catching the exception b/c a pipeline might cause several
 	# exceptions and only the last one will make it into assertOut so bgtrace might be the only place to see some
-	bgtraceIsActive && bgStackTrace $_ea_allStack --logicalStart=$((_ae_stackFrameStart))
+	bgtraceIsActive && [ ! "$bgAssertErrorInhibitTrace" ] && bgStackTrace $_ea_allStack --logicalStart=$((_ae_stackFrameStart))
+	[ "$bgAssertErrorTMPSIGNALTRIGGERED" ] && bgStackDump >> $_bgtraceFile
 
 	# include the proccess tree of the script when bgtrace is active
-	bgtraceIsActive && bgtracePSTree
+	bgtraceIsActive && [ ! "$bgAssertErrorInhibitTrace" ] && bgtracePSTree
 
 	# write a blank line after the bgStackTrace b/c it might be set to stderr (typical for sysadmins to see what the error is)
 	echo >&$ae_outFD
@@ -3479,7 +3480,7 @@ function fsTouch()
 function bgfind() { fsExpandFiles --findCmdLineCompat -R "$@"; }
 function fsExpandFiles()
 {
-	local outputOpts=(--echo "")
+	local outputOpts=()
 	local recursiveOpt=("-maxdepth" "0")
 	local forceFlag fsef_prefixToRemove fsef_outputVarName fTypeOpt=() findCmdLineCompat findOpts=()
 	local findStartingPoints=()
@@ -3497,9 +3498,12 @@ function fsExpandFiles()
 		-R) recursiveOpt=() ;;
 		+R) recursiveOpt=("-maxdepth" "0") ;;
 
-		# how to return the results
-		-A*|--array) bgOptionGetOpt  val: fsef_outputVarName "$@" && shift; outputOpts=(--array --append "$fsef_outputVarName") ;;
-		-S*|--set)   bgOptionGetOpt  val: fsef_outputVarName "$@" && shift; outputOpts=(--set "$fsef_outputVarName") ;;
+		# how to return the results (see man(3) varOutput)
+		-d*|--delim*) bgOptionGetOpt  opt: outputOpts "$@" && shift ;;
+		-a|--append)  bgOptionGetOpt  opt  outputOpts "$@" && shift ;;
+		--string*)    bgOptionGetOpt  opt: outputOpts "$@" && shift ;;
+		-A*|--array*) bgOptionGetOpt  opt: outputOpts "$@" && shift; outputOpts+=(--append) ;; # adding append is legacy we  have to find all places that rely on this and add -a|--append before we can remove it
+		-S*|--set*)   bgOptionGetOpt  opt: outputOpts "$@" && shift ;;
 
 		# modify the output
 		-b|--baseNames) fsef_prefixToRemove="*/" ;;
@@ -3528,8 +3532,8 @@ function fsExpandFiles()
 	# if none of the starting points exist it will match nothing, but there is nothing we can set findStartingPoints to so that find
 	# would exit cleanly without displaying an error so we return here
 	if [ ${#findStartingPoints} -eq 0 ]; then
-		[ "$forceFlag" ] && varSetRef "${outputOpts[@]}" "/dev/null"
-		return 0
+		[ "$forceFlag" ] && varOutput "${outputOpts[@]}" "/dev/null"
+		return 1
 	fi
 
 
@@ -3570,18 +3574,22 @@ function fsExpandFiles()
 
 	# now invoke the find command
 	[ "$fsef_prefixToRemove" ] && fsef_prefixToRemove="#${fsef_prefixToRemove#'#'}"
-	local _file _found;
+	local _file _found _appendFlag
 	while IFS="" read -r -d$'\b' _file; do
 		[ "$fsef_prefixToRemove" ] && _file="${_file/$fsef_prefixToRemove}"
-		varSetRef "${outputOpts[@]}" "$_file"
+		varOutput "${outputOpts[@]}" $_appendFlag "$_file"
 		_found="1"
+		_appendFlag="--append"
 	done < <(find "${findOpts[@]}" "${findStartingPoints[@]}" "${findExpressions[@]}" -print0 | tr "\0" "\b")
 
-	# if no matching pathes were found be forceFlag was specified, output /dev/null. -f is used when making a cmd line for utils
+	# if no matching pathes were found but forceFlag was specified, output /dev/null. -f is used when making a cmd line for utils
 	# (like awk) that read from stdin if no input files are specified.
 	if [ "$forceFlag" ] && [ ! "$_found" ]; then
-		varSetRef "${outputOpts[@]}" "/dev/null"
+		varOutput "${outputOpts[@]}" "/dev/null"
 	fi
+
+	# set the exit code based on whether any were found
+	[ "$_found" ]
 }
 
 

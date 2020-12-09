@@ -373,7 +373,6 @@ Animal : <instance> of Class
                   + Object::clear
                   + Object::clone
                   + Object::eval
-                  + Object::exists
                   + Object::fromDebControl
                   + Object::fromFlatINI
                   + Object::fromINI
@@ -382,19 +381,15 @@ Animal : <instance> of Class
                   + Object::getAttributes
                   + Object::getIndexes
                   + Object::getMethods
-                  + Object::getOID
-                  + Object::getRef
                   + Object::getSize
                   + Object::getValues
                   + Object::hasMethod
-                  + Object::isA
                   + Object::restoreFile
                   + Object::saveFile
                   + Object::set
                   + Object::toDebControl
                   + Object::toFlatINI
                   + Object::toString
-                  + Object::unset
 
 Dog : <instance> of Class
   baseClass       =Animal
@@ -407,7 +402,6 @@ Dog : <instance> of Class
                   + Object::clear
                   + Object::clone
                   + Object::eval
-                  + Object::exists
                   + Object::fromDebControl
                   + Object::fromFlatINI
                   + Object::fromINI
@@ -416,19 +410,15 @@ Dog : <instance> of Class
                   + Object::getAttributes
                   + Object::getIndexes
                   + Object::getMethods
-                  + Object::getOID
-                  + Object::getRef
                   + Object::getSize
                   + Object::getValues
                   + Object::hasMethod
-                  + Object::isA
                   + Object::restoreFile
                   + Object::saveFile
                   + Object::set
                   + Object::toDebControl
                   + Object::toFlatINI
                   + Object::toString
-                  + Object::unset
                   + Animal::__construct
                   + Animal::speak
 
@@ -443,7 +433,6 @@ Cat : <instance> of Class
                   + Object::clear
                   + Object::clone
                   + Object::eval
-                  + Object::exists
                   + Object::fromDebControl
                   + Object::fromFlatINI
                   + Object::fromINI
@@ -452,19 +441,15 @@ Cat : <instance> of Class
                   + Object::getAttributes
                   + Object::getIndexes
                   + Object::getMethods
-                  + Object::getOID
-                  + Object::getRef
                   + Object::getSize
                   + Object::getValues
                   + Object::hasMethod
-                  + Object::isA
                   + Object::restoreFile
                   + Object::saveFile
                   + Object::set
                   + Object::toDebControl
                   + Object::toFlatINI
                   + Object::toString
-                  + Object::unset
                   + Animal::__construct
                   + Animal::speak
 
@@ -482,5 +467,137 @@ myCat[]
      [_OID   ]='myCat'
 
 ## bg_coreBashVars.sh:printfVars_objects: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:varOutput:oneValue start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local strVar="initial value"
+##     | cmd> local -a arrayVar=(initial value)
+##     | cmd> local -A setVar=([initial]="" [value]="")
+##     | cmd> echo "$@"
+##     | one two three
+
+##----------
+## test
+cmd> varOutput "$@"
+one two three
+cmd> varOutput +1 "$@"
+one two three
+cmd> varOutput -d'|' "$@"
+one two three
+
+##----------
+## test
+cmd> varOutput -a -RstrVar   "$@"; printfVars strVar
+strVar='initial value one two three'
+cmd> varOutput -a +1 -RstrVar   "$@"; printfVars strVar
+strVar='initial value one two three
+        one two three'
+cmd> varOutput -RstrVar   "$@"; printfVars strVar
+strVar='one two three'
+cmd> varOutput +1 -RstrVar   "$@"; printfVars strVar
+strVar='one two three'
+
+##----------
+## test
+cmd> varOutput -a -AarrayVar "$@"; printfVars arrayVar
+arrayVar[]
+        [0]='initial'
+        [1]='value'
+        [2]='one two three'
+cmd> varOutput -AarrayVar "$@"; printfVars arrayVar
+arrayVar[]
+        [0]='one two three'
+
+##----------
+## test
+cmd> varOutput -a -SsetVar   "$@"; printfVars setVar
+setVar[]
+      [one two three]=''
+      [initial      ]=''
+      [value        ]=''
+cmd> varOutput -SsetVar   "$@"; printfVars setVar
+setVar[]
+      [one two three]=''
+
+## bg_coreBashVars.sh:varOutput:oneValue finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreBashVars.sh:varOutput:multipleValues start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local strVar="initial value"
+##     | cmd> local -a arrayVar=(initial value)
+##     | cmd> local -A setVar=([initial]="" [value]="")
+##     | cmd> echo "$@"
+##     | one two three
+
+##----------
+## test
+cmd> varOutput "$@"
+one two three
+cmd> varOutput +1 "$@"
+one
+two
+three
+cmd> varOutput -d'|' "$@"
+one|two|three
+
+##----------
+## test
+cmd> varOutput -a -RstrVar   "$@"; printfVars strVar
+strVar='initial value one two three'
+cmd> varOutput -a +1 -RstrVar   "$@"; printfVars strVar
+strVar='initial value one two three
+        one
+        two
+        three'
+cmd> varOutput -RstrVar   "$@"; printfVars strVar
+strVar='one two three'
+cmd> varOutput +1 -RstrVar   "$@"; printfVars strVar
+strVar='one
+        two
+        three'
+
+##----------
+## test
+cmd> varOutput -a -AarrayVar "$@"; printfVars arrayVar
+arrayVar[]
+        [0]='initial'
+        [1]='value'
+        [2]='one'
+        [3]='two'
+        [4]='three'
+cmd> varOutput -AarrayVar "$@"; printfVars arrayVar
+arrayVar[]
+        [0]='one'
+        [1]='two'
+        [2]='three'
+
+##----------
+## test
+cmd> varOutput -a -SsetVar   "$@"; printfVars setVar
+setVar[]
+      [two    ]=''
+      [three  ]=''
+      [initial]=''
+      [value  ]=''
+      [one    ]=''
+cmd> varOutput -SsetVar   "$@"; printfVars setVar
+setVar[]
+      [two  ]=''
+      [three]=''
+      [one  ]=''
+
+## bg_coreBashVars.sh:varOutput:multipleValues finished
 ###############################################################################################################################
 

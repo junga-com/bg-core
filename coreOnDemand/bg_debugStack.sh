@@ -308,6 +308,7 @@ function bgStackMakeLogical()
 		fi
 
 
+		# CRITICALTODO: use declare -F (with lineno's) to fix trap handler boundry detection code. 
 		# OBSOLETE? Now that we alias trap to bgtrap, typical trap handlers will start with BGTRAPEntry and the above code works
 		#           much better than this detection code. This code relies on examining the source to see if the frame matches but
 		#           that is problematic -- notably code that executes a cmd inside a variable like $utFunc ...
@@ -353,6 +354,7 @@ function bgStackMakeLogical()
 				if [ "${sigCandidates[*]}" ]; then
 					detectedTrapFrame+=("${sigCandidates[*]}")
 					bgtraceVars -1 -l"bgStackMakeLogical:DETECTED INTR Frame " detectedTrapFrame frmSrcLineText referenceText
+					bgAssertErrorTMPSIGNALTRIGGERED=1
 				else
 					# if we did not end up finding trap code, reset frmSrcLineNo before we move on
 					frmSrcLineNo=""

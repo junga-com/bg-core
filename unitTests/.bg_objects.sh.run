@@ -375,6 +375,7 @@ argsV[]
 
 ##----------
 ## setup
+##     | ut filter '([[]_vmtCacheNum2[[:space:]]*[]]=).[0-9]*.###\1<redacted>'
 
 ##----------
 ## test
@@ -414,7 +415,7 @@ Object[]
       [                ] +Object::toDebControl
       [                ] +Object::toFlatINI
       [                ] +Object::toString'
-      [_vmtCacheNum2   ]='26'
+      [_vmtCacheNum2   ]=<redacted>
       [subClasses      ]='Class Stack Array Map'
       [name            ]='Object'
       [inheritedMethods]=''
@@ -460,7 +461,7 @@ Class[]
      [                ] +Class::getClassMethods
      [                ] +Class::isDerivedFrom
      [                ] +Class::reloadMethods'
-     [_vmtCacheNum2   ]='26'
+     [_vmtCacheNum2   ]=<redacted>
      [name            ]='Class'
      [inheritedMethods]='Object::addMethod
      [                ] +Object::bgtrace

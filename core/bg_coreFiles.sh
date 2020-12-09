@@ -174,6 +174,34 @@ function fsIsNewer()
 	[ "$1" -nt "$2" ]
 }
 
+# usage: fsGetNewerDeps [-A|--array=<varName>] <referenceFilename> <depFilename1> [.. <depFilenameN>]
+#        if fsGetNewerDeps <referenceFilename> <depFilename1> [.. <depFilenameN>] >/dev/null; ...
+# Determine if any of the dependent files of <referenceFilename> are newer than <referenceFilename>.
+# This function returns true/false in its exit code and the list of newer files on stdout or in <varName>. If you just want to test
+# the exit code, redirect stdout to null
+# Options:
+#    -A|--retArray=<varName> : return the list of <depFilenameN> that are newer than <referenceFilename> in this array var name
+# Exit Code:
+#    0(true)  : yes, at least one <depFilenameN> is newer
+#    1(false) : no, <referenceFilename> is newer than any of the <depFilenameN>
+function fsGetNewerDeps()
+{
+	local retArrayOpt
+	while [ $# -gt 0 ]; do case $1 in
+		-R|--string*) bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
+		-A|--array*)  bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
+		-S|--set*)    bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
+		-a|--append)  bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local refFile="$1"; shift
+	if [ ! -e "$refFile" ]; then
+		varOutput "${retArrayOpt[@]}" "$@"
+		return 0
+	fi
+	bgfind "${retArrayOpt[@]}" "${@:-NOTHING}" -newer "$refFile"
+}
+
 # usage: fsIsDifferent [<diffIgnoreOpt>] <file1> <file2>
 # returns true(0) if <file1> <file2> do not have the same contents and false(1) if they do
 # Options:
@@ -546,19 +574,19 @@ function fsCopyAttributes()
 # but with the following features that a simple redirect does not have.
 #  * <destFile> can be used in <someCommand>. e.g. "grep -v badToken myFile | pipeToFile myFile"
 #  * it will only touch the <destFile> if the content is different than what is already in <destFile>
-#  * -S can be used if the caller wants to know whether the <destFile>was changed.
+#  * you can call it again after the pipeline to find out whether the <destFile>was changed.
 #  * if the USER does not have permission to write to <destFile>, sudo will be attempted.
 #  * if <destFile> exists, it will be overwritten, if not, it will be created
 #  * if the parent folder does not exist, it will be created
 # Note that this command is similar to collectContents but is more generic
 # Params:
-#     <destFile> : the file that the contents will be written to.
+#     <destFile> : the file that the contents will be written to (if needed).
 # Options:
-#    --channelID <channelID> : pass in a communication channel id so that the function which typically runs in a pipe's subshell
-#            can communicate its result about whether the content changed back to the caller. A second call with --getResult called
-#            not in a subshell will return the result.
-#    --didChange : must be used in conjunction with --channelID. After the pipe is done, call this function a second time with
-#            the same channelID and this option and its exit value will indicate if the content was changed.
+#    --channelID <channelID> : (default is the sanitized filename) If you are updating multiple files in a group and only need to
+#            know that at least one file in the group was updated, set the --channelID of all those calls to the same group name
+#            and then call with --getResult once for the whole group.
+#    --didChange : After the pipe is done, call this function a second time with either the same <destFile> or channelID and its
+#            exit value will indicate if the content was changed.
 #    -p|--tmpdir <tmpdir> : provides an existing location to write its tmp file. Otherwise mktmp will be used
 # See Also:
 #    collectContents

@@ -522,7 +522,7 @@ function templateExpand()
 	# expandFolder which may expand a folder with not template content. Maybe this would be better
 	# done there but it does make sense in this context. We do not send non-text files to stdout, but
 	# maybe we should to support pipes?
-	if [ ! "$usedTemplatePath" ] && [ -f "$srcTemplate" ] && [[ ! "$(file $srcTemplate)" =~ text|FORTRAN ]]; then
+	if [ ! "$usedTemplatePath" ] && [ -f "$srcTemplate" ] && [[ ! "$(file -ib $srcTemplate)" =~ ^text ]]; then
 		if [ "$dstFilename" ] && [ "$srcTemplate" != "$dstFilename" ]; then
 			bgsudo -O sudoOpts cp "$srcTemplate" "$dstFilename"
 		fi
