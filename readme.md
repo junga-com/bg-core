@@ -1,9 +1,13 @@
 # bg-core
 
-This is a library for writing secure bash scripts. It supports many features that make it easier to write and maintain
-good scripts that participates in the operating system's host environment.
+This is a library for writing secure bash scripts. It supports many features that make it easier to write and maintain good scripts that participates in the operating system's host environment.
 
-Learn more in the package's man(7) bg-corePkg.
+The motivation of this package is a philosophy that developing software at all levels should be linearly independent. Instead of developing platforms that can be hosted on an OS, the OS is the platform and components coexist and compliment each other.
+
+This is a form of integrating DevOps into application development.
+
+This package is part of a larger ecosystem that I have developed consisting of first, a productive shell scripting environment, second a modern high performance scripting language (javascript), and third, high performance native code (C/C++/WebAsm). Components written in any of these environments are available in the others.
+
 
 ## Key features include...
 
@@ -568,12 +572,40 @@ The only responsibility of bg_core.sh is to setup the host security environment 
 
 ### core/
 
-The core/ subfolder contains the core libraries that are imported unconditionally when a script sources /usr/lib/bg_core.sh
+The core/ subfolder contains the core libraries that are imported unconditionally when a script sources /usr/lib/bg_core.sh.
+
+You never have to import these libraries.
 
 ### coreOnDemand/
 
-The coreOnDemand/ subfolder contains libraries that are not imported initially when a script sources /usr/lib/bg_core.sh but will be automatically imported if certain features are used by the script. For example, if the script declares the daemonDefaultStartLevels variable and uses the daemonDeclare API to become a daemon script, the bg_coreDaemon.sh library will be imported.
+The coreOnDemand/ subfolder contains libraries that are not imported initially when a script sources /usr/lib/bg_core.sh but will be automatically imported if certain features are used by the script. For example, if the script calls the daemonDeclare function to become a daemon script, the bg_coreDaemon.sh library will be imported and its features enabled.
+
+You never have to import these libraries.
 
 ### lib/
 
 The lib/ subfolder contains libraries that are available for a script to use if they import them.
+
+Your script needs to import one of these libraries in order to use its featurs. .
+
+### unitTests/
+
+The unitTests/ folder contains unit test scripts containing testcases that can be executed directly for testing or via `bg-dev test` as part of the package SDLC.
+
+See man(1) bg-dev-tests
+
+### data/
+
+The data/ folder contains file assets that will be copied to the target system when the package is installed.
+
+### doc/
+
+The doc/ folder contains the changelog and copywrite files for the project and miscellaneous documentation such as diagrams.
+
+### man?/
+
+The man[0-7]/ folders contain manually written man pages. Most man pages are written as comment blocks in the source code but some man pages do not fit that pattern well.
+
+### .bglocal/
+
+The .bglocal/ folder is a local cache folder for things that do not get committed to git. For example, a staging folder to build deb and rpm packages and the funcman generated documentation build.

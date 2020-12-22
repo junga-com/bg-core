@@ -1,0 +1,178 @@
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:awkData_parseAwkDataID:0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+##     | cmd> echo "awkDataID=$1"
+##     | awkDataID=foo
+
+##----------
+## test
+cmd> awk  -v awkDataID="$1" '
+long form = foo|foo||/usr/share/ut/foo.awkDataSchema
+
+## bg_awkDataSchema.awk:awkData_parseAwkDataID:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:awkData_parseAwkDataID:1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+##     | cmd> echo "awkDataID=$1"
+##     | awkDataID=./foo
+
+##----------
+## test
+cmd> awk  -v awkDataID="$1" '
+long form = ./foo|foo|./foo.cache|./foo.schema
+
+## bg_awkDataSchema.awk:awkData_parseAwkDataID:1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:awkData_parseAwkDataID:2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+##     | cmd> echo "awkDataID=$1"
+##     | awkDataID=foo|
+
+##----------
+## test
+cmd> awk  -v awkDataID="$1" '
+long form = foo|
+
+## bg_awkDataSchema.awk:awkData_parseAwkDataID:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:awkData_parseAwkDataID:3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+##     | cmd> echo "awkDataID=$1"
+##     | awkDataID=foo|./foo.cache|./foo.schema
+
+##----------
+## test
+cmd> awk  -v awkDataID="$1" '
+long form = foo|./foo.cache|./foo.schema
+
+## bg_awkDataSchema.awk:awkData_parseAwkDataID:3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:schema_restore: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> awk  -v awkDataIDList="type1" '
+stderr> schemas=<array>
+stderr>    type1=<array>
+stderr>       [awkFile             ]='"/tmp/tmp.<redacted>"'
+stderr>       associatedSecKeysSet=<array>
+stderr>       [_OID                ]='type1'
+stderr>       colWidths=<array>
+stderr>          [1]='10'
+stderr>          [2]='5'
+stderr>          [3]='13'
+stderr>       secondaryKeyCols=<array>
+stderr>       [awkSchemaFile       ]='/tmp/tmp.<redacted>'
+stderr>       associatedSecKeys=<array>
+stderr>       conflictKeys=<array>
+stderr>       colTypes=<array>
+stderr>          [1]=''
+stderr>          [2]=''
+stderr>          [3]=''
+stderr>       colFields=<array>
+stderr>          [three ]='3'
+stderr>          [any   ]='0'
+stderr>          [two   ]='2'
+stderr>          [_CLASS]='NFieldMap'
+stderr>          [one   ]='1'
+stderr>       [dependents          ]=''
+stderr>       [keyCol              ]=''
+stderr>       [awkDomFolder        ]=''
+stderr>       data=<array>
+stderr>       [awkDataID           ]='type1'
+stderr>       keyCols=<array>
+stderr>       info=<array>
+stderr>          [awkFile          ]='"/tmp/tmp.<redacted>"'
+stderr>          [_OID             ]='type1'
+stderr>          [colWidths        ]='10 5 13'
+stderr>          [secondaryKeyCols ]=''
+stderr>          [awkSchemaFile    ]='/tmp/tmp.<redacted>'
+stderr>          [dependents       ]=''
+stderr>          [keyCol           ]=''
+stderr>          [schemaType       ]='independent'
+stderr>          [columnsWithWidths]='one(10) two(5) three(13)'
+stderr>          [awkDomFolder     ]=''
+stderr>          [columns          ]='one(10) two(5) three(13)'
+stderr>          [defDisplayCols   ]='all'
+stderr>          [awkDataID        ]='type1'
+stderr>          [0                ]=''
+stderr>          [depsRoot         ]=''
+stderr>          [colWithWidths    ]='one(10) two(5) three(13)'
+stderr>          [colNames         ]='one two three'
+stderr>          [anyKeyCols       ]=' '
+stderr>          [_CLASS           ]='schemaInfo'
+stderr>          [awkObjName       ]='type1'
+stderr>          [fmtStr           ]='%10s %5s %13s'
+stderr>          [schemaFileRead   ]='yes'
+stderr>       normKey=<array>
+stderr>       colWithWidths=<array>
+stderr>          [1]='one(10)'
+stderr>          [2]='two(5)'
+stderr>          [3]='three(13)'
+stderr>       colNames=<array>
+stderr>          [1]='one'
+stderr>          [2]='two'
+stderr>          [3]='three'
+stderr>       anyKeyCols=<array>
+stderr>       [depsRoot            ]=''
+stderr>       [_CLASS              ]='schema'
+stderr>       [colNF               ]='3'
+stderr>       [awkObjName          ]='type1'
+
+## bg_awkDataSchema.awk:schema_restore: finished
+###############################################################################################################################
+

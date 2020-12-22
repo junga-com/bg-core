@@ -585,7 +585,7 @@ function utfRunner_execute()
 # is more simple.
 #
 # A testcase function can be executed with arguments provided on the command line. Instead of specifying a complete testcase ID with
-# the name of an argument list, "..." can be specified and then what ever arguments specidied on the command line after it will be
+# the name of an argument list, "..." can be specified and then what ever arguments specified on the command line after it will be
 # passed to the testcase function.
 #
 #

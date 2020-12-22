@@ -169,7 +169,7 @@ The natural and more readable way to use a function to retrieve a value is ...
    local manifestFile="$(manifestGetHostManifest)"
 
 ... but you will see this variation in library function often because it avoids the subshell
-   local manifestFile; manifestGetHostManifest manifestInstalledPath
+   local manifestFile; manifestGetHostManifest manifestFile
 
 In this example, manifestGetHostManifest uses the pattern "Library Functions with Optional Output Variable Semantics"
 

@@ -561,6 +561,7 @@ function oob_invokeOutOfBandSystem()
 	fi
 }
 
+#' atom syntax highlighting bug
 
 
 # usage: match <str> <regex> [<rematch>]
@@ -1709,14 +1710,14 @@ function signalNorm()
 #       The original rationale was to make sure the child scripts die with their parents but this is probably done better with
 #       figuring out how asynchronous child are identifiable via the pgid or other job control.
 # for each <pid> listed, send <sigSpec> to it and each of its descendants.
-# This is similar to kill but additionally sends the signal to all decendents of any PIDs specified on the command line.
+# This is similar to kill but additionally sends the signal to all descendants of any PIDs specified on the command line.
 # All signals are sent in one kill command with the entire group of processes derived listed on that one command line.
 # Mode Options:
 #    --endScript : does some special processing to end the script and its children. If running a sourced script function
 #                  in a terminal, we dont want to exit $$  because it will close the terminal. Instead we send SIGINT
 #    --childrenOnly : don't send SIGINT to the <pid> listed on the cmdline -- only to their children
 # See Also:
-#    kill -<pid>  : similar but uses the process group concept instead of decendents
+#    kill -<pid>  : similar but uses the process group concept instead of descendants
 #    bgKill <pid> : this replaces the --endScript option
 function bgkillTree()
 {
@@ -3255,7 +3256,7 @@ function extractVariableRefsFromSrc()
 	varSetRef --array "$2" "${varNames[@]}"
 }
 
-
+#"  atom syntax highlight bug
 #######################################################################################################################################
 ### From bg_libFile.sh
 
@@ -3307,6 +3308,7 @@ function fsExists()
 # Params:
 #    <fileOrFolder>  : the path to a filesystem object that should exist. If it ends in a '/' it will be a folder and otherwise a file
 # Options:
+#    --existOnly     : just make sure that <fileOrFolder> exist but dont update its timestamp if it does
 #    -d|--directory  : specify that <fileOrFolder> is a directory (aka folder). Another way to accomplish this is to append a
 #                      trailing '/' to <fileOrFolder>
 #    -p              : normaly it will create at most one parent folder but -p makes it create the entire parent chain as needed.
@@ -3315,8 +3317,9 @@ function fsExists()
 #                      wary of using -p when sudo is in effect.
 function fsTouch()
 {
-	local recurseMkdirFlag typeMode="-f"
+	local recurseMkdirFlag typeMode="-f" existOnlyFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		--existOnly) existOnlyFlag="--existOnly" ;;
 		-p) recurseMkdirFlag="-p" ;;
 		-d|--directory) typeMode="-d" ;;
 	esac; shift; done
@@ -3329,24 +3332,28 @@ function fsTouch()
 	# create the parent folder if needed
 	if [ ! -e "$fileOrFolder" ]; then
 		local parentFolder="${fileOrFolder%/*}"
-		[ ! -d "$parentFolder" ] && { mkdir $recurseMkdirFlag "$parentFolder" || assertError; }
+		[ ! -d "$parentFolder" ] && {
+			bgsudo -w "$parentFolder" mkdir $recurseMkdirFlag "$parentFolder" || assertError
+		}
 	fi
 
 	# if it aready exists,  check to make sure its the right type
 	if [ -e "$fileOrFolder" ]; then
 		if [ "$typeMode" == "-f" ]; then
 			[[ "$(stat -c"%F" "$fileOrFolder")" =~ file ]] || assertError -v fileOrFolder "fsTouch trying to make <fileOrFolder> a file but it is already a '$(stat -c"%F" "$fileOrFolder")'"
-			touch "$fileOrFolder" # update the timestamp
-		else
-			[[ "$(stat -c"%F" "$fileOrFolder/")" =~ directory ]] || assertError -v fileOrFolder "fsTouch trying to make <fileOrFolder> a file but it is already a '$(stat -c"%F" "$fileOrFolder")'"
+		elif [ "$typeMode" == "-d" ]; then
+			# if <fileOrFolder> is a symlink to a directory, we must test it with a trailing /
+			[[ "$(stat -c"%F" "$fileOrFolder/")" =~ ^directory ]] || assertError -v fileOrFolder "fsTouch trying to make <fileOrFolder> a directory but it is already a '$(stat -c"%F" "$fileOrFolder/")'"
 		fi
+		# update the timestamp
+		[ ! "$existOnlyFlag" ] && bgsudo -w "$fileOrFolder" touch "$fileOrFolder"
 
-	else
+	elif [ ! -e "$fileOrFolder" ]; then
 		# at this point, we know the parent exists but fileOrFolder does not so create it
-		[ ! -e "$fileOrFolder" ] && if [ "$typeMode" == "-f" ]; then
-			touch "$fileOrFolder"
-		else
-			mkdir "$fileOrFolder"
+		if [ "$typeMode" == "-f" ]; then
+			bgsudo -w "$fileOrFolder" touch "$fileOrFolder"
+		elif [ "$typeMode" == "-d" ]; then
+			bgsudo -w "$fileOrFolder" mkdir "$fileOrFolder"
 		fi
 	fi
 }
@@ -3459,7 +3466,7 @@ function fsTouch()
 #    -F : files only. match only file objects. Note: upper case F b/c -f is force.
 #    -D : directories only. match only folder(aka directory) objects. Note upper case for consistency with -F
 #    -R : recursive     (default for bgfind alias)        treat each matching <fileSpec> as a startig point to potentially descend
-#    +R : not recursive (default for fsExpandFiles alias) only consider the file objects matching <fileSpec>, not there decendents
+#    +R : not recursive (default for fsExpandFiles alias) only consider the file objects matching <fileSpec>, not there descendants
 # These options determine how the list of files is returned. Default is standard out, one per line
 #    -A <arrayName> : return in Array. instead of writing the matching file system objects to stdout,
 #             one per line, add them to the caller's array. This avoids the sub process and also works

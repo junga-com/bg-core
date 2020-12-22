@@ -1,0 +1,54 @@
+#!/usr/bin/env bg-utRunner
+
+function makeTestData() {
+	[ "$_makeTestData" ] && return
+	declare -g makeTestData=1
+
+	declare -g utDataFolder="$(mktemp -d)"
+
+
+	cat - >"$utDataFolder/manifest" <<-EOS
+		ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+	EOS
+
+	cat - >"$utDataFolder/type1.awkDataSchema" <<-EOS
+		columns=one(10) two(5) three(13)
+		awkFile="$utDataFolder/type1.cache"
+	EOS
+	echo "ut awkDataSchema type1 $utDataFolder/type1.awkDataSchema" >>"$utDataFolder/manifest"
+}
+
+
+declare -A ut_awkData_parseAwkDataID=(
+	[0]="foo"
+	[1]="./foo"
+	[2]="foo|"
+	[3]="foo|./foo.cache|./foo.schema"
+)
+function ut_awkData_parseAwkDataID() {
+	ut setup
+	makeTestData
+	export bgVinstalledManifest="$utDataFolder/manifest"
+	cat "$bgVinstalledManifest"
+	echo "awkDataID=$1"
+
+	ut test
+	awk  -v awkDataID="$1" '
+		@include "bg_awkDataSchema.awk"
+		BEGIN {print("long form = " awkData_parseAwkDataID(awkDataID))}
+	'
+}
+
+
+function ut_schema_restore() {
+	ut setup
+	makeTestData
+	export bgVinstalledManifest="$utDataFolder/manifest"
+	cat "$bgVinstalledManifest"
+
+	ut test
+	awk  -v awkDataIDList="type1" '
+		@include "bg_awkDataSchema.awk"
+		BEGIN {printfVars("schemas")}
+	'
+}

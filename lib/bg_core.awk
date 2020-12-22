@@ -1,6 +1,25 @@
 @load "filefuncs"
 
 #################################################################################################################################
+### bg-core system functions
+
+function manifestGetFile(                      manFile) {
+	manFile=ENVIRON["bgVinstalledManifest"]
+	return (manFile) ? manFile : "/var/lib/bg-core/manifest";
+}
+
+function manifestGet(assetTypeMatch, filenameMatch, array                    ,manFile,cmd,script,asset) {
+	manFile=manifestGetFile()
+	script="$2~/"assetTypeMatch"/ && $3~/"filenameMatch"/ {print $4}"
+	cmd="awk '"script"' "manFile
+	arrayCreate(array)
+	while ((cmd | getline asset) >0) {
+		arrayPush(array,asset)
+	}
+	close(cmd)
+}
+
+#################################################################################################################################
 ### Misc functions
 
 # usage: hardExit(exitCode)
