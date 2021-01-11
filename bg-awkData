@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+###############################################################################
+# Includes and defines
+
+projectName=bg-core
+
+source /usr/lib/bg_core.sh
+import bg_awkDataQueries.sh ;$L1;$L2
+import bg_awkDataBC.sh ;$L1;$L2
+
+supportedCmds="query count get"
+
+###############################################################################
+# Command manpage
+# usage: bg-core [-q|-v] templates [<subCmdOptions>] [<subCmdArguments>]
+# query and manipulate general host settings and resources.
+# The bg-core package provides various addons to the base OS distribution.
+#
+# Sub Commands:
+#  * templates : find and list templates installed from various packages
+#  * cuiWin    : query and manipulate terminal windows participating in various script UI
+#  * dropin    : see status of and enable/disable various dropin configurations
+#  * config    : query and set host and domain configuration settings
+#
+# See Also:
+
+###############################################################################
+# Functions
+
+# this is invoked by oob_invokeOutOfBandSystem when -hb is the first param
+# The bash completion script calls this get the list of possible words.
+function oob_printBashCompletion()
+{
+	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+
+	cmd="$1"
+
+	case $cmd:$posCwords in
+		*:1) echo $supportedCmds ;;
+		*:2) awkData_query -c assetName manifest assetType:~awkDataSchema ;;
+		query:*)
+			shift # cmd
+			local awkDataID="$1"; shift
+			completeAwkDataQueryTerms --cur="$cur" "$awkDataID" $((posCwords-2)) "$@"
+			;;
+	esac
+	exit
+}
+
+# Use this function to provide BC suggestions for positional parameters
+# see man bg-overviewOutOfBandScriptFunctions for details
+function oob_helpMode()
+{
+	local words cword cur prev optWords posWords posCwords
+	parseForBashCompletion --compat2 words cword cur prev optWords posWords posCwords "$@"
+
+	local cmd="${posWords[1]}"
+	case ${cmd:-main} in
+		main)  man "$(basename $0)" ;;
+		*)     man "$(basename $0)" ;;
+	esac
+}
+
+
+
+
+
+
+
+
+
+
+###############################################################################
+# Main script
+
+# default values for parameters
+command=""
+verbosity=1
+oob_invokeOutOfBandSystem "$@"
+while [ $# -gt 0 ]; do case $1 in
+	-v|--verbose) ((verbosity++)) ;;
+	-q|--quiet) ((verbosity--)) ;;
+	--verbosity*) bgOptionGetOpt val: verbosity "$@" && shift ;;
+	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+done
+
+cmd="${1:-list}"; shift
+case ${cmd} in
+	query)      awkData_query       "$@" ;;
+	count)      awkData_countValues "$@" ;;
+	get)        awkData_getValue    "$@" ;;
+	*) assertError -v cmd "unknown cmd" ;;
+esac

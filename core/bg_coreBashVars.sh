@@ -536,7 +536,7 @@ function varSet()
 }
 
 # usage: varGet <varName> [<retVar>]
-# returns the value contained in the simple (string) <varName>. This is a wrapper over the ${!<varName>} sysntax.  For simple
+# returns the value contained in the simple (string) <varName>. This is a wrapper over the ${!<varName>} syntax.  For simple
 # variables that syntax is prefered but this function exists for completeness.
 function varGet()
 {

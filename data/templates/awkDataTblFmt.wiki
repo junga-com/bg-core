@@ -1,0 +1,19 @@
+colLabelType = header
+
+tblPre='{| class=\"wikitable sortable\"\n'
+tblPost='|}\n'
+
+
+headerCellPre = ""
+headerCellPost= ""
+
+headerRowPre   = '|-\n! '
+headerRowPost  = "\n"
+
+cellPre = ""
+cellPost= ""
+cellSep = " || "
+
+rowPre   = "|-\n| "
+rowPost  = "\n"
+rowSep   = ""

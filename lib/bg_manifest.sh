@@ -21,7 +21,17 @@
 # See Also:
 #    man(1) bg-dev-manifest  : from the bg-dev package which supports creating and distributing projects that contain assets.
 
-declare -g manifestInstalledPath="/var/lib/bg-core/manifest"
+declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"
+
+# usage: manifestGet <assetTypeMatch> <assetNameMatch>
+function manifestGet() {
+	local assetTypeMatch="$1"
+	local assetNameMatch="$2"
+	local manifestFile; manifestGetHostManifest manifestFile
+	awk  -v assetTypeMatch="$assetTypeMatch"  -v assetNameMatch="$assetNameMatch" '
+		$2~assetTypeMatch && $3~assetNameMatch {print $0}
+	' $manifestFile
+}
 
 # usage: manifestGetHostManifest
 # returns the file path to the prevailing host manifest file. In production this would be "$manifestInstalledPath"

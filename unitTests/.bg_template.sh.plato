@@ -1,0 +1,74 @@
+
+###############################################################################################################################
+## bg_template.sh:templateFind: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -x bgLibPath=""
+##     | cmd> local -x packageName="bg-testPkg"
+
+##----------
+## test
+cmd> templateFind -p bg-examplePkg  --listPaths
+templatFolders[]
+              [0]='/etc/bgtemplates/bg-examplePkg'
+              [1]='/etc/bgtemplates'
+              [2]='/usr/share/bg-examplePkg/templates'
+
+## bg_template.sh:templateFind: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_template.sh:templateExpand: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local templateFile; fsMakeTemp templateFile
+##     | cmd> cat - >$templateFile <<-'EOS'
+##     | cmd> local size1=42
+##     | cmd> local size2=
+##     | cmd> local color1=green
+##     | cmd> local color2=
+##     | cmd> local name=bobg
+
+##----------
+## test
+cmd> templateExpand -f "$templateFile"
+This is a test template that contains variables that exercise all the supported features.
+Required var           -- %+name%          : bobg
+Plain var w/value      -- %size1%          : 42
+Plain var w/empty      -- %size2%          : 
+Plain var no exists    -- %size3%          : 
+Default var w/value    -- %color1:red%     : green
+Default var w/empty    -- %color2:red%     : 
+Default var no exists  -- %color3:red%     : red
+Default as a var       -- %nickName:$name% : bobg
+
+## bg_template.sh:templateExpand: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_template.sh:templateExpandMissingRequired: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local templateFile; fsMakeTemp templateFile
+##     | cmd> cat - >$templateFile <<-'EOS'
+
+##----------
+## test
+cmd> templateExpand -f "$templateFile"
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: assertTemplateError: required template var 'name' is not defined
+                               context='/tmp/bgmktemp.<redacted>''
+## bg_template.sh:templateExpandMissingRequired: finished
+###############################################################################################################################
+

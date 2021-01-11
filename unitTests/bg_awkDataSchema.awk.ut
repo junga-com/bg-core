@@ -15,17 +15,26 @@ function makeTestData() {
 		columns=one(10) two(5) three(13)
 		awkFile="$utDataFolder/type1.cache"
 	EOS
+
+	cat - >"$utDataFolder/type1.cache" <<-EOS
+		one(10) two(5) three(13)
+		<dependentsList>
+		red       1        --
+		blue      2        --
+		green     3        --
+	EOS
+
 	echo "ut awkDataSchema type1 $utDataFolder/type1.awkDataSchema" >>"$utDataFolder/manifest"
 }
 
 
-declare -A ut_awkData_parseAwkDataID=(
+declare -A ut_awkData_parseID=(
 	[0]="foo"
 	[1]="./foo"
 	[2]="foo|"
 	[3]="foo|./foo.cache|./foo.schema"
 )
-function ut_awkData_parseAwkDataID() {
+function ut_awkData_parseID() {
 	ut setup
 	makeTestData
 	export bgVinstalledManifest="$utDataFolder/manifest"
@@ -35,7 +44,7 @@ function ut_awkData_parseAwkDataID() {
 	ut test
 	awk  -v awkDataID="$1" '
 		@include "bg_awkDataSchema.awk"
-		BEGIN {print("long form = " awkData_parseAwkDataID(awkDataID))}
+		BEGIN {print("long form = " awkData_parseID(awkDataID))}
 	'
 }
 
@@ -50,5 +59,38 @@ function ut_schema_restore() {
 	awk  -v awkDataIDList="type1" '
 		@include "bg_awkDataSchema.awk"
 		BEGIN {printfVars("schemas")}
+	'
+}
+
+declare -A ut_expr_compile=(
+	[empty]="$(cmdline "")"
+	[andTerms]="$(cmdline "one:blue two:2")"
+	[orTerms]="$(cmdline "one,two:blue")"
+	[anyTerms]="$(cmdline "any:blue")"
+	[eqOp]="$(cmdline "one:red one:=red one=red one==red")"
+	[neOp]="$(cmdline "one:!red one!red one:<>red one<>red")"
+	[reOp]="$(cmdline "one:~red one~red")"
+	[nreOp]="$(cmdline "one:!~red one!~red")"
+	[ltOp]="$(cmdline "one<red one:<red")"
+	[leOp]="$(cmdline "one<=red one:<=red")"
+	[gtOp]="$(cmdline "one>red one:>red")"
+	[geOp]="$(cmdline "one>=red one:>=red")"
+	[invalidOp]="$(cmdline "one!>=red")"
+)
+function ut_expr_compile() {
+	ut setup
+	makeTestData
+	export bgVinstalledManifest="$utDataFolder/manifest"
+	cat "$bgVinstalledManifest"
+
+	ut test
+	echo "$1"
+	awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+		@include "bg_awkDataSchema.awk"
+		BEGIN {
+			arrayCreate(compiledExpr);
+			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
+			printfVars("compiledExpr");
+		}
 	'
 }

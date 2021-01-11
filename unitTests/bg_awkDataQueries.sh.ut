@@ -1,0 +1,46 @@
+#!/usr/bin/env bg-utRunner
+
+import bg_awkDataQueries.sh  ;$L1;$L2
+
+function makeTestData() {
+	[ "$_makeTestData" ] && return
+	declare -g makeTestData=1
+
+	declare -g utDataFolder="$(mktemp -d)"
+
+
+	cat - >"$utDataFolder/manifest" <<-EOS
+		ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+	EOS
+
+	cat - >"$utDataFolder/type1.awkDataSchema" <<-EOS
+		columns=one(10) two(5) three(13)
+		awkFile=$utDataFolder/type1.cache
+	EOS
+
+	cat - >"$utDataFolder/type1.cache" <<-EOS
+		one(10) two(5) three(13)
+		<dependentsList>
+		red       1        --
+		blue      2        --
+		green     3        --
+	EOS
+
+	echo "ut awkDataSchema type1 $utDataFolder/type1.awkDataSchema" >>"$utDataFolder/manifest"
+}
+
+
+function ut_awkData_lookup() {
+	ut setup
+	makeTestData
+	export bgVinstalledManifest="$utDataFolder/manifest"
+	cat "$bgVinstalledManifest"
+
+	ut test
+	awkData_lookup type1 all one:blue
+	awkData_lookup type1 all two:1
+	awkData_lookup type1 one two:1
+	awkData_lookup -H type1 all
+	awkData_lookup -e type1 all
+	awkData_lookup -w type1 all
+}

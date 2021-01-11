@@ -45,6 +45,18 @@ BEGIN {
 		ARGV[ARGC++]="/dev/null"
 	}
 
+	opNormal["=="]="=="
+	opNormal["="]="=="
+	opNormal["~"]="~"
+	opNormal["!~"]="!~"
+	opNormal["!="]="!="
+	opNormal["!"]="!="
+	opNormal["<>"]="!="
+	opNormal["<"]="<"
+	opNormal[">"]=">"
+	opNormal["<="]="<="
+	opNormal[">="]=">="
+
 	arrayCreate(schemas)
 	if (awkDataIDList) {
 		spliti(awkDataIDList, awkDataIDSet)
@@ -69,29 +81,39 @@ BEGIN {
 # turn the input text expression into an expression object that can be evealuated efficiently
 # expr objects are hierarchical. They can be a single field comparison or a list of expressions and'd together or a list of expr
 # or'd together. This forms an expression tree.
+# Filter Expression Syntax:
+# <filterExpr> =                                   # empty expr matches all records
+#              = <filterTerm>..<filterTermN>       # a list of <filterTerms> are and'd meaning match the intersection of all terms
+#              = <matchValue>                      # if the schema declares a defCol, this will be treated as <defCol>:=<matchValue>
+# <filterTerm> = <colExpr><operator><matchValue>
+# <colExpr> = <colName>
+#           = any                                  # <matchValue> is checked against all values regardless of column name
+#           = key                                  # <matchValue> is checked against the composite key value
+# <operator> = :
+# <operator> = :~
 # Params:
 #     exprIn : a string or array of strings that describe the expression. This is typically a list of filter terms from the cmdline
 #     exprOut : an array that will be filled in with the attributes to describe exprIn. This array will be cleared and then set.
 #               exprOut["type"] will be set to one of 'operatorExpression'|'andGroup'|'orGroup'
 #     schema : some components of exprIn like colNames are relative to the schema.
-function expr_compile(exprIn, exprOut, schema       ,exprInAnddTerms,i,rematch,name,value,op,orNames) {
+function expr_compile(exprIn, exprOut, schema       ,exprInAndTerms,i,rematch,name,value,op,orNames) {
 	# a list of and'd terms can be passed two ways -- as a space separated string or as an array of strings
 	if (!isarray(exprIn) && exprIn ~ /[[:space:]]/) {
-		split(exprIn, exprInAnddTerms)
+		split(exprIn, exprInAndTerms)
 	} else if (isarray(exprIn)) {
-		arrayCopy(exprIn, exprInAnddTerms)
+		arrayCopy(exprIn, exprInAndTerms)
 	}
 
 	delete exprOut
 
 	# list of and'd terms
-	if (isarray(exprInAnddTerms) && length(exprInAnddTerms)>0) {
+	if (isarray(exprInAndTerms) && length(exprInAndTerms)>0) {
 		exprOut["type"]="andGroup"
 		arrayCreate2(exprOut, "terms")
-		for (i in exprInAnddTerms) {
-			if (isarray(exprInAnddTerms[i])) assert("expr_compile: expaected a string term but found an array term in list of and'd terms")
+		for (i in exprInAndTerms) {
+			if (isarray(exprInAndTerms[i])) assert("expr_compile: expected a string term but found an array term in list of and'd terms")
 			arrayCreate2(exprOut["terms"], i)
-			expr_compile(exprInAnddTerms[i], exprOut["terms"][i], schema)
+			expr_compile(exprInAndTerms[i], exprOut["terms"][i], schema)
 		}
 		return
 	}
@@ -108,6 +130,9 @@ function expr_compile(exprIn, exprOut, schema       ,exprInAnddTerms,i,rematch,n
 	} else if (match(exprIn, /^([^:=<>!~]*)([:=<>!~]*)(.*)$/, rematch)) {
 		name=rematch[1]
 		op=rematch[2]; sub("^:","", op); if (op=="") op="=="
+		op=opNormal[op]
+		if (!op)
+			assert("expr_compile: unknown operator '"rematch[2]"'")
 		value=norm(rematch[3])
 	} else
 		assert("expr_compile: string does not match an attribute term '"termStr"'")
@@ -169,7 +194,9 @@ function expr_evaluate(expr,data         ,i) {
 			value=(isarray(data)) ?data[expr["name"]] :$expr["field"]
 			switch (expr["op"]) {
 				case "==" :  if ((value ==  expr["value"] )) {return 1}; break
+				case "="  :  if ((value ==  expr["value"] )) {return 1}; break
 				case "!"  :  if ((value !=  expr["value"] )) {return 1}; break
+				case "<>" :  if ((value !=  expr["value"] )) {return 1}; break
 				case "~"  :  if ((value ~   expr["value"] )) {return 1}; break
 				case "!~" :  if ((value !~  expr["value"] )) {return 1}; break
 				case "<"  :  if ((value <   expr["value"] )) {return 1}; break
@@ -226,21 +253,39 @@ function expr_extractColNames(expr,retSet,retArray         ,i) {
 ### AwkData Class methods
 
 # usage: awkData_readHeader()
-# sets the header attributes of an awkData file from the FNR==1 line of that file
-# this needs to be called during the time that the FNR==1 line is parsed into $1, $2, ... ,$FN
+# initialize the header information from the first line in an awkData data file. This should be called when FRN==1
+# This initializes <depLinePos>,
+# Format 1:
+#      (1) <colTerm1>..<colTermN>
+#      (2) <dependentsList>
+#      (3) <firstLine of data...>
+# Format 2:
+#      (1) n.m <colLinePos> <depLinePos> <dataStartLinePos> <buildCmd>
+# where...
+#   n.m is a two or three part version number (0.1.0)
+#   <colLinePos>        : the line number in the file where the column information is written. 0 means that it is not present
+#   <depLinePos>        : the line number in the file where the dependentsList information is written. 0 means that it is not present
+#   <dataStartLinePos>  : the line number in the file where the data starts. If this is less than 2 it will be set to 2 so that the
+#                         header line is not parsed as data. A builder can make the header an arbitrary number of lines to store
+#                         what ever it needs in the header by increasing this value to start the data later in the file.
+#   <buildCmd>          : the build cmd that can be invoked to rebuild the file if its dirty.
+# If the awkFile has a schema file and the awkFile does not need to be queried without accesssing the schema file, the awkFile can
+# use this header.
+#       (1) 1.0 0 0 0
+#       (2) <firstLine of data...>
 function awkData_readHeader() {
-	version=($1!~"^[0-9]{1,2}\\.[0-9]{1,2}$") ? "" : $1
+	version=($1!~"^[0-9]{1,3}\\.[0-9]{1,3}(\\..*)?$") ? "" : $1
 	colLinePos= (!version)? 1 : $2
 	depLinePos= (!version)? 2 : $3
-	dataLinePos=(!version)? 3 : $4
+	dataLinePos=(!version)? 3 : $4; if (dataLinePos<2) dataLinePos=2
 	buildCmd=(!version)? "" : $5
 }
 
-# usage: akwDataIDLongForm awkData_parseAwkDataID(awkDataIDShortForm|akwDataIDLongForm)
+# usage: akwDataIDLongForm awkData_parseID(awkDataIDShortForm|akwDataIDLongForm)
 # Returns the long form of akwDataID regardless of whether the short or long form is passed in.
 # Note that this implementation is not as complete as the bash implementation. Typically a bash script should pass in the long form
 # always but this is useful when testing awk scripts from the command line with common awkDataID that this does support.
-function awkData_parseAwkDataID(awkDataID,      awkObjName,awkFile,awkSchemaFile,schemas) {
+function awkData_parseID(awkDataID,      awkObjName,awkFile,awkSchemaFile,schemas) {
 	# already parsed
 	if (awkDataID ~ /[|]/) {
 		return awkDataID
@@ -248,7 +293,7 @@ function awkData_parseAwkDataID(awkDataID,      awkObjName,awkFile,awkSchemaFile
 	# this block is for filename that are specified as awkObjNames. If it contains a / or .
 	# it can not be a valid domData awkObjName name, it must be a filename
 	} else if (awkDataID ~ /[/.]/) {
-		# note that the bash version of awkData_parseAwkDataID will detect if the file path matches a domData awkData and handle that correctly
+		# note that the bash version of awkData_parseID will detect if the file path matches a domData awkData and handle that correctly
 		awkObjName=awkDataID; gsub(/(^.*\/)|(.cache$)(.schema$)/,"", awkObjName)
 		awkFile=awkDataID; gsub(/(.cache$)(.schema$)/,"", awkFile); awkFile=awkFile".cache"
 		awkSchemaFile=awkFile; sub(/.cache$/,".schema", awkSchemaFile)
@@ -260,7 +305,7 @@ function awkData_parseAwkDataID(awkDataID,      awkObjName,awkFile,awkSchemaFile
 		manifestGet("awkDataSchema", awkObjName, schemas)
 		switch (length(schemas)) {
 			case 0: assert("no awkDataSchema was found in the host manifest for awkObjName ='"awkObjName"'")
-			case 1: awkSchemaFile=schemas[0]; break
+			case 1: awkSchemaFile=schemas[1]; break
 			default: assert("multiple manifest entries matched for type='awkDataSchema' and name ='"awkObjName"'")
 		}
 	}
@@ -324,7 +369,7 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 
 	#awkDataID|awkObjName|awkFile|awkSchemaFile
 	# 1        2          3       4
-	split(awkData_parseAwkDataID(awkDataID), awkObjData, "|")
+	split(awkData_parseID(awkDataID), awkObjData, "|")
 	awkDataID=awkObjData[1]
 
 	# set the information from the parsed awkDataID
@@ -367,7 +412,7 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 	close(info["awkSchemaFile"])
 	if ("schemaFileRead" in info) {
 		delete info["noSchemaDataFound"]
-	} else {
+	} else if (info["awkFile"]) {
 		FNR=0
 		while (getline < info["awkFile"]  > 0) {
 			FNR++
@@ -394,6 +439,16 @@ function schemaInfo_construct(info            ,tmpInColumnArray,colName,colWidth
 	info["_CLASS"]="schemaInfo"
 	info["_OID"]=info["awkDataID"]
 	info["0"]=awkDataID   # for compatibility when exported to bash
+
+	# the manifest has a .awkDataSchema file that sets the awkFile but we want to honor the vinstalled manifest if present so it
+	# uses the spacial token "<installedManifest>" to trigger this processing
+	if (info["awkFile"] == "<installedManifest>") {
+		info["awkFile"] = ENVIRON["bgVinstalledManifest"]
+		if (!info["awkFile"])
+			info["awkFile"] = ENVIRON["manifestInstalledPath"]
+		if (!info["awkFile"])
+			info["awkFile"] = "/var/lib/bg-core/manifest"
+	}
 
 	# init schemaType and domData
 	if (info["awkDomFolder"]) {
@@ -452,7 +507,7 @@ function schemaInfo_construct(info            ,tmpInColumnArray,colName,colWidth
 #    ["info"][<attribName>]   : array of the raw string attributes of the schema. Any attribute added to the schema file will be accessible in this
 #             array. All info members are strings so lists like "columns" will be a space separated list of columns. Often there
 #             will be a member var in schema with the same name that is an awk array so that it can be operated on efficiently.
-#    ["awkDataID"] : the short form that identifies the schema/table that this object represents (See awkData_parseAwkDataID)
+#    ["awkDataID"] : the short form that identifies the schema/table that this object represents (See awkData_parseID)
 #    ["awkObjName"]: the simple schema/table name
 #    ["awkFile"]   : the path to the data file for this schema/table
 #    ["awkSchemaFile"]: the path to the schema definition file
@@ -490,7 +545,7 @@ function schemaInfo_construct(info            ,tmpInColumnArray,colName,colWidth
 # construct the schema array object from the data in an awkDataID's schema file or the header of its awkFile.
 # The new object will be accessible in the global schema array as schemas[awkDataID]
 # Params:
-#    awkDataID : identify the awk table to restore. An awkDataID can be in multiple formats. see man(1) awkData_parseAwkDataID (bash)
+#    awkDataID : identify the awk table to restore. An awkDataID can be in multiple formats. see man(1) awkData_parseID (bash)
 # See Also:
 #    schema_restore  : create the new object from the attributes defined in the schema file
 #    schema_new      : create the new object from attributes specified by the script author
@@ -503,7 +558,7 @@ function schema_restore(awkDataID            ,awkDataIDLongForm,awkObjData) {
 
 	#awkDataID|awkObjName|awkFile|awkSchemaFile
 	# 1        2          3       4
-	awkDataIDLongForm=awkData_parseAwkDataID(awkDataID)
+	awkDataIDLongForm=awkData_parseID(awkDataID)
 	split(awkDataIDLongForm, awkObjData, "|")
 	awkDataID=awkObjData[1]
 
@@ -866,7 +921,16 @@ function tblFmt_writeEnding(tblFmt) {
 	printf(tblFmt["tblPost"])
 }
 
-function tblFmt_get(tblFmt, templateFile, schema            ,rematch,name,value,fileRead) {
+# usge: tblFmt_get(tblFmt, templateFile)
+# Params:
+#    tblFmt  : an array that will be filled in with the table format data
+#    templateFile : the name of a template file that describes the table format. If empty it defaults to awkDataTblFmt.txt
+#                   Table Format templates are named like...
+#                     awkDataTblFmt.<outFmtType>[.vert]
+#                   where...
+#                      <outFmtType> is the value of the -F*|--tblFormat* option (default txt)
+#                      [.vert]  is added if the \G suffix is used in the query
+function tblFmt_get(tblFmt, templateFile            ,rematch,name,value,fileRead) {
 	cuiRealizeFmtToTerm("on")
 
 	fileRead=0
@@ -883,7 +947,7 @@ function tblFmt_get(tblFmt, templateFile, schema            ,rematch,name,value,
 	# the default table format if no template was specified or template does not exist
 	if (!fileRead) {
 		# a a template was specified but does not exist, warn the user
-		if (templateFile) warning("table format template "templateFile"not found. using default txt format")
+		if (templateFile) warning("table format template '"templateFile"' not found. using default txt format")
 
 		tblFmt["colLabelType"] = "header"
 		tblFmt["headerCellPre"] = "%csiFaint%%csiReverse%"

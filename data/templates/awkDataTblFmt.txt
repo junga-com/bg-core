@@ -1,0 +1,30 @@
+# note that the terminology of these format fields is that of a table with rows and columns but more generally rows are records
+# and columns are fields. A result set is traversed for output by row/record and then by column/field. This allows either a
+# traditional table type format or a vertical, list of record type format (similar to mysql client's \G terminator).
+
+# Whether column/field labels are included in the output is controlled by at runtime (typically the -H option).
+# If lables/header data is included in the output colLabelType format attribute will determine if the labels appear as the first
+# record (colLabelType==header) or at each data cell as a field label (colLabelType==inline). The value colLabelType==none will
+# suppress labels even if the runtime options call for it.
+#    colLabelType=header  : first table row is a header with column names
+#    colLabelType=inline  : no header. each cell is <colName>:<data>
+#    colLabelType=none    : no labels. Note that typically the format is 'header' and the -H option controls whether the header is printed
+colLabelType = header
+
+# The location of where headerCells are output depend on colLabelType but in any case its always a cell whose value in the column name
+headerCellPre = %csiFaint%%csiReverse%
+headerCellPost= %csiNorm%
+
+# when colLabelType==header these are applied to the first row of the table that contain the column names
+headerRowPre   = ""
+headerRowPost  = "\n"
+
+# these are the data cells that appear in each row
+cellPre = ""
+cellPost= ""
+cellSep = " "
+
+# these are the rows of the table.
+rowPre   = ""
+rowPost  = "\n"
+rowSep   = ""

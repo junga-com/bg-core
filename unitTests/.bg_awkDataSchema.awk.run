@@ -1,6 +1,6 @@
 
 ###############################################################################################################################
-## bg_awkDataSchema.awk:awkData_parseAwkDataID:0 start
+## bg_awkDataSchema.awk:awkData_parseID:0 start
 ## expect: 
 
 ##----------
@@ -18,12 +18,12 @@
 cmd> awk  -v awkDataID="$1" '
 long form = foo|foo||/usr/share/ut/foo.awkDataSchema
 
-## bg_awkDataSchema.awk:awkData_parseAwkDataID:0 finished
+## bg_awkDataSchema.awk:awkData_parseID:0 finished
 ###############################################################################################################################
 
 
 ###############################################################################################################################
-## bg_awkDataSchema.awk:awkData_parseAwkDataID:1 start
+## bg_awkDataSchema.awk:awkData_parseID:1 start
 ## expect: 
 
 ##----------
@@ -41,12 +41,12 @@ long form = foo|foo||/usr/share/ut/foo.awkDataSchema
 cmd> awk  -v awkDataID="$1" '
 long form = ./foo|foo|./foo.cache|./foo.schema
 
-## bg_awkDataSchema.awk:awkData_parseAwkDataID:1 finished
+## bg_awkDataSchema.awk:awkData_parseID:1 finished
 ###############################################################################################################################
 
 
 ###############################################################################################################################
-## bg_awkDataSchema.awk:awkData_parseAwkDataID:2 start
+## bg_awkDataSchema.awk:awkData_parseID:2 start
 ## expect: 
 
 ##----------
@@ -64,12 +64,12 @@ long form = ./foo|foo|./foo.cache|./foo.schema
 cmd> awk  -v awkDataID="$1" '
 long form = foo|
 
-## bg_awkDataSchema.awk:awkData_parseAwkDataID:2 finished
+## bg_awkDataSchema.awk:awkData_parseID:2 finished
 ###############################################################################################################################
 
 
 ###############################################################################################################################
-## bg_awkDataSchema.awk:awkData_parseAwkDataID:3 start
+## bg_awkDataSchema.awk:awkData_parseID:3 start
 ## expect: 
 
 ##----------
@@ -87,7 +87,7 @@ long form = foo|
 cmd> awk  -v awkDataID="$1" '
 long form = foo|./foo.cache|./foo.schema
 
-## bg_awkDataSchema.awk:awkData_parseAwkDataID:3 finished
+## bg_awkDataSchema.awk:awkData_parseID:3 finished
 ###############################################################################################################################
 
 
@@ -174,5 +174,493 @@ stderr>       [colNF               ]='3'
 stderr>       [awkObjName          ]='type1'
 
 ## bg_awkDataSchema.awk:schema_restore: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:empty start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    [type]='true'
+
+## bg_awkDataSchema.awk:expr_compile:empty finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:andTerms start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one:blue two:2
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='blue'
+stderr>       2=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='2'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='two'
+stderr>          [value]='2'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:andTerms finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:orTerms start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one,two:blue
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='blue'
+stderr>       2=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='2'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='two'
+stderr>          [value]='blue'
+stderr>    [type ]='orGroup'
+
+## bg_awkDataSchema.awk:expr_compile:orTerms finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:anyTerms start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+any:blue
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='blue'
+stderr>       2=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='2'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='two'
+stderr>          [value]='blue'
+stderr>       3=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='3'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='three'
+stderr>          [value]='blue'
+stderr>    [type ]='orGroup'
+
+## bg_awkDataSchema.awk:expr_compile:anyTerms finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:eqOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one:red one:=red one=red one==red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       2=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       3=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       4=<array>
+stderr>          [op   ]='=='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:eqOp finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:neOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one:!red one!red one:<>red one<>red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='!='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       2=<array>
+stderr>          [op   ]='!='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       3=<array>
+stderr>          [op   ]='!='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       4=<array>
+stderr>          [op   ]='!='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:neOp finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:reOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one:~red one~red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='~'
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       2=<array>
+stderr>          [op   ]='~'
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:reOp finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:nreOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one:!~red one!~red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='!~'
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       2=<array>
+stderr>          [op   ]='!~'
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:nreOp finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:ltOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one<red one:<red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='<'
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       2=<array>
+stderr>          [op   ]='<'
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:ltOp finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:leOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one<=red one:<=red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='<='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       2=<array>
+stderr>          [op   ]='<='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:leOp finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:gtOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one>red one:>red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='>'
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       2=<array>
+stderr>          [op   ]='>'
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:gtOp finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:geOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one>=red one:>=red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> compiledExpr=<array>
+stderr>    terms=<array>
+stderr>       1=<array>
+stderr>          [op   ]='>='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>       2=<array>
+stderr>          [op   ]='>='
+stderr>          [field]='1'
+stderr>          [type ]='operatorExpression'
+stderr>          [name ]='one'
+stderr>          [value]='red'
+stderr>    [type ]='andGroup'
+
+## bg_awkDataSchema.awk:expr_compile:geOp finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_awkDataSchema.awk:expr_compile:invalidOp start
+## expect: 
+
+##----------
+## setup
+##     | cmd> makeTestData
+##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
+##     | cmd> cat "$bgVinstalledManifest"
+##     | ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+##     | ut awkDataSchema type1 /tmp/tmp.<redacted>
+
+##----------
+## test
+cmd> echo "$1"
+one!>=red
+cmd> awk  -v awkDataIDList="type1" -v filterExpr="$1" '
+stderr> awk assert error () : expr_compile: unknown operator '!>='
+stderr>    inputFile=  : BEGIN
+stderr>    input line= 'N/A'
+stderr> 
+[exitCode 222]
+
+## bg_awkDataSchema.awk:expr_compile:invalidOp finished
 ###############################################################################################################################
 

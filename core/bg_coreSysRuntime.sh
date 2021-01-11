@@ -18,7 +18,7 @@
 # overriding or combining the information.
 
 
-# usage: findInPaths [options] <fileSpec> [-r <relativePaths>] <searchPaths1> [...[-r <relativePaths>] <searchPathsN>]
+# usage: findInPaths [<options>] <fileSpec> [-r <relativePaths>] <searchPaths1> [...[-r <relativePaths>] <searchPathsN>]
 # Find all files matching <fileSpec> in the specified search paths. The order of search paths is significant
 # because the default is to return only the first occurrence of each unique filename that matches <fileSpec>.
 #
@@ -40,10 +40,14 @@
 # If --return-relative is specified then each returned filename(s) will be relative to the search path
 # where it was found. This is not enough information to access the file but this is usefull to expand
 # wiildcard <fileSpec> to get a list of available filenamees of a particular type.
+#
 # Params:
 #   <fileSpec>     : the filename to find. can include wildcards. all multiple matching unique filenames are returned.
 #   <searchPathsN> : default is "$PATH": a list of paths separated by ":". multiple parameters <searchPaths> are combined
+#
 # Options:
+#   -R <retVar> : return the first value found in this  variable name
+#   -A <arrayVar> : return every value found by appending to this array variable name
 #   -r <relativePaths> : this option can appear anywhere on the command line and it effects only the
 #        <searchPathsN> parameters that follow it up until the next -r is encountered.
 #        <relativePaths> is a : separated list of paths similar to <searchPathsN>
@@ -66,7 +70,7 @@
 #    findInPaths : this is a much more flexible algorithm for finding various types of installed files
 function findInPaths()
 {
-	local allowDupes addScriptFolderFlag="1" debug relativePaths=("") tmpPaths allPaths
+	local allowDupes addScriptFolderFlag="1" debug relativePaths=("") tmpPaths allPaths singleValueFlag listPathsFlag
 	local posCwords=1 fileSpec preCmd findPrintFmt="%p" retVar
 	local retArgs=("--echo")
 
@@ -85,12 +89,15 @@ function findInPaths()
 			;;
 		-d:*)  allowDupes="-d" ;;
 		--no-scriptFolder:*) addScriptFolderFlag="" ;;
+		--listPaths:*) listPathsFlag="--listPaths" ;;
 		--debug:*)           debug="1"; preCmd="echo " ;;
 		--return-relative:*) findPrintFmt="%P" ;;
-		-R*|--retVar*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
+		-R*|--retVar*)   bgOptionGetOpt val: retVar "$@" && shift; retArgs=(); singleValueFlag="1" ;;
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
 
 		# first positional param is the filespec
-		[^-]*:1) fileSpec="$1"; ((posCwords++)) ;;
+		[^-]*:1) fileSpec="$1"; ((posCwords++))
+			;;
 
 		# the rest are searchPath terms. Add them to the allPaths array, expanding with the relativePaths
 		# that is in effect
@@ -100,9 +107,9 @@ function findInPaths()
 			local path; for path in "${tmpPaths[@]}"; do
 				path="${path%/}"
 				# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
+				#           searched in non-development mode
 				# TODO: check the path with a white list of all acceptable system paths. we done know if its code or data so the white list needs to include all.
 				#       note that it not ok to check whether the user can write to the folder because a non-root user can make a folder they can not write to.
-				# # searched in non-development mode
 				# if [ "$bgProductionMode" != "development" ] ; then
 				#
 				# fi
@@ -116,6 +123,7 @@ function findInPaths()
 	esac; shift; done
 
 	if [ ! "$fileSpec" ]; then
+		type -t assertError &>/dev/null && assertError "fileSpec is a required parameter to findInPaths()"
 		echo "error: fileSpec is a required parameter to findInPaths()" >&2
 		exit 45
 	fi
@@ -130,11 +138,19 @@ function findInPaths()
 		return
 	fi
 
+	if [ "$listPathsFlag" ]; then
+		printfVars templatFolders:allPaths
+		return
+	fi
+
 	# since we allow wildcards in <fileSpec>, we could be returning multiple matching files even if
 	# the allowDupes option was not specified so the awk filter is needed to remember which fileSpecs
 	# have been seen and suppress outputting subsequent fileSpecs.
+	local count=0
 	while IFS="" read -r -d$'\b' _line; do
+		((count++))
 		varSetRef "${retArgs[@]}"  "$retVar" "$_line"
+		[ "$singleValueFlag" ] && return 0
 	done < <(find "${allPaths[@]}" -maxdepth 1 -type f -name "$fileSpec" -printf "${findPrintFmt}\0" 2>/dev/null \
 		| awk -v RS='\0' -F"/" -v allowDupes="$allowDupes" '
 		{
@@ -147,6 +163,7 @@ function findInPaths()
 			}
 		}
 	')
+	[ ${count:-0} -gt 0 ]
 }
 
 
@@ -263,10 +280,14 @@ fi
 #    template
 #		# TEMPLATETYPE : <baseName>.<typePart1Name>... : <description>...
 #		# TEMPLATEVAR : <baseName> : <varName> : <description>...
+#
 # Params:
 #    <templateName> : the name of the template
 #    <searchPathN>  : each is a ":" separated list of folders. More that one can be specified. The order is relevant
+#
 # Options:
+#   -R <retVar> : return the first value found in this  variable name
+#   -A <arrayVar> : return every value found by appending to this array variable name
 #   -d : allow duplicates. if a matching template exists in more than one path, this causes all occurrences
 #        to be returned instead of only the first found.
 #   -p <packageName> : limit the default search path to package related templates provided by this package.
@@ -275,23 +296,28 @@ fi
 #   --return-relative : instead of returning the fully qualified absolute paths, return just the template
 #        names relative to the search path where it is found. This is useful when using wildcards to
 #        find out which template names are available to use.
+# SECURITY: templateFind needs to return only trusted, installed templates by default because they can be used to change system config.
 function templateFind()
 {
-	local type debug allowDupes returnRelative packageOverride retVar
+	local type debug allowDupes returnRelative packageOverride retVar retArray listPathsFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-d) allowDupes="-d" ;;
 		-p*) bgOptionGetOpt val: packageOverride "$@" && shift ;;
 		--debug) debug="--debug" ;;
+		--listPaths) listPathsFlag="--listPaths" ;;
 		--return-relative) returnRelative="--return-relative" ;;
+		-A*|--retArray*) bgOptionGetOpt val: retArray "$@" && shift ;;
 		-R*|--retVar*) bgOptionGetOpt val: retVar "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local templateName="$1"; [ $# -gt 0 ] && shift
 
-	if [ -f "$templateName" ]; then
-		returnValue "$templateName" "$retVar"
-		return
-	fi
+	# This fature was removed for SECURITY. This function should only return templates it finds in system paths so that the caller
+	# can trust that the template is the product of only priviledged access.
+	# if [ -f "$templateName" ]; then
+	# 	returnValue "$templateName" "$retVar"
+	# 	return
+	# fi
 
 	if [ $# -gt 0 ]; then
 		assertError "specifying paths to search for templates has been removed for security concerns -- templateFind will only
@@ -306,7 +332,7 @@ function templateFind()
 
 		# we can not guarantee that a domFolder will be available because this code is needed to initialize a new domdata.
 		# domResolveDefaultDomFolder -> domContentInit(on local domFolder) -> awkData_lookup -> templateFind
-		local domFolder; domGetFolder domFolder
+		local domFolder; type -t domGetFolder&>/dev/null && domGetFolder domFolder
 		if [ "$domFolder" ]; then
 			sysadminFolders+=":$domFolder/servers/me/templates"
 			sysadminFolders+=":$domFolder/locations/me/templates"
@@ -321,30 +347,34 @@ function templateFind()
 		# overrides the installed content. This allows for a vininstalled package removing a template that may still exist in the
 		# last installed version.
 		# SECURITY: if in non-development mode, we must not consider the virtually installed folders which non-admins could write to.
-		local thisPackageFolder+="/usr/share/${packageOverride:-${packageName}}/templates/"
+		local localPkgName="${packageOverride:-${packageName:-$projectName}}"
+		local thisPackageFolder
+		if [ "$localPkgName" ]; then
+			thisPackageFolder="/usr/share/${localPkgName}/templates/"
+		fi
 		local bgLibPathsAry;
 		if [ ! "$bgSourceOnlyUnchangable" ]; then
 			IFS=":" read -a bgLibPathsAry <<<$bgLibPath
 			local path; for path in "${bgLibPathsAry[@]}"; do
-				[[ "$path" =~ \b${packageOverride:-${packageName}}\b ]] && thisPackageFolder="${path}/data/templates/"
+				[[ "$path" =~ (^|[/])$localPkgName([/]|$) ]] && thisPackageFolder="${path}/data/templates/"
 			done
 		fi
 
 
 		[ "$debug" ] && printfVars packageOverride packageName
 
+		# see man(3) findInPaths for explanation of the -r option. It maintains a statefull list of relative paths that are added
+		# to each path encountered on the cmd line. When its "", the paths are taken as is. If its a list, each path encountered
+		# produces N paths by concatenating it with each of the relative paths. If the -r list contains an empty relative path as
+		# well as some relative paths (i.e. the : appears at the start or the end or :: appears in the middle) then the base path
+		# will added too.
 		if [ "$packageOverride" ]; then
-			# see man(3) findInPaths for explanation of the -r option. It maintains a statefull list of relative paths that are added
-			# to each path encountered on the cmd line. When its "", the paths are taken as is. If its a list, each path encountered
-			# produces N paths by concatenating it with each of the relative paths. If the -r list contains an empty relative path as
-			# well as some relative paths (i.e. the : appears at the start or the end or :: appears in the middle) then the base path
-			# will added too.
-			findInPaths ${retVar:+-R "$retVar"} $debug $allowDupes $returnRelative --no-scriptFolder "$templateName" \
+			findInPaths ${retVar:+-R "$retVar"} ${retArray:+-A "$retArray"} $debug $allowDupes $returnRelative $listPathsFlag --no-scriptFolder "${templateName:-"*"}" \
 			 	-r "${packageOverride}${packageOverride:+:}"   "$sysadminFolders"  \
 				-r ""                "$thisPackageFolder"
 		else
-			findInPaths ${retVar:+-R "$retVar"} $debug $allowDupes $returnRelative --no-scriptFolder "$templateName" \
-			 	-r "${packageName}${packageName:+:}"   "$sysadminFolders" \
+			findInPaths ${retVar:+-R "$retVar"} ${retArray:+-A "$retArray"} $debug $allowDupes $returnRelative $listPathsFlag --no-scriptFolder "${templateName:-"*"}" \
+			 	-r "${localPkgName}${localPkgName:+:}"   "$sysadminFolders" \
 				-r ""                "$thisPackageFolder" \
 				-r "data/templates/" "${bgLibPathsAry[@]}" \
 				-r ""                /usr/share/??-*/templates/

@@ -1,0 +1,5 @@
+This is a test template that contains variables that exercise all the supported features.
+Plain var --        %\%size%\%          : %size%
+Var with default -- %\%color:red%\%     : %color:red%
+Required var --     %\%+name%\%         : %+name%
+Default as a var -- %\%nickName:$name%\%: %nickName:$name%

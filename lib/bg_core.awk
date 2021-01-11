@@ -8,9 +8,9 @@ function manifestGetFile(                      manFile) {
 	return (manFile) ? manFile : "/var/lib/bg-core/manifest";
 }
 
-function manifestGet(assetTypeMatch, filenameMatch, array                    ,manFile,cmd,script,asset) {
+function manifestGet(assetTypeMatch, assetNameMatch, array                    ,manFile,cmd,script,asset) {
 	manFile=manifestGetFile()
-	script="$2~/"assetTypeMatch"/ && $3~/"filenameMatch"/ {print $4}"
+	script="$2~/"assetTypeMatch"/ && $3~/"assetNameMatch"/ {print $4}"
 	cmd="awk '"script"' "manFile
 	arrayCreate(array)
 	while ((cmd | getline asset) >0) {
@@ -184,14 +184,29 @@ function printfVars2(level, varName, varValue, optionsStr,      i,optToken,optio
 # usage: arrayPush(array, element)
 # add <element> to the end of <array>
 function arrayPush(array, element) {
-	array[length(array)]=element
+	array[length(array)+1]=element
 }
 
 # usage: arrayPop(array)
 # remove and return the last element from the end of <array>
 function arrayPop(array                      , element) {
-	element=array[length(array)-1]
-	delete array[length(array)-1]
+	element=array[length(array)]
+	delete array[length(array)]
+	return element
+}
+
+# usage: arrayShift(array)
+# remove and return the first element from the start of <array>
+function arrayShift(array                      , element, i,startLength) {
+	startLength=length(array);
+	element=array[1];
+	for (i=1; i<length(array); i++)
+		array[i]=array[i+1];
+	delete array[length(array)]
+	if (startLength-1 != length(array)) {
+		printfVars2(0,"array after shift", array)
+		assert("arrayShift: this function is only valid for packed numeric indexed arrays. startLength='"startLength"'   endLength='"length(array)"'")
+	}
 	return element
 }
 

@@ -967,7 +967,7 @@ function arrayAdd()
 ####################################################################################################################
 ### Attributes Manipulation Functions
 # Attributes are a concept of stroing a name/value field data in a string that is a single bash token
-# They are used on many command line sysntax.
+# They are used on many command line syntax.
 # See Also:
 #    awkData
 # Summary:

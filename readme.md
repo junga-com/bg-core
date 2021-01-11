@@ -491,6 +491,7 @@ Hello bobg. My favorite color is red
 ```
 Here for brevity I expanded a string literal template but I could have done the same by putting the content in a file. The extended template parser supports directives for flow control
 
+This package supports a mechanism for system templates. System templates require privilege to install on a host -- either by installing a package that provides template assets or by a sysadmin using privilege to copy or create one in the /etc/bgtemplates/ folder. The findTemplate function will only return system templates so that the caller can trust that any fund template comes from a privileged source.  
 
 ## Object Oriented Bash
 

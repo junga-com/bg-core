@@ -26,7 +26,6 @@
 #                    and is equal to the empty string "", the default value will not be used. If no defaultValue is present, the
 #                    empty string will be used as the value. The default value can not contain nested %varName% references but it
 #                    can contain simple $varName references. If the leading + syntax is used, the defaultValue will not be used
-#                    because an error
 #     $objSyntax   : If the first character after the optional + is a $ and/or the varName contains a '.' it is interpreted as an
 #                    object reference. See man(3) completeObjectSyntax for that syntax
 #
@@ -48,7 +47,7 @@
 #
 # Directive Syntax:
 #   The template expansion functions with the work "Extended" in their name support addtional directive syntax in template content.
-#   A directive must start at the beginning of a line. The extended template sysntax is processed line by line. Any %varname%
+#   A directive must start at the beginning of a line. The extended template syntax is processed line by line. Any %varname%
 #   variable references are expanded on the line before the directive is processed so directives can contain variables.
 #        %# comment...           # %# comments are not a part of the expanded template. # comments are passed through.
 #        %set varname="value"    # define the value of a template variable which can be used in subsequent variable references
@@ -77,17 +76,104 @@
 #    man(3) templateExpandExtended : expand templates that only have directives and variable references
 
 
+# usage: templateListTemplates
+function templateListTemplates()
+{
+	local baseTemplateName="${1}"
+	if [[ "$baseTemplateName" =~ []*?[] ]]; then
+		baseTemplateName="$baseTemplateName"
+	elif [ "$baseTemplateName" ]; then
+		baseTemplateName="$baseTemplateName*"
+	else
+		baseTemplateName="*"
+	fi
 
-# usage: templateFindTypes <baseTemplateName>
+	templateFind --return-relative "$baseTemplateName"
+}
+
+
+# usage: templateListTypes <baseTemplateName>
 # return the types available on this host for the given <baseTemplateName>.
 # Template filenames use the ext convention where the type is the ext.
-function templateFindTypes()
+function templateListTypes()
 {
-	local baseTemplateName="$1"
-	templateFind --return-relative "$baseTemplateName.*" | awk -v baseTemplateName="$baseTemplateName" '
-		{sub(baseTemplateName".",""); print $0}
+	local baseTemplateName="${1}"
+	if [[ "$baseTemplateName" =~ []*?[] ]]; then
+		baseTemplateName="$baseTemplateName"
+	elif [ "$baseTemplateName" ]; then
+		baseTemplateName="$baseTemplateName*"
+	else
+		baseTemplateName="*"
+	fi
+
+	templateFind --return-relative "$baseTemplateName" | awk  -v baseTemplateName="$baseTemplateName" '
+		@include "bg_core.awk";
+		function add(array, p1,p2,p3,p4,p5,p6) {
+			if (!(p1 in array))
+				arrayCreate2(array,p1);
+			if (p2)
+				add(array[p1], p2,p3,p4,p5);
+		}
+		function printData(level, array) {
+			for (type in array) {
+				printf("%s%s\n", level, type);
+				printData(level"   ", array[type]);
+			}
+		}
+
+		NF>0 {
+			split($0, parts, ".");
+			type=arrayShift(parts);
+			add(data,type, join(parts,"."))
+		}
+
+		END {
+			PROCINFO["sorted_in"]="@ind_str_asc"
+			printData("", data)
+		}
 	'
 }
+
+# usage: completeTemplateName <cur>
+# do bash cmdline completion on a system template name. System templates are installed by packages or system admins on a host or
+# domain.  They can be specified or listed by name without path. Their names are hierarchical using '.' to delimit the parts.
+function completeTemplateName()
+{
+	local cur="$1"
+	templateFind --return-relative "${cur}*" | awk -v cur="$cur" '
+		@include "bg_core.awk";
+		BEGIN {
+			curDonePart=""
+			if (cur ~ /[.]/) {
+				curDonePart=gensub(/[.].*$/,".","g",cur)
+				printf("$(cur:%s)\n", substr(cur, length(curDonePart)+1))
+			}
+		}
+		NF>0 {
+			if ($0 ~ "^"cur) {
+				leftover=gensub("^"curDonePart, "", "g", $0);
+				if (!leftover)
+					leftover="%20"
+				results[leftover]=1
+			}
+		}
+		END {
+			if (length(results) >= 4) {
+				for (i in results) {
+					leftover=i;
+					delete results[i];
+					if (leftover ~ /[.]/) {
+						leftover=gensub("[.].+$",".%3A","g", leftover)
+					}
+					results[leftover]=1
+				}
+			}
+			for (i in results)
+				printf("%s\n", i)
+		}
+	' | sort -u
+}
+
 
 # usage: templateGetContent [-f] <templateFile>[:<templateSection>] [<templateSection>]
 # usage: templateGetContent -s <templateString>
@@ -127,7 +213,7 @@ function templateGetContent()
 				templateSection="$2"
 			fi
 			templateFile="${templateFile//%3A/:}"
-			templateFile="$(templateFind "$templateFile")"
+			[[ "${templateFile}" =~ ^/ ]] || templateFind -R templateFile "$templateFile"
 
 			[ -f "$templateFile" ] || assertError -v inputType -v templateFile -v templateSection -v cmdLine "template does not exist"
 
@@ -160,31 +246,33 @@ function templateGetContent()
 #    templateGetVarTokens
 function templateListVars()
 {
-	local -A nameSet defaultValues
-	while read -r varName; do
-		[ "$varName" ] || continue
-		[ "$terseFlag" ] && { echo "$varName"; continue; }
-		local pre=""; [ "${varName:0:1}" == "+" ] && pre="+"; varName="${varName#+}"
-		local defVal=""; [[ "${varName}" =~ : ]] && defVal="${varName#*:}"; varName="${varName%%:*}"
-		nameSet[${varName}]+="$pre"
-		[ "$defVal" ] && defaultValues["${varName},$defVal"]="$varName"
-	done < <(templateGetContent "$@" \
-		| grep -o "%[$+]*[a-zA-Z0-9._]*\(:[^%]*\)*%" \
-		| tr -d "%" | sed -e "s/ /%20/g; /^[[:space:]]*$/d")
-	[ "$terseFlag" ] && return 0
-	for varName in "${!nameSet[@]}"; do
-		[ "${nameSet[$varName]}" ] && echo "${nameSet[$varName]}${varName}"
-	done | sort
-	for varName in "${!nameSet[@]}"; do
-		[ "${nameSet[$varName]}" ] && continue
-		local -A defs=()
-		local i; for i in "${!defaultValues[@]}"; do
-			if [ "${defaultValues["$i"]}" == "$varName" ]; then
-				defs="${i#${varName},}"
-			fi
+	local -a variables; mapfile -t variables < <(templateGetVarTokens "$@")
+
+	local -A reqVars optVars
+	local var; for var in "${variables[@]}"; do
+		local rematch; match "$var" "^([+])?([^:]*):?(.*)?$" rematch
+		local varName="${rematch[2]}"
+		[[ "${varName}" =~ ^\\\\*$ ]] && continue
+		if [ "${rematch[1]}" == "+" ]; then
+			reqVars[$varName]="${reqVars[$var]:-${rematch[3]}}"
+		else
+			optVars[$varName]="${optVars[$var]:-${rematch[3]}}"
+		fi
+	done
+
+	if [ ${#reqVars[@]} -gt 0 ]; then
+		printf "Required Template Variables\n"
+		for varName in "${!reqVars[@]}"; do
+			printf "   %-23s %-23s %s\n" "$varName" "def='${reqVars[$varName]}'" "cur='${!varName}'"
 		done
-		printf "%-23s default='%s'\n" "${varName}" "$(arrayJoin -d, defs)"
-	done | sort
+	fi
+
+	if [ ${#optVars[@]} -gt 0 ]; then
+		printf "Optional Template Variables\n"
+		for varName in "${!optVars[@]}"; do
+			printf "   %-23s %-23s %s\n" "$varName" "def='${optVars[$varName]}'" "cur='${!varName}'"
+		done
+	fi
 }
 
 
@@ -210,6 +298,7 @@ function templateGetVarTokens()
 }
 
 
+# OBSOLETE: ? templates as ini sections is being refactored
 # usage: templateContentBashCompletion <cur>
 # this is a bash completion (BC) function for prompting the user to complete a template filename and
 # optional ini section inside that file
@@ -250,6 +339,62 @@ function templateContentBashCompletion()
 	fi
 }
 
+# usage: completeTemplateVariables <cword> <templateName> [<varTerm>..<varTermN>]
+function completeTemplateVariables()
+{
+	local cword cur
+	while [ $# -gt 0 ]; do case $1 in
+		--cur*) bgOptionGetOpt val: cur "$@" && shift ;;
+		--cword*) bgOptionGetOpt val: cword "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local templateName="$1"; shift
+	if [ ${cword:-0} -eq 1 ]; then
+		completeTemplateName "$templateName"
+		return
+	fi
+
+	if [[ "${cur}" =~ : ]]; then
+		echo "<completeTheValueForThisVar>"
+		return
+	fi
+
+	local -A completedVars
+	while [ $# -gt 0 ]; do
+		local term="$1"; shift
+		local rematch; match "$term" "^([+])?([^:]*):(.*)?$" rematch || continue
+		local varName="${rematch[2]}"
+		completedVars[${varName:-empty}]="${rematch[3]}"
+	done
+
+	local -a variables; mapfile -t variables < <(templateGetVarTokens "$templateName")
+
+	local -A reqVars optVars definedVars
+	local var; for var in "${variables[@]}"; do
+		local rematch; match "$var" "^([+])?([^:]*):?(.*)?$" rematch
+		local varName="${rematch[2]}"
+		[[ "${varName}" =~ ^\\\\*$ ]] && continue
+		[ "${completedVars[$varName]+exists}" ] && continue
+		if [ "${rematch[1]}" == "+" ]; then
+			reqVars[$varName]="${reqVars[$var]:-${rematch[3]}}"
+		else
+			optVars[$varName]="${optVars[$var]:-${rematch[3]}}"
+		fi
+		if [ "${!varName+exists}" ]; then
+			definedVars[$varName]="${!varName}"
+		fi
+	done
+
+	if [ ${#reqVars[@]} -gt 0 ]; then
+		echo "<${#reqVars[@]}_requiredVarsNeedToBeCompleted>"
+		echo "\$(suffix::%3A) ${!reqVars[@]}  \$(suffix)"
+	else
+		echo "<onlyOptionalVarsRemain>"
+		echo "\$(suffix::%3A) ${!optVars[@]}  \$(suffix)"
+	fi
+}
+
+# OBSOLETE: use completeTemplateVariables instead
 # usage: templateVarBashCompletion <templateFile> <cur> [<excludeVarList>] [<attribTerm1> .. <attribTermN>]
 # this is a bash completion (BC) function for prompting the user to provide values for template variables referenced in a template
 # See bg-expandTemplate command for an example of how to use this in a BC function
@@ -261,9 +406,9 @@ function templateContentBashCompletion()
 function completeTemplateVar() { templateVarBashCompletion "$@"; }
 function templateVarBashCompletion()
 {
-	local templateFile="$(templateFind $1)"; [ $# -gt 0 ] && shift
-	local cur="$1";                      [ $# -gt 0 ] && shift
-	local excludeVarList="${1//[:,]/ }"; [ $# -gt 0 ] && shift
+	local templateFile; templateFind -R templateFile "$1"; shift
+	local cur="$1";                      shift
+	local excludeVarList="${1//[:,]/ }"; shift
 	while [ $# -gt 0 ]; do
 		local attribName attribValue
 		splitString -d":" "$1" attribName attribValue
@@ -363,12 +508,14 @@ function templateEvaluateVarToken()
 		_objRefETV="1"
 	fi
 
+	#" Atom syntax highlight bug fix
+
 	### perform the evaluation
 
 	# do the supported escape sequences to insert literal % into the output
-	if [[ "$_varNameETV" =~ ^\\*$ ]]; then
+	if [[ "$_varNameETV" =~ ^\\\\*$ ]]; then
 		_foundETV="1"
-		_varValueETV="${_varNameETV//\\/%}"
+		_varValueETV="${_varNameETV//\\/$templateMagicEscToken}"
 
 	# do the supported object reference syntax
 	elif [ "$_objRefETV" ]; then
@@ -382,8 +529,13 @@ function templateEvaluateVarToken()
 	fi
 
 	if [ ! "$_foundETV" ]; then
-		[[ "$_varDefValueETV" =~ \$\( ]] && assertTemplateError -v context -v _varNameTokenETV "default value can not contain \$(cmd...) syntax"
-		_varValueETV="$(eval echo '"'$_varDefValueETV'"')"
+		if [[ "$_varDefValueETV" =~ ^\$ ]]; then
+			_varDefValueETV="${_varDefValueETV:1}"
+			[[ ! "$_varDefValueETV" =~ ^[a-zA-Z0-9_]*$ ]] && assertTemplateError -v context -v _varNameTokenETV "an indirect default value can not contain special characters besides the leading \$"
+			_varValueETV="${!_varDefValueETV}"
+		else
+			_varValueETV="$_varDefValueETV"
+		fi
 	fi
 
 	### finish
@@ -397,12 +549,14 @@ function templateEvaluateVarToken()
 }
 
 
-# usage: templateExpandStr [-R <retVar>] [-s <objectScope>] <templateStr> [<scrContextForErrors>]
+# usage: templateExpandStr [-R <retVar>] [-o <objectScope>] [-s] <templateStr> [<scrContextForErrors>]
 # Replaces variable references in <templateStr> with the values of the process's environment variables.
 # Variable syntax and Examples:
 #   see templateEvaluateVarToken for a description of the supported syntax
 # Options:
-#     -s <objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
+#     -s : this is ignored by this function so that its command line is compatible with other template functions that support passing
+#          either a -s <string> or a -f <file>
+#     -o|--objCtx=<objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
 #           prepended to the template variable so that the members of the <objectScope> object will be the global scope of template vars
 #           The default is "" so that the callers bash variables are queried for individual objects.
 # See Also:
@@ -415,58 +569,65 @@ function expandString() { templateExpandStr "$@"; }
 function templateExpandStr()
 {
 	local _objectContextES retVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-s*)  _objectContextES="$(bgetopt "$@")" && shift ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-s) ;;
+		-o*|--objCtx) bgOptionGetOpt val: _objectContextES "$@" && shift ;;
 		-R*) bgOptionGetOpt val: retVar "$@" && shift ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	local str="$1"
 	local scrContextForErrors="$2"
 	local varNameToken
 
-	# process the escape sequence to allow tempaltes to contain a literal % and %%
+	# process the escape sequence to allow templates to contain a literal % and %%
 	str="${str//%%/}"
 
+	local _literalPercentsSeen
 	for varNameToken in $(templateGetVarTokens -s $str); do
+		[[ "$varNameToken" =~ ^\\\\*$ ]] && _literalPercentsSeen="1"
 		varNameToken="${varNameToken//%20/ }"
 		local _nameETV="" _valueETV=""
 		templateEvaluateVarToken "$varNameToken" _nameETV _valueETV "${scrContextForErrors:-string:${str:0:40}}"
 
 		str="${str//%$varNameToken%/$_valueETV}"
 	done
+	[ "$_literalPercentsSeen" ] && str="${str//$templateMagicEscToken/%}"
+
 	returnValue "$str" "$retVar"
 }
 
 
+templateMagicEscToken="|#0.0.7#|"
 
 
-# usage: templateExpand [-s <objectScope>] <srcTemplate> [ <dstFilename> [ <varName1>:<value1>..<varNameN>:<valueN>] ]
+# usage: templateExpand [<options>] <srcTemplate> <dstFilename>|- [ <varName1>:<value1>..<varNameN>:<valueN>]
+# usage: templateExpand [<options>] -s <stringContent> -d <dstFilename>  [ <varName1>:<value1>..<varNameN>:<valueN>]
+# usage: templateExpand [<options>] -f <srcTemplate> -d <dstFilename>  [ <varName1>:<value1>..<varNameN>:<valueN>] ]
 # Expands the <srcTemplate> and prints the results into <dstFilename> or to stdout
 # Expand means that variable references in the template are replaced with the values of coresponding
 # values of variables set in the linux ENV.  Variables can optionally be specified that will be added to
 # the ENV just for the duration of the template expansion.
+#
 # Variable syntax and Examples:
 #   see templateEvaluateVarToken for a description of the supported syntax
+#
 # Params:
-#    <srcTemplate> : name of the template file in the host file system. It needs to be one token
-#            but can be any sytanx supported by the -f form of templateGetContent. Typically its a
-#            filename or a filename:iniSectionname. If it does not refer to an existing file by itself,
-#            the system template path is searched
-#            If it does not result in it refering to an existing file an error will be asserted.
-#            If the user does not have read permission on the file, sudo will be used.
-#            If <srcTemplate> is a non-text file type and <dstFilename> is specified, it will be copied as is.
-#   <dstFilename>  : the destination file. An empty dstFilename will result in the expanded content being
-#            written to stdout. The <dstFilename> can contain template variables which will be expanded to
-#            form the actual destination filename. If <dstFilename> resolves after expansion to <srcTemplate>,
-#            <srcTemplate> will be expanded in place
-#            If the executing user does not have permission to change or create <dstFilename>, sudo will be
-#            used.
-#            <dstFilename> is required if any name:value pairs are specified. It can be "" to indicate stdout
+#    <srcTemplate> : the source content to be expanded can be specified in several different ways. If neither the -f nor -s options
+#            are incuded, then the first positional parameter will be interpreted as the <srcTemplate> file name. If its not an
+#            absolute path, templateFind will be used to get the absolute path assuming that it is a name of a system template.
+#   <dstFilename>  : the destination where the expanded template wil be written. If it is '-' or '--' or '', it will be written to
+#            stdout. If the -d option is not used to specify <dstFilename>, the first or second positional parameter (depending on
+#            whether <srcTemplate> is the first) will be interpreted as <dstFilename>
 #   <varNameN>:<valueN> or <varNameN>=<valueN> : attributes that will be exported in the ENV and available
 #            for use in the template. A caller can also export variables into the ENV before calling this
 #            function. Any specified on this command line will be in scope only for the template expansion.
 # Options:
-#    -s <objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
+#    -s <string> : use <string> as the template content to expand
+#    -f|--file=<srcTemplate> : use the content contained in <file> as the template content to expand. If <file> is not already an absolute path,
+#                  it uses templateFind to get the absolute path
+#    -d|--destination=<dstFilename> : send the output to this destination. '-', '--' and '' will cause it to be written to stdout
+#    -o|--objCtx=<objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
 #           prepended to the template variable so that the members of the <objectScope> object will be the global scope of template vars
 #           The default is "" so that the callers bash variables are queried for individual objects.
 #    -S <changedStatusVar> : <changedStatusVar> will be set to "1" if <destFile> is changed by this call
@@ -481,13 +642,29 @@ function expandTemplate() { templateExpand "$@"; }
 function templateExpand()
 {
 	local _objectContextES changedStatusVar_ interactiveFlag
+	local srcTemplate srcTemplateParams srcTemplateContent srcTemplateSpecified
+	local dstFilename dstFilenameSpecified
 	while [[ "$1" =~ ^- ]]; do case $1 in
-		-s*) bgOptionGetOpt val: _objectContextES "$@" && shift ;;
+		-s*) bgOptionGetOpt val: srcTemplateContent "$@" && shift
+			srcTemplateParams=(-s "$srcTemplateContent")
+			srcTemplateSpecified="1"
+			;;
+		-f*|--file) bgOptionGetOpt val: srcTemplate "$@" && shift
+			srcTemplateSpecified="1"
+			;;
+		-d*|--destination*) bgOptionGetOpt val: dstFilename "$@" && shift
+			dstFilenameSpecified="1"
+			;;
+		-o*|--objCtx) bgOptionGetOpt val: _objectContextES "$@" && shift ;;
 		-S*) bgOptionGetOpt val: changedStatusVar_ "$@" && shift ;;
 		--interactive) interactiveFlag="--interactive" ;;
 	esac; shift; done
-	local srcTemplate="$1"; [ $# -gt 0 ] && shift
-	local dstFilename="$1"; [ $# -gt 0 ] && shift
+	[ ! "$srcTemplateSpecified" ] && { srcTemplate="$1"; shift; }
+	[ ! "$dstFilenameSpecified" ] && { dstFilename="$1"; shift; }
+
+	# either - or -- is interpretted as sending the output to stdout. '-' b/c gnu cmds do that and '--' b/c it signals the transition
+	# to variable list on the cmdline
+	[[ "$dstFilename" =~ ^--?$ ]] && dstFilename=""
 
 	# if any name/value pairs were listed on the command line set them here
 	while [ $# -gt 0 ]; do
@@ -502,31 +679,35 @@ function templateExpand()
 	# TODO: add _templateStackPushFrame/_templateStackPopFrame and change assertError to assertTemplateError for better error messages
 
 	# we allow the destination name to contain template vars too. Also it can be -- to disambiguate from the name/value pairs
-	[ "$dstFilename" == "--" ] && dstFilename=""
 	if [[ "$dstFilename" =~ % ]]; then
 		dstFilename=$(filename=$dstFilename templateExpandStr $dstFilename) || assertError -v srcTemplate -v dstFilename "expanding dstFilename failed"
 	fi
 
 	# see if sudo is needed to read the input file or write the output file
-	local sudoOpts; bgsudoAdjustPriv sudoOpts -r "$srcTemplate" ${dstFilename:+-w "$dstFilename"} -p "creating '${dstFilename##*/}' [sudo] "
+	local sudoOpts; bgsudoAdjustPriv sudoOpts ${srcTemplate:+-r "$srcTemplate"} ${dstFilename:+-w "$dstFilename"} -p "creating '${dstFilename##*/}' [sudo] "
 
-	# if a complete path was not given, search for this template in the system template paths.
-	local usedTemplatePath
-	if [ ! -e "$srcTemplate" ]; then
-		usedTemplatePath="1"
-		srcTemplate="$(templateFind "$srcTemplate")"
-	fi
+	if [ "$srcTemplate" ]; then
 
-	# if the source exists without searching the system template path but is not a text file the
-	# expansion is trivially considered done and it collapses to the same as a copy. This supports
-	# expandFolder which may expand a folder with not template content. Maybe this would be better
-	# done there but it does make sense in this context. We do not send non-text files to stdout, but
-	# maybe we should to support pipes?
-	if [ ! "$usedTemplatePath" ] && [ -f "$srcTemplate" ] && [[ ! "$(file -ib $srcTemplate)" =~ ^text ]]; then
-		if [ "$dstFilename" ] && [ "$srcTemplate" != "$dstFilename" ]; then
-			bgsudo -O sudoOpts cp "$srcTemplate" "$dstFilename"
+		# if a complete path was not given, search for this template in the system template paths.
+		local usedTemplatePath
+		if [[ ! "$srcTemplate" =~ ^/ ]]; then
+			usedTemplatePath="1"
+			templateFind -R srcTemplate "$srcTemplate"
 		fi
-		return 0
+
+		# if the source exists without searching the system template path but is not a text file the
+		# expansion is trivially considered done and it collapses to the same as a copy. This supports
+		# expandFolder which may expand a folder with not template content. Maybe this would be better
+		# done there but it does make sense in this context. We do not send non-text files to stdout, but
+		# maybe we should to support pipes?
+		if [ ! "$usedTemplatePath" ] && [ -f "$srcTemplate" ] && [[ ! "$(file -ib $srcTemplate)" =~ ^text ]]; then
+			if [ "$dstFilename" ] && [ "$srcTemplate" != "$dstFilename" ]; then
+				bgsudo -O sudoOpts cp "$srcTemplate" "$dstFilename"
+			fi
+			return 0
+		fi
+
+		srcTemplateParams=(-f "$srcTemplate")
 	fi
 
 	# prepare the script that will replace the variables that appear in the template. We build one big
@@ -538,7 +719,9 @@ function templateExpand()
 	sedScript=" s/%%//g "
 
 	# now add a replacement sed command for each token found in the template.
-	local varNameToken; for varNameToken in $(templateGetVarTokens -f "$srcTemplate"); do
+	local _literalPercentsSeen
+	local varNameToken; for varNameToken in $(templateGetVarTokens "${srcTemplateParams[@]}" ); do
+		[[ "$varNameToken" =~ ^\\\\*$ ]] && _literalPercentsSeen="1"
 		varNameToken="${varNameToken//%20/ }"
 		local _nameETV="" _valueETV=""
 		templateEvaluateVarToken "$varNameToken" _nameETV _valueETV "$srcTemplate"
@@ -556,38 +739,40 @@ function templateExpand()
 		_valueETV="${_valueETV//$'\n'/\\$'\n'}"
 
 		newScriptPart='s/%'"${varNameToken//\//\\/}"'%/'"$_valueETV"'/g'
-		sedScript="$(printf "%s \n%s" "$sedScript" "$newScriptPart")"
+		printf -v sedScript "%s \n%s" "$sedScript" "$newScriptPart"
 	done
+	[ "$_literalPercentsSeen" ] && printf -v sedScript "%s \n%s" "$sedScript" "s/$templateMagicEscToken/%/g"
 	#bgtraceVars sedScript
 
 	# call sed to do the actual expansion
 	if [ "$dstFilename" ]; then
 		if [ -e "$dstFilename" ] && [ "$interactiveFlag" ]; then
 			local tmpDir; fsMakeTemp -d tmpDir
-			templateGetContent -f "$srcTemplate" | sed -e "$sedScript" > "$tmpDir/expandedTemplate"
+			templateGetContent "${srcTemplateParams[@]}" | sed -e "$sedScript" > "$tmpDir/expandedTemplate"
 			local results=("${PIPESTATUS[@]}")
 			if (( ${results[0]:-0}+${results[1]:-0}+${results[2]:-0} == 0 )); then
-				fsCopyAttributes "$srcTemplate" "$tmpDir/expandedTemplate"
+				[ "$srcTemplate" ] && fsCopyAttributes "$srcTemplate" "$tmpDir/expandedTemplate"
 				if fsIsDifferent "$tmpDir/expandedTemplate" "$dstFilename"; then
 					bgsudo -w "$dstFilename" $(getUserCmpApp) "$tmpDir/expandedTemplate" "$dstFilename"
 				fi
 			fi
 			fsMakeTemp --release tmpDir
 		else
-			templateGetContent -f "$srcTemplate" | sed -e "$sedScript" | pipeToFile "$dstFilename"
+			templateGetContent "${srcTemplateParams[@]}" | sed -e "$sedScript" | pipeToFile "$dstFilename"
 			local results=("${PIPESTATUS[@]}")
 			pipeToFile --didChange "$dstFilename" && setReturnValue "$changedStatusVar_" "1"
-			if (( ${results[0]:-0}+${results[1]:-0}+${results[2]:-0} == 0 )); then
+			if [ "$srcTemplate" ] && (( ${results[0]:-0}+${results[1]:-0}+${results[2]:-0} == 0 )); then
 				fsCopyAttributes "$srcTemplate" "$dstFilename"
 			fi
 		fi
 	else
-		templateGetContent -f "$srcTemplate" | sed -e "$sedScript"
+		templateGetContent "${srcTemplateParams[@]}" | sed -e "$sedScript"
 		local results=("${PIPESTATUS[@]}")
 	fi
-	[ ${results[0]:-0} -gt 0 ] && assertError -v srcTemplate "could not read contents"
+	[ ${results[0]:-0} -gt 0 ] && assertError -v srcTemplateParams "could not read template contents"
 	[ ${results[1]:-0} -gt 0 ] && assertError -v sedScript -v srcTemplate "sed failed"
 	[ ${results[2]:-0} -gt 0 ] && assertError -v dstFilename "could not write to file"
+	true
 }
 
 
@@ -595,12 +780,12 @@ function templateExpand()
 
 
 
-# usage: templateExpandFolder [-s <objectScope>] <templateFolder> <destinationFolder>
+# usage: templateExpandFolder [-o <objectScope>] <templateFolder> <destinationFolder>
 # This copies an entire folder tree to a new location expanding and template variable tokens found in
 # file and folder names and inside any text files. Binary files are copied as is.
 # This is used, for example, to create a new project folder from a template folder.
 # Options:
-#     -s <objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
+#     -o|--objCtx=<objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
 #           prepended to the template variable so that the members of the <objectScope> object will be the global scope of template vars
 #           The default is "" so that the callers bash variables are queried for individual objects.
 # See Also:
@@ -611,7 +796,7 @@ function templateExpandFolder()
 {
 	local _objectContextES=""
 	while [[ "$1" =~ ^- ]]; do case $1 in
-		-s*)  _objectContextES="$(bgetopt "$@")" && shift ;;
+		-o*|--objCtx) bgOptionGetOpt val: _objectContextES "$@" && shift ;;
 	esac; shift; done
 
 	local intemplatename=$1
@@ -653,7 +838,7 @@ declare -A templateCustomDirectives
 
 # a script that uses this system can set this variable to specify one or more folders where templates can be found. folders are : separated
 # OBSOLETE: search for all uses of this and upgrade to the new templateFind way
-export bgTemplatePath="${bgTemplatePath}"
+#export bgTemplatePath="${bgTemplatePath}"
 
 
 # usage: _templateStackPushFrame
@@ -746,10 +931,11 @@ function _templateGetCurrentScopeFiles()
 function assertTemplateError()
 {
 	local -a opts filesFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-v*) opts+=("-v$(bgetopt "$@")") && shift ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-v*) bgOptionGetOpt opt: opts "$@" && shift ;;
 		-f)  filesFlag="-vtemplateFilesInScope" ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local message="$1"
 
 	# save the current state so that we can access it in a stack frame like the others
@@ -851,7 +1037,7 @@ function templateEnterNewScope()
 
 	# next, if it wasn't fully qualified, see if srcTemplate matches a file name in the template paths
 	if [ ! "$templateFile" ] && [[ ! "$srcTemplate" =~ : ]]; then
-		templateFile="$(templateFind "$srcTemplate")"
+		templateFind -R templateFile "$srcTemplate"
 		if [ "$templateFile" ]; then
 			templateSection=""
 			templateName="${templateFile##*/}"
@@ -862,7 +1048,7 @@ function templateEnterNewScope()
 
 	# if the templateFile was set explicitly with the : and find it
 	if [ ! "$found" ] && [ "$templateFile" ]; then
-		templateFile="$(templateFind "$templateFile")"
+		templateFind -R templateFile "$templateFile"
 		if [ "$templateFile" ]; then
 			templateName="${templateFile##*/}"
 			templateLineNum="1"
@@ -896,7 +1082,7 @@ function templateLeaveScope()
 }
 
 
-# usage: templateExpandExtended [-s <objectScope>] <srcTemplate> [--] [ <varName1>:<value1>..<varNameN>:<valueN> ]
+# usage: templateExpandExtended [-o <objectScope>] <srcTemplate> [--] [ <varName1>:<value1>..<varNameN>:<valueN> ]
 # This expands template content with these additional features/differences over templateExpand:
 #   * Output is always sent to stdout. If you want to write to a file use ...
 #     example: templateExpandExtended <srcTemplate> | pipeToFile <dstFilename>
@@ -910,7 +1096,7 @@ function templateLeaveScope()
 #    <scrContextForErrors> : optional context string. If this function asserts an error, this string
 #         is included as the context of where the error happened.
 # Options:
-#     -s <objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
+#     -o|--objCtx=<objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
 #           prepended to the template variable so that the members of the <objectScope> object will be the global scope of template vars
 #           The default is "" so that the callers bash variables are queried for individual objects.
 #     --getInputVariables : some extended templates use the %inputVariables directive to get values that
@@ -922,10 +1108,10 @@ function templateExpandExtended()
 {
 	local _objectContextES getInputVariablesFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
-		-s*)  _objectContextES="$(bgetopt "$@")" && shift ;;
+		-o*|--objCtx) bgOptionGetOpt val: _objectContextES "$@" && shift ;;
 		--getInputVariables) getInputVariablesFlag="1" ;;
 	esac; shift; done
-	local srcTemplate="$1"; [ $# -gt 0 ] && shift
+	local srcTemplate="$1"; shift
 
 	# any variables that we define in this string will be local to this template run and be pushed onto
 	# a stack frame when ever a include directive starts and restored from the stack frame when it ends
@@ -984,7 +1170,7 @@ function _templateProcessOneLine()
 	case $firstToken in
 		%use)
 			# usage: %use filename
-			local fullFillPath="$(templateFind "$line")"
+			local fullFillPath; templateFind -R fullFillPath "$line"
 			[ ! "$fullFillPath" ] && assertTemplateError "%use directive: file '$line' not found in system template paths"
 			strSetAdd -n -S filesInScope "$fullFillPath"
 			;;

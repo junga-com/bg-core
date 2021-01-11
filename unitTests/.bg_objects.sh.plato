@@ -644,11 +644,11 @@ pet
 cmd> local pet; ConstructObject Animal pet
 cmd> local petOID="$(GetOID "$pet")"
 cmd> eval 'local petOIDVars="${!'"$petOID"'*}"'
-cmd> echo "global vars for this object = ${petOIDVars}" | heapNameAnon
+cmd> echo "global vars for this object = ${petOIDVars}"
 global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
-cmd> printfVars --noObjects pet $petOIDVars | heapNameAnon
+cmd> printfVars --noObjects pet $petOIDVars
 pet='_bgclassCall heap_A_<redacted> Animal 0 |'
-heap_A_<redacted>
+heap_A_<redacted>[]
                 [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
                 [legCount]='unk'
                 [species ]='unk'
@@ -657,16 +657,16 @@ heap_A_<redacted>_sys[]
                 [_CLASS]='Animal'
                 [0     ]='_bgclassCall heap_A_<redacted> Animal 0 |'
                 [_Ref  ]='_bgclassCall heap_A_<redacted> Animal 0 |'
-                [_OID  ]='heap_A_<redacted>
+                [_OID  ]='heap_A_<redacted>'
 
 ##----------
 ## test
 cmd> local -A pet2; ConstructObject Animal pet2
 cmd> local pet2OID="$(GetOID "$pet2")"
 cmd> eval 'local pet2OIDVars="${!'"$pet2OID"'*}"'
-cmd> echo "vars for this object = ${pet2OIDVars}" | heapNameAnon
+cmd> echo "vars for this object = ${pet2OIDVars}"
 vars for this object = pet2 pet2OID
-cmd> printfVars --noObjects $pet2OIDVars | heapNameAnon
+cmd> printfVars --noObjects $pet2OIDVars
 pet2[]
     [_CLASS  ]='Animal'
     [0       ]='_bgclassCall pet2 Animal 0 |'
@@ -682,15 +682,15 @@ pet2OID='pet2'
 cmd> local -n pet3; ConstructObject Animal pet3
 cmd> local pet3OID="$(GetOID "$pet3")"
 cmd> eval 'local pet3OIDVars="${!'"$pet3OID"'*}"'
-cmd> echo "global vars for this object = ${pet3OIDVars}" | heapNameAnon
+cmd> echo "global vars for this object = ${pet3OIDVars}"
 global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
-cmd> printfVars --noObjects pet3 $pet3OIDVars | heapNameAnon
+cmd> printfVars --noObjects pet3 $pet3OIDVars
 pet3[]
     [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
     [legCount]='unk'
     [species ]='unk'
     [family  ]='unk'
-heap_A_<redacted>
+heap_A_<redacted>[]
     [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
     [legCount]='unk'
     [species ]='unk'
@@ -699,7 +699,7 @@ heap_A_<redacted>_sys[]
     [_CLASS]='Animal'
     [0     ]='_bgclassCall heap_A_<redacted> Animal 0 |'
     [_Ref  ]='_bgclassCall heap_A_<redacted> Animal 0 |'
-    [_OID  ]='heap_A_<redacted>
+    [_OID  ]='heap_A_<redacted>'
 
 ## bg_objects.sh:ConstructObject: finished
 ###############################################################################################################################
@@ -752,7 +752,7 @@ a1[]
 ##----------
 ## test
 cmd> local a2; ConstructObject Array a2
-cmd> $a2.getOID | heapNameAnon
+cmd> $a2.getOID
 heap_a_<redacted>
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
@@ -789,15 +789,15 @@ a1[]
 ##----------
 ## test
 cmd> local a2; ConstructObject Map a2
-cmd> $a2.getOID | heapNameAnon
+cmd> $a2.getOID
 heap_A_<redacted>
-cmd> printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
-heap_A_<redacted>
+cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
+heap_A_<redacted>[]
 heap_A_<redacted>_sys[]
                 [_CLASS]='Map'
                 [0     ]='_bgclassCall heap_A_<redacted> Map 0 |'
                 [_Ref  ]='_bgclassCall heap_A_<redacted> Map 0 |'
-                [_OID  ]='heap_A_<redacted>
+                [_OID  ]='heap_A_<redacted>'
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
 a2 : <instance> of Map
@@ -809,8 +809,8 @@ a2 : <instance> of Map
   two  =2
   three=3
   one  =1
-cmd> printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
-heap_A_<redacted>
+cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
+heap_A_<redacted>[]
                 [two  ]='2'
                 [three]='3'
                 [one  ]='1'
@@ -818,7 +818,7 @@ heap_A_<redacted>_sys[]
                 [_CLASS]='Map'
                 [0     ]='_bgclassCall heap_A_<redacted> Map 0 |'
                 [_Ref  ]='_bgclassCall heap_A_<redacted> Map 0 |'
-                [_OID  ]='heap_A_<redacted>
+                [_OID  ]='heap_A_<redacted>'
 cmd> $a2.getSize
 3
 
@@ -905,7 +905,7 @@ element='one'
 ##----------
 ## test
 cmd> ConstructObject DataFile datafile "$tmpFile"
-cmd> printfVars datafile  | tempFileAnon
+cmd> printfVars datafile
 datafile : <instance> of DataFile
   filename=/tmp/bgmktemp.<redacted>
   data : <instance> of Array

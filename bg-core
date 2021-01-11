@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+###############################################################################
+# Includes and defines
+
+projectName=bg-core
+
+source /usr/lib/bg_core.sh
+import bg_template.sh ;$L1;$L2
+
+supportedCmds="templates cuiWin dropin config"
+
+###############################################################################
+# Command manpage
+# usage: bg-core [-q|-v] templates [<subCmdOptions>] [<subCmdArguments>]
+# query and manipulate general host settings and resources.
+# The bg-core package provides various addons to the base OS distribution.
+#
+# Sub Commands:
+#  * templates : find and list templates installed from various packages
+#  * cuiWin    : query and manipulate terminal windows participating in various script UI
+#  * dropin    : see status of and enable/disable various dropin configurations
+#  * config    : query and set host and domain configuration settings
+#
+# See Also:
+
+###############################################################################
+# Functions
+
+# this is invoked by oob_invokeOutOfBandSystem when -hb is the first param
+# The bash completion script calls this get the list of possible words.
+function oob_printBashCompletion()
+{
+	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+
+	cmd="$1"
+
+	case $cmd:$posCwords in
+		*:1) echo $supportedCmds ;;
+		templates:2) echo "types list find expand getVars paths" ;;
+		templates:*)
+			shift; ((posCwords--))
+			subCmd="$1"; shift; ((posCwords--))
+			case $subCmd:$((posCwords)) in
+				paths:1) ;;
+				*:1)
+					completeTemplateName "$@"
+					;;
+
+				expand:2) echo "<destination> - /" ;;
+
+
+				expand:*)
+					completeTemplateVariables --cword="$posCwords" --cur="$cur" "$@"
+					;;
+			esac
+			;;
+	esac
+	exit
+}
+
+# Use this function to provide BC suggestions for positional parameters
+# see man bg-overviewOutOfBandScriptFunctions for details
+function oob_helpMode()
+{
+	local words cword cur prev optWords posWords posCwords
+	parseForBashCompletion --compat2 words cword cur prev optWords posWords posCwords "$@"
+
+	local cmd="${posWords[1]}"
+	case ${cmd:-main} in
+		main)  man "$(basename $0)" ;;
+		*)     man "$(basename $0)" ;;
+	esac
+}
+
+
+
+
+
+
+
+
+# Command manpage: bg-dev-tests
+# usage: bg-dev tests list   [-f|--fullyQualyfied] [all]
+#        bg-dev tests list   [-f|--fullyQualyfied] <utIDSpec> [...<utIDSpecN>]
+#
+# See Also:
+function templateCntr()
+{
+	local cmd="${1:-list}"; shift
+	case ${cmd} in
+		types)      templateListTypes     "$@" ;;
+		list)       templateListTemplates "$@" ;;
+		find)       templateFind          "$@" || assertError "no template found" ;;
+		expand)     templateExpand        "$@" ;;
+		paths)
+			echo "These folders will be searched in order to resolve template names. The first folders will reflect the package where "
+			echo "templateFind is called from so that code will find the templates provided by the pkg that it is delivered in first"
+			echo "A sysadmin can override any template by creating a template with the same name in the first folder."
+			templateFind --listPaths
+			;;
+		getVars)
+			if ((verbosity<=1)); then
+				templateListVars      "$@"
+			else
+				templateGetVarTokens  "$@"
+			fi
+			;;
+		*) assertError -v cmd "unknown cmd" ;;
+	esac
+}
+
+
+###############################################################################
+# Main script
+
+# default values for parameters
+command=""
+verbosity=1
+oob_invokeOutOfBandSystem "$@"
+while [ $# -gt 0 ]; do case $1 in
+	-v|--verbose) ((verbosity++)) ;;
+	-q|--quiet) ((verbosity--)) ;;
+	--verbosity*) bgOptionGetOpt val: verbosity "$@" && shift ;;
+	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+done
+command="$1"; shift
+
+
+case ${command:-show} in
+	templates)     templateCntr   "${passThruOpts[@]}" "$@" ;;
+	dropin)        dropinCntr     "${passThruOpts[@]}" "$@" ;;
+	config)        configCntr     "${passThruOpts[@]}" "$@" ;;
+	show)          echo "coming soon..."  ;;
+	*)  echo "error: unknown command '$command'. "
+		echo "   See man $(basename $0)"
+		;;
+esac

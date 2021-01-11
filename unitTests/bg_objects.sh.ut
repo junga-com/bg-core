@@ -2,15 +2,6 @@
 
 import bg_objects.sh  ;$L1;$L2
 
-function heapNameAnon()
-{
-	sed 's/heap_\([^_]*\)_\([^_ ]*\)/heap_\1_<redacted>/g'
-}
-
-function tempFileAnon()
-{
-	sed 's|bgmktemp\.\([^ ]*\)|bgmktemp\.<redacted>|g'
-}
 
 declare -A ut__parseObjSyntax=(
 	[pOfEmptyOp0]="$(cmdline ".foo")"
@@ -118,22 +109,22 @@ function ut_ConstructObject()
 	local pet; ConstructObject Animal pet
 	local petOID="$(GetOID "$pet")"
 	eval 'local petOIDVars="${!'"$petOID"'*}"'
-	echo "global vars for this object = ${petOIDVars}" | heapNameAnon
-	printfVars --noObjects pet $petOIDVars | heapNameAnon
+	echo "global vars for this object = ${petOIDVars}"
+	printfVars --noObjects pet $petOIDVars
 
 	ut test
 	local -A pet2; ConstructObject Animal pet2
 	local pet2OID="$(GetOID "$pet2")"
 	eval 'local pet2OIDVars="${!'"$pet2OID"'*}"'
-	echo "vars for this object = ${pet2OIDVars}" | heapNameAnon
-	printfVars --noObjects $pet2OIDVars | heapNameAnon
+	echo "vars for this object = ${pet2OIDVars}"
+	printfVars --noObjects $pet2OIDVars
 
 	ut test
 	local -n pet3; ConstructObject Animal pet3
 	local pet3OID="$(GetOID "$pet3")"
 	eval 'local pet3OIDVars="${!'"$pet3OID"'*}"'
-	echo "global vars for this object = ${pet3OIDVars}" | heapNameAnon
-	printfVars --noObjects pet3 $pet3OIDVars | heapNameAnon
+	echo "global vars for this object = ${pet3OIDVars}"
+	printfVars --noObjects pet3 $pet3OIDVars
 }
 
 
@@ -169,7 +160,7 @@ function ut_Array()
 
 	ut test
 	local a2; ConstructObject Array a2
-	$a2.getOID | heapNameAnon
+	$a2.getOID
 	local -n a2OID; $a2.getOID a2OID
 	printfVars a2
 	a2OID=(one two three)
@@ -188,14 +179,14 @@ function ut_Map()
 
 	ut test
 	local a2; ConstructObject Map a2
-	$a2.getOID | heapNameAnon
-	printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
+	$a2.getOID
+	printfVars --noObjects "$($a2.getOID)"{,_sys}
 	local -n a2OID; $a2.getOID a2OID
 	printfVars a2
 	a2OID=([one]=1 [two]=2 [three]=3)
 	$a2.getIndexes
 	printfVars a2
-	printfVars --noObjects "$($a2.getOID)"{,_sys} | heapNameAnon
+	printfVars --noObjects "$($a2.getOID)"{,_sys}
 	$a2.getSize
 }
 
@@ -256,7 +247,7 @@ function ut_nestedObjects()
 
 	ut test
 	ConstructObject DataFile datafile "$tmpFile"
-	printfVars datafile  | tempFileAnon
+	printfVars datafile
 }
 
 function ut_Object_unset() {
@@ -453,12 +444,12 @@ function ut_Object_memberVarReadAccess() {
 		$obj.::doit
 	Catch: && {
 		echo "** Exception thrown and caught"
-		printfVars catch_errorClass catch_errorCode catch_errorDescription | heapNameAnon
+		printfVars catch_errorClass catch_errorCode catch_errorDescription
 	}
 	Try:
 		$obj.doit p1 p2 p3
 	Catch: && {
 		echo "** Exception thrown and caught"
-		printfVars catch_errorClass catch_errorCode catch_errorDescription | heapNameAnon
+		printfVars catch_errorClass catch_errorCode catch_errorDescription
 	}
 }

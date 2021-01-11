@@ -806,7 +806,7 @@ function __bgbc_detectAndCorrectSuggestionsRelativeToWrongCur()
 #    COMPREPLY : contents will be maniplulated to achieve the correct effect.
 function __bgbc_finalizeCOMPREPLY()
 {
-	### detect if there is a logical common root in the remaining suggestions that shold advance the
+	### detect if there is a logical common root in the remaining suggestions that should advance the
 	# cursor/token being completed.
 	local newCur="${cur}"
 
@@ -818,15 +818,19 @@ function __bgbc_finalizeCOMPREPLY()
 	# this is the algorithm to find the longest newCur that is a prefix of all entries
 	local i j; for ((i=1; i<=$(( ${#anotherWord}-${#cur} )); i++)); do
 		newCur="${cur}${anotherWord:${#cur}:$i}"
+		#__bgbc_trace -v "     trying '$newCur'"
 		local isCommonToAll="1"
 		for j in "${!COMPREPLY[@]}"; do
-			[[ ! "${COMPREPLY[$j]}" =~ ^$newCur ]] && { isCommonToAll=""; break; }
+			#__bgbc_trace -v "     checking against '${COMPREPLY[$j]}'"
+			[ "${COMPREPLY[$j]:0:${#newCur}}" != "$newCur" ] && { isCommonToAll=""; break; }
 		done
 		if [ ! "$isCommonToAll" ]; then
+			#__bgbc_trace -v "     backing out the last char  '${newCur:0:-1}'"
 			newCur="${newCur:0:-1}"
 			break
 		fi
 	done
+	__bgbc_trace -v "advanced '$cur' to '$newCur'"
 
 
 	# replace feature. If set, this token will override all the other suggestions to make this the

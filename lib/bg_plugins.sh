@@ -61,7 +61,7 @@ function plugin_bcPluginAttribute()
 }
 
 # usage: plugins_list [-R <retArrayVar>] [<pluginType>]
-# list the names of the plugins of the given type that are installed on the host. 
+# list the names of the plugins of the given type that are installed on the host.
 # If <pluginType> is not specified, list all plugins and include their type in the output.
 # Params:
 #    <pluginType> : only list the names of installed plugins of this type
@@ -173,11 +173,11 @@ function plugins_get()
 #    <pluginType> : the type of plugin. Typically its the extension of the plugin file
 #                   the plugin file registers attributes with this pluginType when it loads
 #    <pluginID>   : the name of a particular plugin. When a plugin file loads, it registers with this name
-#    <attribName> : the name of the plugin attribute to be retreived. 
+#    <attribName> : the name of the plugin attribute to be retreived.
 #    <attribValueVar> : the variable name that will receive the attribute's value. default is to write to stdout
 # Exit Code:
 #     0   : success. the attribute was found and returned
-#     1   : failure. this plugin/attribute was not found. The empty string was returned as the value  
+#     1   : failure. this plugin/attribute was not found. The empty string was returned as the value
 # See Also:
 #     plugins_get: gets all attributes in one call and returns them in an array
 function plugins_getAttribute()
@@ -233,7 +233,7 @@ function plugins_getAttribute()
 
 # usage: plugins_setAttribute <pluginType> <pluginID> <attribName> <attribValue>
 # this sets one mutable attribute persistently on the local host. The plugin will be loaded if its not already loaded.
-# Typically mutable attributes are settings that the host sysadmin can change to effect whether the plugin is activated 
+# Typically mutable attributes are settings that the host sysadmin can change to effect whether the plugin is activated
 # and how its activated. The pluginType declares which attributes are mutable. Attempting to set a non-mutable attribute
 # is an error.
 # After a group of plugins_setAttribute calls, "plugins_buildCaches <pluginType>" should be called so that the installedPlugins-<pluginType> cache reflects the new values
@@ -241,14 +241,14 @@ function plugins_getAttribute()
 #    <pluginType>  : the type of plugin. Typically its the extension of the plugin file
 #                    the plugin file registers attributes with this pluginType when it loads
 #    <pluginID>    : the name of a particular plugin. When a plugin file loads, it registers with this name
-#    <attribName>  : the name of the plugin attribute to be retrieved. 
+#    <attribName>  : the name of the plugin attribute to be retrieved.
 #    <attribValue> : the attribute's value being set
 # Exit Code:
 #     0   : success. the mutable attribute was set persistently
 #     1   : failure. this plugin is not available on this host. no changes were made. Maybe the plugin's pacakge is not installed.
 #     assertError : if the specified attribute is defined non-mutable in the pluginType, an exception is thrown.
 # See Also:
-#    plugins_registerAttribute : registerAttribute looks similar to setAttribute but is an internal function  
+#    plugins_registerAttribute : registerAttribute looks similar to setAttribute but is an internal function
 function plugins_setAttribute()
 {
 	local pluginType pluginID; _pluginsPreamble "$@" && shift; shift; assertNotEmpty pluginType; assertNotEmpty pluginID
@@ -292,7 +292,7 @@ function plugins_setAttribute()
 #                    the plugin file registers attributes with this pluginType when it loads
 #    <pluginID>    : the name of a particular plugin. When a plugin file loads, it registers with this name
 #    <methodAttribName> : the name of the plugin attribute to interpret as a cmd line to execute.
-#    <cmdLine ...> : the remainder of the cmd line will passed to the method. 
+#    <cmdLine ...> : the remainder of the cmd line will passed to the method.
 # Exit Code:
 #    202  : the method was not invoked because the plugin did not provide this method attribute. If --req is specified, this case will assert an error instead of returning 202
 #     <n> : any other return code will be the result of the cmd line being executed
@@ -326,8 +326,8 @@ function plugins_invokeMethod()
 # usage: plugins_buildCaches <pluginType> <pluginType>
 # This loads the specified pluginTypes via the discovery algorithm and creates cache files for them so that they can be loaded
 # more effeciently without doing the discovery algorithm.
-# The "all" form also creates some additional cache files that can only be created when it knows that its iterating 
-# the complete set of known plugins -- namely the installedPlugins cache and the installedPlugins-tags 
+# The "all" form also creates some additional cache files that can only be created when it knows that its iterating
+# the complete set of known plugins -- namely the installedPlugins cache and the installedPlugins-tags
 #
 # Cache Coherency:
 #   "plugins_buildCaches all" should be called after any operation that that might change the set of available plugins on the host
@@ -336,7 +336,7 @@ function plugins_invokeMethod()
 #     * bg_debugCntr vinstall
 #     * bg_debugCntr vuninstall
 #     * after the the selected domData changes (because mutable attributes will change)
-#   "plugins_buildCaches <pluginTypes..>" should be called after a mutable attribute of any plugin of that type is changed 
+#   "plugins_buildCaches <pluginTypes..>" should be called after a mutable attribute of any plugin of that type is changed
 #     * after a group of plugins_setAttribute calls
 #
 # Virtual Installs:
@@ -345,7 +345,7 @@ function plugins_invokeMethod()
 #    me: scope folder but instaead it will use a temporary me: scope folder.
 
 # Cache List:
-#   me:installedPlugins              : (pluginType,pluginID,srcFile)  : contains each plugin and the srcFile that it can be loaded from 
+#   me:installedPlugins              : (pluginType,pluginID,srcFile)  : contains each plugin and the srcFile that it can be loaded from
 #   me:installedPlugins-tags         : (tag,pluginType,pluginID)      : relates tags to plugins
 #   me:installedPlugins-<pluginType> : (columns list specified by pluginType) : pluginType specific cache -- one line per pluginID
 function plugins_buildCaches()
@@ -383,7 +383,7 @@ function plugins_buildCaches()
 
 	### make the installedPlugins.cache (typcical columns: server pluginType pluginID file tags)
 	if [ "$allFlag" ]; then
-		local awkObjData cacheFile schemaFile; awkData_parseAwkDataID --awkObjDataVar=awkObjData "me:installedPlugins" "" "" "" cacheFile schemaFile
+		local awkObjData cacheFile schemaFile; awkData_parseID --awkObjDataVar=awkObjData "me:installedPlugins" "" "" "" cacheFile schemaFile
 		[ ! -f "$schemaFile" ] && templateExpand "installedPlugins.schema" "$schemaFile"
 		domTouch -p "$cacheFile"
 		local pluginKey; for pluginKey in "${!_plugins_pluginFile[@]}"; do
@@ -418,7 +418,7 @@ function plugins_buildCaches()
 	### iterate each pluginType and make a cache specific to it ($columns)
 	# also, in the same loop we can build the tag caches
 	if [ "$allFlag" ]; then
-		local cacheFileTags; awkData_parseAwkDataID "me:installedPlugins-tags" "" "" "" cacheFileTags
+		local cacheFileTags; awkData_parseID "me:installedPlugins-tags" "" "" "" cacheFileTags
 		domTouch -p "$cacheFileTags"
 		printf "tag pluginType pluginID\n\n"  > "$cacheFileTags"
 	fi
@@ -432,7 +432,7 @@ function plugins_buildCaches()
 		[ ! "${_plugins_pluginRegistry[_$pluginType:Loaded]+exists}" ] && continue
 
 		local cacheFilePlugin
-		awkData_parseAwkDataID "me:installedPlugins-$pluginType" "" "" "" cacheFilePlugin
+		awkData_parseID "me:installedPlugins-$pluginType" "" "" "" cacheFilePlugin
 		domTouch -p "$cacheFilePlugin"
 		local columnsWithWidths="${_plugins_pluginRegistry[pluginType:$pluginType:columns]}"
 		columnsWithWidths="${columnsWithWidths//[(]/:}"
@@ -474,7 +474,7 @@ function plugins_buildCaches()
 # Load the specified <pluginID>s into the in memory registry. If any <pluginID> are specified the me:installedPlugins awkData
 # cache table will be consulted to find the associated plugin library script file to source.
 # If no <pluginID> are specified, the discovery algorithm will be used to search for and load all plugins of the specified type
-# that are installed on the host. Typically, only the plugins_buildCaches function uses that form of this function. 
+# that are installed on the host. Typically, only the plugins_buildCaches function uses that form of this function.
 # If any specified <pluginID> is not found in the cache, the plugin discovery algorithm is invoked to see if the plugin has been
 # added to the system since the cache was last made. This behavior may be removed in the future.
 # Definition Of "Loaded":
@@ -491,25 +491,25 @@ function plugins_buildCaches()
 # Plugin Delivery:
 #    Plugins are provide in bash script libraries. Typically they are in a library file specific to one plugin or a few related
 #    plugins but the <pluginType>_registerBuiltins and <pluginType>_onLoadCallbacks are mechanisms to provide plugins inside
-#    general purpose libraries. 
+#    general purpose libraries.
 #    Typically these bash libraries that contain plugins are delivered in packages so we can think of plugins as just another
 #    asset that can be installed via the distribution package management system.
 # Plugin Library Contract:
 #    A library script that implements a plugin is responsible for calling DeclarePlugin with the attributes of the plugin it
 #    contains to register the plugin and all its attributes in the in-memory plugin registry data structures.
 #    It can do that in one of two ways.
-#      1) It can call "DeclarePlugin <pluginType> <pluginID> <attributes...>"  at the top level so that its called automatically with 
+#      1) It can call "DeclarePlugin <pluginType> <pluginID> <attributes...>"  at the top level so that its called automatically with
 #         when the library script is sourced into memory.
 #      2) It can put the "DeclarePlugin <pluginType> <pluginID> <attributes...>" call in a function that can be called with no
 #         parameters and at the top level (that gets executed when its sourced) it can put a line that appends the name of that
-#         function to the variable <pluginType>_onLoadCallbacks. 
+#         function to the variable <pluginType>_onLoadCallbacks.
 #    If the plugin is in a file by itself and is only sourced when the plugin is loaded, then the first way is best.
 #    If the plugin is defined in a general library file that will be sourced for other purposes, the second way is best so that it
 #    does not incur the loading overhead when the plugin is not being used.
 #
 # Plugin Discovery:
 #   On each host, the set of available plugins of a given type is determined by what packages are installed. This function
-#   implements a discovery algorithm to determine that set of plugins. 
+#   implements a discovery algorithm to determine that set of plugins.
 #   In order for a plugin to be discovered it must be defined in a bash script library file and either...
 #      	1) be named with the suffix .<pluginType>
 #       2) contain a global assignment statement of the form <pluginType>_onLoadCallbacks+=" <function> "
@@ -519,12 +519,12 @@ function plugins_buildCaches()
 #    The plugins_buildCaches function is called after package installation/removal. It uses this function to run the discovery
 #    algorithm and then writes the results to these awkData cache files. This function uses these cache files to load specific
 #    plugins when they are used so that the more expensive discovery does not need to be performed.
-#        me:installedPlugins              : (pluginType,pluginID,srcFile, etc...)  : this is used to load plugins directly. 
+#        me:installedPlugins              : (pluginType,pluginID,srcFile, etc...)  : this is used to load plugins directly.
 #        me:installedPlugins-tags         : (tag,pluginType,pluginID)      : relates tags to plugins
 #        me:installedPlugins-<pluginType> : (columns list specified by pluginType) : pluginType specific cache -- one line per pluginID
 #    A plugin can also have mutable attributes that are set in the domConfig system. Those attributes are also cached. The code
 #    that changes those attrubutes should be responsible for calling plugins_buildCaches <pluginType> when its done changing them.
-#    Many plugin functions and commands operate on the cache information which is much faster that the discovery method. 
+#    Many plugin functions and commands operate on the cache information which is much faster that the discovery method.
 #
 # Params:
 #    <pluginType>  : The type of the plugin to be loaded. The pluginID is only unique within its pluginType so this is part of the ID
@@ -561,7 +561,7 @@ function plugins_load()
 
 
 		# to load a specific pluginID, it must have been loaded previously by the "all" so that its in the cache
-		# we do that in the pkgOnPostInstall and pkgOnPostRemove bg-lib functions that should get called 
+		# we do that in the pkgOnPostInstall and pkgOnPostRemove bg-lib functions that should get called
 		# by every packages install and remove scripts. Also we call it from bg-debugCntr vinstall to handle
 		# virtual installs
 		local file="$(awkData_getValue me:installedPlugins.file pluginType:$pluginType pluginID:$pluginID)"
@@ -599,7 +599,7 @@ function plugins_load()
 		# Any general library file can declare builtin plugins that are not written in a separate library file
 		# This block identifies any that are installed on this host and imports (aka source) them
 		# PERFORMANCE: the plugin discovery routine greps all installed libraries. We could do that when a package is built and make the list available at runtime
-		# TODO: if this ever becomes a performance issue to grep all the installed libraries, we can do the 
+		# TODO: if this ever becomes a performance issue to grep all the installed libraries, we can do the
 		#       grep when we build packages and create a convention of the package postinst script to update
 		#       the list of these files. Actually, if we do that, we might as well detect all the plugins
 	  	#       at package build time and have the posinst register its plugins so discovery is never needed.
@@ -652,7 +652,7 @@ function plugins_load()
 # pluginTypes are themselves implemented as plugin instances of pluginType==pluginType. This means that new pluginTypes are
 # defined by using "DeclarePlugin pluginType <newPluginTypeName> .."
 #
-# A pluginID instance is typically defined in a bash library script named with the pluginType as its extension. 
+# A pluginID instance is typically defined in a bash library script named with the pluginType as its extension.
 # A plugin script file should call this function in its global scope so that when the script is sourced this function
 # registers the plugin. This is part of the contract that makes the plugin discoverable.
 #
@@ -681,24 +681,24 @@ function plugins_load()
 # Plugin Type Register Hook:
 # The author of a new pluginType mechanism can define a plugin hook function that gets invoked when a plugin of that type
 # gets loaded and registers itself. That hook is analogous to a base class constructor defined in the pluginType.
-# This hook gets called right after the new pluginID is registered. 
+# This hook gets called right after the new pluginID is registered.
 # Name: <pluginType>__onRegisterHook
 # The following state is available to the hook function
 #    pluginType
 #    pluginID
 #    pluginKey
 #    pluginAttribs[<attribName>]=<attribValue>     # all attributes
-#    attribsFromConfig[<attribName>]=<attribValue> # only mutable attributes 
+#    attribsFromConfig[<attribName>]=<attribValue> # only mutable attributes
 function DeclarePlugin()
 {
-	local -A defaults 
+	local -A defaults
 	local requiredAttribs attribName name value
 	local -A mutableAttribs
 	local pluginType="$1"; shift; assertNotEmpty pluginType
 	local pluginID="$1";   shift; assertNotEmpty pluginID
 
-	# _plugins_pluginRegistry[<pluginType>:<pluginID>:<attributeName>] = <attribValue> 
-	# _plugins_pluginFile    [<pluginType>:<pluginID>                ] = <fullPathToSourceFile> 
+	# _plugins_pluginRegistry[<pluginType>:<pluginID>:<attributeName>] = <attribValue>
+	# _plugins_pluginFile    [<pluginType>:<pluginID>                ] = <fullPathToSourceFile>
 	# _plugins_idByType      [<pluginType>                           ] = <pluginID1> <pluginID2> ... <pluginIDN>
 	[ ! "${_plugins_pluginRegistry+exists}" ] && declare -gA _plugins_pluginRegistry
 	[ ! "${_plugins_pluginFile+exists}" ]     && declare -gA _plugins_pluginFile
@@ -768,8 +768,8 @@ function DeclarePlugin()
 	# set the file and Declaration function from the stack. We assume that we can call the function that called
 	# us without any parameters. If the function is "source" all we have to do is source that file and it will call us again
 	# if we need to register/declare this plugin directly in the future. If its not "source" we assume its a hook onLoad function.
-	# If it turns out that there is a reason to nest DeclarePlugin calls deeper, then we can make this smarter be iterating the 
-	# stack and looking for the first function with no parameters (or something else) 
+	# If it turns out that there is a reason to nest DeclarePlugin calls deeper, then we can make this smarter be iterating the
+	# stack and looking for the first function with no parameters (or something else)
 	if [[ "${FUNCNAME[1]}" == "source" ]]; then
 		# TODO: 2018-11 bobg: noticed a bug in this block but not sure if it still needs to do this so I am not changing it yet.
 		#       [1] should probably be [$i] in the loop and maybe in the other lines
@@ -817,7 +817,7 @@ function DeclarePlugin()
 	# and index the plugID by type
 	[ "$pluginType" ] && _plugins_idByType[$pluginType]+=" $pluginID "
 
-	### 
+	###
 
 	local hookFn="${pluginType}_onRegisterHook"
 	[ "$(type -t $hookFn)" ] && $hookFn
@@ -875,7 +875,7 @@ function plugins_registerAttribute()
 # library. If the library defined DeclarePlugin in the global scope as is typical in a plugin script, those plugins would be
 # created every time the library is sourced even though they might not be needed.
 # Typically plugins are defined in separate files in the ./plugins folders of a package project, but the mechanism
-# that defines a pluginType might want to provide a few common plugins that are always available. 
+# that defines a pluginType might want to provide a few common plugins that are always available.
 # See Also:
 #    plugins_load : calls <pluginType>_registerBuiltins hooks
 #    ${pluginType}_onLoadCallbacks : the string ${pluginType}_onLoadCallbacks is a similar mechanism that is more extensible
@@ -902,7 +902,7 @@ function pluginType_registerBuiltins()
 		projectName: bg-lib
 		columns: name(-18) projectName(-18) keyCol(-13) columns defaults requiredCols mutableCols defDisplayCols tags filename filePath description
 		keyCol: name
-		requiredCols: name projectName keyCol columns 
+		requiredCols: name projectName keyCol columns
 		optionalCols: defaults requiredCols mutableCols
 		defDisplayCols: name keyCol projectName columns
 		description: Plugin record that represents a type of plugin. Its a meta thing -- the Class for Class

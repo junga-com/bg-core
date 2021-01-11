@@ -174,15 +174,15 @@ function awkData_parseID()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
 	done
 	local awkDataID="$1";    [ ! "$awkDataID" ] && return 1
-	local awkObjNameVar="$4"
-	local awkFileVar="$5"
-	local awkSchemaFileVar="$6"
+	local awkObjNameVar="$2"
+	local awkFileVar="$3"
+	local awkSchemaFileVar="$4"
 
 	local scopeTypeValue scopeNameValue awkObjNameValue awkFileValue awkSchemaFileValue awkDomFolderValue awkDepsRootValue
 
 	# we already parsed this awkDataID into its long form so just use those values
 	if [[ "$awkDataID" =~ [|] ]]; then
-		IFS="|" read -r awkObjNameValue awkFileValue awkSchemaFileValue <<<"$awkDataID"
+		IFS="|" read -r awkDataID awkObjNameValue awkFileValue awkSchemaFileValue <<<"$awkDataID"
 
 	# # me: syntax allows us to specify the awkObjName that is specific to the local host and will be in
 	# # the domData if the domData exists but it is quaranteed to exist regardless of whether a domData
@@ -258,8 +258,10 @@ function awkData_parseID()
 	# <awkObjName> syntax
 	else
 		awkObjNameValue="$awkDataID"
-		awkSchemaFileValue="$ldFolder/schema/${awkObjNameValue}.schema"
-		awkDepsRootValue="${awkDomFolderValue:-${awkFileValue%/*}}"
+		local pkg assetType assetName assetPath
+		read -r pkg assetType assetName assetPath <<<"$(manifestGet "awkDataSchema" "^$awkDataID$")"
+		awkSchemaFileValue="$assetPath"
+		awkFileValue="$(awk -F= '$1=="awkFile" {print $2}' "$awkSchemaFileValue")"
 	fi
 
 
@@ -271,7 +273,7 @@ function awkData_parseID()
 	# See schema_restore
 	#                                     awkDataID ,awkObjName       ,awkFile      ,awkSchemaFile
 	#                                     1          2                 3             4
-	setReturnValue "$awkObjDataVar"     "$awkDataID||$awkObjNameValue|$awkFileValue|$awkSchemaFileValue"
+	setReturnValue "$awkObjDataVar"     "$awkDataID|$awkObjNameValue|$awkFileValue|$awkSchemaFileValue"
 }
 
 

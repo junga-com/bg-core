@@ -1,0 +1,55 @@
+#!/usr/bin/env bg-utRunner
+
+import bg_template.sh  ;$L1;$L2
+
+function ut_templateFind() {
+	ut setup
+	local -x bgLibPath=""
+	local -x packageName="bg-testPkg"
+
+	ut test
+	templateFind -p bg-examplePkg  --listPaths
+}
+
+function ut_templateExpand() {
+	ut setup
+	local templateFile; fsMakeTemp templateFile
+	cat - >$templateFile <<-'EOS'
+		This is a test template that contains variables that exercise all the supported features.
+		Required var           -- %\%+name%\%          : %+name%
+		Plain var w/value      -- %\%size1%\%          : %size1%
+		Plain var w/empty      -- %\%size2%\%          : %size2%
+		Plain var no exists    -- %\%size3%\%          : %size3%
+		Default var w/value    -- %\%color1:red%\%     : %color1:red%
+		Default var w/empty    -- %\%color2:red%\%     : %color2:red%
+		Default var no exists  -- %\%color3:red%\%     : %color3:red%
+		Default as a var       -- %\%nickName:$name%\% : %nickName:$name%
+	EOS
+	local size1=42
+	local size2=
+	local color1=green
+	local color2=
+	local name=bobg
+
+	ut test
+	templateExpand -f "$templateFile"
+}
+
+function ut_templateExpandMissingRequired() {
+	ut setup
+	local templateFile; fsMakeTemp templateFile
+	cat - >$templateFile <<-'EOS'
+		This is a test template that contains variables that exercise all the supported features.
+		Required var           -- %\%+name%\%          : %+name%
+		Plain var w/value      -- %\%size1%\%          : %size1%
+		Plain var w/empty      -- %\%size2%\%          : %size2%
+		Plain var no exists    -- %\%size3%\%          : %size3%
+		Default var w/value    -- %\%color1:red%\%     : %color1:red%
+		Default var w/empty    -- %\%color2:red%\%     : %color2:red%
+		Default var no exists  -- %\%color3:red%\%     : %color3:red%
+		Default as a var       -- %\%nickName:$name%\% : %nickName:$name%
+	EOS
+
+	ut test
+	templateExpand -f "$templateFile"
+}
