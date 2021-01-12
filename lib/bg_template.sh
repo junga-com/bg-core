@@ -83,9 +83,9 @@ function templateListTemplates()
 	if [[ "$baseTemplateName" =~ []*?[] ]]; then
 		baseTemplateName="$baseTemplateName"
 	elif [ "$baseTemplateName" ]; then
-		baseTemplateName="$baseTemplateName*"
+		baseTemplateName="$baseTemplateName.*"
 	else
-		baseTemplateName="*"
+		baseTemplateName=".*"
 	fi
 
 	templateFind --return-relative "$baseTemplateName"
@@ -101,9 +101,9 @@ function templateListTypes()
 	if [[ "$baseTemplateName" =~ []*?[] ]]; then
 		baseTemplateName="$baseTemplateName"
 	elif [ "$baseTemplateName" ]; then
-		baseTemplateName="$baseTemplateName*"
+		baseTemplateName="$baseTemplateName.*"
 	else
-		baseTemplateName="*"
+		baseTemplateName=".*"
 	fi
 
 	templateFind --return-relative "$baseTemplateName" | awk  -v baseTemplateName="$baseTemplateName" '

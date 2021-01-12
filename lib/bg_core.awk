@@ -19,6 +19,25 @@ function manifestGet(assetTypeMatch, assetNameMatch, array                    ,m
 	close(cmd)
 }
 
+function templateFind(templateName, options                      ,manFile,templatePath,cmd) {
+	manFile=manifestGetFile()
+	while ((getline < manFile) >0) {
+		if ($2=="template" && $3 == templateName) {
+			templatePath = $4
+			if ($1 == options["pkg"] || $1 == options["pkgOverride"])
+				break;
+		}
+	}
+
+	if (!templatePath) {
+		cmd = "bg-core templates find " templateName
+		cmd | getline templatePath
+		close(cmd)
+	}
+
+	return templatePath
+}
+
 #################################################################################################################################
 ### Misc functions
 
@@ -521,7 +540,7 @@ function stringExpand(str,context                 ,_se_rematch,name,value,defaul
 
 function expandTemplate(templateFilename, context, outFile            ,name,value,a,n,vars,parts) {
 	if (!(templateFilename in seenTemplateFiles) && !fsExists(templateFilename))
-		warning("template file does not exist: "templateFilename)
+		warning("template file does not exist: '"templateFilename"'")
 	seenTemplateFiles[templateFilename]=1
 
 	if (!outFile || outFile=="-") outFile="/dev/stdout"

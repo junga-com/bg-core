@@ -18,6 +18,38 @@
 # these functions would reside in that library.
 #
 
+
+#######################################################################################################################################
+### From bg_manifest.sh
+
+# usage: manifestGet <assetTypeMatch> <assetNameMatch>
+# this is similar in purpose to awkDataQuery but we dont use that because some things need to access the manifest w/o the awkData
+# library so this function is a more limitted to query the manifest
+function manifestGet() {
+	local pkgMatch=".*" outputStr='$0'
+	while [ $# -gt 0 ]; do case $1 in
+		-p|--pkg*)    bgOptionGetOpt val: pkgMatch "$@" && shift ;;
+		-o|--output*) bgOptionGetOpt val: outputStr "$@" && shift ;;
+
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local assetTypeMatch="$1"
+	local assetNameMatch="$2"
+	local manifestFile; manifestGetHostManifest manifestFile
+
+	awk  -v assetTypeMatch="$assetTypeMatch"  -v assetNameMatch="$assetNameMatch" -v pkgMatch="$pkgMatch" '
+		$1~pkgMatch && $2~assetTypeMatch && $3~assetNameMatch {print '"$outputStr"'}
+	' $manifestFile
+}
+
+# usage: manifestGetHostManifest
+# returns the file path to the prevailing host manifest file. In production this would be "$manifestInstalledPath"
+# but vinstalling a sandbox overrides it
+function manifestGetHostManifest() {
+	returnValue "${bgVinstalledManifest:-$manifestInstalledPath}" $1
+}
+
+
 #######################################################################################################################################
 ### From bg_outOfBandScriptFeatures.sh
 

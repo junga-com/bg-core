@@ -207,13 +207,13 @@ if [ "$projectName" ]; then
 fi
 
 
-# usage: templateFind [options] <templateName>
+# usage: templateFind [options] <templateNameSpec>
 # finds the template file in the system template paths. This is similar to how linux finds a
 # command in the system $PATH and has similar security concerns because a template can be used
 # as the basis for system configuration.
 #
 # This is a wrapper over the findInPaths function which hardcodes the serach path to the proper set of system folders.
-# <templateName> can contain wildcards to return all matching templates in the system path. See findInPaths.
+# <templateNameSpec> can contain wildcards to return all matching templates in the system path. See findInPaths.
 #
 # The general idea is that packages can provide templates, domain admins can override and add to those templates, the local sysadmin
 # can override or add to those templates and the unprivileged user can not override or provide any template.
@@ -259,7 +259,10 @@ fi
 #    routine, by calling this function with a wild coard for the type like templateFind vhostConf.*
 #
 # Default Search Path:
-#    The returned template full path will be the first of the following folders that contain the templateName
+#    This function now uses the manifest file first to find templates and then falls back to this search path if the template was
+#    not found in the manifest.  At some point the search paths algorithm may be removed.
+#
+#    The returned template full path will be the first of the following folders that contain the templateNameSpec
 #    The vinstall folders will only be searvhed if the host is not in a production mode and the package is vinstalled
 #      # first, a set of sysadmin/domain admin controlled folders will be checked. The admins can override
 #        the packages provided by packages and also add new templates to extend features.
@@ -282,7 +285,7 @@ fi
 #		# TEMPLATEVAR : <baseName> : <varName> : <description>...
 #
 # Params:
-#    <templateName> : the name of the template
+#    <templateNameSpec> : the name of the template
 #    <searchPathN>  : each is a ":" separated list of folders. More that one can be specified. The order is relevant
 #
 # Options:
@@ -300,22 +303,48 @@ fi
 function templateFind()
 {
 	local type debug allowDupes returnRelative packageOverride retVar retArray listPathsFlag
+	local -a retOpts=(--echo -d $'\n')
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-d) allowDupes="-d" ;;
 		-p*) bgOptionGetOpt val: packageOverride "$@" && shift ;;
 		--debug) debug="--debug" ;;
 		--listPaths) listPathsFlag="--listPaths" ;;
 		--return-relative) returnRelative="--return-relative" ;;
-		-A*|--retArray*) bgOptionGetOpt val: retArray "$@" && shift ;;
-		-R*|--retVar*) bgOptionGetOpt val: retVar "$@" && shift ;;
+		-A*|--retArray*) bgOptionGetOpt val: retArray "$@" && shift; retOpts=(-A "$retArray") ;;
+		-R*|--retVar*)   bgOptionGetOpt val: retVar   "$@" && shift; retOpts=(-R "$retVar") ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local templateName="$1"; [ $# -gt 0 ] && shift
+	local templateNameSpec="$1"; [ $# -gt 0 ] && shift
 
-	# This fature was removed for SECURITY. This function should only return templates it finds in system paths so that the caller
+	local localPkgName="${packageOverride:-${packageName:-$projectName}}"
+
+	### first, try to find the template in the manifest file.
+
+	if [ ! "$listPathsFlag$debug" ]; then
+		local -A resultSet=()
+		local templatePkg templatePath templateName
+		while read -r templatePkg scrap templateName templatePath; do
+			if [ ! "${resultSet["$templateName"]}" ] || [ "$templatePkg" == "$localPkgName" ]; then
+				resultSet["$templateName"]="$templatePath"
+		 	fi
+		done < <(manifestGet --pkg="${packageOverride:-.*}" template "$templateNameSpec")
+
+		if [ ${#resultSet[@]} -gt 0 ]; then
+			if [ "$returnRelative" ]; then
+				outputValue "${retOpts[@]}"  "${!resultSet[@]}"
+			else
+				outputValue "${retOpts[@]}"  "${resultSet[@]}"
+			fi
+			return 0
+		fi
+	fi
+
+	### Next search the filesystem for installed templates. (not sure this will be needed anymore after manifest is well supported)
+
+	# This feature was removed for SECURITY. This function should only return templates it finds in system paths so that the caller
 	# can trust that the template is the product of only priviledged access.
-	# if [ -f "$templateName" ]; then
-	# 	returnValue "$templateName" "$retVar"
+	# if [ -f "$templateNameSpec" ]; then
+	# 	returnValue "$templateNameSpec" "$retVar"
 	# 	return
 	# fi
 
@@ -347,7 +376,6 @@ function templateFind()
 		# overrides the installed content. This allows for a vininstalled package removing a template that may still exist in the
 		# last installed version.
 		# SECURITY: if in non-development mode, we must not consider the virtually installed folders which non-admins could write to.
-		local localPkgName="${packageOverride:-${packageName:-$projectName}}"
 		local thisPackageFolder
 		if [ "$localPkgName" ]; then
 			thisPackageFolder="/usr/share/${localPkgName}/templates/"
@@ -369,11 +397,11 @@ function templateFind()
 		# well as some relative paths (i.e. the : appears at the start or the end or :: appears in the middle) then the base path
 		# will added too.
 		if [ "$packageOverride" ]; then
-			findInPaths ${retVar:+-R "$retVar"} ${retArray:+-A "$retArray"} $debug $allowDupes $returnRelative $listPathsFlag --no-scriptFolder "${templateName:-"*"}" \
+			findInPaths ${retVar:+-R "$retVar"} ${retArray:+-A "$retArray"} $debug $allowDupes $returnRelative $listPathsFlag --no-scriptFolder "${templateNameSpec:-"*"}" \
 			 	-r "${packageOverride}${packageOverride:+:}"   "$sysadminFolders"  \
 				-r ""                "$thisPackageFolder"
 		else
-			findInPaths ${retVar:+-R "$retVar"} ${retArray:+-A "$retArray"} $debug $allowDupes $returnRelative $listPathsFlag --no-scriptFolder "${templateName:-"*"}" \
+			findInPaths ${retVar:+-R "$retVar"} ${retArray:+-A "$retArray"} $debug $allowDupes $returnRelative $listPathsFlag --no-scriptFolder "${templateNameSpec:-"*"}" \
 			 	-r "${localPkgName}${localPkgName:+:}"   "$sysadminFolders" \
 				-r ""                "$thisPackageFolder" \
 				-r "data/templates/" "${bgLibPathsAry[@]}" \

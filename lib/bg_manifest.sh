@@ -23,22 +23,9 @@
 
 declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"
 
-# usage: manifestGet <assetTypeMatch> <assetNameMatch>
-function manifestGet() {
-	local assetTypeMatch="$1"
-	local assetNameMatch="$2"
-	local manifestFile; manifestGetHostManifest manifestFile
-	awk  -v assetTypeMatch="$assetTypeMatch"  -v assetNameMatch="$assetNameMatch" '
-		$2~assetTypeMatch && $3~assetNameMatch {print $0}
-	' $manifestFile
-}
+# moved to bg_coreLibsMisc.sh function manifestGet() {
+# moved to bg_coreLibsMisc.sh function manifestGetHostManifest() {
 
-# usage: manifestGetHostManifest
-# returns the file path to the prevailing host manifest file. In production this would be "$manifestInstalledPath"
-# but vinstalling a sandbox overrides it
-function manifestGetHostManifest() {
-	returnValue "${bgVinstalledManifest:-$manifestInstalledPath}" $1
-}
 
 # usage: manifestSummary
 # print to stdout a summary of what is in the manifest

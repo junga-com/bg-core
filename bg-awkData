@@ -34,14 +34,14 @@ function oob_printBashCompletion()
 {
 	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
 
-	cmd="$1"
+	awkDataID="$1"
+	cmd="$2"
 
 	case $cmd:$posCwords in
-		*:1) echo $supportedCmds ;;
-		*:2) awkData_query -c assetName manifest assetType:~awkDataSchema ;;
+		*:1) awkData_query -c assetName manifest assetType:~awkDataSchema ;;
+		*:2) echo $supportedCmds ;;
 		query:*)
-			shift # cmd
-			local awkDataID="$1"; shift
+			shift 2 # <awkID> <cmd>
 			completeAwkDataQueryTerms --cur="$cur" "$awkDataID" $((posCwords-2)) "$@"
 			;;
 	esac
@@ -75,7 +75,6 @@ function oob_helpMode()
 # Main script
 
 # default values for parameters
-command=""
 verbosity=1
 oob_invokeOutOfBandSystem "$@"
 while [ $# -gt 0 ]; do case $1 in
@@ -85,10 +84,11 @@ while [ $# -gt 0 ]; do case $1 in
 	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 done
 
+awkDataID="$1"; shift
 cmd="${1:-list}"; shift
 case ${cmd} in
-	query)      awkData_query       "$@" ;;
-	count)      awkData_countValues "$@" ;;
-	get)        awkData_getValue    "$@" ;;
+	query)      awkData_query       "$awkDataID" "$@" ;;
+	count)      awkData_countValues "$awkDataID" "$@" ;;
+	get)        awkData_getValue    "$awkDataID" "$@" ;;
 	*) assertError -v cmd "unknown cmd" ;;
 esac
