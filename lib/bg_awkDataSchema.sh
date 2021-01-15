@@ -259,8 +259,11 @@ function awkData_parseID()
 	else
 		awkObjNameValue="$awkDataID"
 		local pkg assetType assetName assetPath
-		read -r pkg assetType assetName assetPath <<<"$(manifestGet "awkDataSchema" "^$awkDataID$")"
+		read -r pkg assetType assetName assetPath <<<"$(manifestGet "data.awkDataSchema" "$awkDataID")"
 		awkSchemaFileValue="$assetPath"
+		if [ ! "$awkSchemaFileValue" ] || [ ! -f "$awkSchemaFileValue" ]; then
+			assertError -v awkDataID "awk data schema not found for this awkDataID"
+		fi
 		awkFileValue="$(awk -F= '$1=="awkFile" {print $2}' "$awkSchemaFileValue")"
 	fi
 

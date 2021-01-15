@@ -12,7 +12,6 @@
 
 # usage: completeAwkDataQueryTerms [--cur=<cur>] <awkDataID> <cword> <filterTerm1>..<filterTermN>
 function completeAwkDataQueryTerms() {
-bgtraceParams
 	local cur
 	while [ $# -gt 0 ]; do case $1 in
 		--cur*) bgOptionGetOpt val: cur "$@" && shift ;;
@@ -26,7 +25,6 @@ bgtraceParams
 		completedFilterTerms=("${@:1:$cword}")
 	fi
 
-bgtraceVars completedFilterTerms
 	completeAwkDataAttributeTerm --filter "$awkDatID" "$cur" "${completedFilterTerms[@]}"
 }
 
@@ -105,7 +103,7 @@ function awkData_bcAwkDataID()
 # usage: awkData_bcColumnList <awkDataID> <cur>
 # complete an awkData column list in a bash completion function. A column list is a token separated list of column names
 # where the token can be one of [,:+-]
-function completeAwkDataColumnList() { awkData_bcColumnList "$@"; }
+function completeAwkDataColumnList() { awkData_bcColumnList "$@"; }  # ALIAS
 function awkData_bcColumnList()
 {
 	local ldFolder="$ldFolder" domIDOverrideOpt
@@ -174,7 +172,6 @@ function awkData_bcAttributeTerm()
 		[ "$1" != "$cur" ] && [[ ! "$1" =~ ^- ]] && [[ "$1" =~ : ]] && completedTerms+=("$1")
 	shift; done
 
-bgtraceVars awkDataID
 	awk -v awkDataIDList="$awkDataID" \
 		-v awkDataID="$awkDataID" \
 		-v cur="$cur" \

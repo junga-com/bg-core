@@ -30,7 +30,6 @@ function manifestGet() {
 	while [ $# -gt 0 ]; do case $1 in
 		-p|--pkg*)    bgOptionGetOpt val: pkgMatch "$@" && shift ;;
 		-o|--output*) bgOptionGetOpt val: outputStr "$@" && shift ;;
-
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local assetTypeMatch="$1"
@@ -38,7 +37,7 @@ function manifestGet() {
 	local manifestFile; manifestGetHostManifest manifestFile
 
 	awk  -v assetTypeMatch="$assetTypeMatch"  -v assetNameMatch="$assetNameMatch" -v pkgMatch="$pkgMatch" '
-		$1~pkgMatch && $2~assetTypeMatch && $3~assetNameMatch {print '"$outputStr"'}
+		$1~"^"pkgMatch"$" && $2~"^"assetTypeMatch"$" && $3~"^"assetNameMatch"$" {print '"$outputStr"'}
 	' $manifestFile
 }
 

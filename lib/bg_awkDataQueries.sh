@@ -47,7 +47,7 @@ function awkData_query()
 	local columns domIDOverrideOpt escapOutput forceFlag refreshFlag noDirtyCheckFlag plainFilterFlag headerFlag outFmtType="txt"
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-C*|--domID*)      bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
-		-c|--columns*)     bgOptionGetOpt val: columns "$@" && shift ;;
+		-c*|--columns*)    bgOptionGetOpt val: columns "$@" && shift ;;
 		-n|--noDirtyCheck) noDirtyCheckFlag="-n" ;;
 		-f|--forceRebuild) forceFlag="-f" ;;
 		-r|--refresh)      refreshFlag="-r" ;;
@@ -61,10 +61,17 @@ function awkData_query()
 	local awkDataID="${1:-$awkDataID}"; shift
 	local filters="$*"
 
-	local allFlag; [ "$columns" == "all" ] && allFlag="all"
 	local verticalOutputFlag; [[ "${@: -1}" =~ [\\]?G$ ]] && { verticalOutputFlag=".vert"; set -- "${@:1:$#-1}"; }
 
 	assertNotEmpty awkDataID
+
+	# columns can be specified as a part of the awkDataID term like <awkDataID>.<coluList>
+	if [[ "$awkDataID" =~ [.] ]]; then
+		columns="${awkDataID#*.}"
+		awkDataID="${awkDataID%%.*}"
+	fi
+
+	local allFlag; [ "$columns" == "all" ] && allFlag="all"
 
 	# force means rebuild the cache unconditionally and then go on to run the query
 	# refresh means rebuild the cache only if its dirty and then return without doing a query
@@ -147,7 +154,7 @@ function awkData_query()
 # returned. Columns can be a list of columns separated by a commas. In that case, the unique combinations of those column values
 # are returned.
 # Options:
-#    -1  : assert that the query will not return more than one value. note the "... || exit if its called in a sub shell"
+#    -1  : assert that the query will not return more than one value. note: use "... || exit" if its called in a sub shell
 #    -R <retVar>  : return the results in this variable as an indexed array. Note that ${<retVar>[0]} is the same as $<retVar>
 #    These options are common to the other query functions
 #    -C : specify the domData to get awkData cache files from (default is the currenly select domData)

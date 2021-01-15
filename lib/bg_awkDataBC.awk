@@ -177,7 +177,7 @@ function bcColumnValueBegin(schema,filters, colName) {
 #   bcColumnValueBegin    : complete value that is valide for this column (uses unique values already in the data)
 #   bcColumnListBegin     : complete a list of column names
 function bcColumnListBegin(schema, cur) {
-	print ("<columnList> $(usingListmode ,)" schema["info"]["colNames"])
+	print ("<columnList> $(usingListmode ,) " schema["info"]["colNames"])
 	if  (cur !~ /[,:+-]/) print("all%20")
 }
 

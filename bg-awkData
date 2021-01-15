@@ -35,15 +35,34 @@ function oob_printBashCompletion()
 	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
 
 	awkDataID="$1"
-	cmd="$2"
 
-	case $cmd:$posCwords in
-		*:1) awkData_query -c assetName manifest assetType:~awkDataSchema ;;
-		*:2) echo $supportedCmds ;;
-		query:*)
-			shift 2 # <awkID> <cmd>
+	cmd="query"
+	[ "${options["-c"]}" ] && cmd="count"
+	[ "${options["-g"]}" ] && cmd="get"
+
+	case $opt:$cmd:$posCwords in
+		*:1)
+			if [[ ! "$awkDataID" =~ [.] ]]; then
+				echo '$(suffix:%3A)'
+				awkData_query -c assetName manifest assetType:~awkDataSchema
+				[ "$awkDataID" ] && echo '<appendDotToSpecifyColumns>'
+			else
+				local columns="${awkDataID#*.}"
+				awkDataID="${awkDataID%%.*}"
+				echo "\$(cur:$columns)"
+				completeAwkDataColumnList "$awkDataID" "$columns"
+			fi
+			;;
+		:*)
+			awkDataID="${awkDataID%%.*}"
+			shift # <awkID>
 			completeAwkDataQueryTerms --cur="$cur" "$awkDataID" $((posCwords-2)) "$@"
 			;;
+		-c:*) if [ "$awkDataID" ]; then
+				completeAwkDataColumnList "$awkDataID" "${options["-c"]}"
+			else
+				echo "<enter_the_first_arg_before_entering_-c>"
+			fi
 	esac
 	exit
 }
@@ -76,19 +95,22 @@ function oob_helpMode()
 
 # default values for parameters
 verbosity=1
+cmd=""
+passThruOpts=()
 oob_invokeOutOfBandSystem "$@"
 while [ $# -gt 0 ]; do case $1 in
-	-v|--verbose) ((verbosity++)) ;;
-	-q|--quiet) ((verbosity--)) ;;
-	--verbosity*) bgOptionGetOpt val: verbosity "$@" && shift ;;
+	-q|--query)    cmd="query"  ;;
+	-s|--summary)  cmd="summary"  ;;
+	-g|--get)      cmd="get"  ;;
+	-c*|--columns*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
 	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 done
 
 awkDataID="$1"; shift
-cmd="${1:-list}"; shift
-case ${cmd} in
-	query)      awkData_query       "$awkDataID" "$@" ;;
-	count)      awkData_countValues "$awkDataID" "$@" ;;
-	get)        awkData_getValue    "$awkDataID" "$@" ;;
+
+case ${cmd:-query} in
+	query)      awkData_query        "${passThruOpts[@]}" "$awkDataID" "$@" ;;
+	summary)    awkData_countValues  "${passThruOpts[@]}" "$awkDataID" "$@" ;;
+	get)        awkData_getValue     "${passThruOpts[@]}" "$awkDataID" "$@" ;;
 	*) assertError -v cmd "unknown cmd" ;;
 esac

@@ -300,7 +300,7 @@ function bgBCParse()
 	local optSpecs="$1"; shift
 	cword="$1"; shift
 	words=( "$@" )
-	shift # cmd name ($0)
+	shift # cmdName ($0)
 	cur=""
 	prev=""
 	options=()
@@ -334,12 +334,14 @@ function bgBCParse()
 				cur="${_bcp_opt:2}"
 				completingType="${syntaxSpec[$opt]:-<argument>}"
 				echo "\$(cur:$cur) ${syntaxSpec[$opt]:-<argument>}"
+				options[$opt]="$cur"
 			# if we are completing the argument part of a long option in one token. (i.e. '--file=...')
 			elif match "$_bcp_opt" "^(--[^=]*)=(.*)$" rematch; then
 				opt="${rematch[1]}"
 				cur="${rematch[2]}"
 				completingType="${syntaxSpec[$opt]:-<argument>}"
 				echo "\$(cur:$cur) ${syntaxSpec[$opt]:-<argument>}"
+				options[$opt]="$cur"
 			# we must still be completing the option itself
 			else
 				echo "<options> ${syntaxSpec[options]}"
