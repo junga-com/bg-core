@@ -1,9 +1,11 @@
 #!/bin/bash
 
-import bg_strings.sh  ;$L1;$L2
-import bg_awkDataSchema.sh  ;$L1;$L2
-import bg_awkDataBuildersAPI.sh  ;$L1;$L2
-import bg_awkDataQueries.sh  ;$L1;$L2
+# import bg_strings.sh  ;$L1;$L2
+# import bg_awkDataSchema.sh  ;$L1;$L2
+# import bg_awkDataBuildersAPI.sh  ;$L1;$L2
+# import bg_awkDataQueries.sh  ;$L1;$L2
+
+
 
 # usage: local pluginType pluginID; _pluginsPreamble "$@" && shift; shift; assertNotEmpty pluginType; assertNotEmpty pluginID
 # This can be used at the top of plugin method functions that require a specific plugin to operate on (like a this pointer).
@@ -71,34 +73,21 @@ function plugin_bcPluginAttribute()
 #    --full            : return pluginType:pluginID for each plugin
 function plugins_list()
 {
-	local returnVar fullyQualifiedFlag="--full"
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		--full)      fullyQualifiedFlag="--full" ;;
-		--short) fullyQualifiedFlag="" ;;
-		-R*) bgOptionGetOpt val: returnVar "$@" && shift ;;
-	esac; shift; done
-	local pluginType="$1"
-
-	local filterTerm="${pluginType:+pluginType:$pluginType}"
-
-	local _pl_resultsValue=()  pluginType pluginID
-
-bgtrace 1
-bgtrace 2
-bgtrace 3
-
-
-	while read -r pluginType pluginID; do
-bgtrace 4
-		_pl_resultsValue+=("${fullyQualifiedFlag:+$pluginType::}$pluginID")
-bgtraceVars _pl_resultsValue
-done < <(bgtrace "yoyoy"; awkData_lookup -n me:installedPlugins "pluginType pluginID" $filterTerm)
-
-	if [ "$returnVar" ]; then
-		setReturnValue --array "$returnVar" "${_pl_resultsValue[@]}"
+	local pluginNameSpec="${1}"
+	if [[ "$pluginNameSpec" =~ []*?[] ]]; then
+		pluginNameSpec="$pluginNameSpec"
+	elif [ "$pluginNameSpec" ]; then
+		pluginNameSpec="$pluginNameSpec.*"
 	else
-		printf "%s\n" "${_pl_resultsValue[@]}"
+		pluginNameSpec=".*"
 	fi
+
+	local pkg scrap pluginName pluginPath pluginType
+	while read -r pkg scrap pluginName pluginPath; do
+		pluginType="${pluginName%%:*}"
+		pluginName="${pluginName#*:}"
+		printf "%-20s %s\n" "$pluginType" "$pluginName"
+	done < <(manifestGet --pkg="${packageOverride:-.*}" "plugin" "$pluginNameSpec")
 }
 
 

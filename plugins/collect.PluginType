@@ -1,0 +1,240 @@
+#!/bin/bash
+
+
+#####################################################################################################
+### This module implements a "Collect"  Plugin class
+# see bg-plugins collect:CollectTypeInformation
+
+
+
+
+pluginType_onLoadCallbacks+=" collect_DeclarePlugin "
+function collect_DeclarePlugin()
+{
+	DeclarePlugin pluginType collect "
+		projectName: bg-lib
+		columns: name(-18) projectName(-18) entryPoint(-18) activationState(-10) runSchedule(13) goal tags filename filePath description
+		keyCol: name
+		requiredCols: name projectName entryPoint
+		mutableCols: activationState runSchedule
+		defaults: runSchedule=SLAm
+		defDisplayCols: name projectName activationState runSchedule goal
+		description: A collect plugin collects some aspect of a host's configuration into the host's scopeFolder in it 
+		 selected domData. When it is activated on a host, a collect plugin will be invoked periodically according to 
+		 the schedule set in its runSchedule attribute
+		 
+		 Required Attributes:
+		    name        : the unique ID for the plugin instance being registered. 
+		    projectName : which package the plugin is deployed in
+		    entryPoint  : the command to invoke to perform the collect action
+		 Optional Attributes:
+		    goal        : a brief description about what this is supposed to do. Should be one short line.
+		    description : more detailed information.
+		 Mutable Attributes: (can be set on the host)
+		    runSchedule     : how often it should be run. If set in the plugin attributes, it will be the default runSchedule
+		                      Each host can override the runSchedule. see man collect_activate
+		    activationState : 'activated' or ''. whether it will run automatically on the host. default is ''
+		    runSchedule     : default is 'SLAm' which means it runs once at the start of each SLA maintenance period
+		                      see man cronNormSchedule for full syntax that is supported.
+		 
+		 Example:
+		    collect_register '
+		    	name: network
+		    	projectName: bg-lib
+		    	entryPoint: collect_network
+		    	goal: collect the basic linux network config on a host
+		    '
+		    function collect_network()
+		    {
+		        collectPreamble || return
+		        ip addr show | collectContents net/ipAddrShow
+		        collectFiles "/etc/network/interfaces"
+		    }
+	"
+}
+
+# usage: collect_activate <pluginName> [<runShedule>]
+# configure <pluginName> to run automatically on this host. 
+# Params:
+#    <pluginName>   : the unique ID for the collect plugin
+#    <runShedule> : when it should be ran. See "man cronNormSchedule" for full syntax that is supported
+function collect_activate()
+{
+	local name="$1"; [ $# -gt 0 ] && shift
+	local pluginKey="collect:$name"
+	local runSchedule="$*"
+	local testCronSched; testCronSched="$(cronNormSchedule "$runSchedule")" || exit
+
+	plugins_setAttribute collect "$name" activationState  activated
+	[ "$runSchedule" ] && plugins_setAttribute collect "$name" runSchedule "$runSchedule"
+
+	plugins_buildCaches collect
+}
+
+# usage: collect_deactivate <pluginName>
+# configure <pluginName> to NOT run automatically on this host
+# Params:
+#    <pluginName>   : the unique ID for the collect plugin
+function collect_deactivate()
+{
+	local name="$1"; [ $# -gt 0 ] && shift
+	local pluginKey="collect:$name"
+
+	plugins_setAttribute collect "$name" activationState  ""
+
+	plugins_buildCaches collect
+}
+
+
+# usage: collect_run [-q] [-v] <pluginName>
+# run the collect plugin by executing its entryPoint
+# Params:
+#    <pluginName>   : the unique ID for the collect plugin
+# Options:
+#    -q : quiet. less output
+#    -v : verbose. more output
+#         <verbosity>    : 0-4. 0 is most terse. 4 is all debug information. effects stdout
+function collect_run()
+{
+	local verbosity=1 verbosityFlags
+	while [[ "$1" =~ ^- ]]; do case $1 in
+		-v)  ((verbosity++)); verbosityFlags+=" -v" ;;
+		-q)  ((verbosity--)); verbosityFlags+=" -q" ;;
+	esac; shift; done
+	local name="$1"; [ $# -gt 0 ] && shift; assertNotEmpty name
+
+	local runFile=""
+	runnablePlugin_prepareScheduledRunIfTime -f collect "$name" runFile
+	[ $? -eq 2 ] && assertError "another process is running this collect plugin now."
+	assertNotEmpty runFile
+
+	local entryPoint; plugins_getAttribute collect "$name" entryPoint  entryPoint
+	assertNotEmpty entryPoint "collect plugin '$name' is missing the 'entryPoint' attribute"
+
+	[ ${verbosity:-1} -ge 1 ] && printf "%s: running\n"  "collect:$name"
+	$entryPoint > "$runFile"
+
+	runnablePlugin_endScheduledRun collect "$name"
+}
+
+
+# usage: collect_runScheduled
+# run any active collect plugins that are scheduled to run now
+# Options:
+#    -f : force flag. force all active plugins to run instead of only the ones that are past their last scheduled runtime
+#    -q : quiet. less output
+#    -v : verbose. more output
+function collect_runScheduled()
+{
+	local forceFlag verbosity=1
+	while [[ "$1" =~ ^- ]]; do case $1 in
+		-f) forceFlag="-f" ;;
+		-q) ((verbosity--)) ;;
+		-v) ((verbosity++)) ;;
+	esac; shift; done
+
+	local name; for name in $(plugins_list collect); do
+		local runFile=""
+		runnablePlugin_prepareScheduledRunIfTime $forceFlag collect "$name" runFile
+		local resultCode=$?
+		case $resultCode in
+			0)	[ ${verbosity:-1} -ge 1 ] && printf "%-18s : running\n" "$name"
+				local entryPoint; plugins_getAttribute collect "$name" entryPoint  entryPoint
+				assertNotEmpty entryPoint "collect plugin '$name' is missing the 'entryPoint' attribute"
+
+				$entryPoint > "$runFile"
+
+				runnablePlugin_endScheduledRun collect "$name"
+				;;
+			1) [ ${verbosity:-1} -ge 2 ] && printf "%-18s : skipping because its not time\n" "$name" ;;
+			2) [ ${verbosity:-1} -ge 2 ] && printf "%-18s : skipping because its being ran now by another process\n"  "$name" ;;
+			3) [ ${verbosity:-1} -ge 3 ] && printf "%-18s : skipping because its inactive\n"  "$name" ;;
+			*) printf "%-18s : skipping because of unknown reason from runnablePlugin_prepareScheduledRunIfTime\n"  "$name" ;;
+		esac
+	done
+	true
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+###########################################################################################################
+### creq functions
+# These functions are used in creq scripts (.creqConfig and .standard plugins) to configure the activation
+# of collect plugins
+
+
+# usage: cr_collectPluginIsActive <collectPluginName> [<runSchedule>]
+# declare that collect plugin should be activated. If <runSchedule> is specified, it must be set too
+# Activated means that the collect plugin will run automatically on a schedule 
+# Params:
+#    <collectPluginName> : the name of a plugin
+#    <runSchedule> : declares that the active runSchedule must be set to this schedule. 
+#                    TODO: if runSchedule is not specified, check that the actiave runSchedule is one of the 
+#                          approved values (i.e. setting the runSchedule to 5years is the same as deactivating
+function cr_collectPluginIsActive()
+{
+	case $objectMethod in
+		objectVars) echo "collectPluginName runSchedule" ;;
+		construct)
+			collectPluginName="$1"; [ $# -gt 0 ] && shift
+			runSchedule="$*"
+			displayName="'$collectPluginName' collect plugin is active"
+			;;
+
+		check)
+			local activationState="$(awkDataCache_getValue me:installedPlugins-collect.activationState name:"$collectPluginName")"
+			[ "$activationState" == "activated" ]
+			local result=$?
+			if [ ${result:=0} -eq 0 ] && [ "$runSchedule" ]; then
+				[ "${plugin[runSchedule]}" == "$runSchedule" ]
+				result=$?
+			fi
+			return $result
+			;;
+
+		apply)
+			collect_activate "$collectPluginName" "$runShedule"
+			;;
+
+		*) cr_baseClass "$@" ;;
+	esac
+}
+
+
+# usage: cr_collectPluginIsNotActive <collectPluginName>
+# declare that collect plugin should be NOT activated.
+# Not being activated means that the collect plugin will not run automatically but it can still be run manually 
+# Params:
+#    <collectPluginName> : the name of a plugin
+function cr_collectPluginIsNotActive()
+{
+	case $objectMethod in
+		objectVars) echo "collectPluginName" ;;
+		construct)
+			collectPluginName="$1"; [ $# -gt 0 ] && shift
+			displayName="'$collectPluginName' collect plugin is NOT active"
+			;;
+
+		check)
+			local activationState="$(awkDataCache_getValue me:installedPlugins-collect.activationState name:"$collectPluginName")"
+			[ "$activationState" != "activated" ]
+			;;
+
+		apply)
+			collect_deactivate "$collectPluginName" "$runShedule"
+			;;
+
+		*) cr_baseClass "$@" ;;
+	esac
+}
+

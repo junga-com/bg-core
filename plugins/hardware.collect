@@ -1,0 +1,27 @@
+#!/bin/bash
+
+DeclarePlugin collect hardware "
+	projectName: bg-core
+	entryPoint: collect_hardware
+	runSchedule: 1day
+	description: collects  information about the host's hardware
+	    * will install lshw if needed
+	    * will install dmidecode if needed
+"
+
+function collect_hardware()
+{
+	collectPreamble || return
+
+	pkgInstallIfNeeded lshw
+	sudo lshw -quiet                 | collectContents "hardware/lshw"
+	sudo lshw -quiet -short          | collectContents "hardware/lshw.short"
+	sudo lshw -quiet -json           | collectContents "hardware/lshw.json"
+
+	pkgInstallIfNeeded dmidecode
+	sudo dmidecode            | collectContents "hardware/dmidecode"
+
+	local tmpFile="$(mktemp)"
+	sudo dmidecode --dump-bin "$tmpFile"
+	cat "$tmpFile" | collectContents "hardware/dmidecode.bin"
+}

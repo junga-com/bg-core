@@ -1,0 +1,36 @@
+#!/bin/bash
+
+DeclarePlugin collect osBase "
+	projectName: bg-core
+	entryPoint: collect_osBase
+	runSchedule: 4/10min
+	description: collect the basic linux OS host information
+	 * osBase/lsb_release
+	 * osBase/uname
+	 * /etc/passwd
+	 * /etc/group
+	 * /etc/hostname
+	 * /etc/cron.d/*
+	 * /etc/apt/sources.list.d/*
+	 * /etc/ssh/*.pub
+	 ...
+"
+
+function collect_osBase()
+{
+	collectPreamble || return
+
+	lsb_release -a  2>/dev/null | collectContents osBase/lsb_release
+	uname -a       | collectContents osBase/uname
+	dpkg -l | sort | collectContents osBase/dpkg
+
+	collectFiles "/etc/passwd"
+	collectFiles "/etc/group"
+	collectFiles "/etc/hostname"
+	collectFiles "/etc/cron.d/*"
+	collectFiles "/etc/apt/sources.list"
+	collectFiles "/etc/apt/sources.list.d/*"
+	collectFiles "/etc/ssh/*.pub"
+	collectFiles "/etc/bg-*"
+	collectFiles "/etc/at-*"
+}

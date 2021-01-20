@@ -7,8 +7,9 @@ projectName=bg-core
 
 source /usr/lib/bg_core.sh
 import bg_template.sh ;$L1;$L2
+import bg_plugins.sh ;$L1;$L2
 
-supportedCmds="templates cuiWin dropin config"
+supportedCmds="templates plugin cuiWin config"
 
 ###############################################################################
 # Command manpage
@@ -55,6 +56,8 @@ function oob_printBashCompletion()
 					;;
 			esac
 			;;
+
+		plugin:2) echo "type list find" ;;
 	esac
 	exit
 }
@@ -110,6 +113,20 @@ function templateCntr()
 	esac
 }
 
+# usage: pluginCntr [<options>] <cmd> <args>
+# This function dispatches cmds from the "bg-core plugins..." cmdline.
+function pluginCntr()
+{
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local cmd="$1"; shift
+
+	case ${cmd:-list} in
+		list) plugins_list "$@" ;;
+	esac
+}
+
 
 ###############################################################################
 # Main script
@@ -129,7 +146,7 @@ command="$1"; shift
 
 case ${command:-show} in
 	templates)     templateCntr   "${passThruOpts[@]}" "$@" ;;
-	dropin)        dropinCntr     "${passThruOpts[@]}" "$@" ;;
+	plugin)        pluginCntr     "${passThruOpts[@]}" "$@" ;;
 	config)        configCntr     "${passThruOpts[@]}" "$@" ;;
 	show)          echo "coming soon..."  ;;
 	*)  echo "error: unknown command '$command'. "
