@@ -80,7 +80,8 @@ function versionEq()
 function versionLt()
 {
 	versionCompare "$@"
-	[ $? -eq 1 ] || [ $? -eq 11 ] || [ $? -eq 101 ] || [ $? -eq 201 ]
+	local result="$?"
+	[ $result -eq 1 ] || [ $result -eq 11 ] || [ $result -eq 101 ] || [ $result -eq 201 ]
 }
 
 # usage: versionGt <versionStr1> <versionStr2>
@@ -94,7 +95,8 @@ function versionLt()
 function versionGt()
 {
 	versionCompare "$@"
-	[ $? -eq 2 ] || [ $? -eq 12 ] || [ $? -eq 102 ] || [ $? -eq 202 ]
+	local result="$?"
+	[ $result -eq 2 ] || [ $result -eq 12 ] || [ $result -eq 102 ] || [ $result -eq 202 ]
 }
 
 # usage: versionIncrement [--major|--minor|--patch] <versionStr> [<retVal>]

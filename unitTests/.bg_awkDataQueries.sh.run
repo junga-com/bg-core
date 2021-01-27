@@ -13,31 +13,18 @@
 
 ##----------
 ## test
-cmd> awkData_lookup type1 all one:blue
-      blue     2              
-cmd> awkData_lookup type1 all two:1
-       red     1              
-cmd> awkData_lookup type1 one two:1
-red
-cmd> awkData_lookup -H type1 all
-[2m[7m       one[0m [2m[7m  two[0m [2m[7m        three[0m
-       red     1              
-      blue     2              
-     green     3              
-cmd> awkData_lookup -e type1 all
-       red     1            --
-      blue     2            --
-     green     3            --
-cmd> awkData_lookup -w type1 all
-{| class=\"wikitable sortable\"
-|-
-|        red ||     1 ||              
-|-
-|       blue ||     2 ||              
-|-
-|      green ||     3 ||              
-|}
+cmd> awkData_query type1 all one:blue
+cmd> awkData_query type1 all two:1
+cmd> awkData_query type1 one two:1
+cmd> awkData_query -H type1 all
 
+siFaint%csiReverse%*sosiNorm% siFaint%csiReverse%*stsiNorm% siFaint%csiReverse%*stsiNorm%cmd> awkData_query -e type1 all
+cmd> awkData_query -w type1 all
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: awkData_query: unknown awkDataTblFmt type. No template for awkDataTblFmt.wiki was found in the template path. Use bg-core templates types 'awkDataTblFmt' to see what types are available on this host. Adding a template named awkDataTblFmt.wiki will enable this command to proceed'
 ## bg_awkDataQueries.sh:awkData_lookup: finished
 ###############################################################################################################################
 

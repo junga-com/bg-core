@@ -362,96 +362,32 @@ nr_longStr='now is the time that all good men should come to the aid of their co
 ## test
 cmd> printfVars Animal "" Dog "" Cat "" myDog "" myCat
 Animal : <instance> of Class
-  baseClass       =Object
-  classHierarchy  =Object Animal
-  methods         =Animal::__construct
-                  + Animal::speak
-  subClasses      =Dog Cat
-  name            =Animal
-  inheritedMethods=Object::addMethod
-                  + Object::bgtrace
-                  + Object::clear
-                  + Object::clone
-                  + Object::eval
-                  + Object::fromDebControl
-                  + Object::fromFlatINI
-                  + Object::fromINI
-                  + Object::fromString
-                  + Object::get
-                  + Object::getAttributes
-                  + Object::getIndexes
-                  + Object::getMethods
-                  + Object::getSize
-                  + Object::getValues
-                  + Object::hasMethod
-                  + Object::restoreFile
-                  + Object::saveFile
-                  + Object::set
-                  + Object::toDebControl
-                  + Object::toFlatINI
-                  + Object::toString
+  baseClass     =Object
+  classHierarchy=Object Animal
+  vmtCacheNum   =<redacted>
+  methods       =Animal::__construct
+                + Animal::speak
+  staticMethods =
+  subClasses    =Dog Cat
+  name          =Animal
 
 Dog : <instance> of Class
-  baseClass       =Animal
-  classHierarchy  =Object Animal Dog
-  methods         =Dog::__construct
-                  + Dog::speak
-  name            =Dog
-  inheritedMethods=Object::addMethod
-                  + Object::bgtrace
-                  + Object::clear
-                  + Object::clone
-                  + Object::eval
-                  + Object::fromDebControl
-                  + Object::fromFlatINI
-                  + Object::fromINI
-                  + Object::fromString
-                  + Object::get
-                  + Object::getAttributes
-                  + Object::getIndexes
-                  + Object::getMethods
-                  + Object::getSize
-                  + Object::getValues
-                  + Object::hasMethod
-                  + Object::restoreFile
-                  + Object::saveFile
-                  + Object::set
-                  + Object::toDebControl
-                  + Object::toFlatINI
-                  + Object::toString
-                  + Animal::__construct
-                  + Animal::speak
+  baseClass     =Animal
+  classHierarchy=Object Animal Dog
+  vmtCacheNum   =<redacted>
+  methods       =Dog::__construct
+                + Dog::speak
+  staticMethods =
+  name          =Dog
 
 Cat : <instance> of Class
-  baseClass       =Animal
-  classHierarchy  =Object Animal Cat
-  methods         =Cat::__construct
-                  + Cat::speak
-  name            =Cat
-  inheritedMethods=Object::addMethod
-                  + Object::bgtrace
-                  + Object::clear
-                  + Object::clone
-                  + Object::eval
-                  + Object::fromDebControl
-                  + Object::fromFlatINI
-                  + Object::fromINI
-                  + Object::fromString
-                  + Object::get
-                  + Object::getAttributes
-                  + Object::getIndexes
-                  + Object::getMethods
-                  + Object::getSize
-                  + Object::getValues
-                  + Object::hasMethod
-                  + Object::restoreFile
-                  + Object::saveFile
-                  + Object::set
-                  + Object::toDebControl
-                  + Object::toFlatINI
-                  + Object::toString
-                  + Animal::__construct
-                  + Animal::speak
+  baseClass     =Animal
+  classHierarchy=Object Animal Cat
+  vmtCacheNum   =<redacted>
+  methods       =Cat::__construct
+                + Cat::speak
+  staticMethods =
+  name          =Cat
 
 myDog : <instance> of Dog
   species=dog

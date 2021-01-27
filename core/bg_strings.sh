@@ -707,8 +707,8 @@ function stringToBashToken()
 
 
 
-# usage: unescapeTokens [-q] <data>
-# modifies the contents of each variable passed in to undo what arrayToBashTokens did and return it to normal strings that could
+# usage: unescapeTokens [-q] <var1> [... <varN>]
+# modifies the contents of each variable passed in to undo what stringToBashToken did and return it to normal strings that could
 # be empty and could contain whitespace
 # Options:
 #    -q : quotes. If the resulting string contains whitespace or is an empty string, surrond it with quotes

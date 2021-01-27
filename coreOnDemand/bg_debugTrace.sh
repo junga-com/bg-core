@@ -346,19 +346,23 @@ function bgtraceStack()
 {
 	bgtraceIsActive || return 0
 
-	local noSrcLookupFlag allStack onelineFlag logicalFrameStart=1; [ "${FUNCNAME[1]}" == "bgStackTrace" ] && ((logicalFrameStart++))
+	local noSrcLookupFlag allStack onelineFlag argValuesFlag sourceAndArgsFlag stackDebugFlag
+	local logicalFrameStart=1; [ "${FUNCNAME[1]}" == "bgStackTrace" ] && ((logicalFrameStart++))
 	while [ $# -gt 0 ]; do case $1 in
 		--allStack) allStack="--allStack" ;;
 		--fromAlias) ((logicalFrameStart++)) ;;
 		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
-		--oneline)  onelineFlag="--oneline" ;;
+		--stackDebug)  stackDebugFlag="--stackDebug" ;;
+		--oneline)     onelineFlag="--oneline" ;;
+		--argValues)   argValuesFlag="--argValues" ;;
+		--sourceAndArgs) sourceAndArgsFlag="--sourceAndArgs" ;;
 		--logicalStart*) ((logicalFrameStart+=${1#--logicalStart?})) ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	import bg_debugStack.sh ;$L1;$L2
 	echo >>$_bgtraceFile
 	echo >>$_bgtraceFile
-	bgStackPrint $allStack $noSrcLookupFlag $onelineFlag --logicalStart+$logicalFrameStart >>$_bgtraceFile
+	bgStackPrint $allStack $noSrcLookupFlag $onelineFlag $argValuesFlag $sourceAndArgsFlag $stackDebugFlag --logicalStart+$logicalFrameStart >>$_bgtraceFile
 }
 
 

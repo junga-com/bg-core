@@ -38,8 +38,7 @@ function ut_initialState()
 {
 	# expect: shows the classes that ae initially created and their content
 	ut setup
-	ut filter '([[]_vmtCacheNum2[[:space:]]*[]]=).[0-9]*.###\1<redacted>'
-	#ut filter '(^\\s*\\[_vmtCacheNum2\\s*\\]=.)[0-9]*.###\1<redacted>'"'"
+	ut filter '([[]vmtCacheNum[[:space:]]*[]]=).[0-9]*.###\1<redacted>'
 	function showClass() {
 		local class="$1"
 		printf "#\n#\n#------------------ $class --------------------\n"
@@ -59,7 +58,7 @@ function ut_isDerivedFrom()
 	# expect: that true tests indicate true and false tests indicate false
 	ut setup
 	DeclareClass Animal
-	DeclareClass Dog : Animal
+	DeclareClass -f Dog : Animal
 
 	ut test
 	ut expect "these to be true"
@@ -79,7 +78,7 @@ function ut_getClassMethods()
 {
 	# expect: the correct set of methods to be printed to stdout. -i includes inherited, -d changes the delimiter between methods
 	ut setup
-	DeclareClass Animal
+	DeclareClass -f Animal
 	Animal::speak() { echo "I am just an animal"; }
 	Animal::pet() { echo "that's nice"; }
 	Animal::feed() { echo "now that's more like it!"; }
@@ -132,13 +131,13 @@ function ut__classUpdateVMT()
 {
 	# expect:
 	ut setup
-	DeclareClass Animal
+	DeclareClass -f Animal
 	Animal::speak() { echo "I am just an animal"; }
 	$Animal.getClassMethods
 
 	ut test
-	Animal::pet() { echo "that's nice"; }
-	Animal::feed() { echo "now that's more like it!"; }
+	Animal::pet() { echo "that's nice"; }; true
+	Animal::feed() { echo "now that's more like it!"; }; true
 
 	ut expect: that pet and feed are not in this list
 	echo "${Animal[methods]}"

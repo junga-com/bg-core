@@ -375,7 +375,7 @@ argsV[]
 
 ##----------
 ## setup
-##     | ut filter '([[]_vmtCacheNum2[[:space:]]*[]]=).[0-9]*.###\1<redacted>'
+##     | ut filter '([[]vmtCacheNum[[:space:]]*[]]=).[0-9]*.###\1<redacted>'
 
 ##----------
 ## test
@@ -388,38 +388,38 @@ cmd> showClass "$class"
 #------------------ Object --------------------
 global array vars: Object Object_vmt
 Object[]
-      [baseClass       ]=''
-      [_CLASS          ]='Class'
-      [0               ]='_bgclassCall Object Class 0 |'
-      [_Ref            ]='_bgclassCall Object Class 0 |'
-      [classHierarchy  ]='Object'
-      [methods         ]='Object::addMethod
-      [                ] +Object::bgtrace
-      [                ] +Object::clear
-      [                ] +Object::clone
-      [                ] +Object::eval
-      [                ] +Object::fromDebControl
-      [                ] +Object::fromFlatINI
-      [                ] +Object::fromINI
-      [                ] +Object::fromString
-      [                ] +Object::get
-      [                ] +Object::getAttributes
-      [                ] +Object::getIndexes
-      [                ] +Object::getMethods
-      [                ] +Object::getSize
-      [                ] +Object::getValues
-      [                ] +Object::hasMethod
-      [                ] +Object::restoreFile
-      [                ] +Object::saveFile
-      [                ] +Object::set
-      [                ] +Object::toDebControl
-      [                ] +Object::toFlatINI
-      [                ] +Object::toString'
-      [_vmtCacheNum2   ]=<redacted>
-      [subClasses      ]='Class Stack Array Map'
-      [name            ]='Object'
-      [inheritedMethods]=''
-      [_OID            ]='Object'
+      [baseClass     ]=''
+      [_CLASS        ]='Class'
+      [0             ]='_bgclassCall Object Class 0 |'
+      [_Ref          ]='_bgclassCall Object Class 0 |'
+      [classHierarchy]='Object'
+      [vmtCacheNum   ]=<redacted>
+      [methods       ]='Object::addMethod
+      [              ] +Object::bgtrace
+      [              ] +Object::clear
+      [              ] +Object::clone
+      [              ] +Object::eval
+      [              ] +Object::fromDebControl
+      [              ] +Object::fromFlatINI
+      [              ] +Object::fromINI
+      [              ] +Object::fromString
+      [              ] +Object::get
+      [              ] +Object::getAttributes
+      [              ] +Object::getIndexes
+      [              ] +Object::getMethods
+      [              ] +Object::getSize
+      [              ] +Object::getValues
+      [              ] +Object::hasMethod
+      [              ] +Object::restoreFile
+      [              ] +Object::saveFile
+      [              ] +Object::set
+      [              ] +Object::toDebControl
+      [              ] +Object::toFlatINI
+      [              ] +Object::toString'
+      [subClasses    ]='Class Stack Array Map'
+      [staticMethods ]=''
+      [name          ]='Object'
+      [_OID          ]='Object'
 #     
 Object_vmt[]
       [_method::fromFlatINI   ]='Object::fromFlatINI'
@@ -452,64 +452,43 @@ cmd> showClass "$class"
 #------------------ Class --------------------
 global array vars: Class Class_vmt
 Class[]
-     [baseClass       ]='Object'
-     [_CLASS          ]='Class'
-     [0               ]='_bgclassCall Class Class 0 |'
-     [_Ref            ]='_bgclassCall Class Class 0 |'
-     [classHierarchy  ]='Object Class'
-     [methods         ]='Class::__construct
-     [                ] +Class::getClassMethods
-     [                ] +Class::isDerivedFrom
-     [                ] +Class::reloadMethods'
-     [_vmtCacheNum2   ]=<redacted>
-     [name            ]='Class'
-     [inheritedMethods]='Object::addMethod
-     [                ] +Object::bgtrace
-     [                ] +Object::clear
-     [                ] +Object::clone
-     [                ] +Object::eval
-     [                ] +Object::fromDebControl
-     [                ] +Object::fromFlatINI
-     [                ] +Object::fromINI
-     [                ] +Object::fromString
-     [                ] +Object::get
-     [                ] +Object::getAttributes
-     [                ] +Object::getIndexes
-     [                ] +Object::getMethods
-     [                ] +Object::getSize
-     [                ] +Object::getValues
-     [                ] +Object::hasMethod
-     [                ] +Object::restoreFile
-     [                ] +Object::saveFile
-     [                ] +Object::set
-     [                ] +Object::toDebControl
-     [                ] +Object::toFlatINI
-     [                ] +Object::toString'
-     [_OID            ]='Class'
+     [baseClass     ]='Object'
+     [_CLASS        ]='Class'
+     [0             ]='_bgclassCall Class Class 0 |'
+     [_Ref          ]='_bgclassCall Class Class 0 |'
+     [classHierarchy]='Object Class'
+     [vmtCacheNum   ]=<redacted>
+     [methods       ]='Class::__construct
+     [              ] +Class::getClassMethods
+     [              ] +Class::isDerivedFrom
+     [              ] +Class::reloadMethods'
+     [staticMethods ]=''
+     [name          ]='Class'
+     [_OID          ]='Class'
 #    
 Class_vmt[]
      [_method::fromFlatINI    ]='Object::fromFlatINI'
      [_method::getValues      ]='Object::getValues'
-     [_method::hasMethod      ]='Object::hasMethod'
      [_method::getAttributes  ]='Object::getAttributes'
+     [_method::hasMethod      ]='Object::hasMethod'
      [_method::toFlatINI      ]='Object::toFlatINI'
      [_method::restoreFile    ]='Object::restoreFile'
      [_method::getClassMethods]='Class::getClassMethods'
      [_method::getSize        ]='Object::getSize'
      [_method::__construct    ]='Class::__construct'
      [_method::fromDebControl ]='Object::fromDebControl'
-     [_method::getMethods     ]='Object::getMethods'
      [_method::eval           ]='Object::eval'
+     [_method::getMethods     ]='Object::getMethods'
      [_method::fromINI        ]='Object::fromINI'
      [_method::saveFile       ]='Object::saveFile'
      [_method::getIndexes     ]='Object::getIndexes'
      [_method::clone          ]='Object::clone'
-     [_method::toString       ]='Object::toString'
      [_method::addMethod      ]='Object::addMethod'
+     [_method::toString       ]='Object::toString'
      [_method::toDebControl   ]='Object::toDebControl'
      [_method::fromString     ]='Object::fromString'
-     [_method::set            ]='Object::set'
      [_method::bgtrace        ]='Object::bgtrace'
+     [_method::set            ]='Object::set'
      [_method::get            ]='Object::get'
      [_method::reloadMethods  ]='Class::reloadMethods'
      [_method::isDerivedFrom  ]='Class::isDerivedFrom'
@@ -581,7 +560,7 @@ Map_vmt[]
 ##----------
 ## setup
 ##     | cmd> DeclareClass Animal
-##     | cmd> DeclareClass Dog : Animal
+##     | cmd> DeclareClass -f Dog : Animal
 
 ##----------
 ## test
@@ -614,7 +593,7 @@ no
 
 ##----------
 ## setup
-##     | cmd> DeclareClass Animal
+##     | cmd> DeclareClass -f Animal
 
 ##----------
 ## test
@@ -711,12 +690,14 @@ heap_A_<redacted>_sys[]
 
 ##----------
 ## setup
-##     | cmd> DeclareClass Animal
+##     | cmd> DeclareClass -f Animal
 ##     | cmd> $Animal.getClassMethods
 ##     | speak
 
 ##----------
 ## test
+cmd> Animal::pet() { echo "that's nice"; }; true
+cmd> Animal::feed() { echo "now that's more like it!"; }; true
 
 # expect that pet and feed are not in this list
 cmd> echo "${Animal[methods]}"
@@ -1161,9 +1142,10 @@ obj : <instance> of Object
 
 # expect that the Object class object is printed
 cmd> $obj.static.toString
-baseClass       =
-classHierarchy  =Object
-methods         =Object::addMethod
+baseClass     =
+classHierarchy=Object
+vmtCacheNum   =<redacted>
+methods       =Object::addMethod
 + Object::bgtrace
 + Object::clear
 + Object::clone
@@ -1185,9 +1167,9 @@ methods         =Object::addMethod
 + Object::toDebControl
 + Object::toFlatINI
 + Object::toString
-subClasses      =Class Stack Array Map
-name            =Object
-inheritedMethods=
+subClasses    =Class Stack Array Map
+staticMethods =
+name          =Object
 
 ## bg_objects.sh:Object_staticCallSyntax: finished
 ###############################################################################################################################

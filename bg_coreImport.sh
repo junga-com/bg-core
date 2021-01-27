@@ -291,18 +291,32 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 			# adds "$@" after the parameters so that the $@ of the top level scripts are preserved here
 			declare -g bgLibExecCmd=("${0##*/}" "$@")
 
+			# TODO: maybe bgLibExecSrc should be created on demand if needed so we dont need to do this block on every script.
+			#       in this case, bgLibExecSrc is derived from bgLibExecCmd but in other cases it is not. bgStackMakeLogical does
+			#       format bgLibExecCmd instead of using this but bgStackGetFrame uses bgLibExecSrc and would need to change
+			declare -g bgLibExecSrc="${0##*/}"
+			for _inint_i in "$@"; do
+				if [[ "$_inint_i" =~ [[:space:]] ]]; then
+					bgLibExecSrc+=" '$_inint_i'"
+				else
+					bgLibExecSrc+=" $_inint_i"
+				fi
+			done
+			unset _inint_i
+
 			declare -g scriptFolder="${0%/*}"
 		fi
 		;;
 
 	# case where we are being sourced in a terminal directly by the user
-	# this is typically done for debugging and development so we setups up some things to make that
+	# this is typically done for debugging and development so we setup up some things to make that
 	# a better experience.
 	source:0)
 		if [ ! "${bgLibExecMode+exists}" ]; then
 			declare -rg bgLibExecMode="terminal"
 
 			declare -g bgLibExecCmd=("${0##*/}" "$@")
+			declare -g bgLibExecSrc; read -r bgLibExecSrc bgLibExecSrc < <(history 1)
 			declare -g scriptFolder="$PWD"
 		fi
 		;;
@@ -311,22 +325,24 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 	# this is the case that "source bg-debugCntr" trips
 	source:*)
 		if [ ! "${bgLibExecMode+exists}" ]; then
-			declare -rg bgLibExecMode="terminal"
+			declare -g bgLibExecMode="terminal"
 
 			scrdFile="${BASH_SOURCE[@]: -1}"
 			declare -g bgLibExecCmd=("source:${scrdFile##*/}" "$@")
+			declare -g bgLibExecSrc; read -r bgLibExecSrc bgLibExecSrc < <(history 1)
 			declare -g scriptFolder="${scrdFile%/*}"
 			unset scrdFile
 		fi
 		;;
 
-	# case where the user invokes bg-debugCntre sourceCore as a shortcut to source the libraries into the debug terminal.
+	# case where the user invokes "bg-debugCntr sourceCore" as a shortcut to source the libraries into the debug terminal.
 	bg-debugCntr:0)
 		if [ ! "${bgLibExecMode+exists}" ]; then
-			declare -rg bgLibExecMode="terminal"
+			declare -g bgLibExecMode="terminal"
 
 			scrdFile="${BASH_SOURCE[@]: -1}"
 			declare -g bgLibExecCmd=("source:${scrdFile##*/}" "$@")
+			declare -g bgLibExecSrc; read -r bgLibExecSrc bgLibExecSrc < <(history 1)
 			declare -g scriptFolder="${scrdFile%/*}"
 			unset scrdFile
 		fi

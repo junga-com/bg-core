@@ -56,7 +56,7 @@
 #
 #
 # Example Bash Object Syntax:
-# 	source /usr/lib/bg_common.sh
+# 	source /usr/lib/bg_core.sh
 #
 # 	DeclareClass Animal
 # 	function Animal::__construct() { this[name]="$1"; }
@@ -251,36 +251,91 @@
 #    <atribNameN:valN> : static class attributes to set in the new class static object.
 function DeclareClass()
 {
+	local forceFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-f|--forceConstruction) forceFlag="-f" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local className="$1"; shift
-	[ "$1" == ":" ] && shift  # the colon is optional syntax sugar
-	local baseClass; [[ ! "$1" =~ : ]] && { baseClass="$1" ; shift; }  # attributes must have a : so if there is none, its baseclass
+	local baseClass
+	if [ "$1" == ":" ] || [ "$1" == "extends" ]; then
+		shift  # the colon is optional syntax sugar
+		baseClass="$1"; shift
+	else
+		[[ ! "$1" =~ : ]] && { baseClass="$1" ; shift; }  # attributes must have a : so if there is none, its baseclass
+	fi
 	[ "$className" != "Object" ] && baseClass="${baseClass:-Object}"
 
 	[ "$baseClass" == "Class" ] && assertError "
-		The special class 'Class' can not be sub classed. You can, however customize Class...
+		The special class 'Class' can not be sub classed. You can, however extend a Class Object...
 		  * add attributes to a particular Class when its declared. see man DeclareClass
 		  * declare methods for use by all Class's like 'function Class::mymethod() { ...; }'
+		  * add member vars and methods dynamically to the class object after the class has been declared
 		"
 
-	# note that these can not be initialized here because of the bootstrapping of Class and Object class objects.
+	# note that these can not be initialized here because of the bootstrapping of Class and Object class objects. For those the
+	# variables already are assigned and we dont want to overwrite them.
 	declare -gA $className
 	declare -gA ${className}_vmt
-	if ubuntuVersionAtLeast trusty; then
-		ConstructObject Class "$className" "$@"
 
-		# a class author can define <className>::__staticConstruct() function before calling DeclareClass to do special static init
-		# __staticConstruct is the end of the recursive, self defining nature of the Object / Class system
-		# Its similar to the concept of having a sub class of Class to represent each different Class, but
-		# instead of defining a whole new sub class (which itself would need to have a unique class data instance
-		# to represent what it is), we only allow that a staticConstructor be defined. This way the loop ends
-		# and the programmer has a way to define the construction of the particular Class instance.
-		if type -t $className::__staticConstruct &>/dev/null; then
-			# the __staticConstruct is invoked in the context of the particular Class. Since there is no instance of type <className>
-			# 'this' is null. The __staticConstruct should be written to use 'static' as the thing that its constructing.
-			local this="$NullObjectInstance"
-			local -n static="$className"
-			$className::__staticConstruct "$@"
-		fi
+	# Some libraries might declare classes but their use is optional so if we are running in an old bash, just do nothing
+	if ! lsbBashVersionAtLeast 4.3; then
+		bgtrace "Silently refusing to DeclareClass '$className' because this bash version does not support 'declare -n'"
+		return 0
+	fi
+
+	# if a class is used as a base class, we realize its construction s0 that its static beavior is avaiable
+	# in general, a problem with the DeclareClassEnd mechanism is that if the class is first
+	DeclareClassEnd "$baseClass"
+
+	declare -ga ${className}_initData='('"$baseClass"' "$@")'
+
+	[ "$forceFlag" ] && DeclareClassEnd "$className"
+	true
+}
+
+# usage: DeclareClassEnd <className>
+# this, along with DeclareClass implements a delayed construction mechanism for class objects.
+# the motivation is that for an organized library script, the DeclareClass call comes before the class's member and static methods
+# declarations. For member methods, the delayed VMT table construction solves the problem but for static methods it does not because
+# they should be available when the class object is constructed. E.G. the static::<classname>::__construct method should be called
+# during the class object construction and that method might call other static methods.
+# Realizing the Class Object:
+# The DeclareClassEnd gets called...
+#    * when an object of that class (or a derived class) is constructed
+#    * when a class declaration uses the class as a baseclass
+# The second was added for the DeclarePluginType case which calls a static $Plugin.register method.
+# There is still a problem that if a class is declared, and then a static reference is used on the class before any object is created
+# or the class is used as a base class, then the class object will not be realized. We may have to introduce something like a
+# RealizeClass function for those situtaions.
+function DeclareClassEnd()
+{
+	local className="$1"; shift
+
+	varExists ${className}_initData || return 0
+
+	local -n delayedData="${className}_initData"
+	local baseClass="${delayedData[0]}"
+	local initData=("${delayedData[@]:1}")
+	unset delayedData
+	unset -n delayedData
+
+	DeclareClassEnd "$baseClass"
+
+	ConstructObject Class "$className" "$className" "$baseClass" "${initData[@]}"
+
+	# a class author can define <className>::__staticConstruct() function before calling DeclareClass to do special static init
+	# __staticConstruct is the end of the recursive, self defining nature of the Object / Class system
+	# Its similar to the concept of having a sub class of Class to represent each different Class, but
+	# instead of defining a whole new sub class (which itself would need to have a unique class data instance
+	# to represent what it is), we only allow that a staticConstructor be defined. This way the loop ends
+	# and the programmer has a way to define the construction of the particular Class instance.
+	if type -t $className::__staticConstruct &>/dev/null; then
+		# the __staticConstruct is invoked in the context of the particular Class. Since there is no instance of type <className>
+		# 'this' is null. The __staticConstruct should be written to use 'static' as the thing that its constructing.
+		local this="$NullObjectInstance"
+		local -n static="$className"
+		$className::__staticConstruct "$@"
 	fi
 }
 
@@ -292,19 +347,12 @@ function DeclareClass()
 # <className>::__staticConstruct will be called with this set to the class object.
 function Class::__construct()
 {
-	# TODO: implement a delayed construction mechanism for class obects.
-	#       this Class::__construct is called when ever DeclareClass is called to bring a new Class into existance
-	#       that is typically done in libraries at their global scope so that it happens when they are sourced.
-	#       this function implementation should do the minimal work required and delay anything it can to when an instance is
-	#       used for the first time. An ::onFirstUse method could be added and called by ConstructObject when the <className>[instanceCount]
-	#       is incremented from 0
+	this[name]="$1"; shift
+	this[baseClass]="$1"; shift
 
 	# Since each class does not have its own *class* constructor, we allow DeclareClass to specify attributes to assign.
 	# TODO: this makes DeclareClass and plugins_register very similar. They should merge when 10.04 support is completely dropped
 	[ $# -gt 0 ] && parseDebControlFile this "$@"
-
-	this[name]="$className"
-	this[baseClass]="$baseClass"
 
 	### Iterate the hierarchy to maintain the global _classIsAMap and super and sub class lists in all involved classes
 
@@ -355,7 +403,10 @@ function Class::isDerivedFrom()
 #
 function Class::reloadMethods()
 {
-	_this[_vmtCacheNum2]=-1
+	this[vmtCacheNum]=-1
+	local -n subClass; for subClass in ${this[subClasses]}; do
+		subClass[vmtCacheNum]=-1
+	done
 	#importCntr bumpRevNumber
 }
 
@@ -380,13 +431,14 @@ function Class::getClassMethods()
 
 	local -A methods=()
 
-	local method; for method in ${this[methods]//${this[name]}::}; do
-		methods[$method]=1
-	done
-
-	if [ "$includeInherited" ]; then
-		local method; for method in ${this[inheritedMethods]}; do
-			methods[${method#*::}]=1
+	if [ ! "$includeInherited" ]; then
+		local method; for method in ${this[methods]//${this[name]}::}; do
+			methods[$method]=1
+		done
+	else
+		local -n vmt="${this[name]}_vmt"
+		local method; for method in "${!vmt[@]}"; do
+			methods[${method##*::}]=1
 		done
 	fi
 
@@ -509,6 +561,8 @@ function ConstructObject()
 	[[ "${BASH_VERSION:0:3}" < "4.3" ]] && assertError "classes need the declare -n option which is available in bash 4.3 and above"
 	local _CLASS="$1"; assertNotEmpty _CLASS "className is a required parameter"
 
+	DeclareClassEnd "$_CLASS"
+
 	### support dynamic base class implemented construction
 	if [[ "$_CLASS" =~ :: ]] && type -t ${_CLASS//::*/::ConstructObject} &>/dev/null; then
 		_CLASS="${1%%::*}"
@@ -521,6 +575,7 @@ function ConstructObject()
 	fi
 
 	local -n class="$_CLASS"
+	local -n newTarget="$_CLASS"
 
 	# _objRefVar is a variable name passed to us so strip out any unallowed characters for security.
 	# SECURITY: clean _objRefVar by removing all but characters that can be used in a variable name. foo[bar] is a valid name.
@@ -610,7 +665,7 @@ function ConstructObject()
 	# if more methods are known
 	_classUpdateVMT "${_this[_CLASS]}"
 
-	# each object can point to its own VMT if its had dynamic methods added, but the typical case is that it uses it's classes VMT
+	# each object can point to its own VMT if had dynamic methods added, but the typical case is that it uses it's classes VMT
 	local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
 
 	# invoke the constructors from Object to this class
@@ -621,14 +676,21 @@ function ConstructObject()
 		_resultCode="$?"; bgDebuggerPlumbingCode=1
 	done
 
-	[ "${_VMT[_method::postConstruct]}" ] && ${_this[_Ref]}.postConstruct
+	# if the class has a postConstruct method, invoke it now. postConstruct allows a base class to do things after the object is
+	# fully constructed into its newTarget class type
+	if [ "${_VMT[_method::postConstruct]}" ]; then
+		unset -n static; local -n static="$_CLASS"
+		bgDebuggerPlumbingCode=0
+		${_VMT[_method::postConstruct]}
+		_resultCode="$?"; bgDebuggerPlumbingCode=1
+	fi
 	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 	true
 }
 
 # usage: _classUpdateVMT [-f|--force] <className>
 # update the VMT information for this <className>.
-# If the _vmtCacheNum2 attribute of the class is not equal to the current import revision number, rescan the sourced functions for
+# If the vmtCacheNum attribute of the class is not equal to the current import revision number, rescan the sourced functions for
 # any matching our class method naming scheme that associated them with this class.
 # Then it visits each class in the hierarchy, starting at the most base class and sets entries in the vmt array for each method in
 # the class. As each class is visited, methods with the same name overwrite methods from previous classes so that in the end, the
@@ -649,44 +711,51 @@ function _classUpdateVMT()
 		-f|--force)   forceFlag="-f" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local className="$1"; shift; #assertNotEmpty className
+	local className="$1"; shift; assertNotEmpty className
 	local -n class="$className"
+	local -n vmt="${className}_vmt"
 
-	# force resest the _vmtCacheNum2 attributes of this entire class hierarchy so that the algorithm will rescan them all this run
+	# force resets the vmtCacheNum attributes of this entire class hierarchy so that the algorithm will rescan them all this run
 	if [ "$forceFlag" ]; then
 		local -n _oneClass; for _oneClass in ${class[classHierarchy]}; do
-			_oneClass[_vmtCacheNum2]="-1"
+			_oneClass[vmtCacheNum]="-1"
 		done
 		unset -n _oneClass
 	fi
 
 	local currentCacheNum; importCntr getRevNumber currentCacheNum
 
-	if [ "${class[_vmtCacheNum2]}" != "$currentCacheNum" ]; then
-		class[_vmtCacheNum2]="$currentCacheNum"
+	if [ "${class[vmtCacheNum]}" != "$currentCacheNum" ]; then
+		class[vmtCacheNum]="$currentCacheNum"
 
-		_classScanForClassMethods "$className" class[methods]
-		class[inheritedMethods]=""
+		vmt=()
 
-		# fill in the vmt in order from most super class to our class so that earlier methods are overwritten by later methods
-		local -n vmt="${className}_vmt"
-		local _oneCname; for _oneCname in ${class[classHierarchy]}; do
-			local -n _oneClass="$_oneCname"
+		# init the vmt with the contents of the base class vmt (Object does not have a baseClass)
+		if [ "${class[baseClass]}" ]; then
+			local -n baseClass="${class[baseClass]}"
+			local -n baseVMT="${class[baseClass]}_vmt"
 
-			if [ "${_oneClass[_vmtCacheNum2]}" != "$currentCacheNum" ]; then
-				_classUpdateVMT "$_oneCname"
+			# update the base class vmt if needed
+			if [ "${class[baseClass]}" ] && [ "${baseClass[vmtCacheNum]}" != "$currentCacheNum" ]; then
+				_classUpdateVMT "${class[baseClass]}"
 			fi
 
-			[ "$_oneCname" != "$className" ] && class[inheritedMethods]+="${class[inheritedMethods]:+$'\n'}${_oneClass[methods]}"
-
-			local _mname; for _mname in ${_oneClass[methods]}; do
-					vmt["_method::${_mname#$_oneCname::}"]="$_mname"
+			# copy the whole base class VMT into our VMT (static and non-static)
+			local _mname; for _mname in ${!baseVMT[@]}; do
+				vmt[$_mname]="${baseVMT[$_mname]}"
 			done
+		fi
+
+		# add the methods of this class
+		_classScanForClassMethods "$className" class[methods]
+		local _mname; for _mname in ${class[methods]} ${class[addedMethods]}; do
+			vmt[_method::${_mname#*::}]="$_mname"
 		done
 
-		# add one off methods added with Object::addMethod. These methods override any others with the same short name
-		local _mname; for _mname in ${class[addedMethods]}; do
-			vmt[_method::${_mname#*::}]="$_mname"
+		# add the static methods of this class
+		_classScanForStaticMethods "$className" class[staticMethods]
+		local _mname; for _mname in ${class[staticMethods]}; do
+			vmt[_static::${_mname##*::}]="$_mname"
 		done
 
 		#bgtraceVars className vmt
@@ -697,10 +766,15 @@ function _classUpdateVMT()
 function _classScanForClassMethods()
 {
 	local className="$1"
-	local retVar="$2"
-	returnValue "$(compgen -A function ${className}::)" $retVar
+	returnValue "$(compgen -A function ${className}::)" $2
 }
 
+# usage: _classScanForStaticMethods <className> <retVar>
+function _classScanForStaticMethods()
+{
+	local className="$1"
+	returnValue "$(compgen -A function static::${className}::)" $2
+}
 
 # usage: DeleteObject <objRef>
 # destroy the specified object
@@ -739,35 +813,110 @@ function DeleteObject()
 
 # man(5) bgBashObjectsSyntax
 # This is the bash object oriented syntax implemented by the _parseObjSyntax function in the bg_objects.sh library.
-# Object Syntax:
-#     $<chainedObjOrMember><memberOp>[<p1> .. <pN>]
-#     <chainedObjOrMember> := <objOrMember>
-#                          := <chainedObjOrMember>.<objOrMember>
-#                          := <chainedObjOrMember>[<attributeMember>]
-#     <objOrMember> = [_a-zA-Z][_a-zA-Z0-9]*
-#                   = static
-#                   = <className>::[_a-zA-Z][_a-zA-Z0-9]*
-#    <attributeMember> = [_a-zA-Z0-9]*
-#     <memberOp>  := <break>            # invoke a method or echo an attribute's value (based on what <chainedObjOrMember> is)
-#                 := .unset<break>      # unset an attribute or throw excetion if its a method
-#                 := .exists<break>     # set exit code to 0(true) or 1(false) if the attribute or method exists
-#                 := .isA<break>        # set exit code to 0(true) or 1(false) based on the type of <chainedObjOrMember>
-#                 := .getType<break>    # return the type of <chainedObjOrMember>
-#                 := .getOID<break>     # return the name of the object's array variable
-#                 := .getRef<break>     # return the ObjRef that points to the object
-#                 := .toString<break>   # print the state of <chainedObjOrMember>. this is an operator so that it can be used on primitives
-#                 := =new<break>        # create a new object and set its reference in <chainedObjOrMember>
-#                 := +=                 # append to <chainedObjOrMember>
-#                 := =                  # replace the value of <chainedObjOrMember>
-#     <break> := \s
-#             := $
-#     # <chainedObjOrMember> will describe an entity that can be one of...
-#          :<className>  (Object, ...)
-#          :primitive    (q bash string var)
-#          :method       (a function)
-#          :null         (nothing exists at this <chainedObjOrMember>. null can happen at any point in the <chainedObjOrMember>)
-#          :self         (the base object, itself -- not a member)
-#     # <memberOp> is the action that will be performed on the <chainedObjOrMember> and depends on the type of the <chainedObjOrMember>
+# Note that often the object syntax is used to create a -n nameRef variable to an object's underlying bash array and then the member
+# variables of that object can be accessed and set with the native bash array syntax. Also, inside a class method, the object's
+# member variables that exist at the time the method is entered are available as local nameRef variables which also allows the use
+# of native bash syntax. This bash object syntax should be used sparingly. It is apropriate to use the object syntax when calling
+# methods and to create nested bash arrays (which is not possible whith native syntax)
+#
+# Examples:
+#    local myObj; ConstructObject SomeClass myObj  # create an instance of 'SomeClass'
+#    $myObj.doSomething "$p1" "$p2"      # call a method of 'SomeClass' or a superclass of 'SomeClass'
+#    $myObj[name]="bob"                  # assign a value to name member
+#    $myObj[name]+=".griffth"            # append a value to name member
+#    $myObj[name]                        # echo the value of member var name to stdout
+#    $myObj[name] nameVar                # copy the value of member var name to the variable 'nameVar'
+#    $myObj.myVar.getType                # print what myVar is to stdout (null,memberVar,method,object)
+#    $myObj.subObj1.subObj2=new SomeClass # create a new nested sub object. if intermediate objects do not exist, they will be
+#                                           created as type 'Object'
+#    $myObj.subObj1.subObj2.doit p1      # call method 'doit' on a nested member object.
+#
+# Informal Object Syntax:
+# An object expression consists of these parts.
+#     $<objRef>[<memberRef>]<objOperator>[<args>]
+#
+# The <memberOp> is one of a fixed set of tokens that delimits the part before and after it.  Most of the <memberOps> look like
+# method names and are terminated with a space or EOS (aka a <break>). The '=' and '+=' <memberOp> are not terminated by a <break>.
+# If no <memberOp> are present, <memberOp> is denoted as the first <break> in the expression and the default operation will be performed.
+#
+# The reason that a particular token would be a <objOperator> as opposed to being implemented as a method of the Object class is that
+# a <objOperator> can operate on primitive types whereas Object methods can only operate on objects.
+#
+# $<objRef> resolves to a specific object. If it is the empty string, it resolves to the NullObjectInstance via the command_not_found_handle function.
+#     examples...
+#     $myObj                  : refers to the object identified by myObj.
+#                               myRef is a primitive bash variable whose value contains an <objRef> string
+#                               ('_bgclassCall <oid> <class> <flags> |') or empty string.
+#                               myObj can be a bash array if myObj[0] contains an <objRef> string.
+#                               $myObj is replaced with its string value before the expression is parsed as a command so it will
+#                               result in a call to _bgclassCall which will interpret and act on the remainder of the expression.
+#     $myObj.child1.child2... : objRefs can be chained together indefinately as along as each child is a member variable of the
+#                               previous <objRef> that contains an <objRef>. The object identified by the last child is the
+#                               object referenced in the expression.
+#
+# <memberRef> is an optional term that changes the target of the expression from the <objRef> object itself to a member element
+# (method or variable) of the <objRef> object.
+#     examples...
+#     $myObj.myVar            : refers to a member of 'myObj' which can be either a variable or a method
+#     $myObj[myVar]           : refers to the member variable 'myVar' in object 'myObj'. [] syntax indicates that the member must be
+#                               a variable. A method by the same name will not be referenced.
+#     $myObj.:myVar           : refers to the member variable 'myVar' in object 'myObj'. .: syntax indicates that the member must be
+#                               a method. A variable by the same name will not be referenced.
+#     $myObj.MyClass::myMethod : override the virtual method call mechanism to call a specific method implementation in MyClass
+#
+# <args> are the optional arguments to the <objOperator> or method or member var access being invoked by the expression.
+#
+# Formal Object Syntax:
+#    $<objRef>[<memberRef>]<objOperator>[<arg1> .. <argN>]
+#    <objRef> := [_a-zA-Z][_a-zA-Z0-9]*
+#             := <objRef>.<objRef>
+#             := <objRef>[<objRef>]
+#    <memberRef> := .<memberName>                     # will refer to either a member variable or method depending on which exists
+#                := [<memberVarName>]                 # [] only refer to member variables
+#                := .:<memberMethodName>              # .: only refer to member methods
+#                := <className>::<memberMethodName>   # override virtual mechanism to call a specific method implementation
+#                := ::<staticMethodName>              # :: only refers to static methods
+#    <memberName>       := [_a-zA-Z][_a-zA-Z0-9]*
+#    <memberVarName>    := [_a-zA-Z][_a-zA-Z0-9]*
+#    <memberMethodName> := [_a-zA-Z][_a-zA-Z0-9]*
+#    <staticMethodName> := [_a-zA-Z][_a-zA-Z0-9]*
+#    <objOperator> := <break>            # default operator. invoke a method or return an attribute's value
+#                  := .unset<break>      # unset an attribute or throw exception if its a method
+#                  := .exists<break>     # set exit code to 0(true) or 1(false) if the attribute or method exists
+#                  := .isA<break>        # set exit code to 0(true) or 1(false) based on the type of <objRef>
+#                  := .getType<break>    # return the type of <objRef>
+#                  := .getOID<break>     # return the name of the object's array variable
+#                  := .getRef<break>     # return the ObjRef that points to the object
+#                  := .toString<break>   # print the state of <objRef>. this is an operator so that it can be used on primitives
+#                  := =new<break>        # create a new object and set its reference in <objRef>
+#                  := +=                 # append to the value in <objRef>
+#                  := =                  # replace the value of <objRef>
+#                  := ::                 # call a static member function
+#     <break> := \s  # whitespace
+#             := $   # end of expression
+#     <argN> := [^\s]
+#
+# How does it work:
+#    echo "'$myObj'"
+#    '_bgclassCall heap_A_uXqNpmuWi Foo 0 |'
+# So when $myObj starts an expression like...
+#    $myObj.doSomething "argument one" "second argument"
+# ...it it turns into this...
+#    _bgclassCall heap_A_uXqNpmuWi Foo 0 |.doSomething "argument one" "second argument"
+# The function _bgclassCall gets called with the rest of the line as its arguments. The first 3 arguments come from the <objRef>
+# syntax. The | character ensures that the space before it does not get removed and the  4th parameter will begin with the |
+# immediately followed by the first token in the expression after the $myObj
+#
+#
+
+
+# usage: _parseObjSyntax <chainedObjOrMemberVar> <memberOpVar> <argsVar> <expression...>
+# _bgclassCall uses this function to parse the object syntax that is passed to it. See man(5) bgBashObjectsSyntax
+# This function separates the expression into 3 parts. It uses the <objOperator> to divide the expression into parts.
+# Params:
+#    <chainedObjOrMemberVar>  : output. The part of the expression before the <objOperator>
+#    <memberOpVar>            : output. One of the fixed set of expression operators found in the expression.
+#    <argsVar>                : output. The part of the expression after the <objOperator>
 function _parseObjSyntax() {
 	local chainedObjOrMemberVar="$1"; shift
 	local memberOpVar="$1"; shift
@@ -789,19 +938,19 @@ function __parseObjSyntax() {
 	# _memberOp
 	# _argsV
 
-	local reExp='((\.unset|\.exists|\.isA|\.getType|\.getOID|\.getRef|\.toString|=new|)[[:space:]]|\+?=)(.*)?$'
+	local reExp='((\.unset|\.exists|\.isA|\.getType|\.getOID|\.getRef|\.toString|=new|)[[:space:]]|\+?=|::)(.*)?$'
 
 	# This commented block is used to build reExp from an easier to understand but less runtime efficient format
 	# un-comment it and run the function and then copy the displayed string into reExp
-	# local reChained=".*"
 	# local reBreak="[[:space:]]"
 	# local reOpWBr="(\.unset|\.exists|\.isA|\.getType|\.getOID|\.getRef|\.toString|=new|)$reBreak"
-	# local reOpNBr="\+?="
+	# local reOpNBr="\+?=|::"
 	# local reOp="$reOpWBr|$reOpNBr"
 	# local reArgs=".*"
 	# local reExp="($reOp)($reArgs)?$"
 	# bgtraceVars reExp
 
+	# add a trailing space so that reBreak does not have to match EOS
 	expression="${expression} "
 
 	# at this point these assignments may not be correct. We need to remove the operator, if any from the chainedObjOrMember
@@ -814,10 +963,11 @@ function __parseObjSyntax() {
 	_memberOp="${rematch[1]}"
 	_chainedObjOrMember="${_chainedObjOrMember%%$_memberOp*}"
 	[[ "${rematch[3]}" =~ [^[:space:]] ]] && _argsV=( "${rematch[3]% }" "${_argsV[@]}")
-	_memberOp="${_memberOp% }"  # we need to capture the empty operator as a " " in the regex but return it as ""
+	_memberOp="${_memberOp% }"  # we capture the empty operator as a " " in the regex but return it as ""
 }
 
-# _resolveMemberChain "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName
+# usage: _resolveMemberChain "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName
+#
 # null:noGlobal
 # null:chain
 # null:method
@@ -885,7 +1035,7 @@ function __resolveMemberChain()
 		_rsvOID="$oidIn"
 	fi
 
-	### unless its 'static' remove the last term, leaving parts with just the chained parts that we need to traaverse
+	### unless its 'static' remove the last term, leaving parts with just the chained parts that we need to traverse
 	[ ${#parts[@]} -gt 0 ] && [ "${parts[@]: -1}" != "static" ] && { _rsvMemberName="${parts[@]: -1}"; parts=("${parts[@]:0: ${#parts[@]}-1}"); }
 
 	# .foo can be a membervar or method but [foo] can only be a memberVar and .::foo can only be a method. .<class>::foo is also a method
@@ -898,7 +1048,6 @@ function __resolveMemberChain()
 		# if 1 or 2 ':' are at the start, its just a way for the caller to declare that the term must be a method so we can remove them now
 		_rsvMemberName="${_rsvMemberName#:}"; _rsvMemberName="${_rsvMemberName#:}"
 	fi
-	_rsvMemberName="${_rsvMemberName}"
 
 
 
@@ -963,9 +1112,9 @@ function __resolveMemberChain()
 			_memberVarInfo="object:${_oidParts[2]}"
 		fi
 
-		# query member var information
+		# query member method information
 		local _methodExists _methodType
-		if [ "$_rsvMemberName" == "memberVar" ]; then
+		if [ "$finalMemberValueSyntax" == "memberVar" ]; then
 			:
 		elif [[ "$_rsvMemberName" =~ .:: ]]; then
 			type -t "$_rsvMemberName" &>/dev/null && _methodExists="exists"
@@ -994,13 +1143,13 @@ function __resolveMemberChain()
 # Variables Provided to the method:
 #     super   : objRef to call the version of a method declared in a super class. Its the same ObjRef as this but with the <hierarchyCallLevel> term incremented
 #     this    : a ref to the associative array that stores the object's logical member vars
+#     _OID    : name of the associative array that stores the object's logical state
 #     _this   : a ref to the associative array that stores the object's system member vars. may or may not be the same as "this"
+#     _OID_sys: name of the associative array that stores the object's system state
 #     static  : a ref to the associative array that stores the object's Class information. This can store static variables
+#     _CLASS  : name of the class of the object (the highest level class, not the one the method is from)
 #     refClass: a ref to the class fron the <objRef>. this is the 'type' of the pointer to the object which may not be the type of the object
 #     _VMT    : a ref to the associative array that is the vmt (virtual method table) for this object
-#     _OID    : name of the associative array that stores the object's logical state
-#     _OID_sys: name of the associative array that stores the object's system state
-#     _CLASS  : name of the class of the object (the highest level class, not the one the method is from)
 #     _METHOD : name of the method(function) being invoked
 #
 #     -n <memberVar> : each logical member var with a valid var name not starting with an '_'
@@ -1022,7 +1171,7 @@ function _bgclassCall()
 	# if <oid> does not exist, its because the myObj=$(NewObject <class>) syntax was used to create the
 	# object reference and it had to delay creation because it was in a subshell.
 	if ! varIsA array "$1"; then
-		[[ "$1" =~ ^heap_[aAixrnlut]*_ ]] || assertError "bad object reference. The object is out of scope. \nObjRef='_bgclassCall $@'"
+		[[ "$1" =~ ^heap_[aAixrnlut]*_ ]] || assertObjExpressionError "bad object reference. The object is out of scope. \nObjRef='_bgclassCall $@'"
 		declare -gA "$1=()"
 		if [[ "$4" =~ ^[._]*construct$ ]]; then
 			local _OID="$1"; shift
@@ -1054,13 +1203,13 @@ function _bgclassCall()
 
 	set -- "${_argsV[@]}"
 
-	local allowOnDemandObjCreation; [[ "${_memberOp:-defaultOp}" =~ ^(defaultOp|=new|\+=|=)$ ]] && allowOnDemandObjCreation="-f"
+	local allowOnDemandObjCreation; [[ "${_memberOp:-defaultOp}" =~ ^(defaultOp|=new|\+=|=|::)$ ]] && allowOnDemandObjCreation="-f"
 	#_resolveMemberChain $allowOnDemandObjCreation "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName
 	__resolveMemberChain "$allowOnDemandObjCreation" "$_OID" "$_chainedObjOrMember" # optimization
 
 	#declare -g msCP2; msLap="10#${EPOCHREALTIME#*.}"; (( msCP2+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 
-	[[ "$_rsvMemberType" =~ ^invalidExpression ]] && assertError -v expression:_memberExpression -v errorType:_rsvMemberType -v _OID -v memberExpr:_chainedObjOrMember  "invalid object expression. The <memberExpr> can not be interpretted relative to the <oid>"
+	[[ "$_rsvMemberType" =~ ^invalidExpression ]] && assertObjExpressionError -v expression:_memberExpression -v errorType:_rsvMemberType -v _OID -v memberExpr:_chainedObjOrMember  "invalid object expression. The <memberExpr> can not be interpretted relative to the <oid>"
 
 	if [ "$_rsvOID" ]; then
 		local _OID="$_rsvOID"
@@ -1088,12 +1237,12 @@ function _bgclassCall()
 		defaultOp:null:noGlobal)  false  ;;
 		defaultOp:null:chain)     false  ;;
 		defaultOp:null:memberVar) false  ;;
-		defaultOp:null:method*)   assertError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found" ;;
+		defaultOp:null:method*)   assertObjExpressionError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found" ;;
 		defaultOp:null:either)
 			# in this ambiguous case, if the the caller provided an argument, it looks more like a method call except if its only
 			# one and it is the name of a variable (that the member value would be returned in)
 			if [ $# -ge 2 ] || { [ "$1" ] && ! varExists "$1"; }; then
-				assertError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found"
+				assertObjExpressionError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found"
 			fi
 			false
 			;;
@@ -1101,6 +1250,14 @@ function _bgclassCall()
 		defaultOp:object:*)
 			${this[$_rsvMemberName]}.toString "$@"
 			;;
+
+
+		# note: this case modifies _rsvMemberName and then drops through to the defaultOp:method* case
+		:::null*)
+			# virtual mechanism override
+			# $myObj.Object::bgtrace ...
+			_rsvMemberName="${_rsvMemberName}::$1"; shift
+			;&
 
 		defaultOp:method*)
 			local -n refClass="$_CLASS"
@@ -1145,6 +1302,55 @@ function _bgclassCall()
 			$_METHOD "$@"
 			;;
 
+		:::self)
+			local -n refClass="$_CLASS"
+
+			# set the _VMT based on whether its being invoked on a Class object or not.
+			if [ "${_this[_CLASS]}" == "Class" ]; then
+				# invoking a static method of the class directly
+				# $Object::<staticMethod>
+				_CLASS="${this[name]}"
+			else
+				# invoking a static method of the class of an instance
+				# $myObj::<staticMethod>
+				_CLASS="${_this[_CLASS]}"
+			fi
+			assertNotEmpty _CLASS
+
+			unset -n static; local -n static="$_CLASS"
+			local -n _VMT="${_CLASS}_vmt"
+
+			_classUpdateVMT "$_CLASS"
+
+			# this is a static call so unset the this pointer vars. Our state array is in 'static', not 'this'
+			unset -n this
+			unset -n _this
+			unset _OID
+			unset _OID_sys
+
+			_rsvMemberName="$1"; shift
+			local _METHOD="${_VMT[_static::${_rsvMemberName}]}"
+			[ "$_METHOD" ] || assertObjExpressionError "The class '#_CLASS' does not contain a static method '$_rsvMemberName'"
+
+			# create local nameRefs for each logical static member variable that has a valid var name not starting with an '_'
+			local _memberVarName; for _memberVarName in "${!static[@]}"; do
+				[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
+				if IsAnObjRef "${static[$_memberVarName]}"; then
+					declare -n $_memberVarName; GetOID "${static[$_memberVarName]}" "$_memberVarName"
+				else
+					declare -n $_memberVarName="static[$_memberVarName]"
+				fi
+			done
+
+			bgDebuggerPlumbingCode=0
+			$_METHOD "$@"
+			;;
+
+
+		:::*)
+			assertObjExpressionError "Invalid use of the :: operator in object expression."
+			;;
+
 		.unset:self)
 			# unset on the base object is a noop -- maybe it should assert?
 			;;
@@ -1166,7 +1372,7 @@ function _bgclassCall()
 			[[ ! "${_rsvMemberType#object:}" =~ ^null ]]
 			;;
 
-		# set exit code to 0(true) or 1(false) based on the type of <chainedObjOrMember>
+		# set exit code to 0(true) or 1(false) based on the type of <objRef>
 		.isA:self)
 			[ "$_rsvOID" ] && [ "${_classIsAMap[${_this[_CLASS]},$1]+exists}" ]
 			;;
@@ -1177,7 +1383,7 @@ function _bgclassCall()
 			[ "${_rsvMemberType%%:*}" == "$1" ]
 			;;
 
-		# return the type of <chainedObjOrMember>
+		# return the type of <objRef>
 		.getType:self)
 			returnValue "${_this[_CLASS]}" $1
 			;;
@@ -1186,7 +1392,7 @@ function _bgclassCall()
 			returnValue "${_retType%%:*}" $1
 			;;
 
-		# return the name of the object array of <chainedObjOrMember>
+		# return the name of the object array of <objRef>
 		.getOID:self)
 			returnValue "$_OID" $1
 			;;
@@ -1199,7 +1405,7 @@ function _bgclassCall()
 			fi
 			;;
 
-		# return the ObjRef of <chainedObjOrMember> -- like "_bgclassCall <oid> <class> <hierarchy> |"
+		# return the ObjRef of <objRef> -- like "_bgclassCall <oid> <class> <hierarchy> |"
 		.getRef:self)
 			returnValue "${_this[_Ref]}" $1
 			;;
@@ -1245,8 +1451,8 @@ function _bgclassCall()
 			;;
 
 
-		# create a new object and set its reference in <chainedObjOrMember>
-		=new:self) assertError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		# create a new object and set its reference in <objRef>
+		=new:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
 		=new:*)
 			local _className="$1"; shift
 			local _newObject; ConstructObject "${_className:-Object}" _newObject "$@"
@@ -1254,22 +1460,21 @@ function _bgclassCall()
 			this[$_rsvMemberName]="$_newObject"
 			;;
 
-		# append to <chainedObjOrMember>
-		+=:self) assertError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		# append to <objRef>
+		+=:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
 		+=:*)
 			[[ "$_rsvMemberType" =~ ^object: ]] && DeleteObject "${this[$_rsvMemberName]}"
 			this[$_rsvMemberName]+="$*"
 			;;
 
-		# replace the value of <chainedObjOrMember>
-		=:self) assertError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		# replace the value of <objRef>
+		=:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
 		=:*)
 			[[ "$_rsvMemberType" =~ ^object: ]] && DeleteObject "${this[$_rsvMemberName]}"
 			this[$_rsvMemberName]="$*"
 			;;
 
-
-		*) assertError -v _memberOp -v _rsvMemberType "case block for object syntax operators by target type is missing this case"
+		*) assertObjExpressionError -v _memberOp -v _rsvMemberType "case block for object syntax operators by target type is missing this case"
 	esac
 
 	_resultCode="$?"
@@ -1295,260 +1500,18 @@ function _bgclassCall()
 
 
 
-# function _bgclassCall()
-# {
-# 	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
-# 	# if <oid> does not exist, its because the myObj=$(NewObject <class>) syntax was used to create the
-# 	# object reference and it had to delay creation because it was in a subshell.
-# 	if ! varIsA array "$1"; then
-# 		[[ "$1" =~ ^heap_[aAixrnlut]*_ ]] || assertError "bad object reference. The object is out of scope. \nObjRef='_bgclassCall $@'"
-# 		declare -gA "$1=()"
-# 		if [[ "$4" =~ ^[._]*construct$ ]]; then
-# 			local _OID="$1"; shift
-# 			local _CLASS="$1"; shift
-# 			ConstructObject "$_CLASS" "$_OID" "$@"
-# 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-# 			return
-# 		else
-# 			ConstructObject "$2" "$1"
-# 		fi
-# 	fi
-#
-# 	((_bgclassCallCount++))
-#
-# 	# the local variables we declare in this function will be available to access in the method function
-# 	local _OID="$1";           shift
-# 	local _CLASS="$1";         shift
-# 	local _hierarchLevel="$1"; shift
-# 	local _memberExpression="$*"; _memberExpression="${_memberExpression#|}"
-# 	local _memberTerm="$1";    shift; _memberTerm="${_memberTerm#|}"
-#
-# 	# its a noop to refer to an object without including a member, like $foo
-# 	[ "${_memberTerm//[]. []}" ] || {
-# 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-# 		return 0
-# 	}
-#
-# 	local -n refClass="$_CLASS"
-#
-# 	local -n this="$_OID" || {
-# 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-# 		assertError -v _OID -v _CLASS -v _memberExpression "could not setup Object calling context '$(declare -p this)'"
-# 	}
-#
-# 	# the array where we store system member variables (that start with '_') may or may not be the same as the main object array
-# 	# If ConstructObject puts _CLASS in the main array, then we use it. Otherwise we expect there to be a _sys version of the OID
-# 	local _OID_sys="${_OID}"
-# 	if { [[ ! "${refClass[oidAttributes]:-A}" =~ A ]] || [ ! "${this[_CLASS]+exists}" ]; } && varExists "${_OID}_sys"; then
-# 		_OID_sys+="_sys"
-# 	fi
-# 	local -n _this="${_OID_sys}"
-#
-# 	local -n static="${_this[_CLASS]}"
-# 	local super="_bgclassCall ${_OID} $_CLASS $((_hierarchLevel+1)) |"
-#
-# 	# create local nameRefs for each logical member variable that has a valid var name not starting with an '_'
-# 	if [ "$_OID_sys" != "$_OID" ] && [[ "${static[oidAttributes]:-A}" =~ A ]]; then
-# 		for _memberVarName in "${!this[@]}"; do
-# 			[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
-# 			if IsAnObjRef "${this[$_memberVarName]}"; then
-# 				declare -n $_memberVarName; GetOID "${this[$_memberVarName]}" "$_memberVarName"
-# 			else
-# 				declare -n $_memberVarName="this[$_memberVarName]"
-# 			fi
-# 		done
-# 	fi
-#
-# 	# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
-# 	_classUpdateVMT "${_this[_CLASS]}"
-#
-# 	local -n _VMT="${_this[_CLASS]}_vmt"
-#
-# 	# _memberTerm is the expression the caller typed after the objRef. It could be
-# 	#      1) a method call                      .<methodName> <p1> <p2> ...
-# 	#      2) a member var reference             .<memberVar> or [<memberVar>]
-# 	#      3) a member var assignment            .<memberVar>=<expression> or [<memberVar>]=<expression>
-# 	#      4) a chained member object reference  .<m1>.<m2>.<m3>... or [<m1>]<m2>.<m3>
-# 	# _mnameShort will be the first attribute name in _memberTerm
-# 	# _memberVal is the current value of the this[$_mnameShort]
-# 	local _mnameShort
-# 	case ${_memberTerm:0:1} in
-# 		[)	_mnameShort="${_memberTerm:1}"
-# 			_mnameShort="${_mnameShort%%[]]*}"
-# 			_memberTerm="${_memberTerm#*]}"
-# 			_memberExpression="${_memberExpression#*]}"
-# 			;;
-# 		.)	_mnameShort="${_memberTerm:1}"
-# 			_mnameShort="${_mnameShort%%[].+=[]*}"
-# 			_memberTerm="${_memberTerm#*$_mnameShort}"
-# 			_memberExpression="${_memberExpression#*$_mnameShort}"
-# 			;;
-# 		*)	_mnameShort="${_memberTerm%%[].+=[]*}"
-# 			_memberTerm="${_memberTerm#*$_mnameShort}"
-# 			_memberExpression="${_memberExpression#*$_mnameShort}"
-# 			;;
-# 	esac
-#
-# 	local _memberVal
-# 	[ "${_mnameShort}" ] && _memberVal="${this[${_mnameShort}]}"
-#
-# 	#bgtraceVars -1 _memberTerm _memberVal _mnameShort
-#
-# 	local _resultCode
-#
-# 	## some hard coded methods that can be called on a member even if that member is not an object or does not exist
-# 	# When these methods are called directly on an object (not in a chained member reference), they are invoked normally and do not hit this case
-#
-# 	# .unset
-# 	if [ "$_memberTerm" == ".unset" ]; then
-# 		[ "${_memberVal:0:12}" == "_bgclassCall" ] && DeleteObject "$_memberVal"
-# 		[ "${_mnameShort}" ] && unset this[${_mnameShort}]
-#
-# 	# .exists
-# 	elif [ "$_memberTerm" == ".exists" ]; then
-# 		[ "${_mnameShort}" ] && [ "${this[${_mnameShort}]+isset}" ]
-#
-# 	# .isA
-# 	elif [ "$_memberTerm" == ".isA" ]; then
-# 		# if its not an Object Ref, isA returns false, if it is, set the exit code by calling the isA method.
-# 		[ "${_memberVal:0:12}" == "_bgclassCall" ] && $_memberVal"$_memberTerm" "$@"
-#
-# 	# =new
-# 	elif [ "$_memberTerm" == "=new" ]; then
-# 		local newObjectClass="${1:-Object}"; shift
-# 		local newObject; ConstructObject "$newObjectClass" newObject "$@"
-# 		this[${_mnameShort}]="$newObject"
-#
-# 	# static...
-# 	elif [ "$_mnameShort" == "static" ]; then
-# 		$static"$_memberTerm" "$@"
-#
-# 	# member chaining syntax
-# 	#    $foo.bar.doIt p1 p2
-# 	#    $foo[bar].doIt p1 p2
-# 	elif [ "${_memberVal:0:12}" == "_bgclassCall" ]; then
-# 		$_memberVal"$_memberTerm" "$@"
-#
-# 	# member variable appending assignment syntax
-# 	#   $this.<classVarName>+=<newValue>
-# 	elif [ "${_memberTerm:0:2}" == "+=" ]; then
-# 		local sq="'" ssq="'\\''"
-# 		_memberTerm="${_memberExpression#+=}"
-# 		[ ! "$_mnameShort" ] && {
-# 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-# 			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
-# 		}
-# 		varSetRef -a this[${_mnameShort}] "${_memberTerm}"
-# 		#eval "this[${_mnameShort}]+='${_memberTerm//$sq/$ssq}'"
-#
-# 	# member variable assignment syntax
-# 	#   $this.<classVarName>=<newValue>
-# 	elif [ "${_memberTerm:0:1}" == "=" ]; then
-# 		local sq="'" ssq="'\\''"
-# 		_memberTerm="${_memberExpression#=}"
-# 		[ ! "$_mnameShort" ] && {
-# 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-# 			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
-# 		}
-# 		varSetRef  this[${_mnameShort}] "${_memberTerm}"
-# 		#eval "this[${_mnameShort}]='${_memberTerm//$sq/$ssq}'"
-#
-# 	# member chaining syntax (cont) -- member does not exist so create an Object on Demand
-# 	elif [ "$_memberTerm" ]; then
-# 		[ ! "$_mnameShort" ] && {
-# 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-# 			assertError -v errorToken:_memberTerm "Invalid object syntax in member terms"
-# 		}
-# 		local newObject; ConstructObject Object newObject "$@"
-# 		this[${_mnameShort}]="$newObject"
-# 		${this[${_mnameShort}]}$_memberTerm "$@"
-#
-# 	# member chaining syntax (cont) -- member does not exist so fail
-# 	# Note that if the the previous condition is not commented out, this will never be reached
-# 	elif [ "$_memberTerm" ]; then
-# 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-# 		assertError -v _memberVal -v _memberTerm -v _mnameShort "'${_mnameShort}' is not an Object reference member of '$_OID'"
-#
-# 	# calling a super class method syntax
-# 	#   $super.<method>
-# 	# TODO: refactor $super. implementation. The current imp only works when initiated from the most subclass because
-# 	#       it uses classHierarchy from the start. What it needs to do is always be related from the
-# 	#       the class that the function its used in is in.
-# 	#       Option1: the <hierarchyCallLevel> position in an obj ref could become a list of optional flags. the super ref would just have that flag
-# 	#           set. Hear we would detect that flag, get the calling method's class from the bash call stack, and increment the hierarchy from there.
-# 	#       Option2: Set the super ref just before calling each method. At that time we can extract the methods' class and change the class position in the
-# 	#           the super ref to be set to the base class of the method's class. This seems more correct but takes a small performance hit on every method call.
-# 	#           Also we would need to change this function to respect the class in the ref over the class in the object's instance array. That also seems more
-# 	#           correct. That would require moving the VMT from the object instance arrays to the class arrays. That was something that I was considering anyway.
-# 	#           I think the performance hit of this will be negligbable.
-# 	elif [ ${_hierarchLevel:-0} -gt 0 ]; then
-# 		# This version might be better but needs to be tested
-# 		#local h=(${static[classHierarchy]}) superName
-# 		#local i=$((${#h[@]}-1)); while [ $_hierarchLevel -gt 0 ] && [ $((--i)) -ge 0 ]; do
-# 		#	type -t ${h[$i]}::${_mnameShort} &>/dev/null && ((_hierarchLevel--))
-# 		#done
-# 		#local _METHOD="${h[$i]}::${_mnameShort}"
-# 		#[ $_hierarchLevel -eq 0 ] && $_METHOD "$@"
-#
-# 		local h="${static[classHierarchy]}" superName
-# 		local i=0; while [ "$h" ] && [ $i -lt $_hierarchLevel ]; do
-# 			[[ ! "$h" =~ \  ]] && h=""
-# 			h="${h% *}"
-# 			superName="${h##* }"
-# 			type -t ${superName}::${_mnameShort} &>/dev/null && ((i++))
-# 		done
-# 		if [ "$superName" ]; then
-# 			local _METHOD="${superName}::${_mnameShort}"
-# 			objOnEnterMethod "$@"
-# 			bgDebuggerPlumbingCode=0
-# 			$_METHOD "$@"
-# #			_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
-# 		fi
-#
-# 	# member function with explicit Class syntax
-# 	#   $this.<class>::<memberFunct> [<p1> .. p2]
-# 	elif [[ "$_mnameShort" =~ :: ]]; then
-# 		local _METHOD="$_mnameShort"
-# 		objOnEnterMethod "$@"
-# 		bgDebuggerPlumbingCode=0
-# 		$_METHOD "$@"
-#
-# 	# member function syntax
-# 	#   $this.<memberFunct> [<p1> .. p2]
-# 	elif [ "${_VMT[_method::${_mnameShort}]+isset}" ]; then
-# 		local _METHOD="${_VMT[_method::${_mnameShort}]}"
-# 		objOnEnterMethod "$@"
-# 		bgDebuggerPlumbingCode=0
-# 		$_METHOD "$@"
-#
-# 	# member variable read syntax. Its ok to read a non-existing member var, but if parameters were provided, it looks like a method call
-# 	#   echo $($this.<memberVar>)
-# 	elif [ ! "$*" ]; then
-# 		echo "${this[${_mnameShort}]}"
-# 		[ "${this[${_mnameShort}]+test}" == "test" ]
-#
-# 	# member not found error
-# 	else
-# 		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-# 		assertError -v _OID -v memberExpression:"$_mnameShort $_memberExpression" "member '$_mnameShort' not found for class $_CLASS"
-# 	fi
-# 	_resultCode="$?"; bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}"); return "$_resultCode"
-# }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+function assertObjExpressionError()
+{
+	local -A exprFrame
+	if [[ "${FUNCNAME[*]}" =~ \ command_not_found_handle\  ]]; then
+		bgStackGetFrame --readCode command_not_found_handle:+1 exprFrame
+	else
+		bgStackGetFrame --readCode _bgclassCall:+1 exprFrame
+	fi
+	local results="$?"
+	[ ${results:-0} -gt 0 ] && echo "assertObjExpressionError could not find the obj syntax on the stack. exitcode='$results'" >&2;
+	assertError -v "objExpression:exprFrame[srcCode]" "$@"
+}
 
 function assertThisRefError()
 {
@@ -1762,13 +1725,13 @@ function ParseObjExpr()
 #                   = .<memberVar>
 #                   = [<memberVar>]
 #                   = =new <constructorArgs>
-#                   = <operator><string>
+#                   = <objOperator><string>
 #  <memberDynamicMethod> = <bashFunctionName> # defined like -- function <ClassName>::bashFunctionName() { ; }
 #  <memberBuiltinMethod> = unset|exists|isA
 #  <memberVar>           = <bashVarName> any associative array index that is not a reserved word.
 #                          names that start with '_' are hidden in that they are not included in default member iteration
 #  [<memberVar>]         = member vars can be refered to with . or [] notation
-#  <operator> = +=|=
+#  <objOperator> = +=|=
 # See Also:
 #    ParseObjExpr
 #    _bgclassCall
@@ -2288,15 +2251,17 @@ declare -A Object=(
 # because "DeclareClass Class" will access its base class's (Object) vmt, we nee to declare it as an -A array early
 declare -A Object_vmt
 
-DeclareClass Class
-DeclareClass Object
+DeclareClass -f Class
+DeclareClass -f Object
 
 # we don't call ConstructObject for the Null Object because the [0],[_Ref] value is an assert instead of the normal format
 # we protect against re-defining it in case we reload the library
+DeclareClass NullObject
 [ ! "${NullObjectInstance[_OID]}" ] && declare -rA NullObjectInstance=(
 	[_OID]="NullObjectInstance"
 	[0]="assertError Null Object reference called <NULL>"
 	[_Ref]="assertError Null Object reference called <NULL>"
+	[_CLASS]="NullObject"
 )
 
 
@@ -2309,7 +2274,7 @@ DeclareClass Object
 # See Also:
 #    class Array
 #    class Map
-DeclareClass Stack
+DeclareClass -f Stack
 function Stack::__construct()
 {
 	this[length]=0
@@ -2388,7 +2353,7 @@ function Array::getSize()       { returnValue "${#this[*]}" $1; }
 function Array::getAttributes() { returnValue "${!this[*]}" $1; }
 function Array::getIndexes()    { returnValue "${!this[*]}" $1; }
 function Array::getValues()     { returnValue "${this[*]}" $1; }
-DeclareClass Array defaultIndex:off oidAttributes:a
+DeclareClass -f Array defaultIndex:off oidAttributes:a
 
 # A Map is a simple Object that can be used like an associative array. This is particularly useful for making arrays within arrays.
 # no system variables are stored in the main object array
@@ -2399,4 +2364,4 @@ function Map::getSize()       { returnValue "${#this[*]}" $1; }
 function Map::getAttributes() { returnValue "${!this[*]}" $1; }
 function Map::getIndexes()    { returnValue "${!this[*]}" $1; }
 function Map::getValues()     { returnValue "${this[*]}" $1; }
-DeclareClass Map defaultIndex:off
+DeclareClass -f Map defaultIndex:off

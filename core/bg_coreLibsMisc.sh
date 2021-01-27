@@ -1360,34 +1360,46 @@ function bgStackGetFrame()
 	local frameArrayVar="$1"; varIsA mapArray "$frameArrayVar" || assertError -v frameArrayVar "the name of an exiting associative array declared in the callers scope needs to be passed into this function to receive the results. '$frameArrayVar' is not an asociative array (exanple: local -A myArray=())"
 
 	local _functName _offset
-	[[ "$_offsetTerm" =~ ^([a-zA-Z_].*)?([-+]?[0-9]*)$ ]] || assertError -v _offsetTerm "bad value passed in for the first parameter"
+	[[ "$_offsetTerm" =~ ^([a-zA-Z_][^:+-]*)?:?([-+]?[0-9]*)$ ]] || assertError -v _offsetTerm "bad value passed in for the first parameter"
 	local rematch=("${BASH_REMATCH[@]}")
 	_functName="${rematch[1]}"
 	_offset="${rematch[2]}"
 
-	local refFrame
+	local refFrame=0
 	if [ "$_functName" ]; then
 		local i; for ((i=1; i<${#FUNCNAME[@]} && refFrame==0; i++)); do
-			[ "${FUNCNAME[$i+1]}" == "$_functName" ] && { refFrame=$i; break; }
+
+			[ "${FUNCNAME[$i]}" == "$_functName" ] && { refFrame=$i; break; }
 		done
 		# if we did not find _functName on the stack, return 2
-		[ ! "$refFrame" ] || return 2
+		[ "$refFrame" != 0 ] || return 2
 	else
 		refFrame=1 # 1 is the function that called us
 	fi
 
-	local targetFrame=$(( refFrame+_offset))
+	local targetFrame=$(( refFrame+(_offset)))
 
-	if [ $targetFrame -lt 0 ] || [ $targetFrame -ge ${#FUNCNAME[@]} ]; then
-		return 1
-	fi
-
-	local frameSrcFileValue frameFunctionValue frameSrcLineNoValue frameSimpleCmdValue
-	frameSrcFileValue="${BASH_SOURCE[$targetFrame]}"
-	frameFunctionValue="${FUNCNAME[$targetFrame]}"
-	if [ $targetFrame -gt 0 ]; then
-		frameSrcLineNoValue="${BASH_LINENO[$targetFrame-1]}"
+	local frameSrcFileValue frameFunctionValue frameSrcLineNoValue frameSimpleCmdValue frameSrcLocationValue frameSrcCodeValue framePrintLineValue
+	if [ $targetFrame -eq ${#FUNCNAME[@]} ]; then
+		frameSrcFileValue="terminal"
+		frameSrcLineNoValue="$$"
+		frameFunctionValue="<invoked>"
 		frameSimpleCmdValue="${FUNCNAME[$targetFrame-1]}"
+		frameSrcCodeValue="$bgLibExecSrc"
+		framePrintLineValue=""
+
+	elif [ $targetFrame -lt 0 ] || [ $targetFrame -ge ${#FUNCNAME[@]} ]; then
+		echo "error: bgStackGetFrame: invalid frame spec. targetFrame='$targetFrame' stackSize='${#FUNCNAME[@]}'" >&2
+		return 1
+
+	else
+		frameSrcFileValue="${BASH_SOURCE[$targetFrame]}"
+		frameFunctionValue="${FUNCNAME[$targetFrame]}"
+		if [ $targetFrame -gt 0 ]; then
+			frameSrcLineNoValue="${BASH_LINENO[$targetFrame-1]}"
+			frameSimpleCmdValue="${FUNCNAME[$targetFrame-1]}"
+		fi
+
 	fi
 
 	if shopt -q extdebug; then
@@ -1402,10 +1414,10 @@ function bgStackGetFrame()
 		done
 	fi
 
-	local frameSrcLocationValue="${frameSrcFileValue##*/}:(${frameSrcLineNoValue})"
-	local frameSrcCodeValue; [ "$readCodeFlag" ] && [ -r "$frameSrcFileValue" ] && frameSrcCodeValue="$(sed -n "$frameSrcLineNoValue"'{s/^[[:space:]]*//;p;q}' "$frameSrcFileValue" 2>/dev/null)"
+	frameSrcLocationValue="${frameSrcFileValue##*/}:(${frameSrcLineNoValue})"
+	[ "$readCodeFlag" ] && [ -r "$frameSrcFileValue" ] && frameSrcCodeValue="$(sed -n "$frameSrcLineNoValue"'{s/^[[:space:]]*//;p;q}' "$frameSrcFileValue" 2>/dev/null)"
 
-	local framePrintLineValue; printf -v framePrintLineValue "%-*s %-*s: %s" \
+	printf -v framePrintLineValue "%-*s %-*s: %s" \
 		"0" "$frameSrcLocationValue:" \
 		"0"  "$frameFunctionValue()" \
 		"${frameSrcCodeValue:-$frameSimpleCmdValue}"
@@ -2545,6 +2557,31 @@ function bgTrapUtils()
 #######################################################################################################################################
 ### From bg_coreAssertError.sh
 
+# usage: (not called directly -- called by bash when a non-existent command is invoked)
+function command_not_found_handle()
+{
+	local cmdName="$1"
+	local cmdline="$*"
+	if [ "${command_not_found_handle}" == "1" ]; then
+		assertError --critical --allStack -v cmdline "Command not found -- recursion detected"
+	fi
+	export command_not_found_handle=1
+
+	if [[ "$cmdName" =~ ^[.] ]]; then
+		import bg_objects.sh ;$L1;$L2
+		_bgclassCall NullObjectInstance NullObject 0 "|$@"
+	elif [[ "$cmdName" =~ ^_bgclassCall ]]; then
+#		cmdline="${cmdline//_bgclassCall/<classCall>}"
+		cmdline="# ${cmdline}"
+		assertError --no-funcname --frameOffset=+1 -v cmdline "Command not found"
+	else
+		assertError --no-funcname --frameOffset=+1 -v cmdline "Command not found"
+	fi
+
+}
+
+
+
 # usage: assertError [-c] [-e <exitCode>] [-v <var>] [-V [<label>:]<data>] [-f <filename>] <errorDescription>"
 # The assertError* family of functions are meant to be called when a script of library function can not complete its intended task.
 # It is similar to throwing an exception in other languages.
@@ -2653,7 +2690,7 @@ function assertError()
 	local _ae_exitCodeLast="$?"
 	local _ae_msg _ae_exitCode=36 _ae_actionOverride _ae_contextVarName _ae_catchAction _ae_catchSubshell _ae_frameOffset
 	local -A _ae_dFiles _ae_contextVarsCheck=([empty]=1)
-	local _ae_dFilesList _ae_contextVars _ae_contextOutput _ea_allStack
+	local _ae_dFilesList _ae_contextVars _ae_contextOutput _ea_allStack _ae_noFuncnameFlag _ae_sourceAndArgsFlag _ae_stackDebugFlag
 
 	# TODO: we need to figure out a good way to associate assertErrorContext with the tryStack so that we stop at the right level
 	### add any assertErrorContext data to the command line parameters.
@@ -2674,6 +2711,9 @@ function assertError()
 
 	### process the command line
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		--no-funcname)  _ae_noFuncnameFlag="--no-funcname" ;;
+		--sourceAndArgs) _ae_sourceAndArgsFlag="--sourceAndArgs" ;;
+		--stackDebug)    _ae_stackDebugFlag="--stackDebug" ;;
 		--critical)     _ae_actionOverride="abort" ;;
 		-c|--continue)  _ae_actionOverride="${_ae_actionOverride:-continue}" ;;
 		--exitOneShell) _ae_actionOverride="${_ae_actionOverride:-exitOneShell}" ;;
@@ -2756,7 +2796,11 @@ function assertError()
 	[ "${tryStateAction}" == "catch" ] && exec {ae_outFD}>$assertOut.catchDescription
 
 	echo >&$ae_outFD
-	echo -e "error: $_ae_failingFunctionName: $_ae_msg" >&$ae_outFD
+	if [ ! "$_ae_noFuncnameFlag" ]; then
+		echo -e "error: $_ae_failingFunctionName: $_ae_msg" >&$ae_outFD
+	else
+		echo -e "error: $_ae_msg" >&$ae_outFD
+	fi
 
 	printfVars "    " "${_ae_contextVars[@]}" >&$ae_outFD
 
@@ -2784,7 +2828,7 @@ function assertError()
 	#       for the Catch block to access.
 	# We write the stack to bgtrace even if we are catching the exception b/c a pipeline might cause several
 	# exceptions and only the last one will make it into assertOut so bgtrace might be the only place to see some
-	bgtraceIsActive && [ ! "$bgAssertErrorInhibitTrace" ] && bgStackTrace $_ea_allStack --logicalStart=$((_ae_stackFrameStart))
+	bgtraceIsActive && [ ! "$bgAssertErrorInhibitTrace" ] && bgStackTrace $_ea_allStack $bgErrorStack $_ae_sourceAndArgsFlag $_ae_stackDebugFlag --logicalStart=$((_ae_stackFrameStart))
 	[ "$bgAssertErrorTMPSIGNALTRIGGERED" ] && bgStackDump >> $_bgtraceFile
 
 	# include the proccess tree of the script when bgtrace is active

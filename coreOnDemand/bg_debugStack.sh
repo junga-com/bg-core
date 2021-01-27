@@ -104,6 +104,7 @@ set +o errtrace # extdebug turns this on but unit tests need it off
 #     bgStackPrint  : format the logical frames that this function produces for output
 function bgStackMakeLogical()
 {
+	# usage: _pushLogicalStackEntry <context> <srcFile> <function> <srcLineNo> <simpleCmd> [<cmd>]
 	# internal function to add the next stack entry to our logical stack variables
 	#     bgStackSize  : is how many frames are already on the stack. the new one goes into the index [$bgStackSize] and then bgStackSize is incremented
 	# Params:
@@ -138,7 +139,7 @@ function bgStackMakeLogical()
 		# the debugger can modify any sourced function to include calls to bgtraceBreak on the fly to implement non-persistent breakpoints.
 		# however, when it does that, the sourceFile and line numbers associated with that modified function changes to the point in
 		# bg_debugger.sh that overwrites the function. When it does that, the debugger adds an entry into bgBASH_debugBPInfo to indicate
-		# the translation bask to the original file. It adds the bgtraceBreak as an addtional compound clause to existing lines so that
+		# the translation back to the original file. It adds the bgtraceBreak as an addtional compound clause to existing lines so that
 		# the simple commands executed by bash will still match up with the original lines in the files
 		declare -gA bgBASH_debugBPInfo
 		local bpInfo="${bgBASH_debugBPInfo["${bgStackFunction[$bgStackSize]// /}"]}"
@@ -148,15 +149,14 @@ function bgStackMakeLogical()
 			bgStackSrcLineNo[$bgStackSize]="$((bgStackSrcLineNo[$bgStackSize] - newLineNo + origLineNo))"
 		fi
 
-
 		bgStackSrcLocation[$bgStackSize]="${bgStackSrcFile[$bgStackSize]##*/}:(${bgStackSrcLineNo[$bgStackSize]})"
 
-		if [ ! "$noSrcLookupFlag" ] && [ -r "${bgStackSrcFile[$bgStackSize]}" ] && ((${bgStackSrcLineNo[$bgStackSize]:-0} > 0 )); then
+		if [ ! "${bgStackSrcCode[$bgStackSize]}" ] && [ ! "$noSrcLookupFlag" ] && [ -r "${bgStackSrcFile[$bgStackSize]}" ] && ((${bgStackSrcLineNo[$bgStackSize]:-0} > 0 )); then
 			bgStackSrcCode[$bgStackSize]="$(sed -n "${bgStackSrcLineNo[$bgStackSize]}"'{s/^[[:space:]]*//;p;q}' "${bgStackSrcFile[$bgStackSize]}" 2>/dev/null )"
 			if [[ "${bgStackSrcCode[$bgStackSize]}" =~ ^[[:space:]]*[{][[:space:]]*$ ]] && [[ ! "${bgStackSimpleCmd[$bgStackSize]}" =~ ^[\<] ]]; then
 				bgStackSimpleCmd[$bgStackSize]="{"
 			fi
-		else
+		elif [ ! "${bgStackSrcCode[$bgStackSize]}" ]; then
 			bgStackSrcCode[$bgStackSize]="${bgStackSimpleCmd[$bgStackSize]}"
 		fi
 		if [ "${bgStackSimpleCmd[$bgStackSize]}" == "<unknown>" ] && [ "${bgStackSrcCode[$bgStackSize]}" ]; then
@@ -218,12 +218,23 @@ function bgStackMakeLogical()
 
 
 
-	local noSrcLookupFlag logicalFrameStart=1
+	local noSrcLookupFlag logicalFrameStart=1 stackDebugFlag
 	while [ $# -gt 0 ]; do case $1 in
 		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
 		--logicalStart*) ((logicalFrameStart+=${1#--logicalStart?})) ;;
+		--stackDebug)  stackDebugFlag="--stackDebug" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+
+	[ "$stackDebugFlag" ] && bgStackDump
+
+
+	# in some cases, the BASH stack data can not be trusted. E.G. with core sourced in terminal, run '$Object.name::bgtrace' (which should assert an error)
+	# The BASH_SOURCE was correct but BASH_LINENO was way off. The top BASH_LINENO was a cmd counter in the terminal. The rest were
+	# wrong and I could not detect what they were
+	# This flag is meant to create a mode where src is not read
+	local bgCantTrustScrLocations; [ "$bgLibExecMode" != "script" ] && bgCantTrustScrLocations="1"
+	[ "$bgCantTrustScrLocations" ] && noSrcLookupFlag="bgCantTrustScrLocations"
 
 	# if we are in a DEBUG handler, frameIdxOfDEBUGTrap will point to the bash array index where the trap was invoked.
 	# an empty value indicates that there is no DEBUG handler on the stack. 0 would be a problem but we know that it can not be zero
@@ -308,7 +319,7 @@ function bgStackMakeLogical()
 		fi
 
 
-		# CRITICALTODO: use declare -F (with lineno's) to fix trap handler boundry detection code. 
+		# CRITICALTODO: use declare -F (with lineno's) to fix trap handler boundry detection code.
 		# OBSOLETE? Now that we alias trap to bgtrap, typical trap handlers will start with BGTRAPEntry and the above code works
 		#           much better than this detection code. This code relies on examining the source to see if the frame matches but
 		#           that is problematic -- notably code that executes a cmd inside a variable like $utFunc ...
@@ -537,30 +548,33 @@ function bgStackMakeLogical()
 	# Synthesize one last logical stack entry to represent how the script was invoked.
 	# Each of our logical frames take some information from a given bash stack frame [i] and some information from the [i-1] frame
 	# The last bash frame contains one last bit of information that we would normally access as [i-1] but i did not go that high.
-	# This is that +1 frame that we are added now that will use that part of the last bash frame.
+	# This is that +1 frame that we are adding now that will use that part of the last bash frame.
 
 	# the highest (last) frame on the BASH_ stack is one of
 	#        'main'         : normal case. running a script in a non-interactive bash process
 	#        'source'       : sourcing a script into an interactive bash process (aka a terminal emulator win)
-	#        <functionName> : running a function from an interactive bash process. This is typical of bash completion scripts and
+	#        <functionName> : running a sourced function from an interactive bash process. This is typical of bash completion scripts and
 	#                         functions in the bg-debugCntr system of development tools. The function is typically sourced from a
-	#                         earlier in a session (maybe in the .bashrc) and now its being invoked directly on the command line.
+	#                         cmd earlier in a session (maybe in the .bashrc) and now its being invoked directly on the command line.
 
 	local simpleCommand=""; lastFrame="$((${#BASH_SOURCE[@]}-1))"
-	if [[ ${FUNCNAME[$lastFrame]} =~ ^(main|source)$ ]]; then
-		# when bg_core.sh is sourced some top level, global code records the cmd line that invoked in bgLibExecCmd
+	if [ "${#bgLibExecCmd[@]}" -gt 0 ]; then
+		# bg_coreImport.sh global code and bg-debugCntr debug trap, records the cmd line being invoked in bgLibExecCmd
 		local v; for (( v=0; v <=${#bgLibExecCmd[@]}; v++ )); do
 			local quotes=""; [[ "${bgLibExecCmd[v]}" =~ [[:space:]] ]] && quotes="'"
 			simpleCommand+=" ${quotes}${bgLibExecCmd[v]}${quotes}"
 		done
 	else
-		# when the highest (last) is a sourced function, then its just like any other function call
-		_constructSimpleCommandFromBashStack "$(($lastFrame-1))" simpleCommand
+		# if the hint is not available, use the information available in the stack. This might be 'main' but it could be a sourced
+		# function that is being called
+		_constructSimpleCommandFromBashStack "$(($lastFrame))" simpleCommand
 	fi
+	# usage: _pushLogicalStackEntry <context> <srcFile> <function> <srcLineNo> <simpleCmd> [<cmd>]
+	bgStackSrcCode[$bgStackSize]="$bgLibExecSrc"  # hack: setting bgStackSrcCode outside of _pushLogicalStackEntry instead of allowing it to be passed in
 	_pushLogicalStackEntry TOPL \
 		"<bash:$$>" \
-		"Script On Interative Bash" \
-		"1" \
+		"${FUNCNAME[@]: -1}" \
+		"<typed>" \
 		"$simpleCommand"
 
 
@@ -598,26 +612,37 @@ function bgStackMakeLogical()
 #                     all the frames will be shown but the --logicalStart point may be indicated in the output.
 function bgStackPrint()
 {
-	local noSrcLookupFlag allStackFlag logicalFrameStart=1 onelineFlag
+	local noSrcLookupFlag allStackFlag logicalFrameStart=1 onelineFlag argValuesFlag stackDebugFlag
 	while [ $# -gt 0 ]; do case $1 in
 		--allStack) allStackFlag="--allStack" ;;
 		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
-		--oneline)  onelineFlag="--oneline" ;;
+		--oneline)     onelineFlag="oneline" ;;
+		--argValues)   argValuesFlag="argValues" ;;
+		--sourceAndArgs) argValuesFlag="both" ;;
+		--stackDebug)  stackDebugFlag="--stackDebug" ;;
 		--logicalStart*) ((logicalFrameStart+=${1#--logicalStart?})) ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+bgtraceVars argValuesFlag
 	#bgStackDump
-	bgStackMakeLogical $noSrcLookupFlag --logicalStart+$logicalFrameStart
+	bgStackMakeLogical $stackDebugFlag $noSrcLookupFlag --logicalStart+$logicalFrameStart
 
 	local startFrame=0; [ ! "$allStackFlag" ] && startFrame="$bgStackLogicalFramesStart"
 
 	echo "===============  BASH call stack trace P:$$/$BASHPID TTY:$(tty 2>/dev/null) ====================="
 	local frameNo; for ((frameNo=$bgStackSize-1; frameNo>=startFrame; frameNo--)); do
-		if [ "$onelineFlag" ]; then
-			printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]/$'\n'*/...}"
-		else
-			printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]}"
-		fi
+		case $onelineFlag:$argValuesFlag in
+			:both)             printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]}"
+							   printf "%-*s    %s\n" "$((bgStackSrcLocationMaxLen+1))" "" "${bgStackSimpleCmd[$frameNo]}"
+							   ;;
+			:argValues)        printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLineWithSimpleCmd[$frameNo]}" ;;
+			:)                 printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]}" ;;
+			oneline::both)     printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]/$'\n'*/...}"
+							   printf "%-*s    %s\n" "$((bgStackSrcLocationMaxLen+1))" "" "${bgStackSimpleCmd[$frameNo]/$'\n'*/...}"
+							   ;;
+			oneline:argValues) printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLineWithSimpleCmd[$frameNo]/$'\n'*/...}" ;;
+			oneline:)          printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]/$'\n'*/...}" ;;
+		esac
 	done
 	echo "=================  last line invoked the stack trace  =========================="
 }
