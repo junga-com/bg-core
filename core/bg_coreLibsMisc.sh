@@ -129,8 +129,15 @@ function manifestGetHostManifest() {
 #    man(7) bgBashIdioms
 function bgOptionsEndLoop()
 {
+	# this block supports functions like bgOptions_DoOutputVarOpts which bundle the handling of multiple options into one option line
+	if [ "$bgOptionHandled" ]; then
+		bgOptionsExpandedOpts=("$@")
+		bgOptionHandled=""
+		return 1
+	fi
+
 	# extract our options.
-	# Note that these do NOT conflict with the script author's options b/c if a case staement exists for
+	# Note that these do NOT conflict with the script author's options b/c if a case statement exists for
 	# one of these and its in the next position that case will match instead of the default case.
 	local firstParamVar eatUnknown
 	if [ "$1" == "--firstParam" ]; then

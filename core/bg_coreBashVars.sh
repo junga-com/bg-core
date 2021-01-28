@@ -312,23 +312,25 @@ function returnValue()
 # This function has the semantics of "echo <value>" but an option can redirect the output from stdout to assigning it to <retVar>
 #
 # Options:
+#    --echo               : (default behavior). echo <value> to stdout.
 #    -R|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
 #    -A|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
 #    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
-#    --echo               : (default behavior). echo <value> to stdout.
 #    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no affect with --set or --echo
-#    -d|--delim=<delim>   : default is the first character of IFS. This is the delimeter used between multiple <valueN> and between
-#                           the first <value1> and the existing value in <retVar> if --append is specified.  Has no affect with
-#                           --array or --set.
+#    -d|--delim=<delim>   : This is the delimeter used between multiple <valueN> when the results are written to stdout or to a string.
+#                           if --append is specified, it is also used between the existing value in <retVar> and the first <value1>.
+#                           The <delim> Has no affect with --array or --set forms. The default is the first character of IFS.
+#    -1|+1                : set the delimiter to '\n' so that each <valueN> will be on a separate line.
 # See Also:
 #    man(3) varSetRef
 #    man(3) returnValue
+#    man(3) bgOptions_DoOutputVarOpts
 function outputValue() { varOutput "$@"; } # ALIAS:
 function varOutput()
 {
 	local _sr_appendFlag _sr_varType="--echo" _sr_varRef _sr_delim=${IFS:0:1}
 	while [ $# -gt 0 ]; do case $1 in
-		+1)               _sr_delim=$'\n' ;;
+		[+-]1)               _sr_delim=$'\n' ;;
 		-a|--append)      _sr_appendFlag="-a" ;;
 		-R*|--string*)    _sr_varType="--string";   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
 		-A*|--array*)     _sr_varType="--array" ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
@@ -378,6 +380,46 @@ function varOutput()
 	true
 }
 
+# usage: bgOptions_DoOutputVarOpts <retVar> <cmdLine...>
+# this is used in the bgOptionsLoop of a function that accepts options that will be passed to the outputValue function to return
+# the results of the function. This pattern allows the function author to write one function that supports returnning it results
+# in a variety of ways that the the user of the function can choose with optional arguments when the function is called.
+#
+# Example:
+#    function foo() {
+#       local retOpts
+#       while [ $# -gt 0 ]; do case $1 in
+#           *)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+#           *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+#       done
+#       outputValue "${retOpts[@]}" one two three
+#    }
+#
+# Options:
+# These options will be supportted by a function that uses this pattern.
+#    --echo               : (default behavior). echo <value> to stdout.
+#    -R|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
+#    -A|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
+#    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
+#    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no affect with --set or --echo
+#    -d|--delim=<delim>   : This is the delimeter used between multiple <valueN> when the results are written to stdout or to a string.
+#                           if --append is specified, it is also used between the existing value in <retVar> and the first <value1>.
+#                           The <delim> Has no affect with --array or --set forms. The default is the first character of IFS.
+#    -1|+1                : set the delimiter to '\n' so that each <valueN> will be on a separate line.
+function bgOptions_DoOutputVarOpts()
+{
+	local _do_retVar="$1"; shift
+	case "$1" in
+		[+-]1)            bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
+		-a|--append)      bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
+		-R*|--string*)    bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
+		-A*|--array*)     bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
+		-S*|--set*)       bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
+		-e|--echo)        bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
+		-d*|--delim*)     bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
+		*) return 1 ;;
+	esac
+}
 
 
 # usage: setReturnValue <varRef> <value>

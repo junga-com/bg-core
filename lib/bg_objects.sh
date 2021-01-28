@@ -400,7 +400,10 @@ function Class::isDerivedFrom()
 }
 
 # usage: <Class>.reloadMethods
-#
+# mark the class VMT as dirty so that the next time a method of this class is accessed, the enironment will be scanned to find
+# all functions that match the naming convention for static and non-static methods of this class.
+#    non-static methods names are:  function <className>::<methodName>() { ... }
+#    static methods names are:      function static::<className>::<methodName>() { ... }
 function Class::reloadMethods()
 {
 	this[vmtCacheNum]=-1
@@ -410,7 +413,33 @@ function Class::reloadMethods()
 	#importCntr bumpRevNumber
 }
 
-# usage: <Class>.getMethods [<retVar>]
+
+# usage: _getMethodsFromVMT [<outputOptions>] <vmtName> method|static
+# helper function used by Class and Object get*Methods methods.
+# Options:
+#    <outputOptions> : See options for "man(3) outputValue"
+function _getMethodsFromVMT()
+{
+	local delim=" " retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local -n vmt="$1"; shift
+	local typeToReturn="$1"; shift
+
+	local -A methods=()
+	local method; for method in "${!vmt[@]}"; do
+		case ${typeToReturn:-all} in
+			method|all)    [[ "$method" =~ ^_method:: ]] && methods[${method#_method::}]=1 ;;&
+			static|all)    [[ "$method" =~ ^_static:: ]] && methods[${method#_static::}]=1 ;;&
+		esac
+	done
+
+	outputValue "${retOpts[@]}" "${!methods[@]}"
+}
+
+# usage: <Class>.getClassMethods [<retVar>]
 # return a list of method names defined for this class. By default This does not return methods inherited from base
 # classes. The names do not include the leading <className>:: prefix.
 # Options:
@@ -420,30 +449,52 @@ function Class::reloadMethods()
 #    <retVar> : return the result in this variable
 function Class::getClassMethods()
 {
-	local includeInherited delim=" "
+	local includeInherited retOpts
 	while [ $# -gt 0 ]; do case $1 in
 		-i|--includeInherited) includeInherited="-i" ;;
-		-d*|--delimiter) bgOptionGetOpt val: delim "$@" && shift ;;
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local retVar="$1"
 	_classUpdateVMT "${this[name]}"
 
-	local -A methods=()
-
 	if [ ! "$includeInherited" ]; then
+		local -A methods=()
 		local method; for method in ${this[methods]//${this[name]}::}; do
 			methods[$method]=1
 		done
+		outputValue "${retOpts[@]}" "${!methods[@]}"
 	else
-		local -n vmt="${this[name]}_vmt"
-		local method; for method in "${!vmt[@]}"; do
-			methods[${method##*::}]=1
-		done
+		_getMethodsFromVMT "${retOpts[@]}" "${this[name]}_vmt" "method"
 	fi
+}
 
-	local methodList="${!methods[*]}"
-	returnValue "${methodList// /$delim}" $retVar
+# usage: <Class>.getClassStaticMethods [<retVar>]
+# return a list of static method names defined for this class. By default This does not return methods inherited from base
+# classes. The names do not include the leading <className>:: prefix.
+# Options:
+#    -i|--includeInherited   : include inherited methods
+#    -d|--delimiter=<delim>  : use <delim> to separate the method names. default is " "
+# Params:
+#    <retVar> : return the result in this variable
+function Class::getClassStaticMethods()
+{
+	local includeInherited retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		-i|--includeInherited) includeInherited="-i" ;;
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	_classUpdateVMT "${this[name]}"
+
+	if [ ! "$includeInherited" ]; then
+		local -A methods=()
+		local method; for method in ${this[staticMethods]//static::${this[name]}::}; do
+			methods[$method]=1
+		done
+		outputValue "${retOpts[@]}" "${!methods[@]}"
+	else
+		_getMethodsFromVMT "${retOpts[@]}" "${this[name]}_vmt" "static"
+	fi
 }
 
 # DEPRECIATED: use the syntax --  $myObj.myMember.new <className> [<p1> .. <pN>]
@@ -1843,13 +1894,36 @@ function Object::clone()
 	fi
 }
 
+# usage: $obj.getMethods [<outputValueOptions>]
+# return a list of methods available to call in the $obj
+# Options:
+#    <outputValueOptions> : see man(3) outputValue
 function Object::getMethods()
 {
-	local _retValue
-	local i; for i in "${!_VMT[@]}"; do
-		_retValue+="${i#_method::} "
+	local retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	returnValue "$_retValue" $1
+	_classUpdateVMT "$_CLASS"
+
+	_getMethodsFromVMT "${retOpts[@]}" "${_CLASS}_vmt" "method"
+}
+
+# usage: $obj.getStaticMethods [<outputValueOptions>]
+# return a list of static methods available to call on the $obj
+# Options:
+#    <outputValueOptions> : see man(3) outputValue
+function Object::getStaticMethods()
+{
+	local retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	_classUpdateVMT "$_CLASS"
+
+	_getMethodsFromVMT "${retOpts[@]}" "${_CLASS}_vmt" "static"
 }
 
 # usage: $obj.hasMethod <methodName>
@@ -1866,7 +1940,7 @@ function Object::addMethod()
 	local _mname="$1"
 	local _mnameShort="${_mname#*::}"
 
-	assertError "DEV: this method needs to be updated because the _VMT is now shared amoung instances"
+	assertError "DEV: this method needs to be updated because the _VMT is now shared among instances"
 
 	_this[_addedMethods]+=" $_mname"
 	_VMT[_method::${_mnameShort}]="$_mname"
