@@ -8,6 +8,18 @@ This man page describes a number of idiomatic conventions used in bg-core style 
 
 Before the reader knows the idiom, the code can look overly complex and cryptic but after knowing the idiom, the reader looks past the literal code and sees the structure that becomes easy to work with.
 
+.SH Pattern: Bash is Linux
+OK, not literally, but this essence is that each programming language or environment uses a implied 'object model' for how functions are called and data is passed. How functions are named and identified when they are called. How are arguments provided in the call are matched with parameters defined in the function. How a function can return information.
+
+A shell language like bash is special because it uses the "object model" of processes implemented by the operating system. It adds a little more, but what it adds is fundamentally compatible with the operating system's 'object model'.
+
+This brings advantages and disadvantages. This constraint makes it hard to support many of the syntax niceties of modern languages so bash can lead to clunky and cryptic code. But on the other hand, bash uses the same command invocation syntax that we use on the terminal. A bash function has the same semantics as an external command installed on the host. A sysadmin who knows the command line, can transfer those skills into automating tasks by writing scripts.
+
+The operating system's 'object model' is not foreign to other languages, because a command written in any language is invoked the same way and has the same facilities to receive input and output information as any other command. A command written in a shell language is special in that when you look inside to see how it works or to modify it to do something different, you dont have to learn a new 'object model' because its the same inside and out.
+
+The motivation of the bg-core bash library is to embrace the idea of the operating system' 'object model' for the system automation so that a system administrator can do more.
+
+
 
 
 .SH Command Line Options Processing
@@ -22,7 +34,7 @@ This idiom isolates the declaration of options from the processing so that wheth
     (1)    local allFlag filename="/my/default/name"
     (2)    while [ $# -gt 0 ]; do case $1 in
     (3)        -a|--all) allFlag="-a" ;;
-    (4)        -f*|--files*) bgOptionGetOpt val: filename "$@" && shift ;;
+    (4)        -f*|--file*) bgOptionGetOpt val: filename "$@" && shift ;;
     (5)        *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
     (6)    done
 
@@ -34,13 +46,11 @@ The eye should focus on lines 3 and 4. Each describes one option and as the func
 
 Line 3 says that this function accepts a option that has the short form "-a" and the long form "--all". Because they lack the trailing *, they do not have a required argument.
 
-Line 4 is another option with short and long forms that do require an argument because each has a trailing *.
+Line 4 is an option with an argument because the short (-f*) and long (--file*) forms end with a '*'. Processing all the variants of an option with argument is not trivial so the task is delegated to the bgOptionGetOpt function. The first argument to bgOptionGetOpt is one of (val,val:,opt,opt:). The second argument is the name of the variable that will receive the information from this option. 'val' means that we want the variable filled with the value of the option and 'opt' means that we want the variable appended with the full option, suitable passing on to another command that supports the same option. The ':' suffix indicates that the option has a required argument.
 
 The author can do what ever processing is required in the option's case statement but typically, options will only set a variable which the body of the function will use to affect its behavior. Note that the option without an argument sets its corresponding value to the short form of the option.  This makes is convenient both to check if the option is set (non-empty string) and also to pass that option through to another command that accepts the same option, if needed.
 
-The option with a required argument uses the bgOptionsGetOpt function to retrieve the value. This is a sub-idiom. The only important thing on that lien is the name fo the "filename" variable that is being set with the required argument.
-
-This block supports all the conventions of *nix options and it does it efficiently as runtime so that the author can add as many options as makes sense without adversely affecting performance.
+This block supports all the conventions of *nix options and it does it efficiently at runtime so that the author can add as many options as makes sense without adversely affecting performance.
 
 I never type out lines 2, 5, and 6 nor do I type out the bgOptionsGetOpt call line. Instead, I either copy and paste an option block from a nearby function or use a snippet feature of my editor to fill them in.
 
@@ -49,9 +59,127 @@ My Atom snippets make it so that I start typing "bgoptloop" to insert line 2,5, 
 
 
 
+.SH Pattern: Library Functions Returning Values
+Other languages allow a function to return information either in reference (output) parameters or by returning a value. Bash only allows returning an exitcode integer and does not have native support for passing parameters by reference. Typically, a function or command writes its information to stdout but that has several shortcomings when writing complex bash frameworks.
 
-.SH Shortcut Evaluation Flow Control
-Bash is not a pretty language. The if statement is awkward and verbose so its common to use the fact that conditions are only evaluated up to the point that the total expression's value is known to implement a shorter verion of the if statement.
+This pattern is about passing the name of a variable into the function as a parameter as a way to support something like reference parameters to return information from the function to the caller.
+
+This technique is problematic in bash for several reasons. There are security concerns because its easy to unintentionally allow arbitrary code execution by the user of the script when using this technique. If the function declares a local variable that has the same name as the variable name that the user passes in to receive the results, the local variable will be set instead of the caller's variable. In the function, accessing and setting the value of the variable using its name is cumbersome, especially when it is an array.
+
+This pattern deals with writing functions in a way that overcomes these problems by using functions provided by the bg_coreBashVars.sh library. Most of these functions begin with var* so you can find them by looking up their man pages "man var<tab><tab>". Note that some also have alias names that do not begin with var* because they read better in scripts that way.
+
+We will refer to a "reference parameter" as a bash function parameter where the caller passes in the name of a variable whose value can be accessed and set by the function.
+
+See "Pattern: Naming of Function Local variables" for the issue of avoiding name conflicts between reference parameters and local variables
+
+To access and set reference parameters bash supports several mechanisms.
+local -n feature.
+    local -n _listRef="$n"
+This allows the reference variable to be accessed and set with any appropriate native bash syntax. This is particularly useful when the reference variable is an array. Note that the local -n feature does not prevent naming conflicts from occurring and conflicts are most likely with the local reference vars because both the function author and the caller are both creating variable names that refer to the same logical thing. See the pattern mentioned above for more details, but remember that it mostly falls on the function author to avoid the conflict.
+
+Indirect Access.
+    local _nameVar="$n"
+    echo "I am ${!_nameVar}"
+Bash provides a convenient and secure way to access the value of a simple scalar (not an array) indirectly, but not a way to set its value (other than local -n)
+
+When I started writing this bash library, the local -n feature was not available and even now, there are times when it is not the best option so bg_coreBashVars.sh provides var* functions to access and set reference variables in various ways.
+
+By using the var* functions, if there is security issue, it is concentrated in one place where it can be fixed.
+
+allows writing a library function so that the caller can either receive the results via stdout or pass in a variable to receive the results.
+
+There are several common patterns for how to pass retVar to the function.
+
+**Simple Scalar pattern**
+
+If the function only returns one scalar value and has a fixed number of required parameters,  the last parameter can be the optional [<retVar>] which will receive the output. If <retVar> is not passed in, the output will go to standard out.
+
+If more than one return value is supported or the positional parameters syntax does not allow supporting an optional last parameter, an option is  added to pass the return value(s)
+   usage: myFunc [-R|--myFirstRet=<retVar1>] [-S|--myFirstRet=<retVar2>] <p1>..<pN>
+   ...
+      returnValue "$value1" $retVar1
+      returnValue -q "$value2" $retVar2
+
+By convention, options that pass in return values are often upper case. R is often used for string values.
+
+The -q|--quiet option to returnValue suppresses the writing the value to stdout is <retVar> is empty. In the last example, the <retVar1> will be written to stdout if the caller does not provide the -R option but <retVar2> will be ignored unless the caller provides the -S option.
+
+**varOutput/outputValue pattern**
+
+When the output of a function is a list, the outputValue supports more control to the caller than the returnValue pattern. See the "Functions with Output to Stdout Semantics" pattern below.
+
+
+
+.SH Pattern: Functions with Output to Stdout Semantics
+Unix utilities typically print their output to stdout which allows it to be piped into another command and eventually displayed or redirected to a file.
+
+Bash functions can follow that convention but with functions there is also the opportunity to assign the output directly to a variable.  See "Pattern: Library Functions Returning Values" for a discussion on issues to be aware of when passing reference parameters in bash. This pattern is about the common semantics of how to pass the reference parameters in some cases.
+
+We can write a function so that the caller can decide how they want to receive the information returned from the function. By default, the function will write its information to stdout as is the long standard convention.
+
+**Simple Scalar Return Values**
+When the function returns one scalar value, the returnValue function can be used. This function is mean to be similar to if bash supported returning a value and is often followed by an actual bash 'return <n>' call if its not the last statement in the function.
+    returnValue "some value" "$retVar"
+If <retVar> is the empty string returnValue will write "some value" to stdout, otherwise it will set the variable named in <retVar> with "some value"
+
+There are two common conventions for passing in <retVar>. If the function has only fixed parameters, <retVar> can be the last, optional parameter.
+    getName # write name to stdout
+    getName myName # fill in the 'myName' variable with the returned name.
+
+If the functions already has optional parameters, or there are more than one returned value, optional parameters can be used to pass the reference variables into the function.
+    doSomething -S status -R myName "this" "that" ... # status is set with some value indicating what happened
+In this case, if the caller does not provide -S <statusVar>, we might not want to write the staus to stdout so we could use returnValue like this.
+    returnValue -q "$_statusValue" "$statusVar"
+
+**List Return Values**
+
+Its very common for commands/functions to return a list of 0 or more results. 'ls' and 'find' are examples of this.
+
+The `outputValue [<option>] <value(s)>...` (alias varOutout) can be used to support a pattern where the caller can not only choose whether to receive the results via stdout or a variable, but also whether to receive the results in a string variable (as one text blob) or as an array or even as the indexes of an associative array (which dedupes the results).
+
+These are the optional parameters that outputValue accepts.
+    --echo               : (default) write the output to stdout
+    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no effect with --set or stdout
+    -R*|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
+    -A*|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
+    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
+    -d*|--delim=<delim>  : the delimiter to use to separate multiple values when writing to stdout or to a string variable.
+    [+-]1                : shortcut to set --delim=$'\n'. inspired by 'ls -1' which causes it to write one entry per line.
+
+A function using this pattern should accept these options and pass them through to the outputValue function. The bgOptionGetOpt makes it easy to gather options to pass through to another function.
+    -R*|--string) bgOptionGetOpt opt: retOpts "$@" && shift ;;
+The 'opt:' tells bgOptionGetOpt to append the option, as is to the array <retOpts>.
+
+Since there are a lot of options to support in the full pattern, there is a helper function to make it easier.
+
+    local retOpts results
+    while [ $# -gt 0 ]; do case $1 in
+        *) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+        *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+    done
+    results=(one two three)
+    outputValue "${retOpts[@]}" "${results[@]}"
+
+If the function needs to change the set of supported options for any reasons, it can look at "man bgOptions_DoOutputVarOpts" and copy and past the options that it wants to support.
+
+I use an Atom snippet to add the bgOptions_DoOutputVarOpts line to an options block when needed.
+
+
+
+.SH Idiom: Calling Functions to get a Value
+The natural and more readable way to use a function to retrieve a value is ...
+   local manifestFile="$(manifestGetHostManifest)"
+
+... but functions that support the "Functions with Output to Stdout Semantics" pattern support a more efficient alternative.
+   local manifestFile; manifestGetHostManifest manifestFile
+
+Unfortunately, this looks to the casual eye a lot like we are declaring 3 local variables but actually we are declaring only one and setting its value with a call to manifestGetHostManifest.
+
+Developers writing the top level script should feel free to use the first, more readable form but be aware of the second form when reading  library functions which use the second form since many library functions can be invoke during a single script run and therefore its significant to reduce the number of subshells that the library uses.
+
+
+.SH Idiom Shortcut Evaluation Flow Control
+Bash is not a pretty language. The if statement is awkward and verbose so its common to use the fact that conditions are only evaluated up to the point that the total expression's value is known to implement a shorter version of the if statement.
 
 These are all the same
    if [ ! "$quietFlag" ]; then
@@ -72,11 +200,11 @@ A series of "and" conditions can be chained resulting in the command at the end 
 A series of "or" conditions can be chained resulting in the command at the end executing only if all the conditions are false.
    [ -f "$file" ] || [ ! "$fileIsNeeded" ] || assertError "we need this file but it does not exist"
 
-If there are more that one command to execute they can be surrounded by {}. Note that spaces around the brackets and that last ; are important
+If there are more that one command to execute they can be surrounded by {}. Note that whitespace around the brackets and that last ; are important
    [ ! "$something" ] && { something="$1"; shift; }
 
 
-.SH Renaming functions with Aliases
+.SH Idiom: Renaming functions with Aliases
 When organizing libraries, sometimes you realize that a function should be named differently for various reasons. For example, when a function was written, it was considered to stand alone but now you consider it part of a family of functions that should share a naming convention.
 
 If the library is used by other code, you may not be in the position to change all references to that function in order to rename it.
@@ -94,88 +222,6 @@ If the alias line contains the DEPRECIATED: tag, tools will indicate to users th
 
 Sometimes a function should have multiple names. Possibly it has a longer name that is descriptive but its a common function used in a way that a short idiomatic alias makes the code where it is used more readable. To be explicit that the alias is valid you can tag it with # ALIAS:
 
-
-
-
-
-
-.SH Pattern: Library Functions with Optional Output Variable Semantics
-Shell functions typically return a value to the caller by writing the value on stdout so that the caller runs the function in a subshell to capture the value like foo="$(myFunc)".
-
-This works well for typical scripts but when making a script library with functions that can be called 100's of times per user interaction, the overhead of that sub shell adds up and its better to return the value by setting a variable whose name the caller passes in as a parameter.
-
-However, its often less convenient for the caller to pass in a variable name.
-
-This pattern allows writing a library function that can efficiently work both ways so that its up to the caller whether to use the more convenient stdout capture or the more efficient variable passing.
-
-In the function, returnValue is used like this...
-   returnValue "some calculated information"  $retVar
-
-If retVar is empty, then the value is written to stdout. Otherwise the value is assigned to the variable named in retVar.
-
-There are several common patterns for how to pass retVar to the function.
-
-**returnValue pattern**
-
-If the function only returns one value and it does not support a variable list of positional parameters, then the last parameter can be the optional [<retVar>]. Often such functions will shift its positional parameters so that the statement looks like `returnValue "$myValue" $1` so that if there is a variable name left on the cmdline, it will be used, otherwise it will use stdout.
-
-If more than one return value is supported or the positional parameters syntax does not allow supporting an optional last parameter, an option is  added to pass the return value(s)
-   usage: myFunc [-R|--myFirstRet=<retVar1>] [-S|--myFirstRet=<retVar2>] <p1>..<pN>
-   ...
-      returnValue "$value1" $retVar1
-      returnValue -q "$value2" $retVar2
-
-By convention, options that pass in return values are often upper case. R is often used for string values.
-
-The -q|--quiet option to returnValue suppresses the writing the value to stdout is <retVar> is empty. In the last example, the <retVar1> will be written to stdout if the caller does not provide the -R option but <retVar2> will be ignored unless the caller provides the -S option.
-
-**varSetRef pattern**
-
-`varSetRef <retVar> <value...>` is similar to returnValue. It has the semantics of an assignment statement and it more flexible in how the output variable is set. <retVar> can be a bash numeric or associative array and the returned value can be a single token or multiple tokens, and can replace the <retVar> or append to it and can be assigned to the indexes so that it has set semantics to eliminate duplicates.
-
-Here is an example code snippet from a function that allows the caller to receive its return value(s) in many ways. By default they will be written to stdout.
-
-    local retArgs=(--echo "")
-    while [ $# -gt 0 ]; do case "$1" in
-       --string*)      bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--string "$retVar") ;;
-       --stringAppend*)bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --string "$retVar") ;;
-       --set*)         bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--set "$retVar") ;;
-       --array*)       bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--array "$retVar") ;;
-       --arrayAppend*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
-       *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-    done
-    ...
-    varSetRef "${retArgs[@]}" "<val1>" "<var2...>"
-
-.SH Pattern: Functions with Output to Stdout Semantics
-This pattern is related to "Pattern: Library Functions with Optional Output Variable Semantics"
-
-Unix utilities typically print their output to stdout which allows it to be piped into another command and eventually displayed or redirected to a file.
-
-Bash functions can follow that convention but with functions there is also the opportunity to assign the output directly to a variable.  
-
-A function can accept options that redirect the stdout output to a bash variable in various ways. Functions that follow this pattern can call other functions that follow this pattern, passing through the option that relates to the the return.
-
-The `outputValue [<option>] <value(s)>...` can be used to support this pattern. When no option is specified, the value is written to stdout. The standard return options are ...
-
-    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no effect with --set or stdout
-    -R|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
-    -A|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
-    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
-
-
-.SH Idiom: Calling Functions to get a Value
-The natural and more readable way to use a function to retrieve a value is ...
-   local manifestFile="$(manifestGetHostManifest)"
-
-... but you will see this variation in library function often because it avoids the subshell
-   local manifestFile; manifestGetHostManifest manifestFile
-
-In this example, manifestGetHostManifest uses the pattern "Library Functions with Optional Output Variable Semantics"
-
-Unfortunately, this looks to the casual eye a lot like we are declaring 3 local variables but actually we are declaring only one and setting its value with a call to manifestGetHostManifest.
-
-Developers writing the top level script should feel free to use the first, more readable form but be aware of the second form when looking to see what library functions do.
 
 
 .SH Pattern: Naming of Function Local variables
@@ -198,3 +244,19 @@ When a function is in a very low level library which is likely to be called from
 Its a bit unpalatable that this naming convention is subjective and not guaranteed to avoid conflicts but in practice I find it not that hard to avoid conflicts because the programming environment provided by bg-core and bg-dev supports an agile, iterative dev cycle where its apparent quickly it there is a naming conflict.   
 
 The bg_coreBashVars.sh library has a number of functions starting with var* that help getting and setting values of bash variables by name.
+
+
+.SH Idiom: Inline For Loop Variable declaration
+Other languages allow a loop variable to be declared in the for statement like.
+    for (var i in ...)
+
+When reading library functions you will see this form of formatting for the bash for loop which mimics this.
+    local i; for i in "${!list[@]}"; do ...
+        <loop body>
+    fi
+
+I do this because I feel that the vertical space that a block consumes should be commensurate with its function. i.e. the start of a loop should be one line.
+
+The counter argument to this is that casaully scanning the code, you might miss that this line is the start of a loop because it starts with the word 'local'. However, because the loop body is indented, despite starting with 'local' the eye sees that the line must be the start of a loop or a conditional statement.
+
+Feel free to not use this idiom, but be aware of it when reading the bg-core library code.

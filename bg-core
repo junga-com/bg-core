@@ -7,9 +7,10 @@ projectName=bg-core
 
 source /usr/lib/bg_core.sh
 import bg_template.sh ;$L1;$L2
-import bg_plugins.sh ;$L1;$L2
+import bg_pluginsObj.sh ;$L1;$L2
 
-supportedCmds="templates plugin cuiWin config"
+
+supportedCmds="templates plugin cuiWin config manifest"
 
 ###############################################################################
 # Command manpage
@@ -57,7 +58,8 @@ function oob_printBashCompletion()
 			esac
 			;;
 
-		plugin:2) echo "type list find" ;;
+		plugin:2) echo "types list get" ;;
+
 	esac
 	exit
 }
@@ -123,7 +125,10 @@ function pluginCntr()
 	local cmd="$1"; shift
 
 	case ${cmd:-list} in
-		list) plugins_list "$@" ;;
+		list)   $Plugin::list "$@" ;;
+		types)  $Plugin::types "$@" ;;
+		get)    $Plugin::get "$@" ;;
+		*) assertError "unknown sub command '$cmd'" ;;
 	esac
 }
 
@@ -148,6 +153,7 @@ case ${command:-show} in
 	templates)     templateCntr   "${passThruOpts[@]}" "$@" ;;
 	plugin)        pluginCntr     "${passThruOpts[@]}" "$@" ;;
 	config)        configCntr     "${passThruOpts[@]}" "$@" ;;
+	manifest)      echo "use 'bg-awkData manifest ...' to query the host manifest" ;;
 	show)          echo "coming soon..."  ;;
 	*)  echo "error: unknown command '$command'. "
 		echo "   See man $(basename $0)"

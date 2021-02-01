@@ -19,6 +19,7 @@
 #
 
 
+
 #######################################################################################################################################
 ### From bg_manifest.sh
 
@@ -2574,17 +2575,15 @@ function command_not_found_handle()
 	fi
 	export command_not_found_handle=1
 
-	if [[ "$cmdName" =~ ^[.] ]]; then
-		import bg_objects.sh ;$L1;$L2
-		_bgclassCall NullObjectInstance NullObject 0 "|$@"
-	elif [[ "$cmdName" =~ ^_bgclassCall ]]; then
-#		cmdline="${cmdline//_bgclassCall/<classCall>}"
-		cmdline="# ${cmdline}"
-		assertError --no-funcname --frameOffset=+1 -v cmdline "Command not found"
-	else
-		assertError --no-funcname --frameOffset=+1 -v cmdline "Command not found"
+	# recognize $foo.something... object syntax where the $foo variable is empty
+	if [[ "$cmdName" =~ ^[.[] ]]; then
+		local -A exprFrame; bgStackGetFrame --readCode command_not_found_handle:+1 exprFrame
+		local results="$?"
+		[ ${results:-0} -gt 0 ] && echo "assertObjExpressionError could not find the obj syntax on the stack. exitcode='$results'" >&2;
+		assertError --no-funcname -v "objExpression:exprFrame[srcCode]" "empty object variable referenced"
 	fi
 
+	assertError --no-funcname --frameOffset=+1 -v cmdline "Command not found"
 }
 
 

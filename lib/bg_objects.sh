@@ -221,11 +221,28 @@
 #
 # The Member functions (aka Methods) of the class are named <className>::* and can be defined before or after the class is Declared.
 # The first time an instance of <className> is created, the <className> array will be updated with a list of functions in the bash
-# environment at that time whose name starts with <className>::*.  If a new script library is imported after that, the next time
-# a <className> object is referenced, the environment will be rescanned to pick up any new <className>::* functions.
+# environment at that time whose name starts with <className>::*. Also, any functions whose name starts with 'static::<className>::*'
+# will be recorded as a static method of that class.  If a new script library is imported after the functions are scanned for members,
+# it will cause scanning for members again the next time a <className> object is referenced so that if any new member functions are
+# added, they will be automatically recorded.
 #
-# Its important for the script author to define the <className>::* functions in the script before any global code that creates an
-# instance of that <className> so that those member functions will be found when the VMT is initially built.
+# Its important for the script author to define the <className>::* functions in the script before any global code in the same script
+# file that creates an instance of that <className> so that those member functions will be found when the VMT is initially built.
+#
+# Static Construction:
+# A static::<className>::__construct() method can be defined that will be called when the Class <className> object array is constructed.
+# Static member variables can be initialized in the 'static' variable that is a nameRef to that oject array. Unlike normal constructors,
+# this static constructor is not inherited so it is not called when class that extends <className> is Declared. All class objects
+# are of class 'Class' but they can each have their own static constuctor that initiallizes their static members differently.
+#
+# Static Member Functions:
+# Other static member functions (besides static::<className>::__construct()) are inherited. This means that a static member can be
+# called from $<className>::<methodName> or from $<derivedClass>::<methodName> or from $<instanceOf_className>::<methodName>. If
+# <methodName> is defined as both static::<className>::<methodName> and static::<derivedClass>::<methodName>, static::<derivedClass>::<methodName>
+# will be called when called from $<derivedClass>::<methodName>, but static::<className>::<methodName> will be called when called
+# from $<className>::<methodName>.
+#
+# In the body of static methods, the variable 'static' points to the class's object and 'this' is undefined (or NullObjectInstance)
 #
 # Accessing Class Static Member Variables:
 # Inside methods of the Class, the class's array can be refered to as "static" which is a -n alias to the <className> global array
@@ -284,11 +301,14 @@ function DeclareClass()
 		return 0
 	fi
 
-	# if a class is used as a base class, we realize its construction s0 that its static beavior is avaiable
-	# in general, a problem with the DeclareClassEnd mechanism is that if the class is first
-	DeclareClassEnd "$baseClass"
+	# if a class is used as a base class, we realize its construction so that its static behavior is avaiable
+	# TODO: this seems not to be needed. when the delay mechanism was first created there wa a use case in the plugin library but now
+	#       the import mechanism uses FlushPendingClassConstructions to construct classes at the end of each library.
+	#DeclareClassEnd "$baseClass"
 
 	declare -ga ${className}_initData='('"$baseClass"' "$@")'
+
+	Class[pendingClassCtors]+=" $className "
 
 	[ "$forceFlag" ] && DeclareClassEnd "$className"
 	true
@@ -319,32 +339,32 @@ function DeclareClassEnd()
 	local initData=("${delayedData[@]:1}")
 	unset delayedData
 	unset -n delayedData
+	Class[pendingClassCtors]="${Class[pendingClassCtors]// $className }"
 
 	DeclareClassEnd "$baseClass"
 
 	ConstructObject Class "$className" "$className" "$baseClass" "${initData[@]}"
 
-	# a class author can define <className>::__staticConstruct() function before calling DeclareClass to do special static init
-	# __staticConstruct is the end of the recursive, self defining nature of the Object / Class system
-	# Its similar to the concept of having a sub class of Class to represent each different Class, but
-	# instead of defining a whole new sub class (which itself would need to have a unique class data instance
-	# to represent what it is), we only allow that a staticConstructor be defined. This way the loop ends
-	# and the programmer has a way to define the construction of the particular Class instance.
-	if type -t $className::__staticConstruct &>/dev/null; then
-		# the __staticConstruct is invoked in the context of the particular Class. Since there is no instance of type <className>
-		# 'this' is null. The __staticConstruct should be written to use 'static' as the thing that its constructing.
-		local this="$NullObjectInstance"
-		local -n static="$className"
-		$className::__staticConstruct "$@"
+	if type -t static::$className::__construct &>/dev/null; then
+		local -n newClass="$className"
+		$newClass::__construct "$@"
 	fi
+}
+
+function FlushPendingClassConstructions()
+{
+	local className; for className in ${Class[pendingClassCtors]}; do
+		DeclareClassEnd "$className"
+	done
 }
 
 # usage: DeclareClass <className> [<baseClassName> [<atribName1:val1> .. <atribNameN:valN>]]
 # This is the constructor for objects of type Class. When DeclareClass is used to bring a new class into existence it creates the
 # global <className> associative array and then uses this function to fill in its contents.
-# A particular <className> can preform extra construction on its class object by defining a <className>::__staticConstruct function
-# *before* calling DeclareClass. This Class::__construct() will be called first to init the associative array and then
-# <className>::__staticConstruct will be called with this set to the class object.
+# A particular <className> can preform extra construction on its class object by defining a static::<className>::__construct function
+# This Class::__construct() will be called first to init the associative array and then static::<className>::__construct will be
+# called with 'static' set to the class object. Class:__construct is a non-static method and uses 'this' inside the function body
+# and static::<className>::__construct is a static method and uses 'static' inside the function body
 function Class::__construct()
 {
 	this[name]="$1"; shift
@@ -614,6 +634,8 @@ function ConstructObject()
 
 	DeclareClassEnd "$_CLASS"
 
+	varExists "$_CLASS[name]" || assertError -v "$_CLASS" "Class '$_CLASS' does not exist"
+
 	### support dynamic base class implemented construction
 	if [[ "$_CLASS" =~ :: ]] && type -t ${_CLASS//::*/::ConstructObject} &>/dev/null; then
 		_CLASS="${1%%::*}"
@@ -653,28 +675,27 @@ function ConstructObject()
 
 	# based on how the caller declared <objRef>, set this and _this
 	local _OID
-	local -n this _this
 	# its an unitialized -n nameRef
 	if [ "$_objRefVarAttributes" == "n" ]; then
 		newHeapVar -"${class[oidAttributes]:-A}"  _OID
 		printf -v $_objRefVar "%s" "${_OID}"
-		this="$_OID"
+		local -n this="$_OID"
 
 		declare -gA ${_OID}_sys="()" 2>$assertOut; [ ! -s "$assertOut" ] || assertError
-		_this="${_OID}_sys"
+		local -n _this="${_OID}_sys"
 
-	# this is the conituation of the NewObject case started above
+	# this is the continuation of the NewObject case started above
 	elif [[ "$_objRefVarAttributes" =~ \& ]]; then
 		_OID="$_objRefVar"
-		this="$_objRefVar"
+		local -n this="$_objRefVar"
 		declare -gA ${_OID}_sys="()" 2>$assertOut; [ ! -s "$assertOut" ] || assertError
-		_this="${_OID}_sys"
+		local -n _this="${_OID}_sys"
 
 	# its an 'A' (associative) array that we can use as our object
 	elif [[ "$_objRefVarAttributes" =~ A ]]; then
 		_OID="$_objRefVar"
-		this="$_objRefVar"
-		_this="$_objRefVar"
+		local -n this="$_objRefVar"
+		local -n _this="$_objRefVar"
 
 	# its an 'a' (numeric) array that we can use as our object
 	# Note that this case is problematic and maybe should assert an error because there is no way to create the _sys array in the
@@ -683,18 +704,18 @@ function ConstructObject()
 	elif [[ "$_objRefVarAttributes" =~ a ]]; then
 		assertError "Test this case more before using..."
 		_OID="$_objRefVar"
-		this="$_objRefVar"
+		local -n this="$_objRefVar"
 		declare -gA ${_OID}_sys="()" 2>$assertOut; [ ! -s "$assertOut" ] || assertError
-		_this="${_OID}_sys"
+		local -n _this="${_OID}_sys"
 
 	# its a plain string variable
 	else
 		newHeapVar -"${class[oidAttributes]:-A}"  _OID
 		printf -v "$_objRefVar" "%s" "_bgclassCall ${_OID} $_CLASS 0 |"
-		this="$_OID"
+		local -n this="$_OID"
 
 		declare -gA ${_OID}_sys="()" 2>$assertOut; [ ! -s "$assertOut" ] || assertError
-		_this="${_OID}_sys"
+		local -n _this="${_OID}_sys"
 	fi
 	shift 2 # the remainder of parameters are passed to the __construct function
 
@@ -846,9 +867,13 @@ function DeleteObject()
 	fi
 
 	# assert that the second term in the objRef is an associative array
-	[[ "$(declare -p "${parts[1]}" 2>/dev/null)" =~ declare\ -[gilnrtux]*A ]] || assertError "'$objRef' is not a valid object reference"
+	if [ ${#parts[@]} -ne 5 ] || [[ ! "$(declare -p "${parts[1]}" 2>/dev/null)" =~ declare\ -[gilnrtux]*A ]]; then
+		assertError "'$*' is not a valid object reference"
+	fi
 
 	local -n this="${parts[1]}"
+	local _OID_sys="${parts[1]}"; varExists "${parts[1]}_sys" && _OID_sys="${parts[1]}_sys"
+	local -n _this="${_OID_sys}"
 	local -n _VMT="${_this[_CLASS]}_vmt"
 
 	# local -n subObj; for subObj in $(VisitObjectMembers this); do
@@ -1001,15 +1026,12 @@ function __parseObjSyntax() {
 	# local reExp="($reOp)($reArgs)?$"
 	# bgtraceVars reExp
 
-	# add a trailing space so that reBreak does not have to match EOS
-	expression="${expression} "
-
 	# at this point these assignments may not be correct. We need to remove the operator, if any from the chainedObjOrMember
 	# and the += and = operators may contain one argV token stuck to it that needs to be moved to argV
 	_chainedObjOrMember="${1#|} "; shift
 	_argsV=("$@")
 
-	[[ "$_chainedObjOrMember" =~ $reExp ]] || assertError -v expression "invalid object syntax"
+	[[ "$_chainedObjOrMember" =~ $reExp ]] || assertError -v _chainedObjOrMember "invalid object syntax"
 	local rematch=("${BASH_REMATCH[@]}")
 	_memberOp="${rematch[1]}"
 	_chainedObjOrMember="${_chainedObjOrMember%%$_memberOp*}"
@@ -1059,7 +1081,7 @@ function __resolveMemberChain()
 	local oidIn="$2"
 	local exprIn="$3"
 
-	_rsvOID=""
+	_rsvOID="$oidIn"
 	_rsvMemberName=""
 	_rsvMemberType=""
 
@@ -1071,19 +1093,28 @@ function __resolveMemberChain()
 	local expr="${exprIn//\[/.}"
 	local parts sIFS; sIFS="$IFS"; IFS='.'; parts=(${expr}); IFS="$sIFS"
 
+	# "$obj.something.." produces an empty first part but  "$obj something..." does not
+	[ "${parts[0]}" == "" ] && parts=("${parts[@]:1}")
+
 	local _objRefV
 
-	# if <oid> was not passed in, the expression starts at the global scope so use the first part as the starting oid
-	if [ ! "$oidIn" ]; then
-		_rsvOID="${part[0]}"; parts=("${parts[@]:1}")
-		_objRefV="${!_rsvOID}"
-		local _oidParts=($_objRefV)
-		[ "${_oidParts[0]}" == "_bgclassCall" ] || { _rsvMemberType="null:noGlobal";  return 101; }
-		_rsvOID="${_oidParts[1]}"
-	else
-		# "$obj.something.." produces an empty first part but  "$obj something..." does not
-		[ "${part[0]}" == "" ] && parts=("${parts[@]:1}")
-		_rsvOID="$oidIn"
+	# if <oid> was not passed in, the expression starts at the function global scope so use the first part as the starting oid
+	# it can either be a valid object (array or var containing _bgclassCall...) or it can be the left hand side of an assignment
+	if [ ! "$_rsvOID" ]; then
+		_rsvOID="${parts[0]}"; parts=("${parts[@]:1}")
+		[ ! "$_rsvOID" ] && { _rsvMemberType="null:noGlobal";  return 101; }
+		local attributes; varGetAttributes "$_rsvOID" attributes
+		if [[ "$attributes" =~ [aA] ]]; then
+			:
+		elif [ "${!_rsvOID:0:12}" == "_bgclassCall" ]; then
+			GetOID "${!_rsvOID}" $_rsvOID
+		else
+			[ ${#parts[@]} -gt 0 ] && { _rsvMemberType="invalidExpression:the first term is not a valid object or assignment left hand side. "; return 101; }
+			_rsvMemberName="$_rsvOID"
+			_rsvOID=""
+			_rsvMemberType="globalVar"
+			return
+		fi
 	fi
 
 	### unless its 'static' remove the last term, leaving parts with just the chained parts that we need to traverse
@@ -1099,9 +1130,6 @@ function __resolveMemberChain()
 		# if 1 or 2 ':' are at the start, its just a way for the caller to declare that the term must be a method so we can remove them now
 		_rsvMemberName="${_rsvMemberName#:}"; _rsvMemberName="${_rsvMemberName#:}"
 	fi
-
-
-
 
 	### follow the 'middle' chained parts which, by syntax, should all be objects. We already removed the last part so this loop is the chaining mechaism
 	local -n _pthis
@@ -1190,6 +1218,7 @@ function __resolveMemberChain()
 }
 
 
+# usage: _bgclassCall <OID> <class> <flags> |...
 # This is the internal method call stub. It is typically only called by objRef invocations. $objRef.methodName
 # Variables Provided to the method:
 #     super   : objRef to call the version of a method declared in a super class. Its the same ObjRef as this but with the <hierarchyCallLevel> term incremented
@@ -1221,7 +1250,7 @@ function _bgclassCall()
 	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
 	# if <oid> does not exist, its because the myObj=$(NewObject <class>) syntax was used to create the
 	# object reference and it had to delay creation because it was in a subshell.
-	if ! varIsA array "$1"; then
+	if [ "$1" ] && ! varIsA array "$1"; then
 		[[ "$1" =~ ^heap_[aAixrnlut]*_ ]] || assertObjExpressionError "bad object reference. The object is out of scope. \nObjRef='_bgclassCall $@'"
 		declare -gA "$1=()"
 		if [[ "$4" =~ ^[._]*construct$ ]]; then
@@ -1275,6 +1304,7 @@ function _bgclassCall()
 
 	#declare -g msCP3; msLap="10#${EPOCHREALTIME#*.}"; (( msCP3+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 
+	#bgtraceVars -1 _memberOp _rsvMemberType
 	#bgtraceVars "" _chainedObjOrMember _memberOp _argsV _rsvOID _rsvMemberType _rsvMemberName -l"${_memberOp:-defaultOp}:${_rsvMemberType}"
 	case ${_memberOp:-defaultOp}:${_rsvMemberType} in
 		defaultOp:primitive)
@@ -1504,6 +1534,10 @@ function _bgclassCall()
 
 		# create a new object and set its reference in <objRef>
 		=new:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		=new:globalVar)
+			local _className="$1"; shift
+			ConstructObject "${_className:-Object}" $_rsvMemberName "$@"
+			;;
 		=new:*)
 			local _className="$1"; shift
 			local _newObject; ConstructObject "${_className:-Object}" _newObject "$@"
@@ -1513,6 +1547,9 @@ function _bgclassCall()
 
 		# append to <objRef>
 		+=:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		+=:globalVar)
+			printf -v "$_rsvMemberName" "%s%s" "${!_rsvMemberName}" "$*"
+			;;
 		+=:*)
 			[[ "$_rsvMemberType" =~ ^object: ]] && DeleteObject "${this[$_rsvMemberName]}"
 			this[$_rsvMemberName]+="$*"
@@ -1520,6 +1557,9 @@ function _bgclassCall()
 
 		# replace the value of <objRef>
 		=:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		=:globalVar)
+			printf -v "$_rsvMemberName" "%s" "$*"
+			;;
 		=:*)
 			[[ "$_rsvMemberType" =~ ^object: ]] && DeleteObject "${this[$_rsvMemberName]}"
 			this[$_rsvMemberName]="$*"
@@ -1573,7 +1613,6 @@ this='assertThisRefError '
 
 
 
-
 # This hook is called before each method
 function objOnEnterMethod()
 {
@@ -1588,7 +1627,7 @@ function objOnEnterMethod()
 # usage: objEval <objExpr>
 # This evaluates an object expression that is stored in a string.
 # Even though "eval <objExpr>" works the same as this function, if objEval comes from an untrusted source,
-# objEval is safer because it checks that the first term is a valid oject reference
+# objEval is safer because it checks that the first term is a valid object reference
 # For example, the normal way to dereference an expression is in a script write..
 #      local msgName="$($obj.msg.name)"
 # but if "$obj.msg.name" is in a string (for example obtained from a template file,
@@ -1598,7 +1637,7 @@ function objEval() { ObjEval "$@"; }
 function ObjEval()
 {
 	local objExpr="$1"; shift
-	objExpr="${objExpr#$}"
+	objExpr="${objExpr#$}" #"
 	local oPart="${objExpr%%[.[]*}"
 	local mPart="${objExpr#$oPart}"
 	local callExpr="${!oPart}"
@@ -1608,6 +1647,12 @@ function ObjEval()
 	eval \$$objExpr "$@"
 }
 
+
+function evalLocalObjectSyntax()
+{
+	_bgclassCall "" "" 0 "|$@"
+}
+declare -g eval="evalLocalObjectSyntax "
 
 # usage: GetOID <objRef> [<retVar>]
 # usage: local -n obj=$(GetOID <objRef>)
@@ -2325,8 +2370,8 @@ declare -A Object=(
 # because "DeclareClass Class" will access its base class's (Object) vmt, we nee to declare it as an -A array early
 declare -A Object_vmt
 
-DeclareClass -f Class
-DeclareClass -f Object
+DeclareClass  Class
+DeclareClass  Object
 
 # we don't call ConstructObject for the Null Object because the [0],[_Ref] value is an assert instead of the normal format
 # we protect against re-defining it in case we reload the library
@@ -2348,7 +2393,7 @@ DeclareClass NullObject
 # See Also:
 #    class Array
 #    class Map
-DeclareClass -f Stack
+DeclareClass  Stack
 function Stack::__construct()
 {
 	this[length]=0
@@ -2423,19 +2468,21 @@ function Stack::isEmpty()
 # See Also:
 #    class Stack
 #    class Map
+function Array::__construct()   { this=("$@"); }
 function Array::getSize()       { returnValue "${#this[*]}" $1; }
 function Array::getAttributes() { returnValue "${!this[*]}" $1; }
 function Array::getIndexes()    { returnValue "${!this[*]}" $1; }
 function Array::getValues()     { returnValue "${this[*]}" $1; }
-DeclareClass -f Array defaultIndex:off oidAttributes:a
+DeclareClass  Array defaultIndex:off oidAttributes:a
 
 # A Map is a simple Object that can be used like an associative array. This is particularly useful for making arrays within arrays.
 # no system variables are stored in the main object array
 # See Also:
 #    class Array
 #    class Stack
+function Map::__construct()   { eval this=("$@"); }
 function Map::getSize()       { returnValue "${#this[*]}" $1; }
 function Map::getAttributes() { returnValue "${!this[*]}" $1; }
 function Map::getIndexes()    { returnValue "${!this[*]}" $1; }
 function Map::getValues()     { returnValue "${this[*]}" $1; }
-DeclareClass -f Map defaultIndex:off
+DeclareClass  Map defaultIndex:off

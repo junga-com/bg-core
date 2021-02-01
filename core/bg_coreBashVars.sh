@@ -99,9 +99,21 @@ function newHeapVar() {
 #     ${<var>+exists}
 function varExists()
 {
-	# the -p option prints the declaration of the variables named in "$@".
-	# we throw away all output but its return value will indicate whether it succeeded in finding all the variables
-	declare -p "$@" &>/dev/null
+	# foo[idx]
+	if [[ "$*" =~ [][] ]]; then
+		local v; for v in "$@"; do
+			# this case works for any input but maybe if there are no names with [], the one declare call in the other case is faster
+			local attribs; varGetAttributes "$v" attribs
+			[ "$attribs" ] || return 1
+		done
+		return 0
+
+	# none contain []
+	else
+		# the -p option prints the declaration of the variables named in "$@".
+		# we throw away all output but its return value will indicate whether it succeeded in finding all the variables
+		declare -p "$@" &>/dev/null
+	fi
 }
 
 # usage: varGetAttributes <varName> [<retVar>]
@@ -308,8 +320,18 @@ function returnValue()
 
 
 # usage: varOutput [<options>] <value>[..<valueN>]
-# output the <value> in a way that is controlled by <options>. This is similar to varSetRef but the call syntax is different.
-# This function has the semantics of "echo <value>" but an option can redirect the output from stdout to assigning it to <retVar>
+# output the <value> in a way that is controlled by <options>.
+# This function has the semantics of "echo <value>" but an option can be added which redirects the output from stdout to assigning
+# it to a variable in a variety of ways.
+#
+# Just like 'echo', a function can call outputValue multiple times to compose the final output. With outputValue, second and subsequent
+# calls should be given the -a option so that they append to the output instead of replacing it.
+#
+# It is typical for a function to pass through options to outputValue so that its caller can decide how to receive the output.
+# If all the options are supported, bgOptions_DoOutputVarOpts can be used to make it easier for the function author to support this
+#
+# This function is written so that if conflicting options are specified, the last one will take affect. This allows a function to
+# change the default behavior and still allow the caller to have the final say.
 #
 # Options:
 #    --echo               : (default behavior). echo <value> to stdout.
@@ -320,18 +342,21 @@ function returnValue()
 #    -d|--delim=<delim>   : This is the delimeter used between multiple <valueN> when the results are written to stdout or to a string.
 #                           if --append is specified, it is also used between the existing value in <retVar> and the first <value1>.
 #                           The <delim> Has no affect with --array or --set forms. The default is the first character of IFS.
-#    -1|+1                : set the delimiter to '\n' so that each <valueN> will be on a separate line.
+#    -1                   : shortcut to set the delimiter to '\n' so that each <valueN> will be on a separate line.
+#    +1                   : shortcut to set the delimiter to ' ' so that all the <valueN> will be on one line.
 # See Also:
-#    man(3) varSetRef
-#    man(3) returnValue
-#    man(3) bgOptions_DoOutputVarOpts
+#    man(3) varSetRef  # obsolete function that this function replaces.
+#    man(3) returnValue # a simpler pattern when th eoutput is a scalar.
+#    man(3) bgOptions_DoOutputVarOpts # helper function often used with outputValue
 function outputValue() { varOutput "$@"; } # ALIAS:
 function varOutput()
 {
 	local _sr_appendFlag _sr_varType="--echo" _sr_varRef _sr_delim=${IFS:0:1}
 	while [ $# -gt 0 ]; do case $1 in
-		[+-]1)               _sr_delim=$'\n' ;;
+		-1)               _sr_delim=$'\n' ;;
+		+1)               _sr_delim=' ' ;;
 		-a|--append)      _sr_appendFlag="-a" ;;
+		+a|++append)      _sr_appendFlag="" ;;
 		-R*|--string*)    _sr_varType="--string";   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
 		-A*|--array*)     _sr_varType="--array" ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
 		-S*|--set*)       _sr_varType="--set"   ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
@@ -395,6 +420,13 @@ function varOutput()
 #       outputValue "${retOpts[@]}" one two three
 #    }
 #
+# The outputValue function is written so that if conflicting options are specified, the last one will take affect. This allows a
+# function to change the default behavior and still allow the caller to have the final say. In the above example, the outputValue
+# line could be changed to ...
+#       outputValue -1 "${retOpts[@]}" one two three
+# ... which makes it print each returned value on a seaparate line by default, but the caller can still specify the +1 option to
+# change it back to the non -1 behavior.
+#
 # Options:
 # These options will be supportted by a function that uses this pattern.
 #    --echo               : (default behavior). echo <value> to stdout.
@@ -402,6 +434,7 @@ function varOutput()
 #    -A|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
 #    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
 #    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no affect with --set or --echo
+#    +a|++append : anti-appendFlag. undoes the -a option so that the value in <varRef> is overwritten. Has no affect with --set or --echo
 #    -d|--delim=<delim>   : This is the delimeter used between multiple <valueN> when the results are written to stdout or to a string.
 #                           if --append is specified, it is also used between the existing value in <retVar> and the first <value1>.
 #                           The <delim> Has no affect with --array or --set forms. The default is the first character of IFS.
@@ -412,6 +445,7 @@ function bgOptions_DoOutputVarOpts()
 	case "$1" in
 		[+-]1)            bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
 		-a|--append)      bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
+		+a|++append)      bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
 		-R*|--string*)    bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
 		-A*|--array*)     bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
 		-S*|--set*)       bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
@@ -480,6 +514,7 @@ function setExitCode()
 }
 
 
+# OBSOLETE: use varOutput instead. varOutput makes <varRef> the argument of options instead of a required positional param.
 # usage: varSetRef [-a] [--array|--set] <varRef> <value...>
 # See http://mywiki.wooledge.org/BashFAQ/048#line-120 for a discussion of why varRefs are problematic.
 # This sets the <varRef> with <value> only if it is not empty.
@@ -933,6 +968,9 @@ function printfVars()
 	local pv_nameColWidth pv_inlineFieldWidth="0" pv_indexColWidth oneLineMode pv_lineEnding="\n"
 	local pv_prefix pv_noObjectsFlag
 
+	# if the bg_objects.sh library is not loaded, turn off object detection
+	type -t _bgclassCall &>/dev/null || pv_noObjectsFlag="1"
+
 	function _printfVars_printValue()
 	{
 		local name="$1"; shift
@@ -1045,7 +1083,13 @@ function printfVars()
 
 		# the term is not a variable name
 		if [ ! "$pv_type" ]; then
-			if [ "$pv_label" == "$pv_varname" ]; then
+			if [ "${pv_varname:0:12}" == "_bgclassCall"  ]; then
+				Try:
+					$pv_varname.toString --title="Object"
+				Catch: && {
+					_printfVars_printValue "" "<error in '$pv_varname.toString --title=Object' call'>"
+				}
+			elif [ "$pv_label" == "$pv_varname" ]; then
 				# if its a simple token that is not a var name, we used to print it as an empty var because of the bash bug that
 				# uninitialized declared vars would not be detectable as being declared. In circa 5.x, that is fixed so now we
 				# treat it as a literal.
@@ -1055,16 +1099,16 @@ function printfVars()
 				_printfVars_printValue "$pv_label" "$pv_varname"
 			fi
 
-		# it its an object reference, invoke its .bgtrace method
-		elif [ ! "$pv_noObjectsFlag" ] && [[ ! "$pv_varname" =~ [[] ]] && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
+		# it its an object reference, invoke its .toString method
+		elif [ ! "$pv_noObjectsFlag" ]  && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
 			Try:
-				objEval "$pv_varname.toString --title=${pv_varname}"
+				${!pv_varname}.toString --title="${pv_varname}"
 			Catch: && {
 				# Note that a bug prevents this Catch from getting called when stepping through the debugger. It seems that the
 				# catch resumes after the objEval.
 				# in debugger when the watch window printfVars sees an object reference that has been created with NewObject,
 				# toString failed on that object. added this try/catch but the catch did not execute.
-				_printfVars_printValue "$pv_label" "<error in Object::toString call>"
+				_printfVars_printValue "$pv_label" "<error in '${!pv_varname}.toString --title=${pv_varname}' call>"
 			}
 
 		# if its an array, iterate its content

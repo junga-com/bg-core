@@ -89,7 +89,7 @@ function importCntr()
 					((_importedLibrariesBumpAdj++))
 				fi
 			done
-			# 2020-10 these seems like it does nothuing b/c L1 is an 'import ... ;$L2' thing, not an importCntr thing
+			# 2020-10 these seems like it does nothing b/c L1 is an 'import ... ;$L2' thing, not an importCntr thing
 			#[ ${_importedLibrariesBumpAdj:-0} -gt 1 ] && L1="source $(import --getPath bg_coreImport.sh)"
 			;;
 		reloadAll)
@@ -99,15 +99,25 @@ function importCntr()
 				-v) verboseFlag="-v" ;;
 				--init) initFlag="--init" ;;
 			esac; shift; done
+
+			# get the list of out-of-date libraries
+			local -A _libsToReload=()
 			local i; [ ! "$initFlag" ] && for i in "${!_importedLibraries[@]}"; do
 				if [[ "$i" =~ ^lib: ]] && { [ ! "$_importedLibrariesTimeRefTmpFile" ] || [ "${_importedLibraries[$i]}" -nt "$_importedLibrariesTimeRefTmpFile" ]; }; then
-					[ "$verboseFlag" ] && echo "reloading '${i#lib:}'"
-					source "${_importedLibraries[$i]}"
-					((_importedLibrariesBumpAdj++))
+					_libsToReload[${i#lib:}]="${_importedLibraries[$i]}"
 				fi
 			done
+
+			# touch the semaphore to make everything up-to-date
 			[ ! "$_importedLibrariesTimeRefTmpFile" ] && bgmktemp --will-not-release _importedLibrariesTimeRefTmpFile
 			[ "$_importedLibrariesTimeRefTmpFile" ] && touch "$_importedLibrariesTimeRefTmpFile"
+
+			# now reload the out-of-date libraries.
+			for i in "${!_libsToReload[@]}"; do
+				[ "$verboseFlag" ] && echo "reloading '$i'"
+				source "${_libsToReload[$i]}"
+				((_importedLibrariesBumpAdj++))
+			done
 			;;
 		list)
 			declare -g _importedLibrariesTimeRefTmpFile
@@ -119,7 +129,28 @@ function importCntr()
 	esac
 }
 
-function _importNOOPWithExitCodePasstrough() { return $?; }
+# this is the function which is called in the contents of the L2 variable in the import <library> ;$L1;$L2
+# its not required to source the <library> but its enables several best effort features.
+function _postImportProcessing() {
+	local result="$?"
+
+	local scriptName="${_importInProgressStack[@]:0:1}"; _importInProgressStack=("${_importInProgressStack[@]:1}")
+
+	if [ "${scriptName:0:1}" != "#" ]; then
+		#echo "_postImportProcessing stack '${#_importInProgressStack[@]}' '${_importInProgressStack[*]}'"
+		if [ "${_importedLibraries[_tracingOn]}" ]; then
+			bgtimerLapTrace -T ImportProfiler $scriptName
+		fi
+
+		type -t FlushPendingClassConstructions &>/dev/null && FlushPendingClassConstructions
+	fi
+
+	L1=""
+	[ ${#_importInProgressStack[@]} -eq 0 ] && L2=""
+
+	return $result
+}
+
 function _importSetErrorCode() { return 202; }
 
 # usage: 'import [-f] <scriptName> ;$L1;$L2'
@@ -166,7 +197,8 @@ function import()
 	### return quickly when the library is already loaded
 	if [ ! "$forceFlag" ] && [ ! "$getPathFlag" ] && [ "${_importedLibraries[lib:$scriptName]}" ]; then
 		L1=""
-		L2=""
+		L2="_postImportProcessing"
+		_importInProgressStack=("#$scriptName" "${_importInProgressStack[@]}")
 		return 0
 	fi
 
@@ -217,17 +249,9 @@ function import()
 			exit 2
 		fi
 
-		if [ "${_importedLibraries[_tracingOn]}" ]; then
-			L1="source $foundScriptPath"
-			L2="bgtimerLapTrace -T ImportProfiler $scriptName"
-		else
-			# put the real source statement in L2 so that the return code from the library is set for the overall import line
-			# this allows 'import <library> ;$L1;$L2 || ...'
-			# CRITICALTODO: function pass() { return $?; } works as L2 to pass the error code through. I cant take time to test it right now.
-			#               this change would make the L2 optional so that import <name> ;$L1  would still work, but just not record time trace info
-			L1="source $foundScriptPath"
-			L2="_importNOOPWithExitCodePasstrough"
-		fi
+		L1="source $foundScriptPath"
+		L2="_postImportProcessing"
+		_importInProgressStack=("$scriptName" "${_importInProgressStack[@]}")
 
 		# if we are reloading a lib that had already been sourced, then inc _importedLibrariesBumpAdj
 		# the import state ID is the size of the _importedLibraries array plus _importedLibrariesBumpAdj
@@ -250,7 +274,8 @@ function import()
 	# because of the unusual ;$L1;$L2 pattern, we cant just return the exit code from this function
 	if [ "$quietFlag" ]; then
 		L1='_importSetErrorCode'
-		L2="_importNOOPWithExitCodePasstrough"
+		L2="_postImportProcessing"
+		_importInProgressStack=("#$scriptName" "${_importInProgressStack[@]}")
 	else
 		assertError -v bgLibPath -v scriptName "bash library not found by in any system path. Default system path is '/usr/lib'"
 	fi
