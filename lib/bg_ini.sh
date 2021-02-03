@@ -847,7 +847,7 @@ function bgsed()
 			bgsudo -O sudoOpts cp "$iniFile" "$tmpFile"
 			bgsudo -O sudoOpts sed "${origCmdLine[@]//$iniFile/$tmpFile}"
 			local result=$?
-			bgsudo -O sudoOpts cat "$tmpFile" | bgsudo -O sudoOpts tee "$iniFile" >/dev/null
+			bgsudo -O sudoOpts cat "$tmpFile" | bgsudo -w "$iniFile" -p "writing to $iniFile" tee "$iniFile" >/dev/null
 			bgsudo -O sudoOpts rm "$tmpFile"
 			return $result
 		fi

@@ -675,7 +675,7 @@ function parseForBashCompletion()
 	done
 	if [ ${compatLevel:-0} -ge 2 ]; then
 		posWordsValue=( "${wordsValue[0]}" "$@" )
-		[ ${#optWordsValue[@]} -lt ${cwordValue:-0} ] && posCwordsValue=$(( cwordValue - ${#optWordsValue[@]} ))
+		[ ${#optWordsValue[@]} -lt ${cwordValue:-0} ] && posCwordsValue=$(( cwordValue - ${#optWordsValue[@]} )) || assertError
 		eval $posCwordsVar=\"\$posCwordsValue\"
 	else
 		posWordsValue=( "$@" )

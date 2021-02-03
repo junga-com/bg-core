@@ -633,7 +633,6 @@ function ConstructObject()
 	local _CLASS="$1"; assertNotEmpty _CLASS "className is a required parameter"
 
 	DeclareClassEnd "$_CLASS"
-
 	varExists "$_CLASS[name]" || assertError -v "$_CLASS" "Class '$_CLASS' does not exist"
 
 	### support dynamic base class implemented construction
@@ -676,7 +675,7 @@ function ConstructObject()
 	# based on how the caller declared <objRef>, set this and _this
 	local _OID
 	# its an unitialized -n nameRef
-	if [ "$_objRefVarAttributes" == "n" ]; then
+	if [[ "$_objRefVarAttributes" =~ n@ ]]; then
 		newHeapVar -"${class[oidAttributes]:-A}"  _OID
 		printf -v $_objRefVar "%s" "${_OID}"
 		local -n this="$_OID"
@@ -1680,11 +1679,17 @@ function GetOID()
 	esac; shift; done
 
 	local objRef="$1"; shift
+
+	# dereferenced without quotes
+	if [ "$objRef" == "_bgclassCall" ]; then
+		objRef="_bgclassCall $1 $2 $3 $4"; shift 4
+	fi
+
+	# see if there is a <retVar> (it can also be passed in the -R <retVar> option)
 	[ ! "$goid_retVar" ] && { goid_retVar="$1"; shift; }
-	[ $# -eq 0 ] || assertError "too many arguments. did you forget to put the <objRef> in quotes?"
 
 	local oidVal
-	if [ "{$objRef}"  == "" ]; then
+	if [ "${objRef}"  == "" ]; then
 		oidVal="NullObjectInstance"
 
 	# this is the normal case
@@ -1693,9 +1698,10 @@ function GetOID()
 		oidVal="${oidVal%% *}"
 
 	# this is when objRef is a variable that points to an objRef
-	elif [[ "$objRef" =~ ^[[:word:]]*$ ]] && [[ "{$!objRef}"  =~ "^_bgclassCall" ]]; then
+	elif [[ "${!objRef}"  =~ ^_bgclassCall ]]; then
 		oidVal="${!objRef}"
-assertError -v oidVal -v objRef "DEVTEST: check that this is correct. I think that we still need to extract teh array name from oidVal "
+		oidVal="${oidVal#_bgclassCall }"
+		oidVal="${oidVal%% *}"
 
 	# unknown
 	else
@@ -1716,6 +1722,22 @@ function IsAnObjRef()
 	[ "${objRef:0:12}"  == "_bgclassCall" ]
 }
 
+# usage: returnObject <objRef> [<retVar>]
+# This is similar to 'returnValue' but does extra processing for objects.
+# If <retVar> is not provided, it uses printfVars to write the object to stdout instead of echo which would write the <objRef>
+# If <retVar> is a unitialized nameRef, it is assigned the object's OID
+function returnObject()
+{
+	local obj="$1"
+	local retVar="$2"
+	if [ ! "$retVar" ]; then
+		printfVars "$obj"
+	elif [[ "$(declare -p "$retVar" 2>/dev/null)" =~ ^declare\ -n[^=]*$ ]]; then
+		GetOID "$obj" "$retVar"
+	else
+		returnValue "$obj" "$retVar"
+	fi
+}
 
 
 

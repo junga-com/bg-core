@@ -1,11 +1,16 @@
 #!/bin/bash
 
-DeclarePlugin collect network "
+DeclarePlugin Collect network "
 	projectName: bg-core
-	entryPoint: collectNetwork
+	cmd_collect: collectNetwork
 	runSchedule: 3/10min
 	description: collect the basic linux network config on a host
 	 * /etc/network/interfaces
 	 * ifconfig output
 	 * route -n output
 "
+
+function collectNetwork()
+{
+	collectPreamble || return
+}

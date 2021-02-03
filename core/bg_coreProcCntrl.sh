@@ -390,6 +390,11 @@ function runPluginCmd()
 #           it can contain the five fields described by .
 function cronNormSchedule()
 {
+	local retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-R*|--retVar) bgOptionGetOpt val: retVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	[ $# == 1 ] || assertError "requires exactly one parameter. a string containing a cron schedule spec"
 	local cronScheduleSpecOrig="$1"
 	local cronScheduleSpec="${1,,}"
@@ -503,7 +508,8 @@ function cronNormSchedule()
 
 
 	local results="${pSched[0]}   ${pSched[1]}   ${pSched[2]}   ${pSched[3]}   ${pSched[4]}"
-	echo "${results}"
+
+	returnValue "${results}" "$retVar"
 }
 
 

@@ -1,0 +1,458 @@
+#!/bin/bash
+
+import bg_plugins.sh ;$L1;$L2
+
+#####################################################################################################
+### This module implements a "Collect"  Plugin class
+
+# Library
+# A collect plugin collects some aspect of a host's configuration into a folder. That folder is often setup so that its content
+# is avalable as readonly data to a remote administration and control system. See man(7) bg_domData.sh
+#
+# When it is activated on a host, a collect plugin will be invoked periodically according to its runSchedule attribute.
+#
+# Collect plugins should be written to have no side effects and to complete quickly without consuming significant resources so that
+# it is always safe to activate on a production host. Furthermore, the intention of Collect plugins is to collect slow changing state
+# that is more aligned with how the host is configured rather than state that changes often. For example, instead of collectin the
+# list of currently logged in users, it is better to collect the syslog configuration that ensures that user sessions are logged to
+# a remote log server.
+#
+# Since 'significant resources' is a subjective analog quality, the runSchedule can be used to make sure that a pluin does not run
+# too often or at inopportune times for the host.
+#
+# Being a plugin, they are typically installed via the host's software package mechanism. Like for any software, that mechanism should
+# only allow installation from trusted sources that apply a security SDLC review process to ensure that Collect plugins as well as
+# other software in the packages they provide comply with the security objectives that the software source participates in. In
+# particular, Collect plugins should be reviewed to make sure that they have no side effects and do not consume resources that could
+# disrupt a host.
+#
+# Writing a Collect Plugin:
+# Refer to man(7) bashPlugins for information how how to write plugins in general.
+#
+# A Collect plugin has a 'cmd_collect' entrypoint command which performs the collection when invoked. Typically, a plugin would
+# set <cmd_collect> to the name of a bash function it provides in the same file. The plugin's script can assume that the Collect
+# plugin library has been sourced and use any of the helper functions it provides in the body of the fnction.
+#
+# A Collect plugin can specify the runSchedule which will become the default schedule if the sysadmin who activates the plugin does
+# not override it. If specified, the Collect PluginType sets the ultimate default value in the DeclarePluginType call.
+#
+# Required Attributes:
+# The pluign author must provide these attributes in the DeclarePlugin call.
+#    cmd_collect : the command to invoke to perform the collect action
+#
+# Optional Attributes:
+#    goal        : a brief description about what this is supposed to do. Should be one short line.
+#    description : more detailed information about what it does.
+#    runSchedule (mutable) : The default schedule for when it should be ran. The host's admin can change this attribute.
+#                  See man(3) cronNormSchedule for the syntax supported by this attribute.
+#
+# Example:
+#     DeclarePlugin Collect network '
+#        cmd_collect: collect_network
+#        goal: collect the basic linux network config on a host
+#     '
+#     function collect_network()
+#     {
+#        collectPreamble || return
+#        ip addr show | collectContents net/ipAddrShow
+#        collectFiles "/etc/network/interfaces"
+#     }
+#
+# collectPreamble,collectContents, and collectFiles are helper functions provided in the Collect plugin library.
+# See man(3) collect<tab><tab> for more information on helper functions.
+
+
+DeclarePluginType Collect "
+	columns: name(-18) cmd_collect(-18) activationState(-10) runSchedule(13) lastResult lastRunTime goal tags description
+	keyCol: name
+	requiredCols: cmd_collect
+	mutableCols: activationState runSchedule lastResult lastRunTime
+	defDisplayCols: name activationState runSchedule goal
+	description: A collect plugin collects some aspect of a host's configuration or slow changing state into a folder.
+	 See man(7) Collect.PluginType
+"
+
+#################################################################################################################################
+### Static members
+
+# usage: $Collect::list [<outputValueOptions>] [--short] [--full]
+# lists the names (--short) or keys (--full) of all the installed Collect plugins on the host.
+# A name is a simple word that is unique among all Collect plugins in the software repositories.
+# A key is Collect:<name> and is unique among all plugins of any type in the software repositories.
+# Options:
+#    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
+#    --short : the words returned are names without the "Collect:" prefix
+#    --full  : (default) the words retuned include the "Collect:" prefix like "Collect:<name>"
+function static::Collect::list()
+{
+	local retOpts shortFlag
+	while [ $# -gt 0 ]; do case $1 in
+		--short) retOpts+=(--short) ;;
+		--full)  retOpts+=(--full) ;;
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	$Plugin::list "${retOpts[@]}" Collect:
+}
+
+
+
+# usage: $Collect::report
+# print a table to stdout that shows the current mutable state for each installed plugin of this type.
+# Columns:
+#    Name    : simple name of the Collect plugin without the "Collect:" prefix
+#    Enabled : [activating|off] indicates if the plugin is activated on this host
+#    RunSchedule : The schedule that it will run on if its activated. Each plugin will have a suggested default schedule that can
+#                  be changed by the host administrator.
+#    LastResult : [success|fail] indicates whether the last run completed successfully or not
+#    When       : how long ago it was last ran.
+function static::Collect::report()
+{
+	local pkg scrap pluginKey filename
+	printf "%-20s %-11s %-12s %-12s %-12s\n" "Name" "Enabled"   "RunSchedule"  "LastResult"  "When"
+	while read -r pkg scrap pluginKey filename; do
+		Try:
+			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp
+		Catch: && {
+			local activationState=$(PluginConfigGet "$pluginKey" "activationState")
+			local runShedule=$(PluginConfigGet "$pluginKey" "runShedule")
+			local lastRunTime=$(PluginConfigGet "$pluginKey" "lastRunTime")
+			local lastResult=$(PluginConfigGet "$pluginKey" "lastResult")
+			printf "%-20s %-11s %-12s %-12s %-12s %s\n" "${pluginKey#*:}" "${activationState:-off}"  "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunTime}" "<error: plugin will not load>"
+			continue
+		}
+		local lastRunExpr="${cp[lastRunTime]}"
+		[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "${cp[lastRunTime]}" lastRunExpr
+		printf "%-20s %-11s %-12s %-12s %-12s\n" "${cp[pluginID]}" "${cp[activationState]:-off}"   "${cp[runSchedule]:-<unset>}"  "${cp[lastResult]:-<notYetRan>}"  "'${lastRunExpr}'"
+	done < <(manifestGet plugin "Collect:.*")
+}
+
+# usage: $Collect::activate <pluginID> [<runShedule>]
+# configure <pluginID> to run automatically on this host at the specified schedule.
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+#    <runShedule> : when it should be ran. See "man cronNormSchedule" for full syntax that is supported. The default value is
+#                   provided by the plugin author.
+function static::Collect::activate()
+{
+	local pluginID="${1#Collect:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Collect:$pluginID"
+	local runSchedule="$*"
+	local testCronSched; cronNormSchedule -R testCronSched "$runSchedule"
+
+	PluginConfigSet "$pluginKey" "activationState" "activated"
+	if [ ! "$runSchedule" ]; then
+		local -n cp; $Plugin::get "$pluginKey" cp
+		runSchedule="${cp[runSchedule]}"
+	fi
+	PluginConfigSet "$pluginKey" "runSchedule" "$runSchedule"
+}
+
+# usage: $Collect::deactivate <pluginID>
+# configure <pluginID> to NOT run automatically on this host
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+function static::Collect::deactivate()
+{
+	local pluginID="${1#Collect:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Collect:$pluginID"
+
+	PluginConfigSet "$pluginKey" "activationState" ""
+}
+
+# usage: $Collect::run [-q] [-v] <pluginID>
+# run the collect plugin by executing its entryPoint
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+# Options:
+#    -q : quiet. less output
+#    -v : verbose. more output
+#         <verbosity>    : 0-4. 0 is most terse. 4 is all debug information. effects stdout
+function static::Collect::run()
+{
+	local verbosity=1 verbosityFlags
+	while [ $# -gt 0 ]; do case $1 in
+		-v)  ((verbosity++)); verbosityFlags+=" -v" ;;
+		-q)  ((verbosity--)); verbosityFlags+=" -q" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local pluginID="${1#Collect:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Collect:$pluginID"
+
+	local cp; $Plugin::get "$pluginKey" cp
+
+	$cp.collect
+}
+
+# usage: $Collect::runAll
+# run any active collect plugins that are scheduled to run now
+# Options:
+#    -f : force flag. force all active plugins to run instead of only the ones that are past their last scheduled runtime
+#    -q : quiet. less output
+#    -v : verbose. more output
+function static::Collect::runAll()
+{
+	local forceFlag verbosity=1
+	while [[ "$1" =~ ^- ]]; do case $1 in
+		-f) forceFlag="-f" ;;
+		-q) ((verbosity--)) ;;
+		-v) ((verbosity++)) ;;
+	esac; shift; done
+
+	local collectPlugins; static::Collect::list -A collectPlugins
+	local pluginKey; for pluginKey in "${collectPlugins[@]}"; do
+		local activationState="$(PluginConfigGet "$pluginKey" "activationState")"
+		local runSchedule="$(PluginConfigGet "$pluginKey" "runSchedule")"
+		local lastRunTime="$(PluginConfigGet "$pluginKey" "lastRunTime")"
+
+		if [ "$activationState" == "activated" ] && cronShouldRun "$runSchedule" "$lastRunTime"; then
+			echo "running '$pluginKey'"
+			PluginConfigSet "$pluginKey" "lastRunTime" "$(date +"%s")"
+			local -n cp; $Plugin::get "$pluginKey" cp
+			$cp.collect
+		fi
+	done
+	true
+}
+
+
+
+
+#################################################################################################################################
+### Non-static members
+
+
+function Collect::__construct()
+{
+	this[runSchedule]="SLAm"
+}
+
+function Collect::collect()
+{
+	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
+	Try:
+		$_this.invoke "cmd_collect" "$@"
+		$_this.setAttribute lastResult "success"
+	Catch: && {
+		$_this.setAttribute lastResult "fail"
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+###########################################################################################################
+### creq functions
+# These functions are used in creq scripts (.creqConfig and .standard plugins) to configure the activation
+# of collect plugins
+
+
+# usage: cr_collectPluginIsActive <collectPluginName> [<runSchedule>]
+# declare that collect plugin should be activated. If <runSchedule> is specified, it must be set too
+# Activated means that the collect plugin will run automatically on a schedule
+# Params:
+#    <collectPluginName> : the name of a plugin
+#    <runSchedule> : declares that the active runSchedule must be set to this schedule.
+#                    TODO: if runSchedule is not specified, check that the actiave runSchedule is one of the
+#                          approved values (i.e. setting the runSchedule to 5years is the same as deactivating
+function cr_collectPluginIsActive()
+{
+	case $objectMethod in
+		objectVars) echo "collectPluginName runSchedule" ;;
+		construct)
+			collectPluginName="$1"; [ $# -gt 0 ] && shift
+			runSchedule="$*"
+			displayName="'$collectPluginName' collect plugin is active"
+			;;
+
+		check)
+			local activationState="$(awkDataCache_getValue me:installedPlugins-collect.activationState name:"$collectPluginName")"
+			[ "$activationState" == "activated" ]
+			local result=$?
+			if [ ${result:=0} -eq 0 ] && [ "$runSchedule" ]; then
+				[ "${plugin[runSchedule]}" == "$runSchedule" ]
+				result=$?
+			fi
+			return $result
+			;;
+
+		apply)
+			collect_activate "$collectPluginName" "$runShedule"
+			;;
+
+		*) cr_baseClass "$@" ;;
+	esac
+}
+
+
+# usage: cr_collectPluginIsNotActive <collectPluginName>
+# declare that collect plugin should be NOT activated.
+# Not being activated means that the collect plugin will not run automatically but it can still be run manually
+# Params:
+#    <collectPluginName> : the name of a plugin
+function cr_collectPluginIsNotActive()
+{
+	case $objectMethod in
+		objectVars) echo "collectPluginName" ;;
+		construct)
+			collectPluginName="$1"; [ $# -gt 0 ] && shift
+			displayName="'$collectPluginName' collect plugin is NOT active"
+			;;
+
+		check)
+			local activationState="$(awkDataCache_getValue me:installedPlugins-collect.activationState name:"$collectPluginName")"
+			[ "$activationState" != "activated" ]
+			;;
+
+		apply)
+			collect_deactivate "$collectPluginName" "$runShedule"
+			;;
+
+		*) cr_baseClass "$@" ;;
+	esac
+}
+
+
+
+###########################################################################################################
+### Collect Helper functions
+# These functions are used when writing collect scripts. They facilitate implementing the common model
+# of collecting information from the host into files in its domData scope folder.
+
+
+# usage: collectPreamble
+# This is meant to be called at the start of all collection related functions and if it returns false(1)
+# the caller should quietly abort and do nothing. It does that when the local host is not a member of the selected domData
+# and therefore should not be collected to it
+# If its successful, the caller can access the variables that it sets up
+# Variables:
+#     scopeFolder  : the domData scope folder for the local host. Typically collected data goes to $scopeFolder/collect/
+function collectPreamble()
+{
+	case $collectMarker in
+		off) return 1 ;;
+		on)  return 0 ;;
+	esac
+
+	# declare -gx scopeName; domWhoami -r scopeName
+	# declare -gx scopeFolder="$(domWhoami -p)"
+
+	scopeFolder="/tmp/collect"
+	fsTouch -d "$scopeFolder/"
+
+	if false && [ ! "$scopeName" ]; then
+		declare -gx collectMarker="off"
+		return 1
+	else
+		declare -gx collectMarker="on"
+		return 0
+	fi
+}
+
+
+
+# usage: collectFiles <fileSpec1> [ .. <fileSpecN>]
+# This makes the files in the host's <domScopeFolder>/collect folder tree mirror the files specified.
+#    * Files will be created, overwritten, or removed from the destination as needed.
+#    * the timestamp of destination files will not change unless the the file's content changes
+# Note:
+#    Temporary files should not be collected.
+#    Use instead -- cat "$tmpFile" | collectContents <relPathInCollectSpace>
+# Algorithm:
+#    * A list of source files is created by applying each spec directly in the host FS tree.
+#    * A list of destination files is created by converting the spec to the collection tree
+#      space and applying there.
+#    * Files that exist only in the source list are created in the destination by copying
+#    * Files that exist in both lists are compared by timestamps and copied only if newer
+#    * Files that exist only in the destination list are removed from the destination.
+# Converting <fileSpecN> From Host FS Tree to the Collection Destination:
+#    Each <fileSpecN> is converted to a file pec in the collection destination tree space.
+#    1) It is converted to an absolute path in the host FS tree space if needed.
+#    2) <domScopeFolder>/collect is prepended
+# Params:
+#    <fileSpecN> : is a path in the host's file system that may include wildcards.
+#                  It can match 0,1, or more files
+#                  If its is a relative path, it is converted to an absolute path
+function collectFiles()
+{
+	collectPreamble || return
+
+	# make lists of source(host FS tree) and destination(collection FS tree). store them in sets(aka maps) for efficient lookup
+	local -A srcFileList dstFileList
+	local fileSpec; for fileSpec in "$@"; do
+		pathGetCanonStr -e "$fileSpec" fileSpec
+		fsExpandFiles -F -S srcFileList $fileSpec
+		fsExpandFiles -F -S dstFileList $scopeFolder/collect/${fileSpec#/}
+	done
+
+	# iterate the source list and create or copy to destination if needed
+	local sourceFile; for sourceFile in ${!srcFileList[@]}; do
+		# make the file path in the collection tree space
+		local destinationFile="$scopeFolder/collect/${sourceFile#/}"
+
+		# if destinationFile does not exist or the sourceFile is newer, copy it
+		if [ ! "${dstFileList[$destinationFile]}" ] || [ "$sourceFile" -nt "$destinationFile" ]; then
+			mkdir -p "${destinationFile%/*}"
+			cat "$sourceFile" > "$destinationFile"
+		fi
+	done
+
+	# iterate the destination list and remove files that are not on the source list
+	local destinationFile; for destinationFile in ${!dstFileList[@]}; do
+		# make the file path in the host tree space
+		local sourceFile="${destinationFile#$scopeFolder/collect}"
+
+		if [ ! "${srcFileList[$sourceFile]}" ]; then
+			rm "$destinationFile"
+		fi
+	done
+}
+
+
+
+# usage: collectContents [--channelID <channelID>] [-p|--tmpdir <tmpdir>] <destFile>
+#        collectContents --didChange --channelID <channelID>
+# usage: <someCommand> | collectContents <destFile>
+# Note that this command is a wrapper over fsPipeToFile that changes the <destFile> path to be relative to the scopeFolder instead
+# of the PWD
+# Params:
+#     <destFile> : the file that the contents will be written to. If it begins with / or ./ it is used as is but otherwise.
+#                  it will be taken as a path relative to the host's domScopeFolder/collect folder.
+# Options:
+#    --channelID <channelID> : (default is the sanitized filename) If you are updating multiple files in a group and only need to
+#            know that at least one file in the group was updated, set the --channelID of all those calls to the same group name
+#            and then call with --getResult once for the whole group.
+#    --didChange : After the pipe is done, call this function a second time with either the same <destFile> or channelID and its
+#            exit value will indicate if the content was changed.
+#    -p|--tmpdir <tmpdir> : provides an existing location to write its tmp file. Otherwise mktmp will be used
+# See Also:
+#    fsPipeToFile
+function collectContents()
+{
+	local passThruOpts
+	while [ $# -gt 0 ]; do case $1 in
+		--channelID*)  bgOptionGetOpt  opt: passThruOpts  "$@" && shift ;;
+		--didChange)   bgOptionGetOpt  opt  passThruOpts  "$@" && shift ;;
+		-p*|--tmpdir*) bgOptionGetOpt  opt: passThruOpts  "$@" && shift ;;
+	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local destFile="$1"; assertNotEmpty destFile
+
+
+	# if it does not begin with / or ./ then we are collecting to the host's scope folder
+	if [[ ! "$destFile" =~ ^[.]*/ ]]; then
+		collectPreamble || return 0
+		destFile="$scopeFolder/collect/${destFile#/}"
+	fi
+
+	fsPipeToFile "${passThruOpts[@]}" "$destFile"
+}

@@ -1252,7 +1252,9 @@ function bgtraceIsActive()
 	# if its off and bgTracingOnState reflects it return 1(false) quickly
 	[ ! "$bgTracingOn$bgTracingOnState" ] && return 1
 
-	import bg_debugTrace.sh ;$L1;$L2
+	# when bgtrace is called in a debug trap, import would clear L1 before it can run when stepping over an import if we let it get
+	# called here.
+	[ ! "${_importedLibraries[lib:bg_debugTrace.sh]+exists}" ] && { import bg_debugTrace.sh ;$L1;$L2; }
 
 	# if its not realized, call bgtraceCntr to make _bgtraceFile reflect bgTracingOn
  	# The value of bgTracingOn is exported/inherited from the parent proc but bgTracingOnState is reset
@@ -2448,7 +2450,7 @@ function bgTrapStack()
 	case $action in
 		peek|pop)
 			local handlerVar="$1"
-			local -a 'handler=(${'"$stackVar"'[@]:0:1})'
+			local handler="${!stackVar}"
 			if [ "$action" == "pop" ]; then
 				declare -ag $stackVar'=( "${'"$stackVar"'[@]:1}" )'
 				# 2020-10 for empty handler changed '-' to ''  (${handler:--} to ${handler})  b/c in test case, Catch was not clearing the DEBUG trap when it called this function
@@ -2514,7 +2516,7 @@ function bgTrapUtils()
 					line="${line%\'*}"
 					printf -v _tu_handler "%s%s%s" "$_tu_handler" "$sep" "${numLinesFlag:+$((lineno++)): }$line"
 					_tu_handler="${_tu_handler//"'\''"/\'}"
-					_tu_trapHandlers[$_tu_signal]="$_tu_handler"
+					_tu_trapHandlers[${_tu_signal:-exmpty}]="$_tu_handler"
 					_tu_signal=""
 					_tu_handler=""
 					sep=""
@@ -2571,7 +2573,7 @@ function command_not_found_handle()
 	local cmdName="$1"
 	local cmdline="$*"
 	if [ "${command_not_found_handle}" == "1" ]; then
-		assertError --critical --allStack -v cmdline "Command not found -- recursion detected"
+		assertError -e127 --critical --allStack -v cmdline "Command not found -- recursion detected"
 	fi
 	export command_not_found_handle=1
 
@@ -2580,10 +2582,10 @@ function command_not_found_handle()
 		local -A exprFrame; bgStackGetFrame --readCode command_not_found_handle:+1 exprFrame
 		local results="$?"
 		[ ${results:-0} -gt 0 ] && echo "assertObjExpressionError could not find the obj syntax on the stack. exitcode='$results'" >&2;
-		assertError --no-funcname -v "objExpression:exprFrame[srcCode]" "empty object variable referenced"
+		assertError -e127 --critical  --no-funcname -v "objExpression:exprFrame[srcCode]" "empty object variable referenced"
 	fi
 
-	assertError --no-funcname --frameOffset=+1 -v cmdline "Command not found"
+	assertError -e127 --critical --no-funcname --frameOffset=+1 -v cmdline "Command not found"
 }
 
 
@@ -2697,6 +2699,7 @@ function assertError()
 	local _ae_msg _ae_exitCode=36 _ae_actionOverride _ae_contextVarName _ae_catchAction _ae_catchSubshell _ae_frameOffset
 	local -A _ae_dFiles _ae_contextVarsCheck=([empty]=1)
 	local _ae_dFilesList _ae_contextVars _ae_contextOutput _ea_allStack _ae_noFuncnameFlag _ae_sourceAndArgsFlag _ae_stackDebugFlag
+	local _ae_traceCatchFlag
 
 	# TODO: we need to figure out a good way to associate assertErrorContext with the tryStack so that we stop at the right level
 	### add any assertErrorContext data to the command line parameters.
@@ -2717,6 +2720,7 @@ function assertError()
 
 	### process the command line
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		--traceCatch)    _ae_traceCatchFlag="--traceCatch" ;;
 		--no-funcname)  _ae_noFuncnameFlag="--no-funcname" ;;
 		--sourceAndArgs) _ae_sourceAndArgsFlag="--sourceAndArgs" ;;
 		--stackDebug)    _ae_stackDebugFlag="--stackDebug" ;;
@@ -2814,7 +2818,7 @@ function assertError()
 	local _ae_label; for _ae_label in $_ae_dFilesList; do
 		printf "   %s:\n" "$_ae_label" >&$ae_outFD
 		[ -f "${_ae_dFiles[$_ae_label]}" ] && awk '
-			{print "      : "$0}
+			{printf("   %3s : %s\n", NR, $0)}
 		' "${_ae_dFiles[$_ae_label]}"
 	done
 
@@ -2873,6 +2877,14 @@ function assertError()
 			local tryStatePID="${bgBASH_tryStackPID[@]:0:1}"
 			local throwingStatePID="$BASHPID"
 
+			if [ "$_ae_traceCatchFlag" ]; then
+				bgtrace "!!!throwing exception "
+				bgtrace "   PID of throw ='$throwingStatePID'"
+				bgtrace "   PID of catch ='$tryStatePID'"
+				bgtracePSTree
+				declare -g traceCatchFlag="1"
+			fi
+
 			## fill in pidsToKill with each pid between where the assert is being thrown (throwingStatePID) and where it will be
 			# caught (tryStatePID)
 			local pidsToKill=()
@@ -2929,9 +2941,11 @@ function assertError()
 			# whose SIGUSR2 trap handler will install a DEBUG handler that will skip simple commands until it finds a "Catch".
 			# Some bash commands are interuptable by SIGINT but if we are running a bash script, all the parents between us and
 			# tryStatePID must be bash subshells stopped on bash functions.
+			[ "$_ae_traceCatchFlag" ] && bgtrace "!!! kill -SIGUSR2 $tryStatePID  "
 			kill -SIGUSR2 "$tryStatePID"     # this wont return if we are tryStatePID
 			(( ${#pidsToKill[@]} > 0 )) && kill -SIGINT "${pidsToKill[@]}"
 			[ "$tryStatePID" != "$BASHPID" ] && bgExit  ${_ae_exitCode:-36}
+			[ "$_ae_traceCatchFlag" ] && bgtrace "!!! returning normally. this is an error"
 			;;
 
 		*)	echo "error: logic error. In assertError the action was computed to be '$tryStateAction' but should be one of catch,abort,continue,exitOneShell"
@@ -3024,8 +3038,9 @@ function assertNotEmpty()
 function Try:() { Try --decFuncDepth "$@"; }
 function Try()
 {
-	local funcDepthOffset=1
+	local funcDepthOffset=1 traceCatchFlag
 	while true; do case $1 in
+		--traceCatch)   traceCatchFlag='bgtrace "!!!$FUNCNAME | $BASH_COMMAND"' ;;
 		--decFuncDepth) funcDepthOffset=2 ;;
 		 *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -3043,7 +3058,7 @@ function Try()
 	local tryStateIFS="$IFS"
 	local tryStateExtdebug="$(shopt -p extdebug)"
 	local debugTrapScript='bgBASH_debugTrapLINENO=$((LINENO))
-		#bgtrace "$FUNCNAME | $BASH_COMMAND"
+		'"${traceCatchFlag}"'
 		if (( ${#BASH_SOURCE[@]} < '"$tryStateFuncDepth"' )); then
 			IFS="$bgWS" # no need to save because we will restore the tryStateIFS copy when we return to user code
 			assertError --critical "For Try block located at '"$tryStateTryStatementLocation"' no Catch block was found in the same Function. Check that code in the Try block did not skip the Catch by returning\n" >&2
@@ -3084,6 +3099,7 @@ function Try()
 		shopt -s extdebug
 		set +o errtrace # extdebug turns this on but unit tests need it off
 	'
+	[ "$traceCatchFlag" ] && bgtrace "!!! Try: installed SIGUSR2 in pid='$BASHPID'"
 }
 
 
@@ -3695,6 +3711,50 @@ function bgtimerStart()
 	import -f bg_coreTimer.sh ;$L1;$L2
 	bgtimerStart --stub "$@"
 }
+
+
+# usage: timeGetAproximateRelativeExpr <timeInEpoch> [<retVar>]
+function timeGetAproximateRelativeExpr() {
+	local timeInEpoch="${1:-0}"; shift
+	local retVar="$1"; shift
+	local nowInEpech="$EPOCHSECONDS"
+	local type
+	if (( timeInEpoch == nowInEpech )); then
+		returnValue "now"; return
+	elif (( timeInEpoch < nowInEpech )); then
+		local secondsDiff=$((nowInEpech - timeInEpoch))
+		type="ago"
+	else
+		local secondsDiff=$((timeInEpoch - nowInEpech))
+		type="from now"
+	fi
+
+	local str
+	if (( secondsDiff > (60*60*24*365) )); then
+		str="over $((secondsDiff / (60*60*24*365) )) year"
+		(( (secondsDiff / (60*60*24*365)) > 1 )) && str+="s"
+	elif (( secondsDiff > (60*60*24*30) )); then
+		str="over $((secondsDiff / (60*60*24*30) )) month"
+		(( (secondsDiff / (60*60*24*30)) > 1 )) && str+="s"
+	elif (( secondsDiff > (60*60*24*7) )); then
+		str="over $((secondsDiff / (60*60*24*7) )) week"
+		(( (secondsDiff / (60*60*24*7)) > 1 )) && str+="s"
+	elif (( secondsDiff > (60*60*24) )); then
+		str="over $((secondsDiff / (60*60*24) )) day"
+		(( (secondsDiff / (60*60*24)) > 1 )) && str+="s"
+	elif (( secondsDiff > (60*60) )); then
+		str="over $((secondsDiff / (60*60) )) hour"
+		(( (secondsDiff / (60*60)) > 1 )) && str+="s"
+	elif (( secondsDiff > (60) )); then
+		str="over $((secondsDiff / (60) )) minute"
+		(( (secondsDiff / (60)) > 1 )) && str+="s"
+	else
+		str="$((secondsDiff)) seconds"
+	fi
+
+	returnValue "$str $type" "$retVar"
+}
+
 
 #######################################################################################################################################
 ### From bg_coreDaemon.sh

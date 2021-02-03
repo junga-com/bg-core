@@ -1,8 +1,8 @@
 #!/bin/bash
 
-DeclarePlugin collect hardware "
+DeclarePlugin Collect hardware "
 	projectName: bg-core
-	entryPoint: collect_hardware
+	cmd_collect: collect_hardware
 	runSchedule: 1day
 	description: collects  information about the host's hardware
 	    * will install lshw if needed

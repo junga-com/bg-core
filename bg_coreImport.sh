@@ -147,6 +147,7 @@ function _postImportProcessing() {
 
 	L1=""
 	[ ${#_importInProgressStack[@]} -eq 0 ] && L2=""
+	#echo "(post) L1='$L1' L2='$L2'" >>"/tmp/bgtrace.out"
 
 	return $result
 }
@@ -251,6 +252,7 @@ function import()
 
 		L1="source $foundScriptPath"
 		L2="_postImportProcessing"
+		#echo "(import) L1='$L1'" >>"/tmp/bgtrace.out"
 		_importInProgressStack=("$scriptName" "${_importInProgressStack[@]}")
 
 		# if we are reloading a lib that had already been sourced, then inc _importedLibrariesBumpAdj

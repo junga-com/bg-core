@@ -7,7 +7,7 @@ projectName=bg-core
 
 source /usr/lib/bg_core.sh
 import bg_template.sh ;$L1;$L2
-import bg_pluginsObj.sh ;$L1;$L2
+import bg_plugins.sh ;$L1;$L2
 
 
 supportedCmds="templates plugin cuiWin config manifest"
@@ -59,6 +59,16 @@ function oob_printBashCompletion()
 			;;
 
 		plugin:2) echo "types list get" ;;
+		plugin:*)
+			shift; ((posCwords--))
+			subCmd="$1"; shift; ((posCwords--))
+			case $subCmd:$((posCwords)) in
+				get:1)
+					echo "<pluginKey>"
+					$Plugin::list
+					;;
+			esac
+			;;
 
 	esac
 	exit

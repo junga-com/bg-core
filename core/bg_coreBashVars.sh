@@ -120,60 +120,94 @@ function varExists()
 # returns the attributes that are set for <varName>.
 #   '-'  If <varName> exists but has none set, '-' is returned.
 #   ''   If <varName> does not exist as a variable, "" is returned
+#
+# NameRef Variables:
+# The attributes reflect the ultimate target of the nameRef change except that an 'n' will be prepended for each indirection before
+# the ultimate target variable. If the nameref is not yet initialized, a '@' will follow the 'n'
+#    local -A bar;      varGetAttributes returns 'A'
+#    local -n goo;      varGetAttributes returns 'n@' (unitialized nameref)
+#    goo=bar;           varGetAttributes returns 'nA' (nameref to an associative Array)
+#    unset bar;         varGetAttributes returns 'n'  (nameref to non-existent variable)
+#    bar=5;             varGetAttributes returns 'n-' (nameref to variable with no attrbutes)
+#    local -n goo2=goo; varGetAttributes returns 'nn-' (nameref a nameref to variable with no attrbutes)
+#
 # Indexed Variables:
 # Indexed variables are array references like foo[idx].
 # If the array part does not exist or idx is not an index in the array "" is returned to indicate that the variable does not exist.
 # If the idx entry does exist, the attributes of the array are returned with 'A' and 'a' removed (because the indexed var is not an
 # array). If 'A' or 'a' are the only attribute, then '-' is returned to indicate that it exists but have no attribute set.
+#
 # Params:
 #    <varName> : can be a direct variable name or an indexed name like foo[idx].
+#    <retVar>  : name of the variable that will receive the attributes. If empty, they will be written to stdout
 #
 # See Also:
 #    ${<varName>@a}
 function varGetAttributes()
 {
-	local ret
+	local _gaRetValue
 
 	# this is no faster than the declare method below (even in cases where eval is not needed)
-	#eval ret='${'"$1"'@a}'
+	#eval _gaRetValue='${'"$1"'@a}'
 
 	# normal vars
 	if [[ "$1" =~ ^[a-zA-Z0-9_]*$ ]]; then
 		local _gaGeclaration="$(declare -p "$1" 2>/dev/null)"
-		ret="${_gaGeclaration#declare -}"
-		ret="${ret%% *}"
+		_gaRetValue="${_gaGeclaration#declare -}"
+		_gaRetValue="${_gaRetValue%% *}"
 
-		if [[ "$ret" =~ n ]]; then
+		if [[ "$_gaRetValue" =~ n ]]; then
 			if [[ "$_gaGeclaration" =~ -n\ [^=]*=\"([^\"]*)\" ]]; then
 				local _gaRefName="${BASH_REMATCH[1]}"
-				varGetAttributes "$_gaRefName" "$2"
+				varGetAttributes "$_gaRefName" "<nameref>$2"
 				return
+			else
+				_gaRetValue+="@"
 			fi
 		fi
 
 	# foo[idx]
-	elif [[ "$1" =~ ^[]a-zA-Z0-9_[]*$ ]]; then
-		eval '[ "${'"$1"'+exists}" ] && ret="-"'
-		if [ "$ret" ]; then
-			local idxRet; varGetAttributes "${1%%\[*}" idxRet
-			ret="${idxRet//[aA]}"
-			ret="${ret:--}"
+	elif [[ "$1" =~ [][] ]]; then
+		local _gaBaseVar="${1%%\[*}"
+		local _gaBaseAttribs; varGetAttributes "$_gaBaseVar" _gaBaseAttribs
+		if [[ "$_gaBaseAttribs" =~ A ]]; then
+			local -n _gaBaseRef="$_gaBaseVar"
+			local _gaIdxPart="${1#$_gaBaseVar\[}"; _gaIdxPart="${_gaIdxPart%]}"
+			if [[ "$_gaIdxPart" =~ ^(@|\*)$ ]] || [ "${_gaBaseRef[${_gaIdxPart:-####empty###Value###}]+exists}" ]; then
+				_gaRetValue="${_gaBaseAttribs//[aA]}"
+				_gaRetValue="${_gaRetValue:--}"
+			fi
+		elif [[ "$_gaBaseAttribs" =~ a ]]; then
+			local -n _gaBaseRef="$_gaBaseVar"
+			local _gaIdxPart="${1#$_gaBaseVar\[}"; _gaIdxPart="${_gaIdxPart%]}"
+			if [[ "$_gaIdxPart" =~ ^(@|\*)$ ]] || { [[ "$_gaIdxPart" =~ ^[0-9+-][0-9+-]*$ ]] && [ "${_gaBaseRef[$_gaIdxPart]+exists}" ]; }; then
+				_gaRetValue="${_gaBaseAttribs//[aA]}"
+				_gaRetValue="${_gaRetValue:--}"
+			fi
 		fi
 	fi
 
-	returnValue "$ret" "$2"
+	# this strange treatment of $2 is because we want to use recursion to handle nameRefs and we cant come up with a var name that
+	# we, ourselfs dont declare local
+	local _gaRetVar="$2"
+	while [[ "$_gaRetVar" =~ ^\<nameref\> ]]; do
+		_gaRetValue="n$_gaRetValue"
+		_gaRetVar="${_gaRetVar#<nameref>}"
+	done
+	returnValue "$_gaRetValue" "$_gaRetVar"
 }
 
 # usage: varIsA <type1> [.. <typeN>] <varName>
 # returns true(0) if the var specified on the cmd line exits as a variable with the specified attributes
-# Note that if a variable is declared without assignment, (like local -A foo) this function
+# Note that in older bash, if a variable is declared without assignment, (like local -A foo) this function
 # will report false until something is assigned to it.
-# Options:
-#    mapArray : (default) test if <varName> is an associative array
-#    numArray : test if <varName> is a numeric array
-#    array    : test if <varName> is either type of array
+# Types:
 #    anyOfThese=<attribs> : example anyOfThese=Aa to test if <varName> is either an associative or numeric array
 #    allOfThese=<attribs> : example allOfThese=rx to test if <varName> is both readonly and exported
+#    <atribs>  : allOfThese=<attribs>
+#    mapArray  : alias to test if attribute 'A' is present
+#    numArray  : alias to test if attribute 'a' is present
+#    array     : alias to test if either attribute 'A' or 'a' is present
 function varIsAMapArray() { varIsA mapArray "$@"; }
 function varIsA()
 {
@@ -184,6 +218,7 @@ function varIsA()
 		array)       anyAttribs+="Aa" ;;
 		anyOfThese*) bgOptionGetOpt val: anyAttribs  "--$1" "$2" && shift ;;
 		allOfThese*) bgOptionGetOpt val: mustAttribs "--$1" "$2" && shift ;;
+		*)           mustAttribs+="$1" ;;
 	esac; shift; done
 
 	[ ! "$1" ] && return 1
@@ -192,16 +227,23 @@ function varIsA()
 	# if the output matches "declare -A" then its an associative array
 	local vima_typeDef="$(declare -p "$1" 2>/dev/null)"
 
+	if [ ! "$anyAttribs$mustAttribs" ]; then
+		[ "$vima_typeDef" ]; return
+	fi
+
 	# if its a referenece (-n) var, get the reference of the var that it points to
-	if [[ "$vima_typeDef" =~ -n\ [^=]*=\"(.*)\" ]]; then
+	if [[ "$vima_typeDef" =~ ^declare\ -[aAilrux]*n[aAilrux]*\ [^=]*=\"([^\"]*)\" ]]; then
 		local vima_refVar="${BASH_REMATCH[1]}"
 		[[ "$anyAttribs" =~ n ]] && return 0
 		vima_typeDef="$(declare -p "$vima_refVar" 2>/dev/null)"
+		mustAttribs="${mustAttribs//n}"
 	else
 		[[ "$mustAttribs" =~ n ]] && return 1
 	fi
 
-	[[ "$vima_typeDef" =~ declare\ -[^\ ]*[$anyAttribs] ]] || return 1
+	if [ "$anyAttribs" ] && [[ ! "$vima_typeDef" =~ ^declare\ -[^\ ]*[$anyAttribs] ]]; then
+		return 1
+	fi
 
 	local i; for ((i=0; i<${#mustAttribs}; i++)); do
 		[[ "$vima_typeDef" =~ declare\ -[^\ ]*${mustAttribs:$i:1} ]] || return 1
@@ -286,6 +328,7 @@ function varUnMarshalToGlobal()
 #    --strset : treat <value> as a string containing space separated array elements
 #    -q       : quiet. if <varRef> is not given, do not print <value> to stdout
 # See Also:
+#   man(3) returnObject : which is similar to returnValue but with special handling for object references
 #   man(3) varSetRef
 #   man(3) varOutput
 #   man(3) setReturnValue
@@ -1083,7 +1126,7 @@ function printfVars()
 
 		# the term is not a variable name
 		if [ ! "$pv_type" ]; then
-			if [ "${pv_varname:0:12}" == "_bgclassCall"  ]; then
+			if [ ! "$pv_noObjectsFlag" ]  && [ "${pv_varname:0:12}" == "_bgclassCall"  ]; then
 				Try:
 					$pv_varname.toString --title="Object"
 				Catch: && {

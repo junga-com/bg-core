@@ -1,8 +1,7 @@
 #!/bin/bash
 
-DeclarePlugin collect osBase "
-	projectName: bg-core
-	entryPoint: collect_osBase
+DeclarePlugin Collect osBase "
+	cmd_collect: collect_osBase
 	runSchedule: 4/10min
 	description: collect the basic linux OS host information
 	 * osBase/lsb_release
@@ -20,6 +19,7 @@ function collect_osBase()
 {
 	collectPreamble || return
 
+bgtrace "here"
 	lsb_release -a  2>/dev/null | collectContents osBase/lsb_release
 	uname -a       | collectContents osBase/uname
 	dpkg -l | sort | collectContents osBase/dpkg

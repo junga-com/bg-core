@@ -539,7 +539,7 @@ function bgtraceBreak()
 
 	# the debugger library is dynamically loaded on demand
 	[ ! "$(import --getPath bg_debugger.sh)" ] && assertError "the debugger is not installed. Try installing the bg-dev package"
-	type -t debuggerOn &>/dev/null || import bg_debugger.sh ;$L1;$L2
+	type -t debuggerOn &>/dev/null || { import bg_debugger.sh ;$L1;$L2; }
 
 	# stepOver is typically the only reasonable option to call because it goes to the next line at the level maintained by the
 	# logicalFrameStart mechanism.
