@@ -1,0 +1,70 @@
+#!/bin/bash
+
+###############################################################################
+# Includes and defines
+
+projectName=bg-core
+
+source /usr/lib/bg_core.sh
+import RBACPermission.PluginType ;$L1;$L2
+
+cmds="list report activate deactivate"
+
+
+###############################################################################
+# Functions
+
+# inspect the command line and if sudo is required set user="root"
+# set group="<someGroup" if known. Typically the group should not be hardcoded
+# see man bg-overviewOutOfBandScriptFunctions for details
+function oob_getRequiredUserAndGroup()
+{
+	bgBCParse "<glean>" 0 "$@"; set -- "${posWords[@]}"
+
+	local cmd="$1"
+	case $cmd in
+		activate)   echo "root" ;;
+		deactivate) echo "root" ;;
+		*) echo "" ;;
+	esac
+}
+
+# Use this function to provide BC suggestions for positional parameters
+# see man bg-overviewOutOfBandScriptFunctions for details
+function printBashCompletion()
+{
+	local words cword cur prev optWords posWords posCwords
+	parseForBashCompletion --compat2 words cword cur prev optWords posWords posCwords "$@"
+
+	local cmd="${posWords[1]}"
+	local pluginID="${posWords[2]}"
+
+	case $cmd:$posCwords in
+		*:1) echo "$cmds" ;;
+
+		activate:2)   echo "<RBACPermissionPluginName>"; $RBACPermission::list --short ;;
+		deactivate:2) echo "<RBACPermissionPluginName>"; $RBACPermission::list --short ;;
+	esac
+	exit
+}
+
+
+
+###############################################################################
+# Input handling
+
+invokeOutOfBandSystem "$@"
+
+
+###############################################################################
+# Main script
+
+cmd="$1"; shift
+
+case ${cmd:-report} in
+	list)         $RBACPermission::list       "$@" ;;
+	report)       $RBACPermission::report     "$@" ;;
+	activate)     $RBACPermission::activate   "$@" ;;
+	deactivate)   $RBACPermission::deactivate "$@" ;;
+	*) assertError "unknown command '$cmd'"
+esac

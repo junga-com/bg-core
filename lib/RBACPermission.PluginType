@@ -1,0 +1,338 @@
+#!/bin/bash
+
+import bg_plugins.sh ;$L1;$L2
+
+#####################################################################################################
+### This module implements an "RBACPermission"  Plugin class
+
+# Library
+# This plugin mechanism introduces the concept of logical RBACPermissions to a host that uses the sudo system for controlled
+# escalation of privileges. Each logical RBACPermission is a set of user group names with the pattern <pluginID>[-<tag>]. If a user
+# is a member of any of those groups, the sudo configuration associated with that <pluginID> will grant permission to use sudo
+# to run the commands listed in the <pluginID>'s attributes.
+#
+# RBAC is a system of access controll management. The systems being controlled provide discrete permissions and groups of permissions
+# The user directory and prevailing authentication mechanisms provide a list of potential users. Roles are a construct to map a set
+# of permissions to a set of users that possess those permissions. At runtime, a user possesses the set of permissions that is the
+# union of those listed in all Roles that they belong to.
+#
+# This mechanism uses linux groups to simulate logical permissions and groups of permissions. Each logical permission is represented
+# by a unique RBACPermission plugin identified by its <pluginID> (aka <name>). Each RBACPermission protects a logical feature which
+# is defined by one or more command line specs that are used to access the feature.
+#
+# A specific, singular permission is the permission to access a feature (aka run a command line) on a specific host and is represented
+# as '<pluginID>-<hostname>'.  A permission  group in this case is the set of the permissions to the same feature across a group of
+# hosts. The permission '<pluginID>' is the largest group -- the permission to access the protected feature on any host in the domain.
+# The permission '<pluginID>-<tagname>' represents the permission to access the protected feature on any host that contains <tagname>
+# in its /etc/tag file. The /etc/tag file has the same security implications as /etc/passwd and /etc/groups
+#
+# Remote vs Local Configuration:
+# This mechanism is part of a pattern for system administration where the security configuration of the host is distributed to the
+# host as opposed to relying on the host to retrieve that configuration from a remote server at runtime. Configuration details are
+# distributed by packages via a secure package management system that includes only trusted sources that implement the security
+# reviews that meet the domain's security policies. Those configuration details are available to enable or disable as features by
+# a system admin who may not have privilege to make arbitrary changes to configuration files on the host ut can turn the capabilities
+# provided by packages on or off. That system admin may be a human working on the host locally, or remotely via ssh or could be a
+# central domain administration agent.
+#
+# This allows a zero-trust model where typical system admin tasks do not not require priviledges to make arbitrary changes.
+#
+# Creating Protected Features:
+# An RBACPermission protects some feature on a host that an unpriviledged user would not otherwise be allowed to execute. An
+# important assumption is that an unpriviledged user can not change files in system folders (/etc/, /etc/usr/bin, etc...).
+#
+# A plugin file, script library or script command is delivered to a host via its secure package manager system where it is installed in a
+# system folder where it can not be changed by an unpriviledged user. If a script contains a command prefixed with 'sudo' like
+# 'sudo <cmdline...>' then a user would be able to run that script in either of two circumstances. 1) if the sudoers config allows
+# the user to run the <cmdline...> then when the script gets to that point, 'sudo <cmdline...>' will succeed (potentially prompting
+# for a password). 2) if the sudoers config allows the user to run the script with sudo, then the user can do so and when the script
+# gets to that line, it will be running as the priviliged user allowed by sudo.
+#
+# In the first case, the script is just acting as an automation convenience. The user fundamentally has the right to run the
+# underlying commands and could do so.
+#
+# In th second case, the script and corresponding sudoers config that allows the user to run it with sudo gives the user the ability
+# to do something that he/she would otherwise not be able to do. The user can examine the content of the script and reproduce its
+# actions manually, but will find that they can not complete those actions that were prefixed with 'sudo' because the sudoers config
+# only allows running the script, not the individual cmdline that is a part of the script.
+#
+# Scripts written to use the bg-core Out-of-band mechanism can be written to automaticall use sudo to change execution to a specific
+# system user. This shields the end user from having to know whether or not they need to prefix the cmd with sudo and what parameters
+# to sudo are required for it to execute properly.
+#
+# A package author can design the assets in the pacakge to make complete features whose access can be controlled by a central user
+# directory. An RBACPermission can grant permission to execute low level system commands when appropriate or bundle low level system
+# commands into a script that achieves some higher level function and grant permission to run that script.
+#
+# When an RBACPermission grants access to a low level command, it is saying that the user can do that command any way they want --
+# either running scripts that invoke that command or directly running that command.
+#
+# When an RBACPermission grants access to run a script provided in the same package, it is saying that the script uses various low
+# level commands to achieve an objective that the user should be able to achieve even if the user does not have the permission to
+# perform the discrete low level command directly. This is powererful because the algorithm in the script obtains a security status.
+# The script is no longer just an automation to reduce the work that the user needs to perform, but rather it represents a new
+# capablity for the user that they would otherwise not be able to perform. This makes the algorithm have real security consequences.
+# If the script checks for a particular input and refuses to take action, then the user can not get around it by examining the script
+# and executing the discrete commands that the script would have done because the user is only grant permission to run the script,
+# not the discrete commands that the scrpt performs.
+#
+# A script author can futher increase security by writing the script to run as a non-root system user. The package assets could
+# create a new system user and configure files on the host to be accessed only by that user. An RBACPermission would grant access
+# to run one or more command assets as that system user and use any low level commands to access the files. This provides the same
+# capabilities as designing the command with to be run with sudo as root except that if a flaw is discovered in the command that
+# allows tricking it into performing an action that it was not intended to perform, it is still limitted to what the new system user
+# can do.
+#
+# Attributes:
+#    <name> : alias for <pluginID>
+#    <cmd>  : a newline separated list of commands that this RBACPermission controlls access to
+#    <auth> : PASSWD|NOPASSWD determines if the user will be required to enter their password to run a <cmd>
+#    <runUser> : the system user that the real user is allowed to run <cmd> with using sudo
+#    <activationState> : (mutable). set at runtime on the host to indicated that the RBACPermission should be available on the host.
+#    <goal> : short one line description of what the logical permission controlls.
+#    <description> : a longer, multi-line text about the permission.
+#    <tags> : words that classify this RBACPermission used in the management of the permission.
+
+DeclarePluginType RBACPermission "
+	columns: name(-18) cmd(-18) auth(-9) runAsUser(-13) activationState goal tags description
+	keyCol: name
+	requiredCols: cmd
+	mutableCols: activationState
+	description: An rbacPermission plugin declares a linux permission that can be controlled in a central RBAC User
+	 directory
+"
+
+#################################################################################################################################
+### Static members
+
+
+# usage: $RBACPermission::list [<outputValueOptions>] [--short] [--full]
+# lists the names (--short) or keys (--full) of all the installed RBACPermission plugins on the host.
+# A name is a simple word that is unique among all RBACPermission plugins in the software repositories.
+# A key is RBACPermission:<name> and is unique among all plugins of any type in the software repositories.
+# Options:
+#    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
+#    --short : the words returned are names without the "RBACPermission:" prefix
+#    --full  : (default) the words retuned include the "RBACPermission:" prefix like "RBACPermission:<name>"
+function static::RBACPermission::list()
+{
+	local retOpts shortFlag
+	while [ $# -gt 0 ]; do case $1 in
+		--short) retOpts+=(--short) ;;
+		--full)  retOpts+=(--full) ;;
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	$Plugin::list "${retOpts[@]}" RBACPermission:
+}
+
+
+
+# usage: $RBACPermission::report
+# print a table to stdout that shows the current mutable state for each installed plugin of this type.
+# Columns:
+#    Name    : simple name of the Collect plugin without the "Collect:" prefix
+#    Enabled : [activating|off] indicates if the plugin is activated on this host
+function static::RBACPermission::report()
+{
+	local pkg scrap pluginKey filename
+	printf "%-20s %-11s\n" "Name" "Enabled"
+	while read -r pkg scrap pluginKey filename; do
+		Try:
+			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp
+		Catch: && {
+			local activationState=$(PluginConfigGet "$pluginKey" "activationState")
+			printf "%-20s %-11s %s\n" "${pluginKey#*:}" "${activationState:-off}"   "<error: plugin will not load>"
+			continue
+		}
+		printf "%-20s %-11s\n" "${cp[pluginID]}" "${cp[activationState]:-off}"
+	done < <(manifestGet plugin "RBACPermission:.*")
+}
+
+# usage: $RBACPermission::activate <pluginID>
+# This static member function provides an easy way to call the activate method of a particular <pluginID>
+# See man(3) RBACPermission::activate
+#
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+function static::RBACPermission::activate()
+{
+bgtraceParams
+	local pluginID="${1#RBACPermission:}"; shift; assertNotEmpty pluginID
+	local pluginKey="RBACPermission:$pluginID"
+
+	local -n perm; $Plugin::get "$pluginKey" perm
+bgtraceVars perm
+	$perm.activate "$@"
+}
+
+# usage: $RBACPermission::deactivate <pluginID>
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+function static::RBACPermission::deactivate()
+{
+	local pluginID="${1#RBACPermission:}"; shift; assertNotEmpty pluginID
+	local pluginKey="RBACPermission:$pluginID"
+
+	local -n perm; $Plugin::get "$pluginKey" perm
+
+	$perm.deactivate "$@"
+}
+
+
+#################################################################################################################################
+### Non-static members
+
+# usage: $rbacPermission.activate
+# Enable this RBACPermission to be used on this host. RBACPermission need to be activated by the host admin because the convention
+# is that installing a software package does not change the configuration of the host, but instead provides some additional
+# capability that can be configured.
+#
+# Activating an RBACPermission will result in a new sudo configuration file being created. That file will grant sudo rights to
+# a set of groups that begin with the RBACPermission name (aka pluginID). For each entry in /etc/tags, a group will be added with
+# the name "<pluginID>-<tagname>". This allows eficient administration of permissions in a central server by creating logical
+# permission groups that can be assigned to Roles.
+#
+# The Sudoers Conf File:
+# Activation generates a conf file in the sudoers configuration system from the information provided by the plugin object and the
+# hostname and /etc/tags file on the host.
+# That conf file grants the permisison to run the cmds listed in the <cmd> attribute with sudo to users that are a member of any
+# of a set of linux group names. The set of group names is <pluginID> plus <pluginID>-<hostname> and <pluginID>-<tagname> for
+# any <tagname> listed in the /etc/tags file. When the /etc/tags file changes, all active RBACPermissions permissions need to be
+# re-generated
+function RBACPermission::activate()
+{
+	### make cmdSpec
+	local cmdSpec cmd sep
+	local commands=(); IFS="," read -a commands <<<"${this[cmd]//$'\n'/,}"
+	for cmd in "${commands[@]}"; do
+		# make the cmd use the fully qualified path to the external command file
+		local cmdFile="${cmd%% *}"
+		local fullCmdFile="$(which "$cmdFile")"
+		[ "$fullCmdFile" ] && [ "$fullCmdFile" != "$cmdFile" ] && cmd="${cmd/$cmdFile/$fullCmdFile}"
+		if [ "$cmd" != "ALL" ] && [[ ! "${cmd%% *}" =~ / ]]; then
+			assertError $continueFlag -e1 "the command '$cmd' must be fully qualified with a path. 'which' did not find a match" || return
+		fi
+
+		# cmdSpec is the syntax expected in the sudoers conf file
+		printf -v cmdSpec "%s%s%s" "$cmdSpec" "$sep" "$cmd"
+		sep=","$' \\\n\t'
+	done
+	[ ! "$cmdSpec" ] && assertError -v commands -v cmdSpec -v this[cmd] "after processing, rbacPermission '${this[name]}' has no commands"
+
+	### make grpSpec
+	local grpModifiers=$(hostname)
+	if [ -f /etc/tags ]; then
+		[ "$(stat -c"%u%g%a" /etc/tags)" == "00644" ] || assertError -c  "warning: not using /etc/tags because 'stat -c"%u%g%a" /etc/tags' is not '00644' "
+		grpModifiers+=$'\n'"$(cat /etc/tags)"
+	fi
+	local grpSpec="%${this[name]}"
+	local grpModifier; for grpModifier in $grpModifiers; do
+		printf -v grpSpec "%s%s%s" "$grpSpec" ","$' \\\n\t' "%${this[name]}-$grpModifier"
+	done
+
+	### expand the file using this embedded template
+	local sudoerFile="/etc/sudoers.d/${this[name]}Permission"
+	local tmpFile; bgmktemp tmpFile
+	cat <<-EOS > "$tmpFile"
+		# this sudo configuration is provided by the ${this[name]}.RBACPermission plugin from package ${this[package]}
+		# See man(7) RBACPermissions to maintain this file
+
+		Cmnd_Alias ${this[name]^^}_CMDS = \\
+		 	${cmdSpec}
+
+		User_Alias ${this[name]^^}_TAGGED_PERMISSION = \\
+		 	${grpSpec}
+
+		${this[name]^^}_TAGGED_PERMISSION ALL=(${this[runAsUser]}) ${this[auth]}: ${this[name]^^}_CMDS
+	EOS
+
+
+	# only install this new version if it passes visudo -c and is different from the current version
+	if ! visudo -c -f "$tmpFile" >/dev/null 2>"${tmpFile}.errOut"; then
+		assertError -v this -f "$tmpFile" -f "${tmpFile}.errOut" "could not create permission. The generated sudo file did not pass visudo -c"
+	fi
+	if fsIsDifferent "$tmpFile" "$sudoerFile"; then
+		bgsudo cp "$tmpFile" "$sudoerFile"
+		bgsudo chown root:root "$sudoerFile"
+		bgsudo chmod 440 "$sudoerFile"
+	fi
+	bgmktemp --release tmpFile
+
+	PluginConfigSet "${this[pluginKey]}" "activationState" "activated"
+}
+
+# usage: $RBACPermission::deactivate
+# This udoes the activation of the <pluginID> so that its logical permission is no longer available on this host. It will not not
+# be an error if a user processes the logical permission, but this host will no longer honor it.
+function RBACPermission::deactivate()
+{
+	local sudoerFile="/etc/sudoers.d/${this[name]}Permission"
+
+	sudo rm -f "$sudoerFile" || assertError -v this "failed to deactive RBACPermission plugin"
+
+	PluginConfigSet "${this[pluginKey]}" "activationState" ""
+}
+
+
+
+# usage: _rbacAddTagsFilter
+# Not sure if I will use this function. The advantage is that this function could be applied to any *Permission.conf sudoers file
+# without any other overhead to update all of them whenever the /etc/tags file changes. On the other hand, we could just loop through
+# and re-call the RBACPermission::activate function on any activated permission plugin.
+#
+# this filters reads a sudo config file on stdin, and re-writes any user alias directives whose name contains "_TAGGED_PERMISSION" statement so that the
+# permName-<tag> exists for each tag name in /etc/tags
+function _rbacAddTagsFilter()
+{
+	awk '
+		BEGIN {
+			while ((getline < "/etc/tags") > 0) {
+				for (j=1; j<=NF; j++)
+					if ($j) tags[$j]=1
+			}
+			PROCINFO["sorted_in"]="@ind_str_asc"
+			tagCount=asorti(tags, orderedTags)
+		}
+
+		# we remove all the User_Alias directives whose name contains "_TAGGED_PERMISSION" and replace them with the current set of permName,permName-{tags}
+		$1=="User_Alias" && $2~"_TAGGED_PERMISSION" {
+			### combine any lines continued by putting a \ at the end.
+			userDirectiveLine=$0; sub("\\\\[[:space:]]*$", "", userDirectiveLine)
+			while ($NF ~ "\\\\[[:space:]]*$") {
+				getline
+				userDirectiveLine=userDirectiveLine""$0; sub("\\\\[[:space:]]*$", "", userDirectiveLine)
+			}
+			$0=userDirectiveLine
+
+			### extract the PERMNAME and permName variables that we need to to build the new alias directive line
+			PERMNAME=$2; sub("_TAGGED_PERMISSION.*$","", PERMNAME)
+			permName=userDirectiveLine; sub("^[^%]*%","",permName); sub("[,-].*$","",permName)
+
+			### make an array of the user/group list that are in the alias. Its a comma separated list to the right of the = sign
+			userList=userDirectiveLine; sub("[^=]*=[[:space:]]*","", userList); sub("[[:space:]]*:.*$","", userList)
+			split(userList, userArray, "[[:space:]]*,[[:space:]]*")
+
+			### write the new directive lines
+			print "User_Alias "PERMNAME"_TAGGED_PERMISSION = \\"
+			printf("\t%s", "%"permName)
+
+			# now any user/groups that were listed that dont match the pattern that we control (%permName or %permName-<tag>)
+			for (i in userArray) {
+				if (userArray[i] !~ "^%"permName"(($)|(-.*$))" ) {
+					printf(", \\\n\t%s", userArray[i])
+				}
+			}
+
+			# and now write the %permName-<tag> that we control
+			for (i=1; i<=tagCount; i++) {
+				tag=orderedTags[i]
+				printf(", \\\n\t%s", "%"permName"-"tag)
+			}
+			printf("\n")
+			next
+		}
+
+		{print $0}
+	'
+}

@@ -1,0 +1,11 @@
+#!/bin/bash
+
+DeclarePlugin RBACPermission upgradeSoftware "
+	auth: NOPASSWD
+	runAsUser: root
+	cmd: apt-get upgrade
+	 apt-get update
+	 apt upgrade
+	 apt update
+	goal: allows upgrading software but not installing new software
+"
