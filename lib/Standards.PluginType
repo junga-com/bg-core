@@ -1,0 +1,182 @@
+#!/bin/bash
+
+import bg_plugins.sh ;$L1;$L2
+
+#####################################################################################################
+### This module implements an "Standards"  Plugin class
+
+# Library
+# This plugin mechanism uses the creq system to implement standards checks on the host.  Each Standards plugin checks some aspect
+# of the host's configuration and reports what parts pass and what parts fail the standard that it represents.
+#
+
+DeclarePluginType Standards "
+	columns: name(-18) cmd_check(-18) activationState(-10) runSchedule(13) lastResult lastRunTime goal tags description
+	keyCol: name
+	requiredCols: cmd_check
+	mutableCols: activationState runSchedule lastResult lastRunTime
+	description: A Standards plugin checks the host's configuration and reports what parts pass and what parts fail to meet the
+	 standard that it represents.
+"
+
+#################################################################################################################################
+### Static members
+
+
+# usage: $Standards::list [<outputValueOptions>] [--short] [--full]
+# lists the names (--short) or keys (--full) of all the installed Standards plugins on the host.
+# A name is a simple word that is unique among all Standards plugins in the software repositories.
+# A key is Standards:<name> and is unique among all plugins of any type in the software repositories.
+# Options:
+#    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
+#    --short : the words returned are names without the "Standards:" prefix
+#    --full  : (default) the words retuned include the "Standards:" prefix like "Standards:<name>"
+function static::Standards::list()
+{
+	local retOpts shortFlag
+	while [ $# -gt 0 ]; do case $1 in
+		--short) retOpts+=(--short) ;;
+		--full)  retOpts+=(--full) ;;
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	$Plugin::list "${retOpts[@]}" Standards:
+}
+
+
+
+# usage: $Standards::report
+# print a table to stdout that shows the current mutable state for each installed plugin of this type.
+# Columns:
+#    Name    : simple name of the Standards plugin without the "Standards:" prefix
+#    Enabled : [activating|off] indicates if the plugin is activated on this host
+function static::Standards::report()
+{
+	local pkg scrap pluginKey filename
+	printf "%-20s %-11s %-12s %-12s %-12s\n" "Name" "Enabled"   "RunSchedule"  "LastResult"  "When"
+	while read -r pkg scrap pluginKey filename; do
+		Try:
+			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp
+		Catch: && {
+			local activationState=$(PluginConfigGet "$pluginKey" "activationState")
+			local runShedule=$(PluginConfigGet "$pluginKey" "runShedule")
+			local lastRunTime=$(PluginConfigGet "$pluginKey" "lastRunTime")
+			local lastResult=$(PluginConfigGet "$pluginKey" "lastResult")
+			printf "%-20s %-11s %-12s %-12s %-12s %s\n" "${pluginKey#*:}" "${activationState:-off}"  "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunTime}" "<error: plugin will not load>"
+			continue
+		}
+		local lastRunExpr="${cp[lastRunTime]}"
+		[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "${cp[lastRunTime]}" lastRunExpr
+		printf "%-20s %-11s %-12s %-12s %-12s\n" "${cp[pluginID]}" "${cp[activationState]:-off}"   "${cp[runSchedule]:-<unset>}"  "${cp[lastResult]:-<notYetRan>}"  "'${lastRunExpr}'"
+	done < <(manifestGet plugin "Standards:.*")
+}
+
+# usage: $Standards::activate <pluginID>
+# This static member function provides an easy way to call the activate method of a particular <pluginID>
+# See man(3) Standards::activate
+#
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+function static::Standards::activate()
+{
+	local pluginID="${1#Standards:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Standards:$pluginID"
+	local runSchedule="$*"
+	local testCronSched; cronNormSchedule -R testCronSched "$runSchedule"
+
+	PluginConfigSet "$pluginKey" "activationState" "activated"
+	if [ ! "$runSchedule" ]; then
+		local -n cp; $Plugin::get "$pluginKey" cp
+		runSchedule="${cp[runSchedule]}"
+	fi
+	PluginConfigSet "$pluginKey" "runSchedule" "$runSchedule"
+}
+
+# usage: $Standards::deactivate <pluginID>
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+function static::Standards::deactivate()
+{
+	local pluginID="${1#Standards:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Standards:$pluginID"
+
+	PluginConfigSet "$pluginKey" "activationState" ""
+}
+
+
+# usage: $Standards::run [-q] [-v] <pluginID>
+# run the Standards plugin by executing its entryPoint
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+# Options:
+#    -q : quiet. less output
+#    -v : verbose. more output
+#         <verbosity>    : 0-4. 0 is most terse. 4 is all debug information. effects stdout
+function static::Standards::run()
+{
+	local verbosity=1 verbosityFlags
+	while [ $# -gt 0 ]; do case $1 in
+		-v)  ((verbosity++)); verbosityFlags+=" -v" ;;
+		-q)  ((verbosity--)); verbosityFlags+=" -q" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local pluginID="${1#Standards:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Standards:$pluginID"
+
+	local cp; $Plugin::get "$pluginKey" cp
+
+	$cp.check
+}
+
+# usage: $Standards::runAll
+# run any active collect plugins that are scheduled to run now
+# Options:
+#    -f : force flag. force all active plugins to run instead of only the ones that are past their last scheduled runtime
+#    -q : quiet. less output
+#    -v : verbose. more output
+function static::Standards::runAll()
+{
+	local forceFlag verbosity=1
+	while [[ "$1" =~ ^- ]]; do case $1 in
+		-f) forceFlag="-f" ;;
+		-q) ((verbosity--)) ;;
+		-v) ((verbosity++)) ;;
+	esac; shift; done
+
+	local standardsPlugins; static::Standards::list -A standardsPlugins
+	local pluginKey; for pluginKey in "${standardsPlugins[@]}"; do
+		local activationState="$(PluginConfigGet "$pluginKey" "activationState")"
+		local runSchedule="$(PluginConfigGet "$pluginKey" "runSchedule")"
+		local lastRunTime="$(PluginConfigGet "$pluginKey" "lastRunTime")"
+
+		if [ "$activationState" == "activated" ] && cronShouldRun "$runSchedule" "$lastRunTime"; then
+			echo "running '$pluginKey'"
+			PluginConfigSet "$pluginKey" "lastRunTime" "$(date +"%s")"
+			local -n cp; $Plugin::get "$pluginKey" cp
+			$cp.check
+		fi
+	done
+	true
+}
+
+
+
+
+#################################################################################################################################
+### Non-static members
+
+function Standards::__construct()
+{
+	this[runSchedule]="SLAm"
+}
+
+function Standards::check()
+{
+	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
+	Try:
+		$_this.invoke "cmd_check" "$@"
+		$_this.setAttribute lastResult "success"
+	Catch: && {
+		$_this.setAttribute lastResult "fail"
+	}
+}

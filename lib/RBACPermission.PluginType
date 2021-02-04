@@ -157,12 +157,10 @@ function static::RBACPermission::report()
 #    <pluginID>   : the unique ID/name for the collect plugin
 function static::RBACPermission::activate()
 {
-bgtraceParams
 	local pluginID="${1#RBACPermission:}"; shift; assertNotEmpty pluginID
 	local pluginKey="RBACPermission:$pluginID"
 
 	local -n perm; $Plugin::get "$pluginKey" perm
-bgtraceVars perm
 	$perm.activate "$@"
 }
 

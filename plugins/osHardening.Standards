@@ -1,0 +1,577 @@
+#!/bin/bash
+
+DeclarePlugin Standards osHardening "
+	cmd_check: standard_osHardening
+	tags: hardening production
+	goal: Secure a linux server against common configuraton errors
+	description: Secure configuration settings that are common to all linux servers
+"
+
+function cr_sshToServerLoginGroups ()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName='<Check that only groups following the format "sshToServer-*" exist in /etc/allowedLoginGroups>'
+                      ;;
+
+                 check)
+			/bin/grep -v ^sshToServer /etc/allowedLoginGroups >/dev/null || return 0
+			return 1
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+
+}
+function cr_noLocalShellAccounts ()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that only root and localadmin exist as local shell accounts>"
+                      ;;
+
+                 check)
+			/usr/bin/awk -F: '{ if ((( $1 !~ /root/ ) &&  ( $1 !~ /localadmin/ )) && ( $0 ~ /sh$/ ))  { exit 1 } }' /etc/passwd
+			return $?
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_diskEncryptionEnabled ()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that SasSan-enabled servers use disk encryption>"
+                      ;;
+
+                 check)
+			which storcli || return 0
+			storcli /c0/eall/sall show all | \
+			/usr/bin/awk  '{ if (( $1 ~ /SED/ ) &&  (( $2 ~ /Capable/ ) || ( $2 ~ /Enabled/ )) && ( $4 ~ /No/ ))  { print; exit 1 } }'
+			 return $?
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_checkNTPService()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the NTP package is installed and enabled>"
+                      ;;
+
+                 check)
+			/usr/sbin/service ntp status | /bin/egrep '(not |unrecognized)' && return 1
+			return 0
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_checkDNSConfig()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the resolv.conf entries are correct according to server location>"
+                      ;;
+
+                 check)
+
+			configured_nameservers=$( /bin/grep ^nameserver /etc/resolv.conf | /usr/bin/awk '{ print $2 }' )
+			standard_nameservers=$( domConfigGet idmClient nameServers )
+
+			fail=1
+			for configured_nameserver in $configured_nameservers
+			do
+				for standard_nameserver in $standard_nameservers
+				do
+					[ "$configured_nameserver" == "$standard_nameserver" ] && fail=0
+				done
+			done
+			return $fail
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_checkNTPConfig()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the ntp.conf entries are correct according to server location>"
+                      ;;
+
+                 check)
+			[ -f /etc/ntp.conf ] || return 1
+
+			configured_ntpservers=$( /bin/grep ^server /etc/ntp.conf | /usr/bin/awk '{ print $2 }' )
+			standard_ntpservers=$( domConfigGet idmClient ntpServers )
+
+			fail=1
+			for configured_ntpserver in $configured_ntpservers
+			do
+				for standard_ntpserver in $standard_ntpservers
+				do
+					[ "$configured_ntpserver" == "$standard_ntpserver" ] && fail=0
+				done
+			done
+			return $fail
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_checkIPMapping()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the server''s primary IP is not mappable from an external IP>"
+                      ;;
+
+                 check)
+			primary_IP=$(/usr/bin/nslookup $(/bin/hostname)|/bin/grep ^Add|/usr/bin/tail -1|/usr/bin/awk '{print $2}')
+			non_mappable_range=$( domConfigGet idmClient nonMappableIPRange )
+
+			[[ $primary_IP =~ $non_mappable_range ]] || return 1
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_checkDefaultAdminPW()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the localadmin password value un /etc/shadow matches the default hash>"
+                      ;;
+
+                 check)
+			# hash value = $1$OR5R2$hYK4NVMpzfBVKmvoKShaA/
+			default_localadmin_pw="$( domConfigGet idmClient defaultAdminPW )"
+			/bin/grep '^localadmin.*'"$default_localadmin_pw" /etc/shadow >/dev/null || return 1
+
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_fail2ban()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the fail2ban package is enabled>"
+                      ;;
+
+                 check)
+			/usr/sbin/service fail2ban status| /bin/egrep '(not |unrecognized)'  >/dev/null && return 1
+			#[ "$( bg-ini /etc/fail2ban/jail.conf iniParamGet sshd enabled )" == "true" ] || return 1
+			[ "$( iniParamGet /etc/fail2ban/jail.conf sshd enabled )" == "true" ] || return 1
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_checkAPTRepository()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the configured Avature repositories are set to the right values>"
+                      ;;
+
+                 check)
+
+			configured_repo_host_list=$( ( /usr/bin/find /etc/apt/sources.list.d/ -name "*list" -exec /bin/cat {} \; ;/bin/cat /etc/apt/sources.list )| /bin/grep ^deb | /usr/bin/awk '{ print $2 }'| /usr/bin/awk -F/ '{ print $3 }' | /usr/bin/sort -u )
+
+			std_repos=$( domConfigGet idmClient aptRepository )
+			for configured_repo_host in $configured_repo_host_list
+			do
+				fail=1
+				for std_repo in std_repos
+				do
+					[ "$configured_repo_host" == "$std_repo" ] && fail=0
+				done
+			done
+			return $fail
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+function cr_checkLDAPservers()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the configured LDAP servers match the standard settings.>"
+                      ;;
+
+                 check)
+		        /bin/egrep '(precise|trusty)' /etc/lsb-release >/dev/null 2>&1  && {
+					ldap_config_file="/etc/ldap.conf"
+			}
+		        /bin/grep xenial /etc/lsb-release >/dev/null 2>&1  && {
+					ldap_config_file="/etc/nslcd.conf"
+			}
+
+			[ -f $ldap_config_file ] || return 1
+
+			configured_ldap_servers=$( /bin/grep ^uri $ldap_config_file | /bin/sed -e 's,^uri,,' )
+			allowed_ldap_servers=$( domConfigGet idmClient ldapServers )
+
+			fail=1
+			for configured_ldap_server in $configured_ldap_servers
+			do
+				for allowed_ldap_server in $allowed_ldap_servers
+				do
+					[ "$configured_ldap_server" == "$allowed_ldap_server" ] && {
+						fail=0
+						break
+					}
+				done
+			done
+			return $fail
+
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+function cr_usePubKeyifPublicIP()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<If OpenSSH is enabled on a publicly mappable IP, then pubkey authentication must be used.>"
+                      ;;
+
+                 check)
+			mappable_ip_ranges=$( domConfigGet idmClient mappableIPRanges )
+			sshd_listen_addresses=$( /bin/grep ^ListenAddress /etc/ssh/sshd_config | /bin/sed -e 's,^ListenAddress,,' | /bin/sed -e 's,:.*,,' )
+
+			listening_on_public=0
+			for mappable_ip_range in $mappable_ip_ranges
+			do
+				mappable_bitwise_network=$( /usr/bin/ipcalc $mappable_ip_range | /bin/grep ^Network | /usr/bin/awk '{ print $3 }' )
+				for configured_listen_address in $sshd_listen_addresses
+				do
+					#First, check that the ListenAddress value actually matches a configured IP Address in the host
+					/sbin/ip address | /bin/grep $configured_listen_address >/dev/null || continue
+					configured_ip_and_mask=$( /sbin/ip address | /bin/grep $configured_listen_address | /usr/bin/awk '{ print $2 }' )
+					configured_ip_bit_mask=$( /usr/bin/ipcalc $configured_ip_and_mask | /bin/grep ^Network | /usr/bin/awk '{ print $3 }' )
+
+					[[ $configured_ip_bit_mask =~ $mappable_bitwise_network ]] && listening_on_public=1
+				done
+			done
+
+
+			[ $listening_on_public -eq 1 ] && {
+					/bin/egrep "^PasswordAuthentication +no" /etc/ssh/sshd_config >/dev/null && \
+					/bin/egrep "^PubkeyAuthentication +yes" /etc/ssh/sshd_config >/dev/null	|| return 1
+			}
+			return 0
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+function cr_checkOpenPorts()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that only ports which are explicitly allowed by audit policy are open>"
+                      ;;
+
+                 check)
+			allowed_ports=$( domConfigGet idmClient allowedServerPorts )
+			open_ports=$( /bin/netstat -nlp | /bin/grep -v ^unix|/bin/grep 'LISTEN' | /usr/bin/awk '{ if ( $4 !~ /^127.0./ ) {print $4 }}' | /usr/bin/awk -F: '{print $NF }' | /usr/bin/sort -gu )
+			for open_port in $open_ports
+			do
+				unauthorized_port=1
+				for allowed_port in $allowed_ports
+				do
+					[ $open_port -eq $allowed_port ] && unauthorized_port=0
+				done
+				[ $unauthorized_port -eq 1 ] && return 1
+			done
+			return 0
+
+                      ;;
+
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+function cr_ldapUseEncryption()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that only LDAPS protocol -- and not LDAP -- is used>"
+                      ;;
+
+                 check)
+                        /bin/egrep '(precise|trusty)' /etc/lsb-release >/dev/null 2>&1  && {
+                                        ldap_config_file="/etc/ldap.conf"
+                        }
+                        /bin/grep xenial /etc/lsb-release >/dev/null 2>&1  && {
+                                        ldap_config_file="/etc/nslcd.conf"
+                        }
+
+                        [ -f $ldap_config_file ] || return 1
+
+			/bin/grep '^uri.*ldap://' $ldap_config_file && return 1
+			return 0
+
+
+		      ;;
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+function cr_ldapBindDn()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that LDAP authentication server uses common, unprivileged LDAP user account lookup.>"
+                      ;;
+
+                 check)
+                        /bin/egrep '(precise|trusty)' /etc/lsb-release >/dev/null 2>&1  && {
+                                        ldap_config_file="/etc/ldap.conf"
+                        }
+                        /bin/grep xenial /etc/lsb-release >/dev/null 2>&1  && {
+                                        ldap_config_file="/etc/nslcd.conf"
+                        }
+
+                        [ -f $ldap_config_file ] || return 1
+
+			/bin/egrep '^binddn +cn=AppReader,dc=avature,dc=net' $ldap_config_file && return 0
+			return 1
+
+
+		      ;;
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+function cr_rootDisabled()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the root account is disabled in /etc/shadow>"
+                      ;;
+
+                 check)
+
+			/bin/grep '^root:!' /etc/shadow >/dev/null || return 1
+			return 0
+
+
+		      ;;
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+function cr_localAdminExists()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the localadmin account exists and is enabled>"
+                      ;;
+
+                 check)
+
+			/bin/grep '^localadmin:x' /etc/passwd >/dev/null || return 1
+			/bin/grep '^localadmin:$' /etc/shadow >/dev/null || return 1
+			return 0
+
+
+		      ;;
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+function cr_nsswitchPasswd()
+{
+            case $objectMethod in
+                 objectVars) echo "p1 p2=5 localVar1" ;;
+                 construct)
+                      displayName="<Check that the nsswitch order for accounts is passwd first, LDAP second>"
+                      ;;
+
+                 check)
+
+			/bin/grep "^passwd.*files.*ldap" /etc/nsswitch.conf >/dev/null || return 1
+			return 0
+
+
+		      ;;
+                 apply)
+                      # TODO: replace with code to make a config change
+                      echo "Not implemented."
+                      ;;
+
+                 *) cr_baseClass "$@" ;;
+            esac
+}
+
+
+function standard_osHardening()
+{
+
+	location=$( domWhereami )
+
+#	creq -p OSH021 cr_noLocalShellAccounts
+	#creq -p OSH001 cr_configLine                  /etc/allowedLoginGroups sshToServer
+#	creq -p OSH001 cr_sshToServerLoginGroups
+	#creq -p OSH002 cr_fileExists                 /etc/rsyslog.d/10-siemClient.conf
+	creq -p OSH003 cr_serverPortNotActive        23
+#	creq -p OSH004 cr_usePubKeyifPublicIP
+	creq -p OSH005 cr_superServersNotIntstalled
+	creq -p OSH006 cr_telnetDeamonNotInstalled
+	creq -p OSH007 cr_ipForwardingIsDisabled
+#	creq -p OSH008 cr_fileContains /etc/snmp/snmpd.conf "syscontact it@avature.net"
+#	creq -p OSH009 cr_configLine /etc/ssh/sshd_config "PermitRootLogin no"
+#	creq -p OSH011 cr_configLine /etc/ssh/sshd_config "Banner /etc/avature.issue"
+#	creq -p OSH012 cr_configLine /etc/ssh/sshd_config "Protocol 2"
+#	creq -p OSH013 cr_configLine /etc/ssh/sshd_config "IgnoreRhosts yes"
+#	creq -p OSH027 cr_configLine /etc/ssh/sshd_config "ListenAddress $(/usr/bin/nslookup $(/bin/hostname)|/bin/grep ^Add|tail -1|/usr/bin/awk '{print $2}'):22"
+#	creq -p OSH028 cr_configLine /etc/ssh/sshd_config "HostbasedAuthentication no"
+
+#	creq -p OSH010 cr_fileExistsWithContent /etc/avature.issue "This system is property of Avature. Unauthorized use is prohibited."
+#	creq -p OSH015 cr_packageInstalled postfix
+#	creq -p OSH033 cr_packageInstalled ntp
+#	creq -p OSH034 cr_packageInstalled fail2ban
+#	creq -p OSH016 cr_checkDNSConfig
+#	creq -p OSH017 cr_checkIPMapping
+#	creq -p OSH035 cr_fileExists	/etc/apt/sources.list.d/avature.list
+#	creq -p OSH018 cr_checkAPTRepository
+#	creq -p OSH019 cr_rootDisabled
+#	creq -p OSH020 cr_localAdminExists
+	#creq -p OSH022 cr_configLine /etc/nsswitch.conf "passwd.*files.*ldap"
+	creq -p OSH022 cr_nsswitchPasswd
+	creq -p OSH023 cr_ldapUseEncryption
+#	creq -p OSH036 cr_checkLDAPservers
+#	creq -p OSH024 cr_ldapBindDn
+#	creq -p OSH029 cr_diskEncryptionEnabled
+#	creq -p OSH030 cr_checkNTPConfig
+#	creq -p OSH014 cr_checkNTPService
+#	creq -p OSH031 cr_checkDefaultAdminPW
+#	creq -p OSH032 cr_fail2ban
+#	creq -p OSH033 cr_checkOpenPorts
+
+	true
+}
