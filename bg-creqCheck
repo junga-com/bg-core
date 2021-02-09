@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+###############################################################################
+# Includes and defines
+
+projectName=bg-core
+
+source /usr/lib/bg_core.sh
+import bg_creqs.sh ;$L1;$L2
+
+
+###############################################################################
+# Command manpage
+#
+# See Also:
+
+###############################################################################
+# Functions
+
+# this is invoked by oob_invokeOutOfBandSystem when -hb is the first param
+# The bash completion script calls this get the list of possible words.
+function oob_printBashCompletion()
+{
+	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+
+	case $posCwords in
+		1) manifestGet "manpage" "cr_.*" | gawk '{print gensub("[.].*$","","g",$3) }' ;;
+	esac
+	exit
+}
+
+###############################################################################
+# Main script
+
+oob_invokeOutOfBandSystem "$@"
+verbosity=1
+while [ $# -gt 0 ]; do case $1 in
+	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+done
+
+creqClass="$1"
+if ! type -t $creqClass &>/dev/null; then
+	read -r scrap library <<<"$(man "$creqClass" 2>/dev/null | grep file:)"
+	library="${library##*/}"
+	library="${library%\'}"
+	if [ "$library" ]; then
+		import $library ;$L1;$L2
+	fi
+fi
+
+
+creqCheck --verbosity="$verbosity" "$@"

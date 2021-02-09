@@ -7,18 +7,27 @@ DeclarePlugin Standards osHardening "
 	description: Secure configuration settings that are common to all linux servers
 "
 
-function cr_sshToServerLoginGroups ()
+DeclareCreqClass cr_sshLoginGroups <allowedGroupsRegEx>
+function cr_sshLoginGroups::check()
 {
-            case $objectMethod in
-                 objectVars) echo "p1 p2=5 localVar1" ;;
-                 construct)
-                      displayName='<Check that only groups following the format "sshToServer-*" exist in /etc/allowedLoginGroups>'
-                      ;;
-
-                 check)
-			/bin/grep -v ^sshToServer /etc/allowedLoginGroups >/dev/null || return 0
-			return 1
-                      ;;
+	accept=()
+	reject=()
+	while read -r line; do
+		if [[ "$line" =~ $* ]]; then
+			accept=("$line")
+		else
+			reject=("$line")
+		fi
+	done < /etc/allowedLoginGroups
+	[ ${#reject[@]} -gt 0 ]
+}
+function cr_sshLoginGroups::apply()
+{
+	while read -r line; do
+		[[ "$line" =~ $* ]] || return 1
+	done < /etc/allowedLoginGroups
+	return 0
+}
 
                  apply)
                       # TODO: replace with code to make a config change

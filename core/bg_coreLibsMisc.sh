@@ -246,6 +246,41 @@ function bgOptionsOnUnknownDefault()
 	return 1
 }
 
+# usage: bgOptions_DoVerbosityOptions <retVar> <cmdLine...>
+# this is used in the bgOptionsLoop of a function that accepts options for verbosity
+#
+# Note that the verbosity options are recognized in the default options handler function if you define a variable named 'verbosity'
+# so you only have to use this function is you need to use a different name
+#
+# Example:
+#    function foo() {
+#       local myVerbosity
+#       while [ $# -gt 0 ]; do case $1 in
+#           *)  bgOptions_DoVerbosityOptions myVerbosity "$@" && shift ;;&
+#           *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+#       done
+#       [ ${verbosity:-0} -gt 1 ] && echo "hi there"
+#    }
+#
+# Options:
+# These options will be supportted by a function that uses this pattern.
+#    --verbosity*=<level>  : set the verbosity to a specific number
+#    -v                   : decrement verbosity
+#    -q                   : increment verbosity
+# See Also:
+#     man(3) bgOptionsOnUnknownDefault
+function bgOptions_DoVerbosityOptions()
+{
+	local _do_retVar="$1"; shift
+	case "$1" in
+		--verbosity) bgOptionHandled="1"; bgOptionGetOpt val: "$_do_retVar" "$@" && return 0 ;;
+		-v)          bgOptionHandled="1"; (( $_do_retVar++ )) ;;
+		-q)          bgOptionHandled="1"; (( $_do_retVar-- )) ;;
+		*) return 1 ;;
+	esac
+}
+
+
 # usage: bgOptionGetOpt val[:]|opt[:]|valArray: <varName> <cmd line ...>
 # usage: bgOptionGetOpt val myoptionName "$@" && shift
 # See man(7) bgBashIdioms for a description of the larger idiom that this function is a part of.
@@ -368,6 +403,10 @@ function bgOptionGetOpt()
 		*) assertError "called incorrectly. first paramter should be one of opt|opt:|val|val: but got '$_oga_type'"
 	esac
 }
+
+
+
+
 
 
 # usage: invokeOutOfBandSystem "$@"
@@ -691,6 +730,9 @@ function oob_printBashCompletionDefault()
 #             bgsudoAdjustPriv.
 #    -r <file> : adjust privilege to provide read access to <file>
 #    -w <file> : adjust privilege to provide write access to <file>
+#    -c <file> : adjust privilege to provide access create or remove <file>. This requires permission on the parent but not necessarily
+#                the <file> itself. Note -w will automatically fall back to the permission to create <file> if it does not exist so
+#                this is primaily used when you want to remove a file.
 #    --skip : dont use sudo. just run the command (used by bgsudoAdjustPriv)
 #    -nn    : sudo's -n fails instead of prompting for a password. -nn extends that to also supress the error.
 # See Also:
@@ -716,6 +758,7 @@ function bgsudo()
 		-d)  debug="-d" ;;
 		-r*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
 		-w*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
+		-c*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
 		-[paghpuUrtCc]*|--role*|--prompt*|--close-from*|--group*|--user*|--host*|--type*|--other-user*)
 			bgOptionGetOpt opt: options "$@" && shift
 			;;
@@ -727,7 +770,7 @@ function bgsudo()
 	# we allow the caller to use those options directly with bgsudo but in typical cases when bgsudo is used multiple
 	# times with the same options, its more efficient to have bgsudoAdjustPriv cache the results of those tests. This
 	# block delegates that processing back to bgsudoAdjustPriv. Maybe this could be done in a cleaner way.
-	if [ "$testFiles" ]; then
+	if [ "${#testFiles[@]}" ]; then
 		local privOpts; bgsudoAdjustPriv privOpts "${testFiles[@]}"
 		if [ "$privOpts" == "--skip" ]; then
 			skipFlag="--skip"
@@ -805,6 +848,9 @@ function bgsudo()
 #             supports --role=<role> since it use -r for its own option which is more typical in this pattern than --role=<role>
 #    -w <file> : the <cmd> will access <file> in write mode so set the privilege adjustment accordingly
 #    -r <file> : the <cmd> will access <file> in read mode so set the privilege adjustment accordingly
+#    -c <file> : adjust privilege to provide access create or remove <file>. This requires permission on the parent but not necessarily
+#                the <file> itself. Note -w will automatically fall back to the permission to create <file> if it does not exist so
+#                this is primaily used when you want to remove a file.
 #    <other options> : other sudo or bgsudo options can be specified and they will be passed through
 # See Also:
 #     bgsudo : a wrapper over sudo that supports priviledge adjustment and other additional features "
@@ -819,6 +865,7 @@ function bgsudoAdjustPriv()
 		--paramsVar*) bgOptionGetOpt val: paramsVar "$@" && shift ;;
 		-r*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
 		-w*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
+		-c*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
 		-[paghpuUrtCcO]*|--role*|--prompt*|--close-from*|--group*|--user*|--host*|--type*|--other-user*)
 			bgOptionGetOpt opt: "$sudoOptsVar" "$@" && shift
 			;;
@@ -852,17 +899,18 @@ function bgsudoAdjustPriv()
 	local term; for term in "${testFiles[@]}"; do
 		local testMode="${term:0:2}"
 		local fileToAccess="${term:2}"
-		{ [[ ! "$testMode" =~ ^-[rw]$ ]] || [ ! "$fileToAccess" ]; } && assertLogicError
+		{ [[ ! "$testMode" =~ ^-[rwc]$ ]] || [ ! "$fileToAccess" ]; } && assertLogicError
 
-		# handle the case where fileToAccess does not exist
+		# handle the case where we need to check the parent's permissions because fileToAccess does not exist or -c was specified
 		local path="${fileToAccess%/}"
-		if [ ! -e "$path" ]; then
+		if [ ! -e "$path" ] || [ "$testMode" == "-c" ]; then
 			# if the file is read access and does not exist, it might be an error, but its not a permission issue. If the caller is going
 			# to create the missing file, it should have specified that it needs write access
 			[ "$testMode" == "-r" ] && continue
 
-			# if we nees write access to the file, we need write access to the first existing parent so that we can create the file so set
-			# path to the first existing parent and that parent's permission determines the access needed.
+			# if we need to create or remove the file, we need write access to the first existing parent so set the path to it
+			# instead of the target file itself
+			[[ "$path" =~ / ]] && path="${path%/*}" || path="."
 			local found=""; while [ ! "$found" ] && [ "$path" != "." ]; do
 				if [ -e "$path" ]; then
 					found="1"

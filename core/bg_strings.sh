@@ -1220,15 +1220,19 @@ function stringTrimQuotes()
 function trimString() { stringTrim "$@"; }
 function stringTrim()
 {
-	local inplaceFlag _st_strVar doRight="1" doLeft="1" doMiddle
- 	while [[ "$1" =~ ^- ]]; do case  $1 in
- 		-i)  inplaceFlag="-i" ;;
+	local inplaceFlag _st_strVar _st_strValue doRight="1" doLeft="1" doMiddle
+	while [ $# -gt 0 ]; do case $1 in
+		-R*|--retVar) bgOptionGetOpt val: _st_strVar "$@" && shift; inplaceFlag="-i"; _st_strValue="${!_st_strVar}" ;;
+		-i)  inplaceFlag="-i" ;;
 		-l)  doRight="" ;;
 		-r)  doLeft="" ;;
 		-m)  doMiddle="1" ;;
- 	esac; shift; done
-	local _st_strValue="$1"; [ "$inplaceFlag" ] && _st_strValue="${!1}"
-	[ "$inplaceFlag" ] && _st_strVar="$1"
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	if [ ! "$_st_strVar" ]; then
+		_st_strValue="$1"; [ "$inplaceFlag" ] && _st_strValue="${!1}"
+		[ "$inplaceFlag" ] && _st_strVar="$1"
+	fi
 
 	[ "$doLeft" ]   && { [[ "$_st_strValue" =~ ^[[:space:]]*(.*)$ ]] && _st_strValue="${BASH_REMATCH[1]}"; }
 	[ "$doRight" ]  && while [[ "$_st_strValue" =~ [[:space:]]$ ]]; do _st_strValue="${_st_strValue:0:-1}"; done

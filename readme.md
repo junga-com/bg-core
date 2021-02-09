@@ -559,45 +559,212 @@ See
 * man(3) ConstructObject
 
 
-## Project Folder structure and naming
 
-This project is managed by the bg-dev project tools. It initially contains only bash script libraries but it may grow to include some commands or other assets over time.
 
-Typically bash libraries are placed in the lib/ subfolder but this project places them in several subfolders for organization.
+## Plugins
+
+The plugin system formalizes the process of building packages that have features that can be extended by arbitrary other packages. A pluginType is a particular type of bash library script named like `<MyNewPluingTypeName>.PluginType` and follows the protocol described in `man(3) DeclarePluginType`. The features in that package can then query the host for available plugins of that type and load and invoke them.
+
+Other packages can include a plugins of that type by creating a library written in bash or another language named like `<myPluginName>.<MyNewPluingTypeName>` of that new type to extend the base functionality in various ways.
+
+The bg-core package introduces several plugin types to provide core functionality for distributed system administration with central command and control.
+
+* RBACPermission  : a way to configure sudo to provide RBAC access control for linux commands
+* Collect : Collect plugins retrieve some information about the host and put it in a shared repository for domain administration
+* Standards : Standards plugins check some aspect of the host configuration state to see if it complies with a standard.
+* Config : Config plugins provide some discrete unit of configuration that can be turned on or off
+
+## RBACPermission Plugins
+
+When an RBACPermission Plugin is activated on a host, it makes it so that a user that is in the group with the same name of the plugin can use sudo to execute the commands named in the plugin.
+
+```bash
+$ cat /usr/lib/upgradeSoftware.RBACPermission
+#!/bin/bash
+
+DeclarePlugin RBACPermission upgradeSoftware "
+	auth: NOPASSWD
+	runAsUser: root
+	cmd: apt-get upgrade
+	 apt-get update
+	 apt upgrade
+	 apt update
+	goal: allows upgrading software but not installing new software
+"
+$ bg-rbacPermissionCntr activate upgradeSoftware
+[sudo] password for bobg:
+$ bg-rbacPermissionCntr report
+Name                 Enabled    
+upgradeSoftware      activated  
+```
+This is particularly powerful when a central user directory is used to administer users and group membership. If a user is put in the `upgradeSoftware` group, they would be able to run `sudo apt upgrade` on any host where this plugin is activated. The plugin actually introduces a family of group names like `upgradeSoftware-<hostGroup>` where <hostGroup> is either a specific hostname or a tagname that is included in the /etc/tags file on one or more hosts. This allows us to grant this permission to a single host or an group of hosts.
+
+## Access Control
+
+The RBACPermission plugin is part of a comprehesive access control system for linux administration. bgsudo is another component. Inside a script you can use bgsudo on a particular command. It is a wrapper over sudo which adds the capability to pass it a list of resources that will be accessed for writing (-w), reading (-r) or creating/deleting (-c) and it results in the command being executed in the least privileged way that allows the specified access. If the user already has the required permissions, it runs the command without sudo. If the user has already been escalated to root (by running the script with sudo, for example) but the loggged in user has the required permission, it uses sudo -u<loguser> to de-escalate privilege back from root to the <loguser>. 
+
+
+
+## Collect Plugins
+
+```bash
+$ cat plugins/osBase.Collect
+#!/bin/bash
+DeclarePlugin Collect osBase "
+	cmd_collect: collect_osBase
+	runSchedule: 4/10min
+	description: collect the basic linux OS host information
+	 * osBase/lsb_release
+	 * osBase/uname
+	 * /etc/passwd
+	 * /etc/group
+	 * /etc/hostname
+	 * /etc/cron.d/*
+	 * /etc/apt/sources.list.d/*
+	 * /etc/ssh/*.pub
+	 ...
+"
+
+function collect_osBase()
+{
+	collectPreamble || return
+
+	lsb_release -a  2>/dev/null | collectContents osBase/lsb_release
+	uname -a       | collectContents osBase/uname
+	dpkg -l | sort | collectContents osBase/dpkg
+
+	collectFiles "/etc/passwd"
+	collectFiles "/etc/group"
+	collectFiles "/etc/hostname"
+	collectFiles "/etc/cron.d/*"
+	collectFiles "/etc/apt/sources.list"
+	collectFiles "/etc/apt/sources.list.d/*"
+	collectFiles "/etc/ssh/*.pub"
+	collectFiles "/etc/bg-*"
+	collectFiles "/etc/at-*"
+}
+$ bg-collectCntr
+Name                 Enabled     RunSchedule  LastResult   When        
+hardware             off         1day         <notYetRan>  ''          
+network              off         3/10min      <notYetRan>  ''          
+osBase               activated   4/10min      success      'over 2 minutes ago'
+```
+Each time a collect plugin runs it copies any of the configuration that it is responsible for into a designated folder hierarchy. That folder would typically be on a mounted shared drive for the domain location that the host is in. The domData system provides a distributed shared folder that can be used for this purpose.
+
+The purpose of collect plugins is to collect up-to-date information about the hosts in a domain without having to grant permission to a remote user to access the host with enough privilege to copy the information.
+
+
+## Declarative Configuration Part 1 -- Creqs
+
+When a human makes a configuration change to a host, they look to see what the current configuration state is and then make only the changes required to get to where they want it to be. Declarative configuration makes our automation configuration scripts work a little bit more like that. Instead of a configuration script containing the steps to get from A to B, it contains more of a description of B so that whether we start at A or B or a different, unanticipated starting point, the script with result in just the steps needed to get to B.
+
+When I maintained a server farm for an enterprise cloud company I learned that scripts are much more robust if they first check to see that an action is necessary before doing the action. The downside is that the script got more verbose, harder to write, harder to read and maintain.
+
+The creq system automates the process of checking to make sure that the action is needed before performing it. Creq stands for 'configuration required'. A creq class is similar to a command or function name. It takes command line arguments just like a command and the creq class combined with its arguments is called a creq statement.
+
+bg-creqApply is an external command that lets you run a creq statement on its own, executing the apply operation. The creq statement in the following commands is `cr_fileExists /tmp/foo`
+```bash
+$ bg-creqApply -v cr_fileExists /tmp/foo
+APPLIED : fileExists /tmp/foo
+$ bg-creqApply -v cr_fileExists /tmp/foo
+PASSED  : fileExists /tmp/foo
+```  
+The first time we invoked the statement, it saw that /tmp/foo did not exist, so it created it. the second time the same command ran, it saw that it already existed so it did nothing.
+
+The bg-core package comes with lots of creq classes to make statements with. They all start with cr_ by convention so you can find them by looking up their man pages with `man cr_<tab><tab>`. The manpage will tell you what argument the creq class expects.
+
+You can also make your own creq classes. An external command, created in any language can be a creq class by complying with the protocol described in man(5) creqClassProtocal. Its also really easy to create one in a bash script.
+
+```bash
+$ cat - >/tmp/test9.sh
+#!/usr/bin/env bash
+source /usr/lib/bg_core.sh
+import bg_creqs.sh ;$L1
+
+DeclareCreqClass cr_myConfFile
+function cr_myConfFile::check() { [ -e "/tmp/myConfig.conf" ]; }
+function cr_myConfFile::apply() { echo "hello word" > "$/tmp/myConfig.conf"; }
+
+creqApply cr_myConfFile
+
+<cntr-d>
+$ chmod a+x /tmp/test9.sh
+$ /tmp/test9.sh
+APPLIED : myConfFile
+$ /tmp/test9.sh
+$
+```
+Notice that because we did not use the verbose switch to the creqApply command, the second time we ran test9.sh it did not print anything because at the default verbosity it only prints a line when it does something.
+
+You can also access the check operation of a creq statement directly with the bg-creqCheck command. Its exit code will reflect whether the host complies with the configuration described by the statement.
+
+The reason that this simple idea is so powerful is that often, performing the earlier steps in a configuration algorithm would mess up the target state if it is already in a later, possibly customized state of configuration. This allows writing the algorithm with the quality of idempotency which means you can call it multiple times without adverse affect.
+
+
+
+## Declarative Configuration Part 2 -- Standards and Config Plugins
+
+You can write scripts that invoke individual creq statements like we saw in the Part 1 of Declarative Configuration section but you can also create groups of creq statements that work in a larger system to perform system administration.
+
+A group of creq statements is called a creq profile and there are two types -- Standards and Config.
+
+In a creq profile, we use the generic `creq` runner command which does not specify whether the statement will run in check or apply mode.
+
+Since they are plugins, you can provide Standards and Config scripts in packages that can be installed to add capabilities to the hosts. Running a Standards plugin produces a report about what on the host complies with the standard and what does not.  When a host admin activates a Standards plugin it will run on a schedule report it using the same shared folder system used by the Collect plugin system.
+
+Config plugins can be used just like Standards but can additionally be ran in apply mode to affect a change in the host configuration to make it comply.
+
+The Standards, Config, Standards and RBACPermission plugins are the heart of a system of distributed system administration that provides central command and control without requiring that any remote user have unrestricted privilege on a host. This is an important new firewall that limits risk in an organization by allowing compartmentalization to an extent not achieved by other means.
+
+
+
+## bg-core Project Folder Description
+
+The bg-core project is managed by the bg-dev project tools. The asset scanners and installers in bg-dev and development packages tools that extend it define how files in various folders in the project are treated. When you install an asset scanner and installed plugin, it will generally identify assets of its type by the containing folder as well as possibly the file extension and file type.   
+
+Note that typically, bg-dev projects place all bash library scripts in the <projectFolder>lib/ subfolder but this project places them in several subfolders to reflect the bootstrapping nature of bg-core.
 
 ### Root level
 
-The root level of this project contains the bg_core.sh script library. That is the entry point for sourcing any of the libraries. bg_core.sh is sourced from its well known /usr/lib/bg_core.sh location. All other libraries are sourced via the import <libFile> ;$L1;$L2 syntax.
+The root level contains any command files that will be installed on the target system.
 
-The only responsibility of bg_core.sh is to setup the host security environment and sourcing the bg_coreImport.sh library which introduces the import system and imports the unconditional core libraries.
+The root level of this project also contains one script library ( bg_core.sh ) which is the entry point for sourcing any libraries in the bg-core package or any package the conform to its protocols. bg_core.sh is sourced from its well known /usr/lib/bg_core.sh location. All other libraries are sourced via the import <libFile> ;$L1;$L2 syntax. The only responsibility of bg_core.sh is to setup the host security environment and sourcing the bg_coreImport.sh library which introduces the import system and imports the unconditional core libraries.
 
 ### core/
 
 The core/ subfolder contains the core libraries that are imported unconditionally when a script sources /usr/lib/bg_core.sh.
 
-You never have to import these libraries.
+You never have to import these libraries. All functions defined in any file in this folder will be available to use in a script after sourcing /usr/lib/bg_core.sh
 
 ### coreOnDemand/
 
 The coreOnDemand/ subfolder contains libraries that are not imported initially when a script sources /usr/lib/bg_core.sh but will be automatically imported if certain features are used by the script. For example, if the script calls the daemonDeclare function to become a daemon script, the bg_coreDaemon.sh library will be imported and its features enabled.
 
-You never have to import these libraries.
+You never have to import these libraries but some functions defined in these files will only be available after the entrypoint function for a certain feature is called.
 
 ### lib/
 
 The lib/ subfolder contains libraries that are available for a script to use if they import them.
 
-Your script needs to import one of these libraries in order to use its featurs. .
+Your script needs to import one of these libraries in order to use its features.
 
 ### unitTests/
 
-The unitTests/ folder contains unit test scripts containing testcases that can be executed directly for testing or via `bg-dev test` as part of the package SDLC.
+The unitTests/ folder contains unit test scripts containing testcases that can be executed directly for testing or via `bg-dev test` as part of the package SDLC. Unit tests are not including in the package this project produces.
 
 See man(1) bg-dev-tests
 
 ### data/
 
-The data/ folder contains file assets that will be copied to the target system when the package is installed.
+The data/ folder contains file assets that will be copied to the target system when the package is installed. On debian systems these files will be in /usr/share/bg-core/. Scripts use the $dataPath variable to refer to this folder which may be in a different location on other OS.
+
+### templates/
+
+Files in this folder will be considered template files regardless of their extension. You can use the `bg-core templates ...` command to manage templates on a host from this and other pacakges. Templates can be overridden by a host administrator.
+
+### plugins/
+
+Plugins are libraries that extend some PluginType mechanism. bg-core provides some general plugins for the pluginTypes that it introduces. Other packages can provide additional plugins of these types. The host admin can decide which to activate.
 
 ### doc/
 
@@ -605,7 +772,7 @@ The doc/ folder contains the changelog and copywrite files for the project and m
 
 ### man?/
 
-The man[0-7]/ folders contain manually written man pages. Most man pages are written as comment blocks in the source code but some man pages do not fit that pattern well.
+The man[0-7]/ folders contain manually written man pages. Most man pages are written as comment blocks in the source code and generated into manpages when the package is built but some man pages do not fit that pattern well and are written manually.
 
 ### .bglocal/
 

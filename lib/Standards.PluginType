@@ -174,7 +174,9 @@ function Standards::check()
 {
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
 	Try:
+		creqStartSession --profileID="${this[pluginKey]}" check
 		$_this.invoke "cmd_check" "$@"
+		creqEndSession
 		$_this.setAttribute lastResult "success"
 	Catch: && {
 		$_this.setAttribute lastResult "fail"
