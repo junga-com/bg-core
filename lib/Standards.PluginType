@@ -30,7 +30,7 @@ DeclarePluginType Standards "
 # Options:
 #    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
 #    --short : the words returned are names without the "Standards:" prefix
-#    --full  : (default) the words retuned include the "Standards:" prefix like "Standards:<name>"
+#    --full  : (default) the words returned include the "Standards:" prefix like "Standards:<name>"
 function static::Standards::list()
 {
 	local retOpts shortFlag
@@ -71,7 +71,7 @@ function static::Standards::report()
 	done < <(manifestGet plugin "Standards:.*")
 }
 
-# usage: $Standards::activate <pluginID>
+# usage: $Standards::activate <pluginID> [<runSchedule>]
 # This static member function provides an easy way to call the activate method of a particular <pluginID>
 # See man(3) Standards::activate
 #
@@ -114,10 +114,8 @@ function static::Standards::deactivate()
 #         <verbosity>    : 0-4. 0 is most terse. 4 is all debug information. effects stdout
 function static::Standards::run()
 {
-	local verbosity=1 verbosityFlags
+	local verbosity=${verbosity:-1}
 	while [ $# -gt 0 ]; do case $1 in
-		-v)  ((verbosity++)); verbosityFlags+=" -v" ;;
-		-q)  ((verbosity--)); verbosityFlags+=" -q" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local pluginID="${1#Standards:}"; shift; assertNotEmpty pluginID

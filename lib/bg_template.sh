@@ -684,7 +684,7 @@ function templateExpand()
 	fi
 
 	# see if sudo is needed to read the input file or write the output file
-	local sudoOpts; bgsudoAdjustPriv sudoOpts ${srcTemplate:+-r "$srcTemplate"} ${dstFilename:+-w "$dstFilename"} -p "creating '${dstFilename##*/}' [sudo] "
+	local sudoOpts; bgsudo --makeOpts sudoOpts ${srcTemplate:+-r "$srcTemplate"} ${dstFilename:+-w "$dstFilename"} -p "creating '${dstFilename##*/}' [sudo] "
 
 	if [ "$srcTemplate" ]; then
 

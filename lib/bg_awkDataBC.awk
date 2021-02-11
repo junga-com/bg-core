@@ -4,7 +4,7 @@
 # This awk file is a complete program that returns the command line completion suggestions for argmument positions that relate to
 # an awkData schema. It uses the bg_awkDataSchema.awk library to read the schema definition for the awkDataID being operated on.
 # Depending on what type of completion is being specified in the parameters passed in, it maybe be able to return the results based
-# only on the schema data provided by bg_awkDataSchema.awk or it may scan the shema's data file.  The awk input files are all
+# only on the schema data provided by bg_awkDataSchema.awk or it may scan the schema's data file.  The awk input files are all
 # specified dynamically from the awkDataIDList/awkDataID input params so this script should be invoked without any input files or
 # piped data.
 # Params:
@@ -38,6 +38,7 @@
 #   bcColumnListBegin     : complete a list of column names
 BEGIN {
 	if (bcType && !isarray(schemas[awkDataID])) assert("awkDataID is a required parameter to this awk script")
+	#bgtraceVars("schemas")
 	switch (bcType) {
 		case "attributeTerm"  :  bcAttributeTermBegin(schemas[awkDataID], validOperators, planMode, filters, !dontDoDefaultCol) ; break
 		case "columnNames"    :  bcColumnNameBegin(   schemas[awkDataID], planMode, filters, !dontDoDefaultCol)    ; break
@@ -221,7 +222,6 @@ END {
 	if (colP0Processing) {
 		printf("<%s_matches> ", matchCount)
 		for (i in outputColFieldSet) {
-bgtrace("here i='"i"' '"schemas[awkDataID]["colNames"][i]"'")
 			if (schemas[awkDataID]["colNames"][i])
 				printf("%s"separator"%s ", schemas[awkDataID]["colNames"][i], "%3A")
 		}

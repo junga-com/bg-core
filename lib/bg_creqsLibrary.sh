@@ -117,11 +117,19 @@ function cr_fileExistsWithContent::apply() {
 	echo "$content" | bgsudo -w "$filename" tee "$filename" >/dev/null
 }
 
+
+
+
 # usage: cr_fileNotExists <filename>
 # declare that a file should exist. Apply will 'rm' the file
-DeclareCreqClass cr_fileNotExists
+DeclareCreqClass cr_fileNotExists "
+	passMsg: %filename% does not exist
+	failMsg: %filename% exists
+	appliedMsg: removed %filename%
+"
 function cr_fileNotExists::check() {
-	! [ -f "$1" ]
+	filename="$1"
+	! [ -f "$filename" ]
 }
 function cr_fileNotExists::apply() {
 	bgsudo -c "$filename" rm -f "$filename"

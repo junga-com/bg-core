@@ -1,0 +1,2 @@
+awkFile=<installedPluginManifest>
+defDisplayCols=package pluginType pluginID loadable goal

@@ -24,29 +24,74 @@
 ### From bg_manifest.sh
 
 # usage: manifestGet <assetTypeMatch> <assetNameMatch>
-# this is similar in purpose to awkDataQuery but we dont use that because some things need to access the manifest w/o the awkData
-# library so this function is a more limitted to query the manifest
+# query the host manifest file for assets installed on the host from any pkg that participates in the bg-core asset management
+# system.
+#
+# awkDataQuery (and bg-awkData) can be used to query the manifest instead of this function, however, this function has no dependencies
+# and be called in bootstrap code where the awdData tools are not available. A manifest.awkDataSchema is provided in bg_core so that
+# the awkData system knows about the manifest file.
+#
+# Manifest File Format:
+# The manifest file complies with man(5) bgawkDataFileFormat.
+# ### Columns
+#    * pkg       : the package name that installs the asset on the host
+#    * assetType : the type of asset. By convention '.' separates logical parts of the type. e.g. lib.script.bash is a library asset
+#                  which is a script (as opposed to a binary) and written in the bash language. The first part is the primary type
+#                  of the asset and then subsequent parts qualify it into sub types.
+#    * assetName : the name of the asset is typically unique within its assetType within the domain of packages but dependign on
+#                  the asset type, it does not necessarily need to to be.
+#    * path      : the installed path of the asset. assets are typically files but can be folders in some cases. The path must be
+#                  unique within all packages in a repository.
+#
+# Compliant Packages:
+# If a package installs its manifest in /var/lib/bg-core/<packagename>/hostmanifest, the next time manifestUpdateInstalledManifest
+# runs, it will combine that file into a combined /var/lib/bg-core/manifest file. Packages built with the bg-dev tool will
+# have this functionality and will call the manifestUpdateInstalledManifest function in the package's postinst script.
+#
+# Params:
+#    <assetTypeMatch> : a regex(gawk) expression to match the assetType field. Default is '' which matches nothing so this parameter must
+#                       be specified to get any results. use '.*' to match all assetTypes
+#    <assetName>      :  a regex(gawk) expression to match the assetName field. Default is '' which matches nothing so this parameter must
+#                       be specified to get any results. use '.*' to match all assetNames
+#
+# Options:
+#    -p|--pkg=<pkgMatch>   : specify a regex(gawk) to match the pkg field. '.*' is the default
+#    -o|--output=<outStr>  : specify what is returned for each matching asset record. default is '$0'. This can use the the terms
+#                            $1,$2,$3,$4 to refer to the columns of the manifest file respectively. $0 is all colums.
+#    --manifest=<file>     : override the path of the manifest file to use.
 function manifestGet() {
+	local manifestFile
 	local pkgMatch=".*" outputStr='$0'
 	while [ $# -gt 0 ]; do case $1 in
 		-p|--pkg*)    bgOptionGetOpt val: pkgMatch "$@" && shift ;;
 		-o|--output*) bgOptionGetOpt val: outputStr "$@" && shift ;;
+		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local assetTypeMatch="$1"
 	local assetNameMatch="$2"
-	local manifestFile; manifestGetHostManifest manifestFile
+	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
-	awk  -v assetTypeMatch="$assetTypeMatch"  -v assetNameMatch="$assetNameMatch" -v pkgMatch="$pkgMatch" '
+	gawk --sandbox  -v assetTypeMatch="$assetTypeMatch"  -v assetNameMatch="$assetNameMatch" -v pkgMatch="$pkgMatch" '
 		$1~"^"pkgMatch"$" && $2~"^"assetTypeMatch"$" && $3~"^"assetNameMatch"$" {print '"$outputStr"'}
 	' $manifestFile
 }
+
+declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"
+declare -gx pluginManifestInstalledPath="/var/lib/bg-core/pluginManifest"
 
 # usage: manifestGetHostManifest
 # returns the file path to the prevailing host manifest file. In production this would be "$manifestInstalledPath"
 # but vinstalling a sandbox overrides it
 function manifestGetHostManifest() {
 	returnValue "${bgVinstalledManifest:-$manifestInstalledPath}" $1
+}
+
+# usage: manifestGetHostPluginManifest
+# returns the file path to the prevailing host plugin manifest file. In production this would be "$pluginManifestInstalledPath"
+# but vinstalling a sandbox overrides it
+function manifestGetHostPluginManifest() {
+	returnValue "${bgVinstalledPluginManifest:-$pluginManifestInstalledPath}" $1
 }
 
 
@@ -681,8 +726,18 @@ function oob_printBashCompletionDefault()
 # this is a wrapper over the linux sudo command used in bash scripts.
 #
 # Least privilege Feature:
-# When the caller uses at least one -r <file> or -w <file> option, bgsudo will invoke the <cmdline> in a way that gives it the
-# least priviledge required to access the specified files. Multiple -r and -w options may be given.
+# bgsudo has the concept of 4 privilege levels from least privilege(1) to most privilege(4).
+#     4 nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+#     3 escalate            -> escalate to root                                      -> `sudo <cmd...>`
+#     2 noChange            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+#     1 deescalate           -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+# The privilege level takes into account the current USER and the user who authenticated the current session (aka loguser, aka real user)
+# In generall, we start at the least priviledge and test to see if it needs to be higher. This function (and bgsudo) can be called
+# multiple times with new information to adjust the privilege further. The current privilege level is passed through to the output
+# <sudoOptsVar> array so that when its called multiple times, each call will start at the last privilege.
+#
+# When the caller uses at least one -r <file>, -w <file>, or -c <file> option, bgsudo will invoke the <cmdline> in a way that gives
+# it the least priviledge required to access the specified files. Multiple -r|-w|-c options may be given.
 #    1) if the script is already running as root because the user escalated priviledge before running the script, but the
 #       loguser (the real user that authenticated the session) has sufficient permissions, sudo -u <loguser> is used to
 #       de-escalate priviledge beofore running the <cmdline>
@@ -720,38 +775,37 @@ function oob_printBashCompletionDefault()
 #    <most sudo options are passed through>
 #    <the following options are processed by this wrapper instead of the base sudo>
 #    -O <optVar> : interpret <optVar> as an array containing cmdline options. <optVar> is typically initialized with a previous call
-#             to bgsudo --makeOpts <optVar> or to  bgsudoAdjustPriv
+#             to bgsudo --makeOpts <optVar>
 #             Note that because the target of sudo must be an external command to prevent privilege escalation, there is no way to
 #             group commands inside a script into a single sudo invocation. This pattern is the next best thing so that a script
 #             can determine if it needs sudo and then run multiple commands with the <optVar> which will use sudo or not based on
 #             the -r and -w options used to create <optVar>
 #    --makeOpts <optVar> : instead of running a command, process the options and store the results in <optVar>. Subsequent calls
-#             can use -O <optVar> to specify the arguments more compactly and without repeating the work. This is the same as calling
-#             bgsudoAdjustPriv.
+#             can use -O <optVar> to specify the arguments more compactly and without repeating the work.
+#    --defaultAction : one of (nativeRoot-skipSudo|escalate|noChange|deescalate) default is deescalate. This is the starting privilege
+#         level before any -r|-w|-c <fileN> are considered. The action taken will be either this or a higher privilege level
 #    -r <file> : adjust privilege to provide read access to <file>
 #    -w <file> : adjust privilege to provide write access to <file>
 #    -c <file> : adjust privilege to provide access create or remove <file>. This requires permission on the parent but not necessarily
 #                the <file> itself. Note -w will automatically fall back to the permission to create <file> if it does not exist so
 #                this is primaily used when you want to remove a file.
-#    --skip : dont use sudo. just run the command (used by bgsudoAdjustPriv)
 #    -nn    : sudo's -n fails instead of prompting for a password. -nn extends that to also supress the error.
-# See Also:
-#     bgsudoAdjustPriv : prepare sudo options to adjust privilege based on the access needed for a list of resources
 function bgsudo()
 {
-	local options=() skipFlag suppressSudoErrorsFlag testFiles testFile
+	local options=() suppressSudoErrorsFlag testFiles testFile defaultAction
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-O*) local _bs_optVar
 			 bgOptionGetOpt val: _bs_optVar "$@" && shift
-			 # note that because we are in a loop that shifts at the end, we have to shift first and then add an empty $1 for it to shift out
+			 # note that because we are in a loop that shifts at the end, we add an empty $1 for it to shift out
 			 shift; eval 'set -- "" "${'"$_bs_optVar"'[@]}" "$@"'
 			 ;;
 		--makeOpts*)
 			local _bs_optVar; bgOptionGetOpt val: _bs_optVar "$@" && shift
+			shift # the rest of this option would be shifted at the end of the loop so remove it now before returning
 			bgsudoAdjustPriv "$_bs_optVar" "$@"
 			return
 			;;
-		--skip) skipFlag="--skip" ;;
+		--defaultAction*) bgOptionGetOpt val: defaultAction "$@" && shift ;;
 		-nn) suppressSudoErrorsFlag="-n"
 			 options+=("-n")
 			 ;;
@@ -766,21 +820,16 @@ function bgsudo()
 		*)  bgOptionGetOpt opt options "$@" && shift ;;
 	esac; shift; done
 
-	# bgsudoAdjustPriv processes the -r<file> and -w<file> options and either adds the --skip or -u<realUser> options.
-	# we allow the caller to use those options directly with bgsudo but in typical cases when bgsudo is used multiple
-	# times with the same options, its more efficient to have bgsudoAdjustPriv cache the results of those tests. This
-	# block delegates that processing back to bgsudoAdjustPriv. Maybe this could be done in a cleaner way.
-	if [ "${#testFiles[@]}" ]; then
-		local privOpts; bgsudoAdjustPriv privOpts "${testFiles[@]}"
-		if [ "$privOpts" == "--skip" ]; then
-			skipFlag="--skip"
-		else
-			options+=("${privOpts[@]}")
-		fi
+	# if the user passed in -r|-w|-c <fileN> resources to determine the required privilege, use bgsudoAdjustPriv to do that
+	if [ ${#testFiles[@]} -gt 0 ]; then
+		local privOpts; bgsudoAdjustPriv privOpts --defaultAction="$defaultAction" "${testFiles[@]}"
+		[ "${privOpts[0]}" == "--defaultAction" ] || assertLogicError -v privOpts
+		[[ "${privOpts[1]}" =~ ^(nativeRoot-skipSudo|escalate|noChange|deescalate)$ ]] || assertLogicError -v privOpts
+		defaultAction="${privOpts[1]}"
 	fi
 
-	# bgsudoAdjustPriv will set the --skip option when it determines that the current user can access the -r/-w files
-	if [ "$skipFlag" ]; then
+	# cases where we dont need sudo.
+	if [[ "$defaultAction" =~ ^(noChange|nativeRoot-skipSudo)$ ]]; then
 		"$@" # execute the rest of the params as a command
 		return
 	fi
@@ -789,8 +838,17 @@ function bgsudo()
 	local tmpErrOutFile="$(mktemp)" bgsudoCanceled=""
 	bgtrap -n bgsudo 'bgsudoCanceled="1"' SIGINT
 
-	# run the command trapping cntr-c and stderr
-	sudo "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
+	# run with sudo ...
+	case ${defaultAction:-escalate} in
+		deescalate)
+			local realUser; bgGetLoginuid realUser
+			sudo -u "$realUser" "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
+			;;
+		escalate)
+			sudo                "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
+			;;
+		*) assertLogicError ;;
+	esac
 
 	# clean up the SIGINT trap and stderr file
 	bgtrap -r -n bgsudo SIGINT
@@ -821,31 +879,49 @@ function bgsudo()
 }
 
 
-# usage: bgsudoAdjustPriv <sudoOptsVar> [<options>] -r|-w <file1> [... -r|-w <fileN>]
-# prepare sudo options to pass to one or more commands using bgsudo -O <sudoOptsVar> <cmd...>.
-# bgsudo is similar to sudo except that it will only invoke sudo if needed and can de-escalate priviledges as will as escalate
-# If multiple cmds in a function will use bgsudo, this function can be used to prepare an array of options in advance which
-# can be passed into multiple bgsudo calls
+# usage: bgsudoAdjustPriv <sudoOptsVar> [<sudoOptions>] [--defaultAction=<action>] [[-r|-w|-c <file1>]..[-r|-w|-c <fileN>]]
+# Note that you typically do not call this function directly anymore. Instead call `bgsudo --makeOpts ...` which is an alias to call
+# this command.
+#
+# This function does two things. First, it calculates --defaultAction=<action> based on the <fileN> and adds it to the <sudoOptsVar>
+# array and Second, it passes through options that sudo understands (e.g. -p "<promtMsg") to the <sudoOptsVar> array
+#
+# The idea of this command is that it can process sudo options and extended bgsudo options and stores them in the <sudoOptsVar>
+# array which can be used to pass 0 or more options to a future call to bgsudo. This allows determining the sudo arguments once
+# and then invoking multiple commands that will use the same sudo privilege.
 #
 # Priviledge Adjustments:
-# When at least one -w or -r option is included, the resulting options will specify whether bgsudo will escalate, de-escalate or
-# retain the existing priviledge level.
-#    No Priv Change: --skip         : the current user can access the resources so sudo will not be used.
-#    Escalation    : <default mode> : root access is needed to access the resources so sudo will be used w/o -u or -g
-#    De-escalation : -u<loguser>    : the current user is root but loguser has permission so sudo -u<loguser> will be used
+# bgsudo has the concept of 4 privilege levels from least privilege(1) to most privilege(4).
+#     4 nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+#     3 escalate            -> escalate to root                                      -> `sudo <cmd...>`
+#     2 noChange            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+#     1 deescalate           -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+# The privilege level takes into account the current USER and the user who authenticated the current session (aka loguser, aka real user)
+# In generall, we start at the least priviledge and test to see if it needs to be higher. This function (and bgsudo) can be called
+# multiple times with new information to adjust the privilege further. The current privilege level is passed through to the output
+# <sudoOptsVar> array so that when its called multiple times, each call will start at the last privilege.
+#
+# When calling a group of commands with sudo, the conservative security approach is to not save the sudo options and let each command
+# get the privilege that it needs to use based on a bespoke set of -r|-w|-c <file> resources that the command will access. It is
+# more convenient and performant, however, to calculate the aggregate privilege of all commands and then calling all commands with
+# the same <sudoOptsVar> that will have the highest privilege required by any of the commands (based on the aggregate list of <file>
+# resources that will be accessed).
 #
 # Example:
-#     local sudoOpts; bgsudoAdjustPriv sudoOpts -p "modify file (${myFile##*/})[sudo]" "$myFile" -r "$myFile2"
+#     local sudoOpts; bgsudo --makeOpts=sudoOpts -p "modify file (${myFile##*/})[sudo]" "$myFile" -r "$myFile2"
 #     bgsudo -O sudoOpts mv "$myFile2" "$myFile"
 #     bgsudo -O sudoOpts touch "$myFile"
 #     echo "hello" | bgsudo -O sudoOpts tee -a "$myFile" >/dev/null
 #
 # Param:
-#   <sudoOpts>    : the variable name that will receive sudo options. This function will add -u, -g or --skip
+#   <sudoOpts>    : the variable name that will receive sudo options. This function will add --defaultAction and pass through
+#                   native sudo options.
 #
 # Options:
 #    --role=<role> : Note that the posix sudo supports the short form -r <role> for --role=<role> option but this function only
 #             supports --role=<role> since it use -r for its own option which is more typical in this pattern than --role=<role>
+#    --defaultAction : one of (nativeRoot-skipSudo|escalate|noChange|deescalate) default is deescalate. This is the starting privilege
+#         level before any -r|-w|-c <fileN> are considered. The output action will be either this or a higher privilege level
 #    -w <file> : the <cmd> will access <file> in write mode so set the privilege adjustment accordingly
 #    -r <file> : the <cmd> will access <file> in read mode so set the privilege adjustment accordingly
 #    -c <file> : adjust privilege to provide access create or remove <file>. This requires permission on the parent but not necessarily
@@ -860,9 +936,10 @@ function bgsudoAdjustPriv()
 	local sudoOptsVar="$1"; shift; assertNotEmpty sudoOptsVar
 	[[ "$sudoOptsVar" =~ ^- ]] && assertError "the <sudoOptsVar> parameter must be the first argument, before any options"
 
-	local testFiles testFile paramsVar
+	local testFiles testFile paramsVar action="deescalate"
 	while [[ "$1" =~ ^[-+] ]]; do case $1 in
 		--paramsVar*) bgOptionGetOpt val: paramsVar "$@" && shift ;;
+		--defaultAction*) bgOptionGetOpt val: action "$@" && shift; action="${action:-deescalate}" ;;
 		-r*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
 		-w*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
 		-c*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
@@ -873,16 +950,9 @@ function bgsudoAdjustPriv()
 		*)  bgOptionGetOpt opt "$sudoOptsVar" "$@" && shift ;;
 	esac; shift; done
 
-	# start by assuming least priviledge and then if we find that a resource needs more, we will set this to the required level
-	#     4 nativeRoot-skipSudo
-	#     3 escalate
-	#     2 noChange
-	#     1 descalate
-	local action="deescalate"
-
 	# if the user is not root, deescalate is not possible.
 	local realUser
-	if (( EUID != 0 )); then
+	if (( EUID != 0 )) && [[ "$action" =~ ^(deescalate)$ ]]; then
 		action="noChange"
 	else
 		# get the loguser -- the user that authenticated the session
@@ -890,7 +960,7 @@ function bgsudoAdjustPriv()
 
 		# if the realUser is root or there is no real user (i.e. cron or other daemon), there is nothing to de-escalate or escalate so
 		# just skip sudo. we don't need to process the rest of the options since sudo wont be used
-		if [ ! "$realUser" ] || [ "$realUser" == "root" ]; then
+		if { [ ! "$realUser" ] || [ "$realUser" == "root" ]; }; then
 			action="nativeRoot-skipSudo"
 		fi
 	fi
@@ -933,22 +1003,7 @@ function bgsudoAdjustPriv()
 		fi
 	done
 
-	# now that the resource checking loop set the action variable, act on it
-	case ${action} in
-		deescalate)
-			setReturnValue --array --append "$sudoOptsVar" "-u" "$realUser"
-			;;
-		noChange)
-			setReturnValue --array --append "$sudoOptsVar" "--skip"
-			;;
-		escalate)
-			# the default sudo options result in escalation
-			# maybe in future we will offer escalation to non-root users and groups
-			;;
-		nativeRoot-skipSudo)
-			setReturnValue --array --append "$sudoOptsVar" "--skip"
-			;;
-	esac
+	setReturnValue --array --append "$sudoOptsVar" "--defaultAction" "$action"
 
 	setReturnValue --array "$paramsVar" "$@"
 }
@@ -1078,7 +1133,7 @@ function bgGetLoginuid()
 	# A host should be configured so that all luanching daemons set it to the correct value but in the
 	# meantime we support hosts that do not by falling back on this compensation algorithm.
 
-	# walk the parent tree back to inti(1) and choose the first non-root uid closest to init(1)
+	# walk the parent tree back to init(1) and choose the first non-root uid closest to init(1)
 	# this idea is that init and other launcher procs run as root and then drop privilege to a non-root
 	# user just before execve'ing the launched code so the first non-root user will be the logical
 	# loginuid that the launcher should have set.

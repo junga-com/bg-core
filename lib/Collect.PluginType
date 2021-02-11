@@ -82,7 +82,7 @@ DeclarePluginType Collect "
 # Options:
 #    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
 #    --short : the words returned are names without the "Collect:" prefix
-#    --full  : (default) the words retuned include the "Collect:" prefix like "Collect:<name>"
+#    --full  : (default) the words returned include the "Collect:" prefix like "Collect:<name>"
 function static::Collect::list()
 {
 	local retOpts shortFlag

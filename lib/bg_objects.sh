@@ -262,6 +262,8 @@
 #          object's member variables. If this is 'a', the member variables of such an object can only be numbers or system variables
 #          stored in a separate _sys array. It forces the creation of a separate _sys array even when <objRef> passed to
 #          ConstructObject is an array variable.
+#    memberVars: a whitespace separated string of member variable names. member variables of an object instance are dynamic and
+#          declaring them here is optional.
 # Params:
 #    <className>       : the name of the new class. By convention it should be capitalized
 #    <baseClassName>   : (default=Object) the name of the class that the new class derives from.
@@ -374,6 +376,35 @@ function Class::__construct()
 	# TODO: this makes DeclareClass and plugins_register very similar. They should merge when 10.04 support is completely dropped
 	[ $# -gt 0 ] && parseDebControlFile this "$@"
 
+	# the DeclareClass statements can define member variables in the debconf control file syntax argument. The memberVars attribute
+	# can contain multiple lines. Each non-empty, un-commented line can be one of two syntaxes.
+	#    1) <varname>[<whitespace><varname>]*
+	#    2) <varname>=<value>
+	# where <value> can be quoted or not with single or double quotes
+	if [ "${this[memberVars]:+exists}" ]; then
+		local varRE="[a-zA-Z_][a-zA-Z_0-9]*"
+		local sqValRE="'([^']*)'"
+		local dqValRE="\"([^\"]*)\""
+		local uqValRE="([^[:space:]'\"]*)"
+		local memVarRE="^[[:space:]]*((${varRE})=($sqValRE|$dqValRE|$uqValRE)|$varRE)[[:space:]]*"
+
+		local memberVarsText="${this[memberVars]}"
+
+		$_this[prototype]=new Map
+		local -n prototype; GetOID "${this[prototype]}" prototype
+
+		while [[ ! "$memberVarsText" =~ ^[[:space:]]*$ ]]; do
+			[[ "$memberVarsText" =~ $memVarRE ]] || assertError -v className:this[name] -v errorText:memberVarsText "invalid memberVars syntax in a DeclareClass statement"
+			rematch=("${BASH_REMATCH[@]}");
+			memberVarsText="${memberVarsText#${rematch[0]}}"
+
+			varName="${rematch[2]:-${rematch[1]}}"
+			varValue="${rematch[6]:-${rematch[5]:-${rematch[4]}}}"
+
+			prototype[$varName]="$varValue"
+		done
+	fi
+
 	### Iterate the hierarchy to maintain the global _classIsAMap and super and sub class lists in all involved classes
 
 	declare -gA _classIsAMap
@@ -408,6 +439,8 @@ function Class::__construct()
 
 	# typically a class's methods defined after the DeclareClass line so we delay creating the list of methods until the first
 	# object construction
+	# TODO: consider if we should start scanning for methods at this point now since the Class construction is delayed to the end
+	#       of the library script that its defined in
 	#Class::getClassMethods
 }
 
@@ -738,6 +771,14 @@ function ConstructObject()
 
 	# each object can point to its own VMT if had dynamic methods added, but the typical case is that it uses it's classes VMT
 	local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
+
+	# if the Class has a prototype, use it to initialize our new object
+	if [ "${newTarget[prototype]}" ]; then
+		local -n prototype; GetOID "${newTarget[prototype]}" prototype
+		local _memberVarName; for _memberVarName in "${!prototype[@]}"; do
+			this[$_memberVarName]="${prototype[$_memberVarName]}"
+		done
+	fi
 
 	# invoke the constructors from Object to this class
 	local _cname; for _cname in ${class[classHierarchy]}; do
@@ -2014,58 +2055,82 @@ function Object::addMethod()
 }
 
 
-function Object::getAttributes()
-{
-	Object::getIndexes "$@"
-}
-
+# usage: $obj.getAttributes [<outputValueOptions>]
+# return a list of the attribute names that is the union of names currently in the object's array at his moment and the names in
+# the Class's prototype member. Attributes are dynamic and can be added and removed over the object's lifetime. Even if an attribute
+# is removed from the object's array, if it is in the Class's protocol member it will be returned by this function.
+# The Class prototype member contains the default values for the initial member variables .
+# Options:
+#    <outputValueOptions>  : see man(3) outputValue for supported options
+function Object::getAttributes() { Object::getIndexes "$@"; }  # alias
 function Object::getIndexes()
 {
-	local _retValue
+	local retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
-	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ]; then
-		_retValue=" ${!this[@]} "
+	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ] && [ ! "${static[protocol]}" ]; then
+		outputValue -1 "${retOpts[@]}" "${!this[@]}"
 	else
-		[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && _retValue="0 "
+		local -A _retValue=()
 
-		local i; for i in "${!this[@]}"; do
-			if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
-				_retValue+="$i "
+		if [ "${static[protocol]}" ]; then
+			local -n prototype; GetOID "${static[protocol]}" protocol
+			local _varName; for _varName in "${!prototype[@]}"; do
+				_retValue[$_varName]=1
+			done
+		fi
+
+		[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && _retValue["0"]=1
+
+		local _varName; for _varName in "${!this[@]}"; do
+			if [[ ! "$_varName" =~ ^((_)|(0$)) ]]; then
+				_retValue[$_varName]=1
 			fi
 		done
-	fi
 
-	returnValue "$_retValue" $1
+		outputValue -1 "${retOpts[@]}" "${!_retValue[@]}"
+	fi
 }
 
+
+# usage: $obj.getAttributes [<outputValueOptions>]
+# return a list of the values in the object's array.
+# Options:
+#    <outputValueOptions>  : see man(3) outputValue for supported options
 function Object::getValues()
 {
-	local _retValue
+	local retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
-	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ]; then
-		_retValue=" ${this[*]} "
+	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ] && [ ! "${static[protocol]}" ]; then
+		outputValue -1 "${retOpts[@]}" "${this[@]}"
 	else
-		[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && _retValue="${this[0]} "
+		local _retValue=()
+		local _attributeNames=(); Object::getAttributes -A _attributeNames
 
-		local i; for i in "${!this[@]}"; do
-			if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
-				_retValue+="${this[$i]} "
-			fi
+		local _attributeName; for _attributeName in "${_attributeNames[@]}"; do
+			_retValue+=("${this[$_attributeName]}")
 		done
+
+		outputValue -1 "${retOpts[@]}" "${_retValue[@]}"
 	fi
-	returnValue "$_retValue" $1
 }
 
 function Object::getSize()
 {
-	local size=0
-	[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && ((size++))
-	local i; for i in "${!this[@]}"; do
-		if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
-			((size++))
-		fi
-	done
-	returnValue "$size" $1
+	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ] && [ ! "${static[protocol]}" ]; then
+		returnValue "${#this[@]}" $1
+	else
+		local _attributeNames=()
+		Object::getAttributes -A _attributeNames
+		returnValue "${#_attributeNames[@]}" $1
+	fi
 }
 
 function Object::get()
@@ -2491,10 +2556,6 @@ function Stack::isEmpty()
 #    class Stack
 #    class Map
 function Array::__construct()   { this=("$@"); }
-function Array::getSize()       { returnValue "${#this[*]}" $1; }
-function Array::getAttributes() { returnValue "${!this[*]}" $1; }
-function Array::getIndexes()    { returnValue "${!this[*]}" $1; }
-function Array::getValues()     { returnValue "${this[*]}" $1; }
 DeclareClass  Array defaultIndex:off oidAttributes:a
 
 # A Map is a simple Object that can be used like an associative array. This is particularly useful for making arrays within arrays.
@@ -2503,8 +2564,4 @@ DeclareClass  Array defaultIndex:off oidAttributes:a
 #    class Array
 #    class Stack
 function Map::__construct()   { eval this=("$@"); }
-function Map::getSize()       { returnValue "${#this[*]}" $1; }
-function Map::getAttributes() { returnValue "${!this[*]}" $1; }
-function Map::getIndexes()    { returnValue "${!this[*]}" $1; }
-function Map::getValues()     { returnValue "${this[*]}" $1; }
 DeclareClass  Map defaultIndex:off

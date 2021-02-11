@@ -1,7 +1,6 @@
 #!/bin/bash
 
 DeclarePlugin Collect network "
-	projectName: bg-core
 	cmd_collect: collectNetwork
 	runSchedule: 3/10min
 	description: collect the basic linux network config on a host

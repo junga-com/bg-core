@@ -1,7 +1,6 @@
 #!/bin/bash
 
 DeclarePlugin Collect hardware "
-	projectName: bg-core
 	cmd_collect: collect_hardware
 	runSchedule: 1day
 	description: collects  information about the host's hardware

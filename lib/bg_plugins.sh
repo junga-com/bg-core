@@ -25,6 +25,9 @@ function DeclarePluginType()
 
 	local -n static="$pluginType"
 
+	static[pluginType]="PluginType"
+	static[pluginID]="$pluginType"
+
 	# make a mutableCols Map member var so that setAttribute can easily check
 	local mutableColsString="${static[mutableCols]}"
 	$static[mutableCols]=new Map
@@ -34,6 +37,7 @@ function DeclarePluginType()
 	done
 
 	$Plugin::register "PluginType:$pluginType" "$static"
+	true
 }
 
 
@@ -74,10 +78,11 @@ function static::Plugin::register()
 #   "bg-awkData manifest assetType:plugin" # assetName is of the form <pluginType>:<pluginName>
 function static::Plugin::list()
 {
-	local retOpts shortFlag
+	local retOpts shortFlag manifestOpt
 	while [ $# -gt 0 ]; do case $1 in
 		--short) shortFlag="--short" ;;
 		--full)  shortFlag="" ;;
+		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
 		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -90,7 +95,7 @@ function static::Plugin::list()
 	while read -r pkg scrap pluginID pluginPath; do
 		[ "$shortFlag" ] && pluginID="${pluginID#*:}"
 		plugins+=($pluginID)
-	done < <(manifestGet --pkg="${packageOverride:-.*}" "plugin" "$pluginNameSpec")
+	done < <(manifestGet $manifestOpt --pkg="${packageOverride:-.*}" "plugin" "$pluginNameSpec")
 
 	outputValue -1 "${retOpts[@]}" "${plugins[@]}"
 }
@@ -149,6 +154,7 @@ function static::Plugin::get()
 	else
 		local pluginType="$1"; shift
 		local pluginID="$1"; shift
+		assertNotEmpty pluginID "invalid parameters. should be either '<pluginType>:<pluginID>' '<pluginType> <pluginID>'"
 	fi
 	local pluginKey="$pluginType:$pluginID"
 
@@ -160,25 +166,27 @@ function static::Plugin::get()
 		[ "$pluginType" != "PluginType" ] && static::Plugin::get -q "PluginType:$pluginType"
 
 		# get the filename that implements this plugin from the manifest
-		local pkg scrap filename
-		read -r pkg scrap scrap filename < <(manifestGet  plugin "$pluginType:$pluginID")
-		assertNotEmpty filename "could not find assetType:plugin assetName:'$pluginType:$pluginID' in host manifest"
+		local _pg_pkg _pg_scrap _pg_filename
+		read -r _pg_pkg _pg_scrap _pg_scrap _pg_filename < <(manifestGet  plugin "$pluginType:$pluginID")
+		assertNotEmpty _pg_filename "could not find assetType:plugin assetName:'$pluginType:$pluginID' in host manifest"
 
-		local fileTypeInfo="$(file "$filename")"
-		if [[ "$fileTypeInfo" =~ Bourne-Again ]]; then
+		local _pg_fileTypeInfo="$(file "$_pg_filename")"
+		if [[ "$_pg_fileTypeInfo" =~ Bourne-Again ]]; then
 			# this is the initially typical case where the plugin is implemented as a bash script
-			import "$filename" ;$L1;$L2
-		else
+			import "$_pg_filename" ;$L1;$L2
+
+		elif [ -x "$_pg_filename" ]; then
 			# this is the case where the plugin is implemented in a different language. It could be a php or python script or a binary
 			# The executable should respond to the 'getAttributes' command by returning its attributes in the deb control file syntax
-			[ -x "$filename" ] || assertError "could not load plugin file '$filename' because it is not a bash script and not an executable"
-			DeclarePlugin "$pluginType" "$pluginID" "$($filename getAttributes)"
+			DeclarePlugin "$pluginType" "$pluginID" "$($_pg_filename getAttributes)"
+		else
+			assertError "could not load plugin file '$_pg_filename' because it is not a bash script and not an executable"
 		fi
 
 		[ "${loadedPlugins[$pluginKey]+exists}" ] || assertError "failed to load plugin '$pluginKey'"
 
-		local -n plugin; GetOID "${loadedPlugins[$pluginKey]}" plugin
-		plugin[package]="$pkg"
+		local -n _pg_plugin; GetOID "${loadedPlugins[$pluginKey]}" _pg_plugin
+		_pg_plugin[package]="$_pg_pkg"
 	fi
 
 	if [ "$quietFlag" ]; then
@@ -186,6 +194,109 @@ function static::Plugin::get()
 	else
 		returnObject "${loadedPlugins[$pluginKey]}" "$retVar"
 	fi
+}
+
+# usage: $Plugin::buildAwkDataTable
+# This builds an awkData style table of all installed plugins and the union of attribute names that they contain as columns
+# Mutable attributes (aka columns) and attributes that start with '_' are not included.
+# The output is sent to stdout.
+function static::Plugin::buildAwkDataTable()
+{
+	local manifestOpt
+	while [ $# -gt 0 ]; do case $1 in
+		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	local allPlugins; $Plugin::list -A allPlugins $manifestOpt --full '.*'
+
+	local pluginKey
+	local -n plugin
+	for pluginKey in "${allPlugins[@]}"; do
+		Try:
+			unset -n plugin; local -n plugin; $Plugin::get -R plugin "$pluginKey"
+			echo "$pluginKey" "pluginKey" "$pluginKey"
+			local attribNames=(); $plugin.getAttributes -A attribNames
+			local -n mutableCols; $plugin.static.mutableCols.getOID mutableCols
+			local attrib; for attrib in "${attribNames[@]}"; do
+				if [ ! "${mutableCols[$attrib]+exists}" ]; then
+					local value="${plugin[$attrib]}"
+					varEscapeContents attrib value
+					echo "$pluginKey" "$attrib" "$value"
+				fi
+			done
+			echo  "$pluginKey" "loadable" "loadSuccess"
+		Catch: && {
+			echo  "$pluginKey" "loadable" "loadFail"
+			echo "the plugin '$pluginKey' failed to load" >&2
+		}
+	done >  >(gawk '
+		@include "bg_core.awk"
+		function addCol(col) {
+			if (!(col in attribs)) {
+				attribs[col]=col
+				arrayPush(columns, col)
+			}
+		}
+		function addRow(row) {
+			if (!(row in plugins)) {
+				plugins[row]=row
+				arrayPush(rows, row)
+			}
+		}
+		BEGIN {
+			arrayCreate(plugins)
+			arrayCreate(attribs)
+			arrayCreate(columns)
+			arrayCreate(rows)
+			arrayCreate(values)
+
+			# add the well known column names so that they appear on the left of each line
+			addCol("package")
+			addCol("pluginKey")
+			addCol("loadable")
+			addCol("pluginType")
+			addCol("pluginID")
+			addCol("keyCol")
+			addCol("name")
+
+			addCol("requiredCols")
+			addCol("cmd_run")
+			addCol("cmd_collect")
+			addCol("cmd_check")
+			addCol("auth")
+			addCol("runAsUser")
+			addCol("tags")
+
+			addCol("cmd")
+			addCol("goal")
+			addCol("defDisplayCols")
+			addCol("columns")
+		}
+		NF!=3 {assert("logic error. The pipe should feed in only lines with three columns : <pluginKey> <attribName> <value>")}
+		{
+			pluginKey=$1; attrib=$2; value=$3
+			#bgtrace("   |pluginKey=|"pluginKey"|  attrib=|"attrib"|")
+			if (attrib ~ /^[a-zA-Z]/  && attrib !~ /^(staticMethods|methods|vmtCacheNum|classHierarchy|baseClass|mutableCols)$/) {
+				addRow(pluginKey)
+				addCol(attrib)
+				values[pluginKey,attrib]=value
+			}
+		}
+		END {
+			# print the header
+			for (j in columns)
+				printf("%s ", columns[j])
+			printf("\n\n")
+
+			# print each row
+			for (i in rows) {
+				for (j in columns)
+					printf("%s ", norm(values[rows[i],columns[j]]))
+				printf("\n")
+			}
+		}
+	' | column -t -e)
 }
 
 
@@ -217,7 +328,6 @@ function Plugin::postConstruct()
 	this[${newTarget[keyCol]:-name}]="$pluginID"
 	this[pluginID]="$pluginID"
 	this[pluginType]="$pluginType"
-	this[key]="${newTarget[name]}:$pluginID"
 	this[pluginKey]="${newTarget[name]}:$pluginID"
 
 	# normalize tags attribute (if it exists)
@@ -225,7 +335,7 @@ function Plugin::postConstruct()
 
 	local -n mutableCols="$(GetOID "${newTarget[mutableCols]}")"
 	for attribName in "${!mutableCols[@]}"; do
-		this[$attribName]="$(PluginConfigGet "${this[key]}" "$attribName" "${this[$attribName]}")"
+		this[$attribName]="$(PluginConfigGet "${this[pluginKey]}" "$attribName" "${this[$attribName]}")"
 	done
 
 	local requiredCol; for requiredCol in ${static[requiredCols]}; do
@@ -239,7 +349,7 @@ function Plugin::setAttribute()
 	local value="$1"; shift
 	if $static[mutableCols][$name].exists; then
 		this[$name]="$value"
-		PluginConfigSet "${this[key]}" "$name" "${this[$name]}"
+		PluginConfigSet "${this[pluginKey]}" "$name" "${this[$name]}"
 	else
 		bgtrace "not setting attribute '$name' in plugin '${this[pluginID]}' because its plugin type '${this[pluginType]}' does not declare it as mutable"
 	fi
@@ -268,102 +378,3 @@ function PluginConfigSet()
 {
 	iniParamSet /etc/bgPlugins.conf "$1" "$2" "$3"
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#
-#
-# ##### Alt1
-#
-# DeclarePlugin CollectPlugin osBase "
-# 	cmd_collect: collect_osBase
-# 	runSchedule: 4/10min
-# 	description: collect the basic linux OS host information
-# 	 * osBase/lsb_release
-# 	 * osBase/uname
-# 	 * /etc/passwd
-# 	 * /etc/group
-# 	 * /etc/hostname
-# 	 * /etc/cron.d/*
-# 	 * /etc/apt/sources.list.d/*
-# 	 * /etc/ssh/*.pub
-# 	 ...
-# "
-#
-# function collect_osBase()
-# {
-# 	collectPreamble || return
-#
-# 	lsb_release -a  2>/dev/null | collectContents osBase/lsb_release
-# 	uname -a       | collectContents osBase/uname
-# 	dpkg -l | sort | collectContents osBase/dpkg
-#
-# 	collectFiles "/etc/passwd"
-# 	collectFiles "/etc/group"
-# 	collectFiles "/etc/hostname"
-# 	collectFiles "/etc/cron.d/*"
-# 	collectFiles "/etc/apt/sources.list"
-# 	collectFiles "/etc/apt/sources.list.d/*"
-# 	collectFiles "/etc/ssh/*.pub"
-# 	collectFiles "/etc/bg-*"
-# 	collectFiles "/etc/at-*"
-# }
-#
-# ###### Alt2
-#
-# DeclareClass OSBase extends CollectPlugin "
-# 	cmd_collect: collect_osBase
-# 	runSchedule: 4/10min
-# 	description: collect the basic linux OS host information
-# 	 * osBase/lsb_release
-# 	 * osBase/uname
-# 	 * /etc/passwd
-# 	 * /etc/group
-# 	 * /etc/hostname
-# 	 * /etc/cron.d/*
-# 	 * /etc/apt/sources.list.d/*
-# 	 * /etc/ssh/*.pub
-# 	 ...
-# "
-#
-# function OSBase::collect()
-# {
-# 	collectPreamble || return
-#
-# 	lsb_release -a  2>/dev/null | collectContents osBase/lsb_release
-# 	uname -a       | collectContents osBase/uname
-# 	dpkg -l | sort | collectContents osBase/dpkg
-#
-# 	collectFiles "/etc/passwd"
-# 	collectFiles "/etc/group"
-# 	collectFiles "/etc/hostname"
-# 	collectFiles "/etc/cron.d/*"
-# 	collectFiles "/etc/apt/sources.list"
-# 	collectFiles "/etc/apt/sources.list.d/*"
-# 	collectFiles "/etc/ssh/*.pub"
-# 	collectFiles "/etc/bg-*"
-# 	collectFiles "/etc/at-*"
-# }

@@ -137,6 +137,11 @@ function _postImportProcessing() {
 	local scriptName="${_importInProgressStack[@]:0:1}"; _importInProgressStack=("${_importInProgressStack[@]:1}")
 
 	if [ "${scriptName:0:1}" != "#" ]; then
+		# support the import -e option which turns on the error stop flag just for the duration of one imported script
+		if [ "${scriptName:0:3}" == "-e|" ]; then
+			scriptName="${scriptName#-e|}"
+			set +e -E
+		fi
 		#echo "_postImportProcessing stack '${#_importInProgressStack[@]}' '${_importInProgressStack[*]}'"
 		if [ "${_importedLibraries[_tracingOn]}" ]; then
 			bgtimerLapTrace -T ImportProfiler $scriptName
@@ -180,6 +185,8 @@ function _importSetErrorCode() { return 202; }
 # Options:
 #    -f : force sourcing. Even if the script has already been sourced into the environment, do it again.
 #    -q : if the library is not found, set the exit code to 202 instead of ending the script with an assert.
+#    -e : turn on 'set -e' for the duration of loading this library. Note, that shift exits non-zero if there is nothing to shift
+#         so my code generally can not run with set -e on
 #    --getPath : This options gives utilities the chance to lookup the path without sourcing it.
 # See Also:
 #    importCntr  : change settings and get the current state of imported libraries
@@ -190,6 +197,7 @@ function import()
 	local forceFlag quietFlag getPathFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-f) forceFlag="-f" ;;
+		-e) stopOnErrorFlag="-e" ;;
 		-q) quietFlag="-q" ;;
 		--getPath) getPathFlag="--getPath" ;;
 	esac; shift; done
@@ -253,7 +261,7 @@ function import()
 		L1="source $foundScriptPath"
 		L2="_postImportProcessing"
 		#echo "(import) L1='$L1'" >>"/tmp/bgtrace.out"
-		_importInProgressStack=("$scriptName" "${_importInProgressStack[@]}")
+		_importInProgressStack=("${stopOnErrorFlag:+-e|}$scriptName" "${_importInProgressStack[@]}")
 
 		# if we are reloading a lib that had already been sourced, then inc _importedLibrariesBumpAdj
 		# the import state ID is the size of the _importedLibraries array plus _importedLibrariesBumpAdj
@@ -263,6 +271,8 @@ function import()
 		# by multiple library files which is typical for Class hierarchies
 		[ "${_importedLibraries[lib:$scriptName]}" ] && ((_importedLibrariesBumpAdj++))
 		_importedLibraries[lib:$scriptName]=$foundScriptPath
+		[ "$stopOnErrorFlag" ] && set -e +E
+		#echo "DOING import return '$foundScriptPath'" >>"/tmp/bgtrace.out"
 		return 0
 	fi
 

@@ -469,15 +469,15 @@ function creqStartSession()
 {
 	varExists creqAction && assertError "nesting creq profile sessions is not (yet?) allowed"
 
-	declare -gx creqVerbosity=1 creqProfileID="<anon>" statementLog
+	declare -gx verbosity="${verbosity:-1}" creqProfileID="<anon>" statementLog
 	while [ $# -gt 0 ]; do case $1 in
-		--verbosity*) bgOptionGetOpt val: creqVerbosity "$@" && shift ;;
 		--profileID*) bgOptionGetOpt val: creqProfileID "$@" && shift ;;
 		--statementLog*) bgOptionGetOpt val: statementLog "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	declare -gx creqAction="${1:-check}"
 	[[ "$creqAction" =~ ^(check|apply)$ ]] || assertError -v creqAction "The first positional argument must be 'check' or 'apply'"
+
 
 	if [ "$statementLog" ]; then
 		fsTouch "$statementLog"
@@ -498,7 +498,15 @@ function creqStartSession()
 # usage: creqEndSession
 function creqEndSession()
 {
-	printfVars creqRun
+	creqRun[countCompliant]="$(( ${creqRun[countPass]:-0}+${creqRun[countApplied]:-0} ))"
+	creqRun[completeness]="$(( ${creqRun[countCompliant]:-0} * 100 / ${creqRun[countTotal]:-1} ))"
+
+	printf "%-18s : %s/%s %3s%% compliant\n" "${creqRun[profileID]}" "${creqRun[countCompliant]}" "${creqRun[countTotal]}" "${creqRun[completeness]}"
+
+	for countVar in Pass Fail Applied ErrorInCheck ErrorInApply ErrorInProtocol; do
+		[ ${creqRun[count${countVar}]:-0} -gt 0 ] && printf "   %4s: %s\n"  "${creqRun[count${countVar}]}" "$countVar"
+	done
+
 	bgmktemp --release stderrFile
 	bgmktemp --release stdoutFile
 	unset creqRun creqAction
@@ -540,16 +548,16 @@ function creq()
 
 	case $resultState in
 		Pass)
-			[ ${creqVerbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
+			[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
 			;;
 		Applied)
-			[ ${creqVerbosity:-1} -ge 1 ] && printf "${csiBlue}%-7s${csiNorm} : %s\n" "APPLIED"  "$stmText"
+			[ ${verbosity:-1} -ge 1 ] && printf "${csiBlue}%-7s${csiNorm} : %s\n" "APPLIED"  "$stmText"
 			;;
 		Fail)
-			[ ${creqVerbosity:-1} -ge 1 ] && printf "${csiHiYellow}%-7s${csiNorm} : %s\n" "FAILED"  "$stmText"
+			[ ${verbosity:-1} -ge 1 ] && printf "${csiHiYellow}%-7s${csiNorm} : %s\n" "FAILED"  "$stmText"
 			;;
 		ErrorInCheck|ErrorInApply)
-			[ ${creqVerbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
+			[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
 			if [ "$logFileFD" ]; then
 				echo "$resultState: $stmText" >&$logFileFD
 				[ "$stdoutFile" ] && awk '{print "   stdout: " $0}' "$stdoutFile" >&$logFileFD
@@ -557,7 +565,7 @@ function creq()
 			fi
 			;;
 		ErrorInProtocol)
-			[ ${creqVerbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : \ntext returned by creqClass='%s'\n" "$resultState"  "$resultMsg"
+			[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : \ntext returned by creqClass='%s'\n" "$resultState"  "$resultMsg"
 			if [ "$logFileFD" ]; then
 				printf "ErrorInProtocol : \ntext returned by creqClass='%s'" "$resultMsg" >&$logFileFD
 				[ "$stdoutFile" ] && awk '{print "   stdout: " $0}' "$stdoutFile" >&$logFileFD
@@ -657,15 +665,8 @@ function creqApply()
 
 
 
-
-
-
-
-
-
-
 ##############################################################################################
-### functions to use in cr_* sections / lists to augment and add features
+### functions to use in creqProfile scripts (Standards and Config)
 #   For example to keep track of what has changed to know if a daemon needs to be restarted
 
 declare -A creqsChangetrackers

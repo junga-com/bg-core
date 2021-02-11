@@ -629,12 +629,11 @@ function fsPipeToFile()
 	cat - > "$tmpFile"
 
 	# we only need read permissions to test to see if the file is different
-	local sudoOpts; bgsudoAdjustPriv sudoOpts -r "$destFile" -p "accessing '${destFile##*/}' [sudo] "
-
+	local sudoOpts; bgsudo --makeOpts sudoOpts -r "$destFile" -p "reading '${destFile##*/}' [sudo] "
 
 	if [ ! -e "$destFile" ] || ! bgsudo -O sudoOpts diff -q "$tmpFile" "$destFile" &>/dev/null; then
 		# now we need write perission
-		sudoOpts=(); bgsudoAdjustPriv sudoOpts -w "$destFile" -p "writing to '${destFile##*/}' [sudo] "
+		sudoOpts=(); bgsudo --makeOpts=sudoOpts -w "$destFile" -p "writing to '${destFile##*/}' [sudo] "
 		if [[ "$destFile" =~ / ]]; then
 			local destFolder="${destFile%/*}"
 			[ ! -d "$destFolder" ] && bgsudo -O sudoOpts mkdir -p "${destFolder}"

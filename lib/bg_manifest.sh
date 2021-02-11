@@ -21,7 +21,10 @@
 # See Also:
 #    man(1) bg-dev-manifest  : from the bg-dev package which supports creating and distributing projects that contain assets.
 
-declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"
+# these are moved to bg_coreLibsMisc.sh
+#declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"
+#declare -gx pluginManifestInstalledPath="/var/lib/bg-core/pluginManifest"
+
 
 # moved to bg_coreLibsMisc.sh function manifestGet() {
 # moved to bg_coreLibsMisc.sh function manifestGetHostManifest() {
@@ -109,9 +112,20 @@ function manifestReadOneType()
 
 
 # usage: manifestUpdateInstalledManifest
+# This function is called by postinst to update the manifest and pluginManifest to reflect the new state of installed packages.
+# There is another version in the bg-dev package in bg_manifestScanner.sh that is used in a vinstalled environment.
+# Initially, the vinstall version also called this version because the installer code was not yet done. In a vinstall environment,
+# this function can update the global manifest file fine and it does no harm but the pluginManifest can not be called from a vinstall
+# because it loads plugins to get there attributes and it could install a vinstall version of the plugin
 function manifestUpdateInstalledManifest() {
 	local rebuildInstalled dirtyDeps
 	if fsGetNewerDeps --array=dirtyDeps "$manifestInstalledPath" /var/lib/bg-core/*/hostmanifest; then
 		cat $(fsExpandFiles -f /var/lib/bg-core/*/hostmanifest) | sort | fsPipeToFile "$manifestInstalledPath"
+	fi
+
+	# protect this from being called in vinstall environment
+	if [ ! "${bgVinstalledManifest}${bgVinstalledPluginManifest}" ]; then
+		import bg_plugins.sh  ;$L1;$L2
+		$Plugin::buildAwkDataTable | fsPipeToFile "$pluginManifestInstalledPath"
 	fi
 }

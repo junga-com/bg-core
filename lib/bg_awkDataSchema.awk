@@ -363,7 +363,7 @@ function schemas_writeOutput(                awkDataID) {
 
 # usage: schemaInfo_restore(info, awkDataID)
 # restore the schema definition information from the schema file or the header data of the awkFile of the given awkDataID
-function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObjData,schemaSection,tmpInColumnArray,colName,colWidth) {
+function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObjData,schemaSection,tmpInColumnArray,colName,colWidth,schemaFileRead) {
 	if (!awkDataID)
 		assert("-v awkDataID (awk)schemaInfo_restore(): awkDataID is a required parameter")
 
@@ -379,9 +379,10 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 	info["awkFile"]=awkObjData[3]
 	info["awkSchemaFile"]=awkObjData[4]
 
+	schemaFileRead=""
 	schemaSection=""
 	while (getline < info["awkSchemaFile"]  > 0) {
-		info["schemaFileRead"]="yes"
+		schemaFileRead="yes"
 		delete info["noSchemaDataFound"]
 
 		# section line ([ scope:servers ])
@@ -410,9 +411,27 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 		}
 	}
 	close(info["awkSchemaFile"])
-	if ("schemaFileRead" in info) {
-		delete info["noSchemaDataFound"]
-	} else if (info["awkFile"]) {
+
+	# manifest and plugins have .awkDataSchema files that sets the awkFile but we want to honor the vinstalled manifest if present
+	# so they use the special tokens "<installedManifest>" and "<installedPluginManifest>" to trigger this processing
+	if (info["awkFile"] == "<installedManifest>") {
+		info["awkFile"] = ENVIRON["bgVinstalledManifest"]
+		if (!info["awkFile"])
+			info["awkFile"] = ENVIRON["manifestInstalledPath"]
+		if (!info["awkFile"])
+			info["awkFile"] = "/var/lib/bg-core/manifest"
+
+	} else if (info["awkFile"] == "<installedPluginManifest>") {
+		info["awkFile"] = ENVIRON["bgVinstalledPluginManifest"]
+		if (!info["awkFile"])
+			info["awkFile"] = ENVIRON["pluginManifestInstalledPath"]
+		if (!info["awkFile"])
+			info["awkFile"] = "/var/lib/bg-core/pluginManifest"
+	}
+
+	# read the awkFile header if there was new awkSchemaFile or it did not set any columns.
+	# A dynamic awkSchemaFile will leave columns empty so we have to read the actual column list from the awkFile header
+	if ( (schemaFileRead != "yes" || ! info["columns"]) && info["awkFile"]) {
 		FNR=0
 		while (getline < info["awkFile"]  > 0) {
 			FNR++
@@ -440,16 +459,6 @@ function schemaInfo_construct(info            ,tmpInColumnArray,colName,colWidth
 	info["_OID"]=info["awkDataID"]
 	info["0"]=awkDataID   # for compatibility when exported to bash
 
-	# the manifest has a .awkDataSchema file that sets the awkFile but we want to honor the vinstalled manifest if present so it
-	# uses the spacial token "<installedManifest>" to trigger this processing
-	if (info["awkFile"] == "<installedManifest>") {
-		info["awkFile"] = ENVIRON["bgVinstalledManifest"]
-		if (!info["awkFile"])
-			info["awkFile"] = ENVIRON["manifestInstalledPath"]
-		if (!info["awkFile"])
-			info["awkFile"] = "/var/lib/bg-core/manifest"
-	}
-
 	# init schemaType and domData
 	if (info["awkDomFolder"]) {
 		info["domFolder"]=info["awkDomFolder"]   ; sub("/$","",info["domFolder"])
@@ -473,7 +482,9 @@ function schemaInfo_construct(info            ,tmpInColumnArray,colName,colWidth
 	for (i in tmpInColumnArray) {
 		match(tmpInColumnArray[i], /^([^(]*)([(]([0-9-]*)[)])?$/, rematch)
 		colName=rematch[1]
-		colWidth=( (rematch[3]=="")?"-"length(colName):rematch[3] )
+		colWidth=( (rematch[3]=="") \
+			? "-"gleanColumnWidth(info["columns"], colName) \
+			: rematch[3] )
 
 		info["colNames"]         =appendStr(info["colNames"]         , colName, " ")
 		info["colWidths"]        =appendStr(info["colWidths"]        , colWidth, " ")
@@ -483,7 +494,11 @@ function schemaInfo_construct(info            ,tmpInColumnArray,colName,colWidth
 	info["colWithWidths"]=info["columnsWithWidths"]
 }
 
-
+function gleanColumnWidth(colStr, colName                      ,token,rematch) {
+	match(colStr, colName"[ ]*", rematch)
+	token=rematch[0]
+	return length(token)
+}
 
 
 

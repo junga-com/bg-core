@@ -113,7 +113,7 @@ DeclarePluginType RBACPermission "
 # Options:
 #    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
 #    --short : the words returned are names without the "RBACPermission:" prefix
-#    --full  : (default) the words retuned include the "RBACPermission:" prefix like "RBACPermission:<name>"
+#    --full  : (default) the words returned include the "RBACPermission:" prefix like "RBACPermission:<name>"
 function static::RBACPermission::list()
 {
 	local retOpts shortFlag
