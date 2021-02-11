@@ -1,0 +1,237 @@
+#!/bin/bash
+
+import bg_plugins.sh ;$L1;$L2
+import bg_creqs.sh ;$L1;$L2
+import bg_creqsLibrary.sh ;$L1;$L2
+
+#####################################################################################################
+### This module implements an "Config"  Plugin class
+
+# Library
+# This plugin mechanism uses the creq system to implement units of configuration that can be applied to a host.
+#
+
+DeclarePluginType Config "
+	columns: ConfigType(-18) name(-18) cmd_run(-18) activationState(-10) runSchedule(13) lastResult lastRunTime goal tags description
+	keyCol: name
+	requiredCols: cmd_run
+	mutableCols: activationState runSchedule lastResult lastRunTime
+	description: A Config plugin uses creqStatements to achieve a unit of configuration that can be checked or enforced on a host
+"
+
+#################################################################################################################################
+### Static members
+
+
+# usage: $Config::list [<outputValueOptions>] [--short] [--full] [--tree]
+# lists the names (--short) or keys (--full) of all the installed Config plugins on the host.
+# A name is a simple word that is unique among all Config plugins in the software repositories.
+# A key is Config:<name> and is unique among all plugins of any type in the software repositories.
+# Options:
+#    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
+#    --short : the words returned are names without the "Config:" prefix
+#    --full  : (default) the words returned include the "Config:" prefix like "Config:<name>"
+function static::Config::list()
+{
+	local retOpts shortFlag modeFlag="--list"
+	while [ $# -gt 0 ]; do case $1 in
+		--tree)  modeFlag="--tree" ;;
+		--types) modeFlag="--types" ;;
+		--short) retOpts+=(--short); modeFlag="--list" ;;
+		--full)  retOpts+=(--full);  modeFlag="--list" ;;
+		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local results
+	mapfile -t results < <($Plugin::list  Config: | gawk -F: -v modeFlag="$modeFlag" '
+		@include "bg_core.awk"
+		modeFlag=="--list" {print $0; next}
+		{
+			type=$2; name=$3
+			if (!(type in data))
+				arrayCreate2(data, type)
+			arrayPush(data[type], name)
+		}
+
+		END {
+			for (type in data) {
+				print type
+				if (modeFlag=="--tree")
+					for (i in data[type])
+						print "   :"data[type][i]
+			}
+		}
+	')
+	outputValue -1 "${retOpts[@]}" "${results[@]}"
+}
+
+
+
+# usage: $Config::report
+# print a table to stdout that shows the current mutable state for each installed plugin of this type.
+# Columns:
+#    Name    : simple name of the Config plugin without the "Config:" prefix
+#    Enabled : [activating|off] indicates if the plugin is activated on this host
+function static::Config::report()
+{
+	local types; static::Config::list -A types --types
+
+	printf "%-20s %-20s %-12s %-12s %-12s\n" "ConfigType" "ActiveConfig"   "RunSchedule"  "LastResult"  "When"
+	local configType; for configType in "${types[@]}"; do
+		local activeConfig=$(PluginConfigGet "ConfigType:$configType" "activeConfig")
+		local runShedule=$(PluginConfigGet "ConfigType:$configType" "runShedule")
+		local lastRunTime=$(PluginConfigGet "ConfigType:$configType" "lastRunTime")
+		local lastResult=$(PluginConfigGet "ConfigType:$configType" "lastResult")
+		printf "%-20s %-20s %-12s %-12s %-12s\n" "${configType}" "${activeConfig:-<none>}"  "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunTime}"
+	done
+}
+
+# usage: $Config::activate <pluginID> [<runSchedule>]
+# This static member function provides an easy way to call the activate method of a particular <pluginID>
+# See man(3) Config::activate
+#
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+function static::Config::activate()
+{
+	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Config:$pluginID"
+	local configType configName; stringSplit "$pluginID" configType configName
+	local runSchedule="$*"
+	local testCronSched; cronNormSchedule -R testCronSched "$runSchedule"
+
+	if [ ! "$configName" ]; then
+		: lookup the default activation config name
+	fi
+
+	PluginConfigSet "ConfigType:$configName" "activeConfig" "$configName"
+	if [ ! "$runSchedule" ]; then
+		local -n cp; $Plugin::get "$pluginKey" cp
+		runSchedule="${cp[runSchedule]}"
+	fi
+	PluginConfigSet "$pluginKey" "runSchedule" "$runSchedule"
+}
+
+# usage: $Config::deactivate <pluginID>
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+function static::Config::deactivate()
+{
+	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Config:$pluginID"
+
+	PluginConfigSet "$pluginKey" "activationState" ""
+}
+
+
+# usage: $Config::check [-q] [-v] <pluginID>
+# run the Config plugin by executing its entryPoint
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+# Options:
+#    -q : quiet. less output
+#    -v : verbose. more output
+#         <verbosity>    : 0-4. 0 is most terse. 4 is all debug information. effects stdout
+function static::Config::check()
+{
+	local verbosity=${verbosity:-1}
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Config:$pluginID"
+
+	local cp; $Plugin::get "$pluginKey" cp
+
+	$cp.check
+}
+
+# usage: $Config::apply [-q] [-v] <pluginID>
+# run the Config plugin by executing its entryPoint
+# Params:
+#    <pluginID>   : the unique ID/name for the collect plugin
+# Options:
+#    -q : quiet. less output
+#    -v : verbose. more output
+#         <verbosity>    : 0-4. 0 is most terse. 4 is all debug information. effects stdout
+function static::Config::apply()
+{
+	local verbosity=${verbosity:-1}
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
+	local pluginKey="Config:$pluginID"
+
+	local cp; $Plugin::get "$pluginKey" cp
+
+	$cp.apply
+}
+
+# usage: $Config::runAll
+# run any active collect plugins that are scheduled to run now
+# Options:
+#    -f : force flag. force all active plugins to run instead of only the ones that are past their last scheduled runtime
+#    -q : quiet. less output
+#    -v : verbose. more output
+function static::Config::runAll()
+{
+	local forceFlag verbosity=1
+	while [[ "$1" =~ ^- ]]; do case $1 in
+		-f) forceFlag="-f" ;;
+		-q) ((verbosity--)) ;;
+		-v) ((verbosity++)) ;;
+	esac; shift; done
+
+	local standardsPlugins; static::Config::list -A standardsPlugins
+	local pluginKey; for pluginKey in "${standardsPlugins[@]}"; do
+		local activationState="$(PluginConfigGet "$pluginKey" "activationState")"
+		local runSchedule="$(PluginConfigGet "$pluginKey" "runSchedule")"
+		local lastRunTime="$(PluginConfigGet "$pluginKey" "lastRunTime")"
+
+		if [ "$activationState" == "activated" ] && cronShouldRun "$runSchedule" "$lastRunTime"; then
+			echo "running '$pluginKey'"
+			PluginConfigSet "$pluginKey" "lastRunTime" "$(date +"%s")"
+			local -n cp; $Plugin::get "$pluginKey" cp
+			$cp.check
+		fi
+	done
+	true
+}
+
+
+
+
+#################################################################################################################################
+### Non-static members
+
+function Config::__construct()
+{
+	this[runSchedule]="SLAm"
+}
+
+function Config::check()
+{
+	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
+	Try:
+		creqStartSession --profileID="${this[pluginKey]}" check
+		$_this.invoke "cmd_run" "$@"
+		creqEndSession
+		$_this.setAttribute lastResult "success"
+	Catch: && {
+		$_this.setAttribute lastResult "fail"
+	}
+}
+
+function Config::apply()
+{
+	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
+	Try:
+		creqStartSession --profileID="${this[pluginKey]}" apply
+		$_this.invoke "cmd_run" "$@"
+		creqEndSession
+		$_this.setAttribute lastResult "success"
+	Catch: && {
+		$_this.setAttribute lastResult "fail"
+	}
+}
