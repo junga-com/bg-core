@@ -1,7 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bg-utRunner
 
-source /usr/lib/bg_core.sh
-bgtrace "sourceing unitTest.ut '$L1' '$L2'"
 import bg_unitTest.sh ;$L1;$L2
 
 
@@ -136,9 +134,3 @@ function ut_assertInTest()
 	assertError "this is an error"
 	echo "this wont happen"
 }
-
-
-
-
-# this should be the last line of any ut script
-unitTestCntr "$@"

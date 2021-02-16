@@ -79,8 +79,7 @@ To build good scripts and especially good script libraries, you need to define t
 Unit tests scripts are simple bash scripts that follow a minimal pattern.
 ```bash
 $ cat - >/tmp/test4.sh.ut
-#!/usr/bin/env bash
-source /usr/lib/bg_core.sh
+#!/usr/bin/env bg-utRunner
 import mylib.sh ;$L1
 
 declare -A ut_myCoolFunction=(
@@ -91,10 +90,6 @@ function ut_myCoolFunction() {
     # expect: output of myCoolFunction be different if the first argument is 42
     myCoolFunction "$@"
 }
-
-# this should be the last line of any ut script
-unitTestCntr "$@"
-
 <cntr-d>
 $ chmod a+x /tmp/test4.sh
 ```
@@ -601,7 +596,7 @@ This is particularly powerful when a central user directory is used to administe
 
 ## Access Control
 
-The RBACPermission plugin is part of a comprehesive access control system for linux administration. bgsudo is another component. Inside a script you can use bgsudo on a particular command. It is a wrapper over sudo which adds the capability to pass it a list of resources that will be accessed for writing (-w), reading (-r) or creating/deleting (-c) and it results in the command being executed in the least privileged way that allows the specified access. If the user already has the required permissions, it runs the command without sudo. If the user has already been escalated to root (by running the script with sudo, for example) but the loggged in user has the required permission, it uses sudo -u<loguser> to de-escalate privilege back from root to the <loguser>. 
+The RBACPermission plugin is part of a comprehesive access control system for linux administration. bgsudo is another component. Inside a script you can use bgsudo on a particular command. It is a wrapper over sudo which adds the capability to pass it a list of resources that will be accessed for writing (-w), reading (-r) or creating/deleting (-c) and it results in the command being executed in the least privileged way that allows the specified access. If the user already has the required permissions, it runs the command without sudo. If the user has already been escalated to root (by running the script with sudo, for example) but the loggged in user has the required permission, it uses sudo -u<loguser> to de-escalate privilege back from root to the <loguser>.
 
 
 

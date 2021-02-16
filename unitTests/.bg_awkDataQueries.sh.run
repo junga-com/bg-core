@@ -22,6 +22,7 @@ siFaint%csiReverse%*sosiNorm% siFaint%csiReverse%*stsiNorm% siFaint%csiReverse
 cmd> awkData_query -w type1 all
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
+   catch_errorFn='awkData_query'
    catch_errorCode='36'
    catch_errorDescription='
                            error: awkData_query: unknown awkDataTblFmt type. No template for awkDataTblFmt.wiki was found in the template path. Use bg-core templates types 'awkDataTblFmt' to see what types are available on this host. Adding a template named awkDataTblFmt.wiki will enable this command to proceed'

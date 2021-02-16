@@ -1,70 +1,437 @@
 
 ###############################################################################################################################
-## bg_coreAssertError.sh:testcase:1 start
+## bg_coreAssertError.sh:frameOffsetOption:default start
 ## expect: 
 
 ##----------
 ## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError
+##     | }
 
 ##----------
 ## test
 
-## bg_coreAssertError.sh:testcase:1 finished
+# expect that catch_errorFn is the one identified by '<default>' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='f1'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f1: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:default finished
 ###############################################################################################################################
 
 
 ###############################################################################################################################
-## bg_coreAssertError.sh:testcase:2 start
+## bg_coreAssertError.sh:frameOffsetOption:-1 start
 ## expect: 
 
 ##----------
 ## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError --frameOffset=-1
+##     | }
 
 ##----------
 ## test
 
-## bg_coreAssertError.sh:testcase:2 finished
+# expect that catch_errorFn is the one identified by '--frameOffset=-1' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='assertError'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: assertError: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:-1 finished
 ###############################################################################################################################
 
 
 ###############################################################################################################################
-## bg_coreAssertError.sh:testcase:3 start
+## bg_coreAssertError.sh:frameOffsetOption:0 start
 ## expect: 
 
 ##----------
 ## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError --frameOffset=0
+##     | }
 
 ##----------
 ## test
 
-## bg_coreAssertError.sh:testcase:3 finished
+# expect that catch_errorFn is the one identified by '--frameOffset=0' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='f1'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: assertError: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:0 finished
 ###############################################################################################################################
 
 
 ###############################################################################################################################
-## bg_coreAssertError.sh:testcase:4 start
+## bg_coreAssertError.sh:frameOffsetOption:1 start
 ## expect: 
 
 ##----------
 ## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError --frameOffset=1
+##     | }
 
 ##----------
 ## test
 
-## bg_coreAssertError.sh:testcase:4 finished
+# expect that catch_errorFn is the one identified by '--frameOffset=1' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='f2'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f2: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:1 finished
 ###############################################################################################################################
 
 
 ###############################################################################################################################
-## bg_coreAssertError.sh:testcase:5 start
+## bg_coreAssertError.sh:frameOffsetOption:2 start
 ## expect: 
 
 ##----------
 ## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError --frameOffset=2
+##     | }
 
 ##----------
 ## test
 
-## bg_coreAssertError.sh:testcase:5 finished
+# expect that catch_errorFn is the one identified by '--frameOffset=2' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='f3'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f3: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreAssertError.sh:frameOffsetOption:3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError --frameOffset=3
+##     | }
+
+##----------
+## test
+
+# expect that catch_errorFn is the one identified by '--frameOffset=3' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='f4'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f4: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreAssertError.sh:frameOffsetOption:40 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError --frameOffset=40
+##     | }
+
+##----------
+## test
+
+# expect that catch_errorFn is the one identified by '--frameOffset=40' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='in top level script'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: in top level script: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:40 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreAssertError.sh:frameOffsetOption:byName start
+## expect: 
+
+##----------
+## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError --frameOffset=^f.*
+##     | }
+
+##----------
+## test
+
+# expect that catch_errorFn is the one identified by '--frameOffset=^f.*' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='f4'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f4: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:byName finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreAssertError.sh:frameOffsetOption:byNameOffset start
+## expect: 
+
+##----------
+## setup
+##     | cmd> eval 'function f1() { assertError '"$1"'; }'
+##     | cmd> function f2() { f1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type f1
+##     | f1 is a function
+##     | f1 () 
+##     | { 
+##     |     assertError --frameOffset=f3:1
+##     | }
+
+##----------
+## test
+
+# expect that catch_errorFn is the one identified by '--frameOffset=f3:1' relative to assertError
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='f4'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f4: eval 'function f1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:frameOffsetOption:byNameOffset finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreAssertError.sh:errorClassFeature:0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> eval 'function assertF1() { assertError '"$1"'; }'
+##     | cmd> function f2() { assertF1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type assertF1
+##     | assertF1 is a function
+##     | assertF1 () 
+##     | { 
+##     |     assertError
+##     | }
+
+##----------
+## test
+
+# expect that the catch_errorClass is 'assertF1' because it starts with assert*
+
+# expect that the catch_errorFn is now relative to 'assertF1' i.e. 'assertF1'+frameOffset
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertF1'
+   catch_errorFn='f2'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f2: eval 'function assertF1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:errorClassFeature:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreAssertError.sh:errorClassFeature:1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> eval 'function assertF1() { assertError '"$1"'; }'
+##     | cmd> function f2() { assertF1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type assertF1
+##     | assertF1 is a function
+##     | assertF1 () 
+##     | { 
+##     |     assertError --frameOffset=1
+##     | }
+
+##----------
+## test
+
+# expect that the catch_errorClass is 'assertF1' because it starts with assert*
+
+# expect that the catch_errorFn is now relative to 'assertF1' i.e. 'assertF1'+frameOffset
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertF1'
+   catch_errorFn='f3'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f3: eval 'function assertF1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:errorClassFeature:1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreAssertError.sh:errorClassFeature:2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> eval 'function assertF1() { assertError '"$1"'; }'
+##     | cmd> function f2() { assertF1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type assertF1
+##     | assertF1 is a function
+##     | assertF1 () 
+##     | { 
+##     |     assertError --frameOffset=2
+##     | }
+
+##----------
+## test
+
+# expect that the catch_errorClass is 'assertF1' because it starts with assert*
+
+# expect that the catch_errorFn is now relative to 'assertF1' i.e. 'assertF1'+frameOffset
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertF1'
+   catch_errorFn='f4'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: f4: eval 'function assertF1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:errorClassFeature:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreAssertError.sh:errorClassFeature:40 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> eval 'function assertF1() { assertError '"$1"'; }'
+##     | cmd> function f2() { assertF1; }          ; :
+##     | cmd> function f3() { f2; }          ; :
+##     | cmd> function f4() { f3; }          ; :
+##     | cmd> type assertF1
+##     | assertF1 is a function
+##     | assertF1 () 
+##     | { 
+##     |     assertError --frameOffset=40
+##     | }
+
+##----------
+## test
+
+# expect that the catch_errorClass is 'assertF1' because it starts with assert*
+
+# expect that the catch_errorFn is now relative to 'assertF1' i.e. 'assertF1'+frameOffset
+cmd> f4
+** Exception thrown by testcase **
+   catch_errorClass='assertF1'
+   catch_errorFn='in top level script'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: in top level script: eval 'function assertF1() { assertError '"$1"'; }'
+                               1'
+## bg_coreAssertError.sh:errorClassFeature:40 finished
 ###############################################################################################################################
 

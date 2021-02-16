@@ -367,8 +367,8 @@ Animal : <instance> of Class
   vmtCacheNum   =<redacted>
   methods       =Animal::__construct
                 + Animal::speak
-  staticMethods =
   subClasses    =Dog Cat
+  staticMethods =
   name          =Animal
 
 Dog : <instance> of Class
@@ -415,12 +415,14 @@ myCat[]
 ##     | cmd> local strVar="initial value"
 ##     | cmd> local -a arrayVar=(initial value)
 ##     | cmd> local -A setVar=([initial]="" [value]="")
-##     | cmd> echo "$@"
-##     | one two three
+##     | cmd> echo "'$1' '$2' '$3' '$4'"
+##     | 'one two three' '' '' ''
 
 ##----------
 ## test
 cmd> varOutput "$@"
+one two three
+cmd> varOutput -1 "$@"
 one two three
 cmd> varOutput +1 "$@"
 one two three
@@ -431,10 +433,15 @@ one two three
 ## test
 cmd> varOutput -a -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three'
-cmd> varOutput -a +1 -RstrVar   "$@"; printfVars strVar
+cmd> varOutput -a -1 -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three
         one two three'
+cmd> varOutput -a +1 -RstrVar   "$@"; printfVars strVar
+strVar='initial value one two three
+        one two three one two three'
 cmd> varOutput -RstrVar   "$@"; printfVars strVar
+strVar='one two three'
+cmd> varOutput -1 -RstrVar   "$@"; printfVars strVar
 strVar='one two three'
 cmd> varOutput +1 -RstrVar   "$@"; printfVars strVar
 strVar='one two three'
@@ -474,17 +481,19 @@ setVar[]
 ##     | cmd> local strVar="initial value"
 ##     | cmd> local -a arrayVar=(initial value)
 ##     | cmd> local -A setVar=([initial]="" [value]="")
-##     | cmd> echo "$@"
-##     | one two three
+##     | cmd> echo "'$1' '$2' '$3' '$4'"
+##     | 'one' 'two' 'three' ''
 
 ##----------
 ## test
 cmd> varOutput "$@"
 one two three
-cmd> varOutput +1 "$@"
+cmd> varOutput -1 "$@"
 one
 two
 three
+cmd> varOutput +1 "$@"
+one two three
 cmd> varOutput -d'|' "$@"
 one|two|three
 
@@ -492,17 +501,24 @@ one|two|three
 ## test
 cmd> varOutput -a -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three'
-cmd> varOutput -a +1 -RstrVar   "$@"; printfVars strVar
+cmd> varOutput -a -1 -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three
         one
         two
         three'
+cmd> varOutput -a +1 -RstrVar   "$@"; printfVars strVar
+strVar='initial value one two three
+        one
+        two
+        three one two three'
 cmd> varOutput -RstrVar   "$@"; printfVars strVar
 strVar='one two three'
-cmd> varOutput +1 -RstrVar   "$@"; printfVars strVar
+cmd> varOutput -1 -RstrVar   "$@"; printfVars strVar
 strVar='one
         two
         three'
+cmd> varOutput +1 -RstrVar   "$@"; printfVars strVar
+strVar='one two three'
 
 ##----------
 ## test

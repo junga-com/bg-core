@@ -1,7 +1,4 @@
-#!/bin/bash
-
-source /usr/lib/bg_core.sh
-import bg_unitTest.sh ;$L1;$L2
+#!/usr/bin/env bg-utRunner
 
 
 ###################################################################################################
@@ -10,21 +7,48 @@ import bg_unitTest.sh ;$L1;$L2
 ###################################################################################################
 ### Unit Tests
 
-ut_testcase=(
-	[1]="$(cmdline "$iniFileData_empty")"
-	[2]="$(cmdline "$iniFileData_noSections")"
-	[3]="$(cmdline "$iniFileData_noTopLevel")"
-	[4]="$(cmdline "$iniFileData_topAndSections")"
-	[5]="$(cmdline "$iniFileData_colonInSectNames")"
+declare -A ut_frameOffsetOption=(
+	[default]="$(cmdLine "")"
+	[-1]="$(cmdLine "--frameOffset=-1")"
+	[0]="$(cmdLine "--frameOffset=0")"
+	[1]="$(cmdLine "--frameOffset=1")"
+	[2]="$(cmdLine "--frameOffset=2")"
+	[3]="$(cmdLine "--frameOffset=3")"
+	[40]="$(cmdLine "--frameOffset=40")"
+	[byName]="$(cmdLine "--frameOffset=^f.*")"
+	[byNameOffset]="$(cmdLine "--frameOffset=f3:1")"
 )
-function ut_testcase()
+function ut_frameOffsetOption()
 {
 	ut setup
+	eval 'function f1() { assertError '"$1"'; }'
+	function f2() { f1; }          ; :
+	function f3() { f2; }          ; :
+	function f4() { f3; }          ; :
+	type f1
 
 	ut test
+	ut expect "that catch_errorFn is the one identified by '${1:-<default>}' relative to assertError"
+	f4
 }
 
+declare -A ut_errorClassFeature=(
+	[0]="$(cmdLine "")"
+	[1]="$(cmdLine "--frameOffset=1")"
+	[2]="$(cmdLine "--frameOffset=2")"
+	[40]="$(cmdLine "--frameOffset=40")"
+)
+function ut_errorClassFeature()
+{
+	ut setup
+	eval 'function assertF1() { assertError '"$1"'; }'
+	function f2() { assertF1; }          ; :
+	function f3() { f2; }          ; :
+	function f4() { f3; }          ; :
+	type assertF1
 
-
-# this should be the last line of any ut script
-unitTestCntr "$@"
+	ut test
+	ut expect "that the catch_errorClass is 'assertF1' because it starts with assert*"
+	ut expect "that the catch_errorFn is now relative to 'assertF1' i.e. 'assertF1'+frameOffset"
+	f4
+}

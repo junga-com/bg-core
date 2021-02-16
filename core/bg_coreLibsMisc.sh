@@ -1183,12 +1183,6 @@ function progressCntr()
 #######################################################################################################################################
 ### From bg_unitTest.sh
 
-# FUNCMAN_SKIP
-function unitTestCntr()
-{
-	import bg_unitTest.sh ;$L1;$L2 || assertError
-	unitTestCntr "$@"
-}
 
 # usage: utEsc [<p1> ...<pN>]
 # usage: cmdline [<p1> ...<pN>]
@@ -1204,6 +1198,7 @@ function utEsc()
 	params=("${params[@]//$'\t'/%09}")
 	params=("${params[@]//$'\n'/%0A}")
 	params=("${params[@]//$'\r'/%0D}")
+	params=("${params[@]//$'*'/%2A}")
 
 	local i; for i in "${!params[@]}"; do
 		[ "${params[$i]}" == "--" ] && params[$i]="%2D%2D"
@@ -1231,6 +1226,7 @@ function utUnEsc()
 	_params=("${_params[@]//%09/$'\t'}")
 	_params=("${_params[@]//%0A/$'\n'}")
 	_params=("${_params[@]//%0D/$'\r'}")
+	_params=("${_params[@]//%2A/$'*'}")
 }
 
 
@@ -1464,84 +1460,87 @@ function debuggerIsInBreak()
 function bgStackGetFrame()
 {
 	local readCodeFlag
+	local fStackName="FUNCNAME"
+	local sStackName="BASH_SOURCE"
+	local lStackName="BASH_LINENO"
+	local acStackName="BASH_ARGC"
+	local avStackName="BASH_ARGV"
+
 	while [ $# -gt 0 ]; do case $1 in
+		--useVars)
+			fStackName="bgFUNCNAME"
+			sStackName="bgBASH_SOURCE"
+			lStackName="bgBASH_LINENO"
+			acStackName="bgBASH_ARGC"
+			avStackName="bgBASH_ARGV"
+			;;
 		--readCode) readCodeFlag="--readCode" ;;
+		--) shift; break ;;
 		+*) break ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local _offsetTerm="${1:-0}"; shift
-	local frameArrayVar="$1"; varIsA mapArray "$frameArrayVar" || assertError -v frameArrayVar "the name of an exiting associative array declared in the callers scope needs to be passed into this function to receive the results. '$frameArrayVar' is not an asociative array (exanple: local -A myArray=())"
+	local frameLocationTerm="$1"; shift
+	local frameArrayVar="$1"; shift
+	local -n frameArray="$frameArrayVar"
 
-	local _functName _offset
-	[[ "$_offsetTerm" =~ ^([a-zA-Z_][^:+-]*)?:?([-+]?[0-9]*)$ ]] || assertError -v _offsetTerm "bad value passed in for the first parameter"
-	local rematch=("${BASH_REMATCH[@]}")
-	_functName="${rematch[1]}"
-	_offset="${rematch[2]}"
+	# default is to use FUNCNAME and offset by 1 to account for this function being on the stack
+	# if an fStack is passed in, dont offset
+	local -n fStack="$fStackName"
+	local -n srcStack="$sStackName"
+	local -n lineStack="$lStackName"
+	local -n argcStack="$acStackName"
+	local -n argvStack="$avStackName"
 
-	local refFrame=0
-	if [ "$_functName" ]; then
-		local i; for ((i=1; i<${#FUNCNAME[@]} && refFrame==0; i++)); do
+#bgtraceVars fStack srcStack lineStack argcStack argvStack
 
-			[ "${FUNCNAME[$i]}" == "$_functName" ] && { refFrame=$i; break; }
-		done
-		# if we did not find _functName on the stack, return 2
-		[ "$refFrame" != 0 ] || return 2
-	else
-		refFrame=1 # 1 is the function that called us
-	fi
+	local targetFrame; bgStackFind --stackVar="$fStackName" -- "$frameLocationTerm" targetFrame
+bgtraceVars -1 "!!! "  targetFrame fStackName frameLocationTerm
 
-	local targetFrame=$(( refFrame+(_offset)))
-
-	local frameSrcFileValue frameFunctionValue frameSrcLineNoValue frameSimpleCmdValue frameSrcLocationValue frameSrcCodeValue framePrintLineValue
-	if [ $targetFrame -eq ${#FUNCNAME[@]} ]; then
-		frameSrcFileValue="terminal"
-		frameSrcLineNoValue="$$"
-		frameFunctionValue="<invoked>"
-		frameSimpleCmdValue="${FUNCNAME[$targetFrame-1]}"
-		frameSrcCodeValue="$bgLibExecSrc"
-		framePrintLineValue=""
-
-	elif [ $targetFrame -lt 0 ] || [ $targetFrame -ge ${#FUNCNAME[@]} ]; then
-		echo "error: bgStackGetFrame: invalid frame spec. targetFrame='$targetFrame' stackSize='${#FUNCNAME[@]}'" >&2
+	if [ ${targetFrame:--1} -lt 0 ] || [ ${targetFrame:-0} -ge ${#fStack[@]} ]; then
+		echo "non-exception error: bgStackGetFrame: invalid frame spec. targetFrame='$targetFrame' stackSize='${#fStack[@]}'" >&2
+		bgtrace "non-exception error: bgStackGetFrame: invalid frame spec. targetFrame='$targetFrame' stackSize='${#fStack[@]}'" >&2
 		return 1
+	fi
+
+
+	if [ ${targetFrame:-0} -eq ${#fStack[@]} ]; then
+		frameArray[srcFile]="terminal"
+		frameArray[srcLineNo]="$$"
+		frameArray[function]="<invoked>"
+		frameArray[simpleCmd]="${fStack[${targetFrame}-1]}"
+		frameArray[srcCode]="$bgLibExecSrc"
+		frameArray[printLine]=""
 
 	else
-		frameSrcFileValue="${BASH_SOURCE[$targetFrame]}"
-		frameFunctionValue="${FUNCNAME[$targetFrame]}"
-		if [ $targetFrame -gt 0 ]; then
-			frameSrcLineNoValue="${BASH_LINENO[$targetFrame-1]}"
-			frameSimpleCmdValue="${FUNCNAME[$targetFrame-1]}"
-		fi
-
+		(( ${targetFrame:-0}+1 < ${#fStack[@]}-1 )) && frameArray[srcFile]="${srcStack[$targetFrame+1]}"
+		frameArray[function]="${fStack[$targetFrame+1]}"
+		frameArray[simpleCmd]="${fStack[$targetFrame]}"
+		frameArray[srcLineNo]="${lineStack[$targetFrame]}"
 	fi
 
+	# add the args to simpleCmd
 	if shopt -q extdebug; then
-		local argcOffset=0 v argc
-		local i; for ((i=0; i<$targetFrame-1; i++)); do
-			argc=${BASH_ARGC[$i]}
-			(( argcOffset+=${argc:-0} ))
+		local argcOffset=0 v argc i
+		for ((i=0; i<${targetFrame:-0}; i++)); do (( argcOffset+=${argcStack[$i]:-0} )); done
+		for ((i=${argcStack[$targetFrame]}-1; i>=0; i-- )); do
+			frameArray[simpleCmd]+=" ${argvStack[argcOffset+$i]}"
 		done
-		argc=${BASH_ARGC[$targetFrame-1]}
-		for (( v=1; v <=${argc:-0}; v++ )); do
-			frameSimpleCmdValue+=" ${BASH_ARGV[$argcOffset+argc-v]}"
-		done
+	else
+		frameArray[simpleCmd]+=" <extdebug off...>"
 	fi
 
-	frameSrcLocationValue="${frameSrcFileValue##*/}:(${frameSrcLineNoValue})"
-	[ "$readCodeFlag" ] && [ -r "$frameSrcFileValue" ] && frameSrcCodeValue="$(sed -n "$frameSrcLineNoValue"'{s/^[[:space:]]*//;p;q}' "$frameSrcFileValue" 2>/dev/null)"
+	# make srcLocation which is the basename of srcFile with the line number added
+	frameArray[srcLocation]="${frameArray[srcFile]##*/}:(${frameArray[srcLineNo]})"
 
-	printf -v framePrintLineValue "%-*s %-*s: %s" \
-		"0" "$frameSrcLocationValue:" \
-		"0"  "$frameFunctionValue()" \
-		"${frameSrcCodeValue:-$frameSimpleCmdValue}"
+	# read the actual source line if called for
+	[ "$readCodeFlag" ] && [ -r "${frameArray[srcFile]}" ] && frameArray[srcCode]="$(sed -n "${frameArray[srcLineNo]}"'{s/^[[:space:]]*//;p;q}' "${frameArray[srcFile]}" 2>/dev/null)"
 
-	setReturnValue "$frameArrayVar[srcFile]"     "$frameSrcFileValue"
-	setReturnValue "$frameArrayVar[srcLineNo]"   "$frameSrcLineNoValue"
-	setReturnValue "$frameArrayVar[srcLocation]" "$frameSrcLocationValue"
-	setReturnValue "$frameArrayVar[function]"    "$frameFunctionValue"
-	setReturnValue "$frameArrayVar[simpleCmd]"   "$frameSimpleCmdValue"
-	setReturnValue "$frameArrayVar[srcCode]"     "$frameSrcCodeValue"
-	setReturnValue "$frameArrayVar[printLine]"   "$framePrintLineValue"
+	# format the standard summary line which describes this stack frame
+	printf -v frameArray[printLine] "%-*s %-*s: %s" \
+		"0" "${frameArray[srcLocation]}:" \
+		"0"  "${frameArray[function]}()" \
+		"${frameArray[srcCode]:-${frameArray[simpleCmd]}}"
+
 	return 0
 }
 
@@ -1953,12 +1952,18 @@ function bgkillTree()
 #   <exitCode>    : the exit code set that the calling process can check to see how the process ended
 function bgExit()
 {
-	local exitCompletelyFlag
+	local exitCompletelyFlag _msg
 	while [ $# -gt 0 ]; do case $1 in
 		--complete|--completely) exitCompletelyFlag="--complete" ;;
+		--msg*)
+			bgOptionGetOpt val: _msg "$@" && shift
+			bgtrace "bgExit: $_msg"
+			echo "bgExit: $_msg" >&2
+			;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local exitCode="$1"
+
 
 	if [ "$$" != "$BASHPID" ] || [ "${FUNCNAME[@]: -1}" == "main" ]; then
 		if [ "$exitCompletelyFlag" ] && [ "$$" != "$BASHPID" ]; then
@@ -2077,8 +2082,8 @@ function BGTRAPExit()
 #            ran at the time of the trap but as the trap handler calls function, the indexes change and its no longer easy to determine
 #            which stack entry that was. The handler script can record the funcDepth (the size of the FUNCNAME array) when the interupt
 #            started running.
-#     LINENO : DEBUGTrap handlers can copy $((LINENO-1)) in its first line which will indicate the line number within the interrupted
-#            function or script that will be exected next. However for all other traps, LINENO is reset to '1' upon entering the trap
+#     LINENO : DEBUG (and ERR?) Trap handlers can copy $((LINENO-1)) in its first line which will indicate the line number within the interrupted
+#            function or script that will be executed next. However for all other traps, LINENO is reset to '1' upon entering the trap
 #            handler so it contains no information about the interupted function.
 #     BASH_COMMAND: bash does not update BASH_COMMAND during a DEBUG Trap and it points to the command that will be executed next in
 #            the interupted function or script. In other trap handlers, BASH_COMMAND has the peculular behavior that only on the first
@@ -2683,8 +2688,6 @@ function command_not_found_handle()
 	# recognize $foo.something... object syntax where the $foo variable is empty
 	if [[ "$cmdName" =~ ^[.[] ]]; then
 		local -A exprFrame; bgStackGetFrame --readCode command_not_found_handle:+1 exprFrame
-		local results="$?"
-		[ ${results:-0} -gt 0 ] && echo "assertObjExpressionError could not find the obj syntax on the stack. exitcode='$results'" >&2;
 		assertError -e127 --critical  --no-funcname -v "objExpression:exprFrame[srcCode]" "empty object variable referenced"
 	fi
 
@@ -2798,8 +2801,23 @@ function command_not_found_handle()
 #                     an <errorDescription> and add context variable for any variable reference in that source line
 function assertError()
 {
+	if varExists _ae_exitCodeLast; then
+		[ -w /dev/tty ] && echo "critical error: an assertError was called during an assertError call." >/dev/tty
+		bgtrace "critical error: an assertError was called during an assertError call."
+		declare -g assertError_EndingScript="1"
+		bgExit --complete ${_ae_exitCode:-37}
+		[ -w /dev/tty ] && echo "error: logic error. bgExit did not stop this line from executing" >/dev/tty
+		bgtrace "error: logic error. bgExit did not stop this line from executing"
+	fi
+
+	# this captures the current stack in a set of bgStack* global vars. It detects and adds trap invocations into the stack
+	# this is also used to freeze the stack so that when we call functions that operate on it, it wont change like the FUNCNAME
+	# and other bash maintained stack vars
+	# --logicalStart=0 means that this assertError call will be the first (zero'th) element in the stack
+	bgStackMakeLogical
+
 	local _ae_exitCodeLast="$?"
-	local _ae_msg _ae_exitCode=36 _ae_actionOverride _ae_contextVarName _ae_catchAction _ae_catchSubshell _ae_frameOffset
+	local _ae_msg _ae_exitCode=36 _ae_actionOverride _ae_contextVarName _ae_catchAction _ae_catchSubshell _ae_frameOffsetTerm=1
 	local -A _ae_dFiles _ae_contextVarsCheck=([empty]=1)
 	local _ae_dFilesList _ae_contextVars _ae_contextOutput _ea_allStack _ae_noFuncnameFlag _ae_sourceAndArgsFlag _ae_stackDebugFlag
 	local _ae_traceCatchFlag
@@ -2864,8 +2882,14 @@ function assertError()
 			_ae_dFilesList+=" $_ae_label"
 			;;
 		--allStack) _ea_allStack="--allStack" ;;
-		--frameOffest*) bgOptionGetOpt val: _ae_frameOffset "$@" && shift ;;
+		--frameOffset*) bgOptionGetOpt val: _ae_frameOffsetTerm "$@" && shift ;;
 	esac; shift; done
+
+
+
+	##############################################
+	### assemble the context
+
 
 	# this adjusts the message format so that convenient source code formatting of the msg text over multiple lines will produce
 	# pretty output for the user.
@@ -2873,22 +2897,29 @@ function assertError()
 	# that are referenced in the line to the _ae_contextVars array
 	assertDefaultFormatter "$@"
 
-	# _ae_failingFunctionName will be that name of the function that called the first assert. That is the function in which the error ocured
-	# _ae_stackFrameStart will control where the stack print will start. We want that to include the first assert function so we -1
-	# --frameOffest (_ae_frameOffset) allows the caller declare the some number of functions on the stack should be skipped too
-	# --allStack (_ea_allStack) makes the render algorithm ignore _ae_frameOffset and show everything including this function
-	local i _ae_failingFunctionName="" _ae_assertFunctionName
 
-# # this loop now seems defunct because _ae_failingFunctionName is overwritten right after it
-# 	local i; for i in "${!FUNCNAME[@]}"; do
-# 		if [ ! "$_ae_failingFunctionName" ] && [[ ! "${FUNCNAME[$i]}" =~ ^[aA]ssert|^[a-zA-Z][a-z]*Assert|^_ ]]; then
-# 			_ae_failingFunctionName="${FUNCNAME[$i]}"
-# 			break
-# 		fi
-# 	done
-	local _ae_stackFrameStart=$(( (i+_ae_frameOffset-1<0)?0:i+_ae_frameOffset-1 ))
-	_ae_failingFunctionName="${FUNCNAME[_ae_stackFrameStart+1]}"
-	_ae_assertFunctionName="${FUNCNAME[_ae_stackFrameStart]}"
+	# find the name of the first assert* function that led to this assertError being called. An assert* function might be implemented
+	# by calling another assert*  function which ultimately calls this one.
+	local _ae_idxOfAssertFunc _ae_assertFunctionName
+	for ((_ae_idxOfAssertFunc=0; _ae_idxOfAssertFunc<${#bgStackFunction[@]}; _ae_idxOfAssertFunc++)); do
+		[[ ! "${bgStackFunction[$_ae_idxOfAssertFunc]}" =~ ^[aA]ssert ]] && break;
+		_ae_assertFunctionName="${bgStackFunction[$_ae_idxOfAssertFunc]}"
+	done
+
+	# if _ae_frameOffsetTerm does not specify a functionName to use as the reference, use _ae_assertFunctionName as the reference
+	[[ "$_ae_frameOffsetTerm" =~ ^[+-]?[0-9]*$ ]] && _ae_frameOffsetTerm="${_ae_assertFunctionName}:${_ae_frameOffsetTerm}"
+
+	# use _ae_frameOffsetTerm to get the logical frame start which is the _ae_failingFunctionName frame
+	# _ae_stackFrameStart will control where the stack print will start. We want that to include the first assert function so we -1
+	local _ae_stackFrameStart; bgStackFind --stackVar=bgStackFunction -- "$_ae_frameOffsetTerm" _ae_stackFrameStart
+
+	# _ae_failingFunctionName is the one identified by the _ae_frameOffsetTerm and will be the function that appears in the message
+	# displyed to the user. It will typically be one that called the first assert but sometimes there are non-assert plumbing
+	# functions that should be skipped. For example, bgOptionsEndLoop uses this to change _ae_failingFunctionName to the function
+	# that called it instead of itself.
+	local _ae_failingFunctionName="${bgStackFunction[$_ae_stackFrameStart]}"
+
+#bgtraceVars -1  _ae_stackFrameStart _ae_assertFunctionName _ae_failingFunctionName
 
 	# 'main' is a fine label for the stack traces but for the name we display in errors, we need to be in the context of people who
 	# run scripts
@@ -2901,12 +2932,15 @@ function assertError()
 	# the caller can use the --critical, --exitOneShell, or --continue options to override the action
 	[ "$_ae_actionOverride" ] && tryStateAction="$_ae_actionOverride"
 
-	### write the error to stderr or to $assertOut
-	# the () are because we might redirect stderr for this block
-	# TODO: alternative to () -- create a FD to stream these output to. either exec {errorFD}>$asertOut or asertOut=2 then echo ".." >&$errorFD
 
-	local ae_outFD=2
-	[ "${tryStateAction}" == "catch" ] && exec {ae_outFD}>$assertOut.catchDescription
+
+
+	##############################################
+	### format and write the error message
+
+	# ae_outFD is the FD that we write the error message to. It will be stdout normally or the file $assertOut.catchDescription
+	# if we are going to catch the exception.
+	local ae_outFD=2; [ "${tryStateAction}" == "catch" ] && exec {ae_outFD}>$assertOut.catchDescription
 
 	echo >&$ae_outFD
 	if [ ! "$_ae_noFuncnameFlag" ]; then
@@ -2933,24 +2967,34 @@ function assertError()
 		' "${_ae_contextOutput}" >&$ae_outFD
 	fi
 
-	# for debugging the bgStackMakeLogical function, uncomment this line to dump the raw data to the bgtrace
-	#bgStackDump >>$_bgtraceFile
+	# write a blank line at the end and close the FD if we openned it.
+	# we only write the blank line if bgtrace is not set to stdout because in the next section we write the stack to bgtrace and
+	# if they are going to the same place, we dont want to separate them.
+	[ "$_bgtraceFile" != "/dev/stderr" ] && echo >&$ae_outFD
+	[ ${ae_outFD:-0} -ne 2 ] && exec {ae_outFD}>&-
 
-	# write the stack to bgtrace if active
-	# TODO: save the stack trace in assertOut and then have Catch parse and create an e[] object that includes it
-	#       for the Catch block to access.
+
+
+
+	##############################################
+	### format and write information bgtrace output
+
+	# write the stack to bgtrace
 	# We write the stack to bgtrace even if we are catching the exception b/c a pipeline might cause several
 	# exceptions and only the last one will make it into assertOut so bgtrace might be the only place to see some
-	bgtraceIsActive && [ ! "$bgAssertErrorInhibitTrace" ] && bgStackTrace $_ea_allStack $bgErrorStack $_ae_sourceAndArgsFlag $_ae_stackDebugFlag --logicalStart=$((_ae_stackFrameStart))
-	[ "$bgAssertErrorTMPSIGNALTRIGGERED" ] && bgStackDump >> $_bgtraceFile
+	# The unit test runner uses bgAssertErrorInhibitTrace to prevent many expected exceptions from spamming the bgtrace output
+	bgtraceIsActive && [ ! "$bgAssertErrorInhibitTrace" ] && bgStackTrace --useVars $_ea_allStack $bgErrorStack $_ae_sourceAndArgsFlag $_ae_stackDebugFlag --logicalStart=$((_ae_stackFrameStart))
+
+	# optionally write the raw stack dump to debug the logical stack
+	{ [ "$bgAssertErrorTMPSIGNALTRIGGERED" ] || [ "$_ae_stackDebugFlag" ]; } && bgStackDump >> $_bgtraceFile
 
 	# include the proccess tree of the script when bgtrace is active
 	bgtraceIsActive && [ ! "$bgAssertErrorInhibitTrace" ] && bgtracePSTree
 
-	# write a blank line after the bgStackTrace b/c it might be set to stderr (typical for sysadmins to see what the error is)
-	echo >&$ae_outFD
 
 
+
+	##############################################
 	### Perform the script Flow action
 
 	# if this exception is not being caught, check to see if we should invoke the debugger
@@ -3003,29 +3047,18 @@ function assertError()
 
 			## Record the state at this point that the exception is being raised
 
-			declare -ag _catch_stkArrayRaw catch_stkArray; bgStackGet _catch_stkArrayRaw catch_stkArray
 			declare -g catch_psTree; bgGetPSTree "$$" catch_psTree
 			declare -gx	catch_errorCode="$_ae_exitCode"
 			declare -gx	catch_errorClass="$_ae_assertFunctionName"
+			declare -gx	catch_errorFn="$_ae_failingFunctionName"
 			declare -gx	catch_errorDescription="$(cat $assertOut.catchDescription)"
 
 			## record the state in $assertOut.* files if catch that is receiving this exception is in a different subshell
 			if [ "$BASHPID" != "$tryStatePID"  ]; then
-				echo -n >$assertOut.stkArray
-				for _ae_stkFrame in "${catch_stkArray[@]}"; do
-					echo "$_ae_stkFrame" >>$assertOut.stkArray
-				done
-
-				echo -n >$assertOut.stkArrayRaw
-				for _ae_stkFrame in "${_catch_stkArrayRaw[@]}"; do
-					echo "$_ae_stkFrame" >>$assertOut.stkArrayRaw
-				done
-
-				bgGetPSTree "$$" >>$assertOut.psTree
-
-				echo "$catch_errorCode $catch_errorClass" >>$assertOut.errorInfo
+				bgStackMarshal --file="$assertOut.stkArrayRaw"
+				echo "$catch_psTree" >"$assertOut.psTree"
+				echo "$catch_errorCode $catch_errorClass $catch_errorFn" >>$assertOut.errorInfo
 			else
-				[ -f "$assertOut.stkArray" ]    && rm "$assertOut.stkArray"
 				[ -f "$assertOut.stkArrayRaw" ] && rm "$assertOut.stkArrayRaw"
 				[ -f "$assertOut.psTree" ]      && rm "$assertOut.psTree"
 				[ -f "$assertOut.errorInfo" ]   && rm "$assertOut.errorInfo"
@@ -3056,6 +3089,8 @@ function assertError()
 			;;
 	esac
 }
+
+
 
 # usage: assertNotEmpty <varToTest> [options] [params]
 # assert that the specified variable is not empty
@@ -3153,6 +3188,7 @@ function Try()
 	catch_errorCode=""
 	catch_errorDescription=""
 	catch_errorClass=""
+	catch_errorFn=""
 
 	# collect the current state
 	local tryStatePID="$BASHPID"
@@ -3203,6 +3239,7 @@ function Try()
 		set +o errtrace # extdebug turns this on but unit tests need it off
 	'
 	[ "$traceCatchFlag" ] && bgtrace "!!! Try: installed SIGUSR2 in pid='$BASHPID'"
+	return 0
 }
 
 
@@ -3220,18 +3257,17 @@ function Try()
 # The Error Path:
 # The <errorPathCode...> in the usage synteax will be executed only when an exception is caught by that Catch:
 # Inside this block some global variables starting with catch_* describe the state of the exception being caught.
+#    bgStack*               : these stack variables are set with the state of the stack at the point where assertError was called
+#                             "bgtraceStack --useVars"  and "bgStackPrint --useVars" to print the stack
 #    catch_errorCode        : the numeric exist code being thrown. If the exception was uncaught, this would be the exit code of the
 #                             process
 #    catch_errorDescription : The formatted text of the exception. If the exception was uncaught, this would be the text printed to
 #                             stderr
 #    catch_errorClass       : This is the name of the assert* function that raised the exception. assertError is the most generic
-#    catch_stkArray         : each element of this array is a formatted string representing one stack frame.
+#    catch_errorFn          : This is the name of the function on the stack that contains the error. It is typicaly the function
+#                             that invoked the catch_errorFn but that can be changed by using the --frameOffset option.
 #    catch_psTree           : a string  containing the pstree output of the script at the point that the assert was raised. This
 #                             shows the state of subshells and spawn async commands.
-#    _catch_stkArrayRaw     : The first element [0] contains some information about the whole stack.
-#        read -r bgStackSize bgStackLogicalFramesStart bgStackSrcLocationMaxLen bgStackFunctionMaxLen bgStackSrcCodeMaxLen <<< "${_catch_stkArrayRaw[0]}"
-#                             Each of the other elements refer to one stack frame.
-#        read -r bgStackSrcFile bgStackSrcLineNo bgStackSrcLocation bgStackSimpleCmd bgStackFrameType bgStackSrcCode bgStackFunction bgStackLine bgStackLineWithSimpleCmd bgStackBashStkFrm <<< "${_catch_stkArrayRaw[$i]}"
 # Exit Code:
 #    0: (true) error path. This means that this Catch: statement is catching an error.
 #    1: (false) normal path. This Catch: statement is not catching an exception.
@@ -3301,14 +3337,11 @@ function Catch()
 	# The pattern is Catch: && { <catchCodeBlocl>; } so return 0(true) when we caught an exception
 	if [ "$tryStateWasThrown" ]; then
 		# if the exception was thrown from a subshell, restore the information from the $assertOut.* files into the vars in this PID
-		if [ -f $assertOut.stkArray ]; then
-			declare -ag _catch_stkArrayRaw catch_stkArray
-			mapfile catch_stkArray <$assertOut.stkArray
-			catch_stkArray=("${catch_stkArray[@]%$'\n'}")
-			mapfile _catch_stkArrayRaw <$assertOut.stkArrayRaw
+		if [ -f $assertOut.stkArrayRaw ]; then
+			bgStackUnMarshal --file="$assertOut.stkArrayRaw"
 			declare -g catch_psTree; IFS= read -r -d '' catch_psTree <$assertOut.psTree
-			declare -gx	catch_errorCode catch_errorClass
-			read -r catch_errorCode catch_errorClass <$assertOut.errorInfo
+			declare -gx	catch_errorCode catch_errorClass catch_errorFn
+			read -r catch_errorCode catch_errorClass catch_errorFn <$assertOut.errorInfo
 			declare -gx	catch_errorDescription="$(cat $assertOut.catchDescription)"
 		fi
 		return 0

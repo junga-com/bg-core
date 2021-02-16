@@ -7,7 +7,6 @@
 * add a bg-db() function to bg-debugCntr so that `bg-db <myscript>` invokes the debugger
 * add bg-debugCntr debugger stopOnAssert:(on|off)
 * reverse the driection of bgtraceStack traces to match the that of the debugger. Should be script at the top
-* make unitTestCntr an on-demand core function
 * bgtraceBreak stops inside system code instead of a the the line after bgtraceBreak
 * make funcman collect Environment: sections and BGENV: tags and create an agregate documentation
 * fix bg-debugCntr listCodeFiles
@@ -20,6 +19,7 @@
 * assertError: add "Throw: assertError" and "Rethrow:" syntax function
 * assertError: support catching specific exceptions
 * bring over bg_plugins.sh
+(done)* make unitTestCntr an on-demand core function
 (done) * break out progress from cui.sh to separate library script
 (done) * unitTest: support ut_<func> without parameters. it ut_<func>: would run it without any params
 (done) * unitTest: finish test runner in "bg-dev tests"

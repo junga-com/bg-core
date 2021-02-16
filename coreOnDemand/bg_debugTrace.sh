@@ -346,10 +346,11 @@ function bgtraceStack()
 {
 	bgtraceIsActive || return 0
 
-	local noSrcLookupFlag allStack onelineFlag argValuesFlag sourceAndArgsFlag stackDebugFlag
+	local noSrcLookupFlag allStack onelineFlag argValuesFlag sourceAndArgsFlag stackDebugFlag useVarsFlag
 	local logicalFrameStart=1; [ "${FUNCNAME[1]}" == "bgStackTrace" ] && ((logicalFrameStart++))
 	while [ $# -gt 0 ]; do case $1 in
 		--allStack) allStack="--allStack" ;;
+		--useVars)  useVarsFlag="--useVars"  ;;
 		--fromAlias) ((logicalFrameStart++)) ;;
 		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
 		--stackDebug)  stackDebugFlag="--stackDebug" ;;
@@ -362,7 +363,7 @@ function bgtraceStack()
 	import bg_debugStack.sh ;$L1;$L2
 	echo >>$_bgtraceFile
 	echo >>$_bgtraceFile
-	bgStackPrint $allStack $noSrcLookupFlag $onelineFlag $argValuesFlag $sourceAndArgsFlag $stackDebugFlag --logicalStart+$logicalFrameStart >>$_bgtraceFile
+	bgStackPrint $useVarsFlag $allStack $noSrcLookupFlag $onelineFlag $argValuesFlag $sourceAndArgsFlag $stackDebugFlag --logicalStart+$logicalFrameStart >>$_bgtraceFile
 }
 
 

@@ -1,0 +1,98 @@
+#!/usr/bin/env bg-utRunner
+
+declare -A ut_bgStackFind=(
+	[0]="$(cmdLine "")"
+	[1]="$(cmdLine "1")"
+	[2]="$(cmdLine "2")"
+	[3]="$(cmdLine "3")"
+	[tooHigh]="$(cmdLine "40")"
+	[tooLow]="$(cmdLine -- "-40")"
+	[byName]="$(cmdLine "c3")"
+	[byNameAndOffset]="$(cmdLine "c3:1")"
+	[byNameAndOffsetPlus]="$(cmdLine "c3:+1")"
+	[byNameAndTooLow]="$(cmdLine "c3:-100")"
+	[byNameAndEmpty]="$(cmdLine "c3:")"
+	[byNameAndOffsetNeg]="$(cmdLine "c3:-1")"
+	[byNameReg]="$(cmdLine "c.*")"
+	[byNameRegOffset]="$(cmdLine "c.*:1")"
+	[byNameNotFound]="$(cmdLine "somethingNotOnStack")"
+	[byNameAny]="$(cmdLine ".*")"
+)
+function ut_bgStackFind()
+{
+	ut setup
+	eval 'function a1() {
+		local level; bgStackFind "$@" level
+		local funcname=("${FUNCNAME[@]:0:5}" "<main>")
+		printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFind "'"$*"'" = [$level]="${funcname[$level]}
+	}'
+	function b2() { a1 "$@"; }          ; :
+	function c3() { b2 "$@"; }          ; :
+	function d4() { c3 "$@"; }          ; :
+	type a1
+
+	ut test
+	ut expect "that the identified frame reflects '$*', the argument passed to bgStackFind"
+	d4 "$@"
+}
+
+function ut_bgStackFind2()
+{
+	ut setup
+	function assertA1() { bgStackFind "assert.*" level; fname="${FUNCNAME[$level]}" ; printfVars fname; } ; :
+	function assertB2() { assertA1 "$@"; }          ; :
+	function assertC3() { assertB2 "$@"; }          ; :
+	function d4() { assertC3 "$@"; }          ; :
+	type assertA1
+
+	ut test
+	ut expect "that fname is assertC3 which is the last consequetive assert* function on the stack"
+	d4 "$@"
+}
+
+
+
+
+declare -A ut_bgStackGetFrame=(
+	[default]="$(cmdLine "")"
+	[0]="$(cmdLine "0")"
+	[1]="$(cmdLine "1")"
+	[2]="$(cmdLine "2")"
+	[tooHigh]="$(cmdLine "40")"
+	[tooLow]="$(cmdLine -- "-40")"
+	[byName]="$(cmdLine "c3")"
+)
+function ut_bgStackGetFrame()
+{
+	ut setup
+	eval 'function a1() { local -A frame; bgStackGetFrame "$@" frame; printfVars frame; }'
+	function b2() { a1 "$@"; }          ; :
+	function c3() { b2 "$@"; }          ; :
+	function d4() { c3 "$@"; }          ; :
+	type a1
+
+	ut test
+	ut expect "that the frame printed reflects '$*', the argument passed to bgStackGetFrame"
+	d4 "$@"
+}
+
+
+function ut_bgStackMarshal()
+{
+	ut setup
+	local tmpFile; bgmktemp tmpFile
+
+	function a1() { bgStackMakeLogical; bgStackMarshal --file="$tmpFile"; } ; :
+	function b2() { a1 "$@"; }          ; :
+	function c3() { b2 "$@"; }          ; :
+	function d4() { c3 "$@"; }          ; :
+
+	ut test
+	d4
+	ut expect "that the stack performed on the next line begins with this function "
+	bgStackMakeLogical; echo "   [0] ${bgStackLine[0]}"
+
+	ut expect "that now after restoring stack saved in function a1, the stack variables reflect the stack from that place "
+	bgStackUnMarshal --file="$tmpFile"
+	for ((i=0; i<5; i++)); do echo "   [$i] ${bgStackLine[$i]}"; done
+}

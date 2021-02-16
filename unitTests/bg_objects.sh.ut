@@ -452,3 +452,11 @@ function ut_Object_memberVarReadAccess() {
 		printfVars catch_errorClass catch_errorCode catch_errorDescription
 	}
 }
+
+function ut_expressionErrors() {
+	ut setup
+	ConstructObject Object obj
+
+	ut test
+	$obj.:foo
+}

@@ -157,7 +157,6 @@ stderr>          [anyKeyCols       ]=' '
 stderr>          [_CLASS           ]='schemaInfo'
 stderr>          [awkObjName       ]='type1'
 stderr>          [fmtStr           ]='%10s %5s %13s'
-stderr>          [schemaFileRead   ]='yes'
 stderr>       normKey=<array>
 stderr>       colWithWidths=<array>
 stderr>          [1]='one(10)'

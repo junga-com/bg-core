@@ -1633,15 +1633,9 @@ function _bgclassCall()
 
 function assertObjExpressionError()
 {
-	local -A exprFrame
-	if [[ "${FUNCNAME[*]}" =~ \ command_not_found_handle\  ]]; then
-		bgStackGetFrame --readCode command_not_found_handle:+1 exprFrame
-	else
-		bgStackGetFrame --readCode _bgclassCall:+1 exprFrame
-	fi
-	local results="$?"
+	local -A exprFrame; bgStackGetFrame --readCode _bgclassCall:+1 exprFrame; local results="$?"
 	[ ${results:-0} -gt 0 ] && echo "assertObjExpressionError could not find the obj syntax on the stack. exitcode='$results'" >&2;
-	assertError -v "objExpression:exprFrame[srcCode]" "$@"
+	assertError --frameOffset="_bgclassCall:+1" -v "objExpression:exprFrame[srcCode]" "$@"
 }
 
 function assertThisRefError()

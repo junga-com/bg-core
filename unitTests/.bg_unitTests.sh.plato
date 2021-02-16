@@ -100,6 +100,7 @@ one more thing...
 ##     | cmd> assertError "bad setup"
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
+   catch_errorFn='ut_setupError3'
    catch_errorCode='36'
    catch_errorDescription='
                            error: ut_setupError3: bad setup'
@@ -144,6 +145,7 @@ cmd> exit 2
 cmd> assertError "this is an error"
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
+   catch_errorFn='ut_assertInTest'
    catch_errorCode='36'
    catch_errorDescription='
                            error: ut_assertInTest: this is an error'

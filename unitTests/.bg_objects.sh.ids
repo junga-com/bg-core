@@ -38,3 +38,4 @@ Object_chainCallSyntax:
 Object_equalsOp: 
 Object_virtualCallSyntax: 
 Object_memberVarReadAccess: 
+expressionErrors: 

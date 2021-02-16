@@ -380,7 +380,7 @@ argsV[]
 ##----------
 ## test
 cmd> echo Object ${Object[subClasses]}
-Object Class Stack Array Map
+Object Class NullObject Stack Array Map
 cmd> local class; for class in Object ${Object[subClasses]}; do
 cmd> showClass "$class"
 #
@@ -408,6 +408,7 @@ Object[]
       [              ] +Object::getIndexes
       [              ] +Object::getMethods
       [              ] +Object::getSize
+      [              ] +Object::getStaticMethods
       [              ] +Object::getValues
       [              ] +Object::hasMethod
       [              ] +Object::restoreFile
@@ -416,34 +417,35 @@ Object[]
       [              ] +Object::toDebControl
       [              ] +Object::toFlatINI
       [              ] +Object::toString'
-      [subClasses    ]='Class Stack Array Map'
+      [subClasses    ]='Class NullObject Stack Array Map'
       [staticMethods ]=''
       [name          ]='Object'
       [_OID          ]='Object'
 #     
 Object_vmt[]
-      [_method::fromFlatINI   ]='Object::fromFlatINI'
-      [_method::getValues     ]='Object::getValues'
-      [_method::hasMethod     ]='Object::hasMethod'
-      [_method::getAttributes ]='Object::getAttributes'
-      [_method::toFlatINI     ]='Object::toFlatINI'
-      [_method::restoreFile   ]='Object::restoreFile'
-      [_method::getSize       ]='Object::getSize'
-      [_method::fromDebControl]='Object::fromDebControl'
-      [_method::getMethods    ]='Object::getMethods'
-      [_method::eval          ]='Object::eval'
-      [_method::fromINI       ]='Object::fromINI'
-      [_method::saveFile      ]='Object::saveFile'
-      [_method::getIndexes    ]='Object::getIndexes'
-      [_method::clone         ]='Object::clone'
-      [_method::toString      ]='Object::toString'
-      [_method::addMethod     ]='Object::addMethod'
-      [_method::toDebControl  ]='Object::toDebControl'
-      [_method::fromString    ]='Object::fromString'
-      [_method::set           ]='Object::set'
-      [_method::bgtrace       ]='Object::bgtrace'
-      [_method::get           ]='Object::get'
-      [_method::clear         ]='Object::clear'
+      [_method::fromFlatINI     ]='Object::fromFlatINI'
+      [_method::getValues       ]='Object::getValues'
+      [_method::hasMethod       ]='Object::hasMethod'
+      [_method::getAttributes   ]='Object::getAttributes'
+      [_method::toFlatINI       ]='Object::toFlatINI'
+      [_method::restoreFile     ]='Object::restoreFile'
+      [_method::getSize         ]='Object::getSize'
+      [_method::fromDebControl  ]='Object::fromDebControl'
+      [_method::getMethods      ]='Object::getMethods'
+      [_method::eval            ]='Object::eval'
+      [_method::fromINI         ]='Object::fromINI'
+      [_method::saveFile        ]='Object::saveFile'
+      [_method::getIndexes      ]='Object::getIndexes'
+      [_method::clone           ]='Object::clone'
+      [_method::toString        ]='Object::toString'
+      [_method::addMethod       ]='Object::addMethod'
+      [_method::toDebControl    ]='Object::toDebControl'
+      [_method::fromString      ]='Object::fromString'
+      [_method::set             ]='Object::set'
+      [_method::bgtrace         ]='Object::bgtrace'
+      [_method::get             ]='Object::get'
+      [_method::clear           ]='Object::clear'
+      [_method::getStaticMethods]='Object::getStaticMethods'
 
 cmd> local class; for class in Object ${Object[subClasses]}; do
 cmd> showClass "$class"
@@ -452,19 +454,21 @@ cmd> showClass "$class"
 #------------------ Class --------------------
 global array vars: Class Class_vmt
 Class[]
-     [baseClass     ]='Object'
-     [_CLASS        ]='Class'
-     [0             ]='_bgclassCall Class Class 0 |'
-     [_Ref          ]='_bgclassCall Class Class 0 |'
-     [classHierarchy]='Object Class'
-     [vmtCacheNum   ]=<redacted>
-     [methods       ]='Class::__construct
-     [              ] +Class::getClassMethods
-     [              ] +Class::isDerivedFrom
-     [              ] +Class::reloadMethods'
-     [staticMethods ]=''
-     [name          ]='Class'
-     [_OID          ]='Class'
+     [baseClass        ]='Object'
+     [_CLASS           ]='Class'
+     [0                ]='_bgclassCall Class Class 0 |'
+     [_Ref             ]='_bgclassCall Class Class 0 |'
+     [pendingClassCtors]=''
+     [classHierarchy   ]='Object Class'
+     [vmtCacheNum      ]=<redacted>
+     [methods          ]='Class::__construct
+     [                 ] +Class::getClassMethods
+     [                 ] +Class::getClassStaticMethods
+     [                 ] +Class::isDerivedFrom
+     [                 ] +Class::reloadMethods'
+     [staticMethods    ]=''
+     [name             ]='Class'
+     [_OID             ]='Class'
 #    
 Class_vmt[]
      [_method::fromFlatINI    ]='Object::fromFlatINI'
@@ -494,6 +498,27 @@ Class_vmt[]
      [_method::isDerivedFrom  ]='Class::isDerivedFrom'
      [_method::clear          ]='Object::clear'
 
+cmd> local class; for class in Object ${Object[subClasses]}; do
+cmd> showClass "$class"
+#
+#
+#------------------ NullObject --------------------
+global array vars: NullObject NullObjectInstance
+NullObject[]
+          [baseClass     ]='Object'
+          [_CLASS        ]='Class'
+          [0             ]='_bgclassCall NullObject Class 0 |'
+          [_Ref          ]='_bgclassCall NullObject Class 0 |'
+          [classHierarchy]='Object NullObject'
+          [name          ]='NullObject'
+          [_OID          ]='NullObject'
+#         
+NullObject_vmt[]
+NullObjectInstance[]
+          [_CLASS]='NullObject'
+          [_Ref  ]='assertError Null Object reference called <NULL>'
+          [0     ]='assertError Null Object reference called <NULL>'
+          [_OID  ]='NullObjectInstance'
 cmd> local class; for class in Object ${Object[subClasses]}; do
 cmd> showClass "$class"
 #
@@ -600,7 +625,7 @@ no
 cmd> $Animal.getClassMethods
 speak feed pet
 cmd> $Animal.getClassMethods -i
-get speak hasMethod fromINI addMethod getAttributes toDebControl fromFlatINI restoreFile clear fromString bgtrace fromDebControl toString set eval toFlatINI getValues getSize getMethods saveFile feed getIndexes clone pet
+get speak hasMethod fromINI addMethod getAttributes toDebControl fromFlatINI restoreFile clear fromString bgtrace getStaticMethods fromDebControl toString set eval toFlatINI getValues getSize getMethods saveFile feed getIndexes clone pet
 cmd> $Animal.getClassMethods -d$'\n'
 speak
 feed
@@ -784,7 +809,9 @@ cmd> printfVars a2
 a2 : <instance> of Map
 cmd> a2OID=([one]=1 [two]=2 [three]=3)
 cmd> $a2.getIndexes
-two three one
+two
+three
+one
 cmd> printfVars a2
 a2 : <instance> of Map
   two  =2

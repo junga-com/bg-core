@@ -2,17 +2,17 @@
 
 # Library
 # FUNCMAN_NO_FUNCTION_LIST
-# usage: # define one or more ut_* functions
+# usage: #!/usr/bin/env bg-utRunner
+#        # import script libraries as needed
+#        # define one or more ut_* functions
 #        function ut_myTest() { ...}
-#        # make this the last line of the ut script file
-#        unitTestCntr "$@"
 # This is a bash script library that is imported only by bash unit test script files.
 # A script follows these requirements to become a valid test script that can be ran under the unit test framework.
-#    1) the file should be in its project's ./unitTests/ folder and end in the .ut extension.
+#    1) the file should end in the .ut extension so that bash completion will work.
 #    2) make the file executable (chmode a+x uitTests/<file>.ut)
-#    3) import bg_unitTest.sh ;$L1;$L2
+#    3) use "#!/usr/bin/env bg-utRunner" as the shebang line at the top of the script
 #    4) define one or more functions starting with ut_
-#    5) at the end of the file call unitTestCntr "$@"
+#    5) the file should be in its project's ./unitTests/ folder to participate in the "bg-dev tests..." system
 #
 # This pattern produces a script that can be invoked like a command for development or invoked within the unit test framework via
 # "bg-dev tests".
@@ -110,20 +110,6 @@ assertNotEmpty bgUnitTestScript
 # the functions defined in this section are always included so that they are available regardless of whether the ut script is
 # executed directly or sourced by the unit test framework
 
-# usage: unitTestCntr <spec>
-# usage: unitTestCntr "$@"
-# This function is called at the end of each unit test script file passing in any arguments that the script was invoked with.
-# When a ut script is invoked directly, it implements various commands to query and invoke the unit test cases contained in the file.
-# When a ut script is sourced by the unit test framework, this function returns without doing anything.
-function unitTestCntr()
-{
-	# if we are being sourced, the utRuntime will manage the unit tests so just return
-	if [ "$bgUnitTestMode" == "utRuntime" ]; then
-		return
-	else
-		utfDirectScriptRun "$@"
-	fi
-}
 
 # usage: ut <event> ...
 # The ut function monitors and manages the state of the running testcase. The testcase author calls it to signal entering 'setup'
@@ -304,7 +290,7 @@ function ut()
 		printf "** Exception thrown by testcase **\n"
 		#catch_errorDescription="${catch_errorDescription##$'\n'}"
 		#printfVars "   " ${!catch_*}
-		printfVars "   " catch_errorClass catch_errorCode catch_errorDescription
+		printfVars "   " catch_errorClass catch_errorFn catch_errorCode catch_errorDescription
 		if [ "$_utRun_section" == "setup" ]; then
 			[ "$_utRun_expectSetupFail"  ] || printfVars catch_stkArray catch_psTree
 		 	ut setupFailed;

@@ -1,7 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bg-utRunner
 
-source /usr/lib/bg_core.sh
-import bg_unitTest.sh ;$L1;$L2
 
 ut_pathGetCanonStr=(
    [0]="$(cmdLine '
@@ -92,9 +90,3 @@ ut_pathGetCanonStr() {
 	ut test
 	echo "$1" | awk "$awkScript" 2>&1
 }
-
-
-
-
-# this should be the last line of any ut script
-unitTestCntr "$@"

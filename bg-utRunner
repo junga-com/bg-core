@@ -15,7 +15,7 @@ source "$bgUnitTestScript"
 #	echo "'$1'"; shift
 #done
 
-unitTestCntr "$@"
+utfDirectScriptRun "$@"
 
 
 # Command
@@ -27,4 +27,3 @@ unitTestCntr "$@"
 # Typically, you never run this command directly but instead set it as the shebang script processor of script library files so
 # that they can be ran directly as commands themselves to directly test the output.
 #
- 

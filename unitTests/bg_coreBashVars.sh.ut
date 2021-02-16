@@ -100,17 +100,20 @@ function ut_varOutput() {
 	local strVar="initial value"
 	local -a arrayVar=(initial value)
 	local -A setVar=([initial]="" [value]="")
-	echo "$@"
+	echo "'$1' '$2' '$3' '$4'"
 
 	ut test
 	varOutput "$@"
+	varOutput -1 "$@"
 	varOutput +1 "$@"
 	varOutput -d'|' "$@"
 
 	ut test
 	varOutput -a -RstrVar   "$@"; printfVars strVar
+	varOutput -a -1 -RstrVar   "$@"; printfVars strVar
 	varOutput -a +1 -RstrVar   "$@"; printfVars strVar
 	varOutput -RstrVar   "$@"; printfVars strVar
+	varOutput -1 -RstrVar   "$@"; printfVars strVar
 	varOutput +1 -RstrVar   "$@"; printfVars strVar
 
 	ut test

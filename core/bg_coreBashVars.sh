@@ -717,7 +717,7 @@ function arrayPush()
 # remove the last element and return its value
 function arrayPop()
 {
-	local -n aa_varRef="$1"; shift
+	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"; shift
 	local aa_value="${aa_varRef[@]: -1}"
 	aa_varRef=("${aa_varRef[@]: 0 : ${#aa_varRef[@]}-1}")
 	returnValue "$aa_value" $1
@@ -727,7 +727,7 @@ function arrayPop()
 # grows the array by inserting <value> at the start
 function arrayShift()
 {
-	local -n aa_varRef="$1"; shift
+	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"; shift
 	aa_varRef=("$@" "${aa_varRef[@]}")
 }
 
@@ -735,7 +735,7 @@ function arrayShift()
 # remove the first element and return its value
 function arrayUnshift()
 {
-	local -n aa_varRef="$1"; shift
+	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"; shift
 	local aa_value="${aa_varRef[@]:0:1}"
 	aa_varRef=("${aa_varRef[@]:1}")
 	returnValue "$aa_value" $1
@@ -744,7 +744,7 @@ function arrayUnshift()
 # usage: arrayClear <varName>
 function arrayClear()
 {
-	local -n aa_varRef="$1"; shift
+	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"; shift
 	aa_varRef=();
 }
 
@@ -752,13 +752,13 @@ function arrayClear()
 # returns the number of elements
 function arraySize()
 {
-	local -n aa_varRef="$1"; shift
+	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"; shift
 	returnValue "${#aa_varRef[@]}" $1
 }
 
 
 # usage: setAdd <setVarName> <key> [...<keyN>]
-# uses the keys of an associateive array as a Set data structure
+# part of a family of functions that use the keys of an associateive array as a Set data structure
 # Example:
 #    local -A mySet
 #    setAdd mySet dog
@@ -779,7 +779,7 @@ function setAdd()
 }
 
 # usage: setHas <setVarName> <key>
-# uses the keys of an associateive array as a Set data structure
+# part of a family of functions that use the keys of an associateive array as a Set data structure
 # Example:
 #    local -A mySet
 #    setAdd mySet dog
@@ -797,8 +797,8 @@ function setHas()
 	[ "${!sr_tmpname+exists}" ]
 }
 
-# usage: setDelete <setVarName> <key>
-# uses the keys of an associateive array as a Set data structure
+# usage: setDelete <setVarName> <key> [..<keyN>]
+# part of a family of functions that use the keys of an associateive array as a Set data structure
 # Example:
 #    local -A mySet
 #    setAdd mySet dog
@@ -809,15 +809,17 @@ function setHas()
 function varSetDelete() { setDelete "$@"; }
 function setDelete()
 {
-	local sr_varRef="$1"
-	local sr_key="${2:-emtptKey}"
+	local sr_varRef="$1"; shift
 	[ ! "$sr_varRef" ] &&  return 1
-	local sr_tmpname="$sr_varRef[$sr_key]"
-	unset "$sr_tmpname"
+	while [ $# -gt 0 ]; do
+		local sr_key="${1:-emtptKey}"; shift
+		local sr_tmpname="$sr_varRef[$sr_key]"
+		unset "$sr_tmpname"
+	done
 }
 
 # usage: setClear <setVarName>
-# uses the keys of an associateive array as a Set data structure
+# part of a family of functions that use the keys of an associateive array as a Set data structure
 # Example:
 #    local -A mySet
 #    setAdd mySet dog
@@ -832,7 +834,7 @@ function setClear()
 }
 
 # usage: setClear <setVarName>
-# uses the keys of an associateive array as a Set data structure
+# part of a family of functions that use the keys of an associateive array as a Set data structure
 # Example:
 #    local -A mySet
 #    setAdd mySet dog
@@ -1006,6 +1008,7 @@ function varGenVarname()
 #   -wN : set the width of the variable name field. this can be used to align a group of variables.
 #   -1  : display vars on one line. this suppresses the \n after each <varSpecN> output
 #   +1  : display vars on multiple lines. this is the default. it undoes the -1 effect so that a \n is output after each <varSpecN>
+#   --prefix=<prefix>  : add this <prefix> to subsequent output lines.
 function printfVars()
 {
 	local pv_nameColWidth pv_inlineFieldWidth="0" pv_indexColWidth oneLineMode pv_lineEnding="\n"
@@ -1052,6 +1055,10 @@ function printfVars()
 	local pv_term pv_varname pv_tmpRef pv_label
 	for pv_term in "$@"; do
 
+		if [[ "$pv_term" =~ ^--prefix= ]]; then
+			pv_prefix="${pv_term#--prefix=}"
+			continue
+		fi
 		if [[ "$pv_term" =~ ^-w ]]; then
 			if [ "$oneLineMode" ]; then
 				pv_inlineFieldWidth="${pv_term#-w}"

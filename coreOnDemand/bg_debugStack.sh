@@ -99,6 +99,7 @@ set +o errtrace # extdebug turns this on but unit tests need it off
 #         are not part of the logical code. For example if there are 3 nested assertFunctions on the stack when
 #         this is called, passing +2 will cause two to be ignored and only the first assert that the applicaiton
 #         code called would be included in the stack (as if that first assert called this function.
+#    --ignoreFrames=<n> : the number of frames to ignore.
 # See Also:
 #     bg-lib/bashTests//bg-trapStrackTraces   : interactive test cases for various combinations of signals and logical stacks.
 #     bgStackPrint  : format the logical frames that this function produces for output
@@ -218,16 +219,16 @@ function bgStackMakeLogical()
 
 
 
-	local noSrcLookupFlag logicalFrameStart=1 stackDebugFlag
+	local noSrcLookupFlag logicalFrameStart=1 stackDebugFlag ignoreFrames=1
 	while [ $# -gt 0 ]; do case $1 in
 		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
 		--logicalStart*) ((logicalFrameStart+=${1#--logicalStart?})) ;;
+		--ignoreFrames*)  bgOptionGetOpt val: ignoreFrames "$@" && shift ;;
 		--stackDebug)  stackDebugFlag="--stackDebug" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
 	[ "$stackDebugFlag" ] && bgStackDump
-
 
 	# in some cases, the BASH stack data can not be trusted. E.G. with core sourced in terminal, run '$Object.name::bgtrace' (which should assert an error)
 	# The BASH_SOURCE was correct but BASH_LINENO was way off. The top BASH_LINENO was a cmd counter in the terminal. The rest were
@@ -278,9 +279,16 @@ function bgStackMakeLogical()
 	# traps. bg_untiTest.sh uses this feature to not step through ERR and EXIT traps that maintain the testcase run
 	bgStackInUserTrap=""
 
+	declare -ga bgFUNCNAME=("${FUNCNAME[@]:$ignoreFrames}")
+	declare -ga bgBASH_SOURCE=("${BASH_SOURCE[@]:$ignoreFrames}")
+	declare -ga bgBASH_LINENO=("${BASH_LINENO[@]:$ignoreFrames}")
+	declare -ga bgBASH_ARGC=("${BASH_ARGC[@]:$ignoreFrames}")
+	local i offset; for ((i=0; i<ignoreFrames; i++)) do ((offset+=${BASH_ARGC[i]})); done
+	declare -ga bgBASH_ARGV=("${BASH_ARGV[@]:$offset}")
+
 	# iterate over the bash stack array (BASH_SOURCE, et all) and insert frames into our arrays (bgStack*)
 	local i frmSrcFile frmFunc frmSrcLineNo frmSimpleCmd frmSrcLineText
-	for ((i=0; i<${#BASH_SOURCE[@]}; i++)); do
+	for ((i=ignoreFrames; i<${#BASH_SOURCE[@]}; i++)); do
 		# the structure of this loop is that various conditions examine the current frame $i and determine if they should handle it.
 		# if no conditions match, the default handler block at the end will add its corresponding logical stack frame.
 		local doDefaultBlock="1"
@@ -612,9 +620,10 @@ function bgStackMakeLogical()
 #                     all the frames will be shown but the --logicalStart point may be indicated in the output.
 function bgStackPrint()
 {
-	local noSrcLookupFlag allStackFlag logicalFrameStart=1 onelineFlag argValuesFlag stackDebugFlag
+	local noSrcLookupFlag allStackFlag logicalFrameStart=1 onelineFlag argValuesFlag stackDebugFlag useVarsFlag
 	while [ $# -gt 0 ]; do case $1 in
 		--allStack) allStackFlag="--allStack" ;;
+		--useVars)  useVarsFlag="--useVars"  ;;
 		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
 		--oneline)     onelineFlag="oneline" ;;
 		--argValues)   argValuesFlag="argValues" ;;
@@ -623,9 +632,8 @@ function bgStackPrint()
 		--logicalStart*) ((logicalFrameStart+=${1#--logicalStart?})) ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-bgtraceVars argValuesFlag
-	#bgStackDump
-	bgStackMakeLogical $stackDebugFlag $noSrcLookupFlag --logicalStart+$logicalFrameStart
+
+	[ "$useVarsFlag" ] || bgStackMakeLogical $stackDebugFlag $noSrcLookupFlag --logicalStart+$logicalFrameStart
 
 	local startFrame=0; [ ! "$allStackFlag" ] && startFrame="$bgStackLogicalFramesStart"
 
@@ -648,41 +656,40 @@ bgtraceVars argValuesFlag
 }
 
 
-# OBSOLETE? bgStackMakeLogical now produces bgStack which is similar but does not include some duplicate formatted vars
-#           in any case, even if we want a more complete version it should be made there and not here.
-# usage: bgStackGet <retStack>
-# create a stack trace of the current execution state and return it in an array where each array element is a tokenized string
-# of stack frame attributes
-# the last array element is a string of integers stackSize, logicalStart, and 3 max lengths for fields
-function bgStackGet()
+# usage: bgStackMarshal [--file=<mFile>] <retStack>
+# save the bgStack* variables (created by bgStackMakeLogical) into either the <retStack> assiciative array or the <mFile> file.
+# The first ([0]) array element and first line in <mFile> is a string of space separated integers -- stackSize, logicalStart, and
+# 3 max lengths for fields.
+#
+# Subsequent array entries and file lines are each a logical frame as a space separated list of tokens.
+#
+# Params:
+#    <reStack> : if provided, it is the name of an existing associative (-A) array variable that will be filled in with the results.
+#                <reStack>[0]=<headerStr>
+#                <reStack>[1-n]=<frameStr>
+# Options:
+#    <mFile>  : if provided, it is a filename that will be filled in with the results.
+#               <headerStr>
+#               <frame1Str>
+#               ...
+#               <frameNStr>
+function bgStackMarshal()
 {
-	local noSrcLookupFlag allStackFlag logicalFrameStart=1 onelineFlag
+	local noSrcLookupFlag logicalFrameStart=1 onelineFlag mFile
 	while [ $# -gt 0 ]; do case $1 in
-		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
-		--logicalStart*) ((logicalFrameStart+=${1#--logicalStart?})) ;;
+		--file*)  bgOptionGetOpt val: mFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local retVar="$1"
-	local retVar2="$2"
 
-	bgStackMakeLogical $noSrcLookupFlag --logicalStart+$logicalFrameStart
+	local headerStr="${bgStackSize} ${bgStackLogicalFramesStart} ${bgStackSrcLocationMaxLen} ${bgStackFunctionMaxLen} ${bgStackSrcCodeMaxLen}"
 
-	varSetRef --array  $retVar
-	varSetRef --array  $retVar2
+	[ "$mFile" ] && echo "$headerStr"  > "$mFile"
+	[ "$retVar" ] && varSetRef --array  $retVar
+	[ "$retVar" ] && varSetRef --array -a $retVar "$headerStr"
 
-	varSetRef --array -a $retVar "
-		"${bgStackSize}"
-		"${bgStackLogicalFramesStart}"
-		"${bgStackSrcLocationMaxLen}"
-		"${bgStackFunctionMaxLen}"
-		"${bgStackSrcCodeMaxLen}"
-	"
 	local frameNo; for ((frameNo=$bgStackSize-1; frameNo>=startFrame; frameNo--)); do
-		if ((frameNo > bgStackLogicalFramesStart )); then
-			varSetRef --array -a $retVar2 "$(printf "%s %s\n" "${bgStackFrameType[$frameNo]}" "${bgStackLine[$frameNo]/$'\n'*/...}")"
-		fi
-
-		varSetRef --array -a $retVar "$(cmdline \
+		local frameStr="$(cmdline \
 			"${bgStackSrcFile[$frameNo]}" \
 			"${bgStackSrcLineNo[$frameNo]}" \
 			"${bgStackSrcLocation[$frameNo]}" \
@@ -694,7 +701,101 @@ function bgStackGet()
 			"${bgStackLineWithSimpleCmd[$frameNo]}" \
 			"${bgStackBashStkFrm[$frameNo]}"
 		)"
+
+		[ "$mFile" ] && echo "$frameStr" >> "$mFile"
+
+		[ "$retVar" ] && varSetRef --array -a $retVar "$frameStr"
 	done
+}
+
+# usage: bgStackUnMarshal [--file=<mFile>] <mVar>
+# restore the bgStack* variables from either the file <mFile> or the associative array <mVar>
+function bgStackUnMarshal()
+{
+	local noSrcLookupFlag logicalFrameStart=1 onelineFlag mFile
+	while [ $# -gt 0 ]; do case $1 in
+		--file*)  bgOptionGetOpt val: mFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local mVar="$1"
+
+	bgStackSize=""
+	bgStackLogicalFramesStart=""
+	bgStackSrcLocationMaxLen=""
+	bgStackFunctionMaxLen=""
+	bgStackSrcCodeMaxLen=""
+	bgStackSrcFile=()
+	bgStackSrcLineNo=()
+	bgStackSrcLocation=()
+	bgStackSimpleCmd=()
+	bgStackFrameType=()
+	bgStackSrcCode=()
+	bgStackFunction=()
+	bgStackLine=()
+	bgStackLineWithSimpleCmd=()
+	bgStackBashStkFrm=()
+
+	local mStr
+	if [ "$mVar" ]; then
+		local -n mArray="$mVar"
+		mStr="${mArray[0]}"
+		read -r bgStackSize bgStackLogicalFramesStart bgStackSrcLocationMaxLen bgStackFunctionMaxLen bgStackSrcCodeMaxLen <<<"$mStr"
+
+		local frameNo=$((bgStackSize-1))
+		for mStr in "${mArray[@]}"; do
+			read -r "bgStackSrcFile[$frameNo]" \
+					"bgStackSrcLineNo[$frameNo]" \
+					"bgStackSrcLocation[$frameNo]" \
+					"bgStackSimpleCmd[$frameNo]" \
+					"bgStackFrameType[$frameNo]" \
+					"bgStackSrcCode[$frameNo]" \
+					"bgStackFunction[$frameNo]" \
+					"bgStackLine[$frameNo]" \
+					"bgStackLineWithSimpleCmd[$frameNo]" \
+					"bgStackBashStkFrm[$frameNo]" \
+				<<<"${mStr}"
+			varUnescapeContents "bgStackSrcFile[$frameNo]" \
+					"bgStackSrcLineNo[$frameNo]" \
+					"bgStackSrcLocation[$frameNo]" \
+					"bgStackSimpleCmd[$frameNo]" \
+					"bgStackFrameType[$frameNo]" \
+					"bgStackSrcCode[$frameNo]" \
+					"bgStackFunction[$frameNo]" \
+					"bgStackLine[$frameNo]" \
+					"bgStackLineWithSimpleCmd[$frameNo]" \
+					"bgStackBashStkFrm[$frameNo]"
+			((frameNo--))
+		done
+
+	elif [ "$mFile" ]; then
+		{
+			read -r bgStackSize bgStackLogicalFramesStart bgStackSrcLocationMaxLen bgStackFunctionMaxLen bgStackSrcCodeMaxLen
+			local frameNo=$((bgStackSize-1))
+
+			while read -r "bgStackSrcFile[$frameNo]" \
+						"bgStackSrcLineNo[$frameNo]" \
+						"bgStackSrcLocation[$frameNo]" \
+						"bgStackSimpleCmd[$frameNo]" \
+						"bgStackFrameType[$frameNo]" \
+						"bgStackSrcCode[$frameNo]" \
+						"bgStackFunction[$frameNo]" \
+						"bgStackLine[$frameNo]" \
+						"bgStackLineWithSimpleCmd[$frameNo]" \
+						"bgStackBashStkFrm[$frameNo]"; do
+				varUnescapeContents "bgStackSrcFile[$frameNo]" \
+						"bgStackSrcLineNo[$frameNo]" \
+						"bgStackSrcLocation[$frameNo]" \
+						"bgStackSimpleCmd[$frameNo]" \
+						"bgStackFrameType[$frameNo]" \
+						"bgStackSrcCode[$frameNo]" \
+						"bgStackFunction[$frameNo]" \
+						"bgStackLine[$frameNo]" \
+						"bgStackLineWithSimpleCmd[$frameNo]" \
+						"bgStackBashStkFrm[$frameNo]"
+				((frameNo--))
+			done
+		} < "$mFile"
+	fi
 }
 
 
@@ -772,9 +873,102 @@ function bgStackDump()
 	#local frameNo; for frameNo in "${!FUNCNAME[@]}"; do
 	local frameNo; for ((frameNo=${#FUNCNAME[@]}-1; frameNo>=0; frameNo--)); do
 		local n argcOffset=0; for ((n=0; n<frameNo; n++)); do ((argcOffset+=${BASH_ARGC[$n]:-0})); done
-		local argList="" j; for ((j=0; j<${BASH_ARGC[$frameNo]}; j++)); do  argList+=" '${BASH_ARGV[$((argcOffset++))]}'"; done
+		local argList="" j; for ((j=0; j<${BASH_ARGC[$frameNo]}; j++)); do  argList+=" '[$argcOffset]=${BASH_ARGV[$argcOffset]}'"; ((argcOffset++)); done
 		((frameNo>0)) && printf "%4s %-25s %14s %-25s %2s %s\n" "$((frameNo-1))" "${FUNCNAME[$frameNo]}" "${BASH_LINENO[$frameNo]}" "${BASH_SOURCE[$frameNo]##*/}" "${BASH_ARGC[$frameNo]}" "$argList"
 	done
 #	printfVars bgBASH_funcDepthDEBUG bgBASH_debugTrapLINENO
 #	printfVars ${!bgBASH_trapStkFrm_*}
+}
+
+
+# usage: bgStackFind [--stackVar=<var>] [+-]<offset> [<retVar>]
+#        bgStackFind [--stackVar=<var>] <functionName>[:[+-]<offset>] [<retVar>]
+# locate search the function name stack variable for the frame that matches the spec passed in.
+# If the spec includes a function name, the first function that matches <functionName> will become the reference frame that the
+# optional offset is implied. If not, the default reference frame is the function that called bgStackFind.
+#
+# Return Value:
+#    The result of this function is a numeric index into the function stack that points to the identified frame. If the result is
+#    relative to the caller. If FUNCNAME is used as the stack var, 0 will refere to the caller, 1 the function that called the caller,
+#    etc...
+#
+#    The lower range of the result is clipped at 0.
+#    The upper range is 'clipped' at (stackSize-1) with the special feature that in bash, the index -1 refers to the same element
+#    as (stackSize-1). If the result is greater than (stackSize-1), it will be returned as -1 which will
+#
+# Params:
+#    <functionName>  : the name of the function to use as the reference frame. It can be an exact name or a regex(bash) expression.
+#                      the default reference frame is 1, meaning the function that called us (bgStackFind)
+#    <offset>        : the offset to apply to the reference frame. 0 returns the reference frame. Positive offsets get closer to
+#                      'main' at the top of the stack. Negative offsets get closer to this function call
+# Options:
+#    <stackVar> : an alternate funcName stack variable to use. default is FUNCNAME.  If FUNCNAME is used the the result will be
+#                 decremented by one to account for the fact that this function is in FUNCNAME during this call, but not when the
+#                 caller is executing. If the caller references FUNCNAME[$<retVar>] it will be the function name identified
+function bgStackFind()
+{
+	local fStackName="FUNCNAME" fStackOffest=1
+	while [ $# -gt 0 ]; do case $1 in
+		--stackVar*)
+			bgOptionGetOpt val: fStackName "$@" && shift
+			# when fStackName == "FUNCNAME" we ignore the [0] element because it referes to us (bgStackFind function)
+			# but when its a different array, [0] is a valid stack frame
+			[ "$fStackName" != "FUNCNAME" ] && fStackOffest=0
+			;;
+		--) shift; break ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local _ae_frameOffsetTerm="$1"; shift
+
+	# default is to use FUNCNAME and offset by 1 to account for this function being on the stack
+	# if an fStack is passed in, dont offset
+	local -n fStack="$fStackName"
+
+	if [[ ! "$_ae_frameOffsetTerm" =~ ^([^0-9+-][^:+-]*)?:?([-+]?[0-9]*)$ ]]; then
+		local frameOffesetTerm="$_ae_frameOffsetTerm"
+		assertError -v frameOffesetTerm "bad value passed in for the first parameter"
+	fi
+	local rematch=("${BASH_REMATCH[@]}")
+	local _ae_functName="${rematch[1]}"
+	local _ae_offset="${rematch[2]:-0}"
+bgtraceVars -1 "!!! " _ae_frameOffsetTerm _ae_functName _ae_offset rematch
+
+
+	# The refFrame is the function that called us, or the one that matches _functName
+	local refFrame
+	if [ "$_ae_functName" ]; then
+		# first try it using exact comparison
+		local i; for ((i=fStackOffest; i<${#fStack[@]}; i++)); do
+			[ "${fStack[$i]}" == "$_ae_functName" ] && { refFrame=$i; break; }
+		done
+		[ "$refFrame" ] && while ((refFrame+1<${#fStack[@]})) && [ "${fStack[$refFrame+1]}" == "$_ae_functName" ]; do ((refFrame++)); done
+
+		# if this function is recursive, go up to the first consequetive call of this function as the relative stack location
+		while ((refFrame+1<${#fStack[@]})) && [ "${fStack[$refFrame+1]}" == "$_ae_functName" ]; do ((refFrame++)); done
+
+		# if not found, try it again using regex comparison
+		if [ ! "$refFrame" ]; then
+			for ((i=fStackOffest; i<${#fStack[@]}; i++)); do
+				[[ "${fStack[$i]}" =~ $_ae_functName ]] && { refFrame=$i; break; }
+			done
+			# if more than one consequetive function matches the expression, go up to the first call as the relative stack location
+			[ "$refFrame" ] && while ((refFrame+1<${#fStack[@]})) && [[ "${fStack[$refFrame+1]}" =~ $_ae_functName ]]; do ((refFrame++)); done
+		fi
+		# if we did not find _ae_functName on the stack, return 2
+		if [ ! "$refFrame" ]; then
+			bgStackDump >>$_bgtraceFile
+			bgtrace "non exception error: bgStackFind: '$functName' did not match any function on the stack"
+			return -1
+		fi
+	else
+		refFrame=1 # this function is '0', the function that called us is '1'
+	fi
+
+	returnValue $((
+		((refFrame+_ae_offset < ${#fStack[@]} )
+			? ((refFrame+_ae_offset >= 0 )
+				? refFrame+_ae_offset
+				: fStackOffest)
+			: -1 + fStackOffest) - fStackOffest
+	)) "$1"
 }
