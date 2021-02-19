@@ -103,8 +103,8 @@ function fsMakeTemp()
 		local fileNameValue="$(command mktemp "${passThruOpts[@]}" $templateValue)"
 		local caller trapHandler
 		if [ "$keepFlag" ] || [ "${BGMKTEMP_TRACE_FILE+exists}" ] || [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; then
-			local -A stackFrame=(); bgStackGetFrame "${callerStackFrame:-1}" stackFrame
-			caller="${stackFrame[printLine]}"
+			local -A stackFrame=(); bgStackFrameGet "${callerStackFrame:-1}" stackFrame
+			caller="${stackFrame[frmSummary]}"
 			trapHandler='
 				# bgmktemp '"${keepFlag}"' '"${passThruOpts[@]}"' '"${fileNameVar}"'
 				# created at: '"$caller"''

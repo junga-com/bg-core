@@ -50,11 +50,11 @@
 function assertLogicError()
 {
 	# collect the context of the error
-	local -A stackFrame=(); bgStackGetFrame +1  stackFrame
+	local -A stackFrame=(); bgStackFrameGet +1  stackFrame
 	local context="$(awk '
-		NR>=('"${stackFrame[srcLineNo]}"'-7) {printf("%4s: %s\n", NR, $0)}
-		NR>=('"${stackFrame[srcLineNo]}"'+2) {exit}
-	' < "${stackFrame[srcFile]}")"
+		NR>=('"${stackFrame[cmdLineNo]}"'-7) {printf("%4s: %s\n", NR, $0)}
+		NR>=('"${stackFrame[cmdLineNo]}"'+2) {exit}
+	' < "${stackFrame[cmdFile]}")"
 
 	# include the stack trace even if tracing is not turned on
 	bgtraceTurnOn -n /dev/stdout

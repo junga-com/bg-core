@@ -1,7 +1,5 @@
 #!/bin/bash
 
-import bg_debugStack.sh ;$L1;$L2
-
 # Library bg_debugTrace.sh
 # This library provides a set of bgtrace* functions that can be used to trace the operation of a script.
 # These statements can be used with or without the interactive debugger. Any breakpoint feature of the interactive debugger
@@ -341,31 +339,11 @@ function bgtraceParams()
 # usage: bgtraceStack
 # print the current stack trace to bgtrace destination
 # it is called by  assertError
-function bgStackTrace() { bgtraceStack --fromAlias "$@"; }
 function bgtraceStack()
 {
 	bgtraceIsActive || return 0
-
-	local noSrcLookupFlag allStack onelineFlag argValuesFlag sourceAndArgsFlag stackDebugFlag useVarsFlag
-	local logicalFrameStart=1; [ "${FUNCNAME[1]}" == "bgStackTrace" ] && ((logicalFrameStart++))
-	while [ $# -gt 0 ]; do case $1 in
-		--allStack) allStack="--allStack" ;;
-		--useVars)  useVarsFlag="--useVars"  ;;
-		--fromAlias) ((logicalFrameStart++)) ;;
-		--noSrcLookup) noSrcLookupFlag="--noSrcLookup" ;;
-		--stackDebug)  stackDebugFlag="--stackDebug" ;;
-		--oneline)     onelineFlag="--oneline" ;;
-		--argValues)   argValuesFlag="--argValues" ;;
-		--sourceAndArgs) sourceAndArgsFlag="--sourceAndArgs" ;;
-		--logicalStart*) ((logicalFrameStart+=${1#--logicalStart?})) ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-	done
-	import bg_debugStack.sh ;$L1;$L2
-	echo >>$_bgtraceFile
-	echo >>$_bgtraceFile
-	bgStackPrint $useVarsFlag $allStack $noSrcLookupFlag $onelineFlag $argValuesFlag $sourceAndArgsFlag $stackDebugFlag --logicalStart+$logicalFrameStart >>$_bgtraceFile
+	bgStackPrint "$@" >>$_bgtraceFile
 }
-
 
 
 # usage: bgtracePSTree
@@ -531,8 +509,6 @@ function bgtraceBreak()
 		--logicalStart*) ((logicalFrameStart= 1 + ${1#--logicalStart?})) ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-
-	local assertErrorContext="--allStack" i
 
 	# when bgtracing is not active, bgtraceBreak is a noop just like all other bgtrace* functions. This allows the user to temporarily
 	# run the script in production mode in the middle of a debugging session.

@@ -689,6 +689,7 @@ function marshalCmdline()
 # modifies the contents of each of the variable names passed in so that they could then be passed unquoted on a command line and
 # be interpretted as exactly one argument. If the content is empty, it is replaced with '--' and any whitespace characters (space,
 # newline, carrigeReturn, or tab) are replaced with their $nn equivalent where nn is the two digit hex code. (%20, %0A, %0D %09)
+function strEscapeToToken() { stringToBashToken "$@"; }
 function escapeTokens() { stringToBashToken "$@"; }
 function varEscapeContents() { stringToBashToken "$@"; }
 function stringToBashToken()
@@ -713,6 +714,7 @@ function stringToBashToken()
 # be empty and could contain whitespace
 # Options:
 #    -q : quotes. If the resulting string contains whitespace or is an empty string, surrond it with quotes
+function strUnescapeFromToken() { stringFromBashToken "$@"; }
 function unescapeTokens() { stringFromBashToken "$@"; }
 function varUnescapeContents() { stringFromBashToken "$@"; }
 function stringFromBashToken()

@@ -329,8 +329,7 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 			declare -g bgLibExecCmd=("${0##*/}" "$@")
 
 			# TODO: maybe bgLibExecSrc should be created on demand if needed so we dont need to do this block on every script.
-			#       in this case, bgLibExecSrc is derived from bgLibExecCmd but in other cases it is not. bgStackMakeLogical does
-			#       format bgLibExecCmd instead of using this but bgStackGetFrame uses bgLibExecSrc and would need to change
+			#        update: the new bg_coreStack.sh code wont use this so we can remove it after that transition.
 			declare -g bgLibExecSrc="${0##*/}"
 			for _inint_i in "$@"; do
 				if [[ "$_inint_i" =~ [[:space:]] ]]; then
@@ -425,6 +424,8 @@ import bg_coreLSBVersions.sh ;$L1;$L2
 # these functions should probably be somewhere else but its not yet clear where. Some could be pruned from the required runtime
 import bg_coreMisc.sh ;$L1;$L2
 
+# used when an exception is thrown and debugger. Could be easily made on-demand
+import bg_coreStack.sh ;$L1;$L2
 
 
 # if we are being sourced in a terminal, tell importCntr to record the timestamp used to tell if libraries are newer

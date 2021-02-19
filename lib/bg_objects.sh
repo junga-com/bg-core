@@ -1633,9 +1633,9 @@ function _bgclassCall()
 
 function assertObjExpressionError()
 {
-	local -A exprFrame; bgStackGetFrame --readCode _bgclassCall:+1 exprFrame; local results="$?"
+	local -A exprFrame; bgStackFrameGet _bgclassCall:+1 exprFrame; local results="$?"
 	[ ${results:-0} -gt 0 ] && echo "assertObjExpressionError could not find the obj syntax on the stack. exitcode='$results'" >&2;
-	assertError --frameOffset="_bgclassCall:+1" -v "objExpression:exprFrame[srcCode]" "$@"
+	assertError --frameOffset="_bgclassCall:+1" -v "objExpression:exprFrame[cmdSrc]" "$@"
 }
 
 function assertThisRefError()

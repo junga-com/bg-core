@@ -670,6 +670,7 @@ function varGet()
 # modifies each element in the array so that it would be interpreted as exactly one bash token if subject to bash word splitting
 # empty strings are replaced with '--' and whitespace in the strings are replaced with their %nn equivalent where nn is their two
 # digit ascii hex code.
+function arrayEscapeValues() { arrayToBashTokens "$@"; }
 function arrayToBashTokens()
 {
 	local -a aa_keys='("${!'"$1"'[@]}")'
@@ -681,6 +682,7 @@ function arrayToBashTokens()
 # usage: arrayFromBashTokens <varName>
 # modifies each element in the array to undo what arrayToBashTokens did and return it to normal strings that could be empty and
 # could contain whitespace
+function arrayUnEscapeValues() { arrayFromBashTokens "$@"; }
 function arrayFromBashTokens()
 {
 	local -a aa_keys='("${!'"$1"'[@]}")'
@@ -703,6 +705,15 @@ function arrayGet()
 {
 	local aa_varRef="$1[$2]"; shift 2
 	returnValue "${!aa_varRef}" $1
+}
+
+# usage: arrayExistsAt <varName> <index>
+# the exit code reflects whether element <index> exists in <varName>
+function arrayExistsAt()
+{
+	[[ ! "$2" =~ ^[+-]?[0-9]*$ ]] && ! varIsA mapArray "$1" && return 1
+	local aa_varRef="$1[$2]"; shift 2
+	[ "${!aa_varRef+exists}" ]
 }
 
 # usage: arrayPush <varName> <value...>
@@ -740,6 +751,31 @@ function arrayUnshift()
 	aa_varRef=("${aa_varRef[@]:1}")
 	returnValue "$aa_value" $1
 }
+
+# usage: arrayFind <varName> <value> [<retVar>]
+function arrayFind()
+{
+	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"; shift
+	local _i; for _i in "${!aa_varRef[@]}"; do
+		if [ "${aa_varRef[$_i]}" == "$2" ]; then
+			returnValue "$_i" "$3"
+		fi
+	done
+}
+
+# usage: arrayDelete <varName> <value>
+function arrayDelete()
+{
+	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"; shift
+	local _i; for _i in "${!aa_varRef[@]}"; do
+		if [ "${aa_varRef[$_i]}" == "$2" ]; then
+			unset aa_varRef[$_i]
+		fi
+	done
+	# re-index so that they are consequetive
+	aa_varRef=("${aa_varRef[$_i][@]}")
+}
+
 
 # usage: arrayClear <varName>
 function arrayClear()
@@ -878,6 +914,32 @@ function mapGet() {
 	[ ! "$sr_varRef" ] &&  return 1
 	varDeRef "$sr_varRef[$sr_key]" "$3"
 }
+
+# usage: mapGetValues  [<outputValueOptions>] <mapVarName>
+function varMapGetValues() { mapGetValues "$@"; }
+function mapGetValues() {
+	local retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local sr_tmpname="$1[@]"
+	outputValue "${retOpts[@]}"  "${!sr_tmpname}"
+}
+
+# usage: mapGetKeys  [<outputValueOptions>] <mapVarName>
+function varMapGetKeys() { mapGetKeys "$@"; }
+function mapGetKeys() {
+	local retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	# SECURITY: the varExists line is meant to prevent ACE in the eval
+	varExists "$1" || assertError
+	eval 'outputValue "${retOpts[@]}"  "${!'"$1"'[@]}"'
+}
+
 
 # usage: mapDelete <mapVarName> <key>
 function varMapDelete() { mapDelete "$@"; }
@@ -1055,6 +1117,11 @@ function printfVars()
 	local pv_term pv_varname pv_tmpRef pv_label
 	for pv_term in "$@"; do
 
+		if [[ "$pv_term" =~ ^--table= ]]; then
+			printfTable ${pv_term#--table=}
+			continue
+		fi
+
 		if [[ "$pv_term" =~ ^--prefix= ]]; then
 			pv_prefix="${pv_term#--prefix=}"
 			continue
@@ -1186,5 +1253,104 @@ function printfVars()
 	done
 	if [ "$pv_lineEnding" != "\n" ]; then
 		printf "\n"
+	fi
+}
+
+
+# usage: printfTable [--horizontal] <colVar1>[..<colVarN>]
+# given a list of array valriable names, print a table. The variable names are the columns of the table. The union of all keys/indexes
+# are the rows of the table. Each cell is the value of the array variable from that column subscripted with the index from that row.
+# If ColName[RowName] does not exist (including the case where ColName is a numeric array and RowName is an alpha-numeric word),
+# the cell willl contain '<unset>'
+# Prarms:
+#    <colVarN>  : the name of an array variable to include in the table. It can any type of bash variable. Scalar vars are treated
+#                 like a numeric array with a single index [0]
+# Options:
+#    --horizontal  : transpose the table so that variable names will be the rows and indexes will be the columns
+function printfTable()
+{
+	local _ptOrientation="vert"
+	while [ $# -gt 0 ]; do case $1 in
+		--horizontal) _ptOrientation="hor" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local _ptColList=("$@")
+
+	local _ptCol _ptTblLength=0 _ptType
+	local -A _ptRows
+	for _ptCol in "${_ptColList[@]}"; do
+		local _ptSize; arraySize "$_ptCol" _ptSize
+		((_ptTblLength = (_ptTblLength>_ptSize) ? (_ptTblLength) : (_ptSize) ))
+		if varIsA mapArray "$_ptCol"; then
+			mapGetKeys -a -S _ptRows "$_ptCol"
+			[ "$_ptType" == "numArray" ] && _ptType="mixed"
+			_ptType="${_ptType:-mapArray}"
+		elif varIsA numArray "$_ptCol"; then
+			mapGetKeys -a -S _ptRows "$_ptCol"
+			[ "$_ptType" == "mapArray" ] && _ptType="mixed"
+			_ptType="${_ptType:-numArray}"
+		else
+			_ptRows[0]=
+		fi
+	done
+
+	# get the _ptRowList. If all the vars are numeric arrays, make sure that they are in order
+	local _ptRowList
+	if [ "$_ptType" == "numArray" ]; then
+		local _ptI; for ((_ptI=0; _ptI<_ptTblLength; _ptI++)); do
+			if [ "${_ptRows[$_ptI]+exists}" ]; then
+				unset _ptRows[$_ptI]
+				_ptRowList+=($_ptI)
+			fi
+		done
+		_ptRowList+=("${!_ptRows[@]}")
+	else
+		_ptRowList=("${!_ptRows[@]}")
+	fi
+
+	if [ "$_ptOrientation" == 'vert' ]; then
+		{
+			local _ptValue
+			echo "_ | ${_ptColList[*]}"
+			local _ptRow; for _ptRow in "${_ptRowList[@]}"; do
+				_ptValue="$_ptRow"
+				strEscapeToToken _ptValue
+				echo -n "[$_ptValue] | "
+				for _ptCol in "${_ptColList[@]}"; do
+					_ptValue="<unset>"
+					if arrayExistsAt  "$_ptCol" "$_ptRow"; then
+						arrayGet "$_ptCol" "$_ptRow" _ptValue
+						strEscapeToToken _ptValue
+					fi
+					echo -n "$_ptValue "
+				done
+				echo
+			done
+		} | column -e -t | awk 'NR==1 {print gensub(/^_/," ","g"); next}   NR==2 {print gensub(/./,"-","g")} {print $0}'
+
+	else
+		{
+			local _ptValue
+			echo -n "_ | "
+			local _ptRow; for _ptRow in "${_ptRowList[@]}"; do
+				_ptValue="$_ptRow"
+				strEscapeToToken _ptValue
+				echo -n "[$_ptValue] "
+			done
+			echo
+
+			for _ptCol in "${_ptColList[@]}"; do
+				echo -n "$_ptCol | "
+				local _ptRow; for _ptRow in "${_ptRowList[@]}"; do
+					_ptValue="<unset>"
+					if arrayExistsAt  "$_ptCol" "$_ptRow"; then
+						arrayGet "$_ptCol" "$_ptRow" _ptValue
+						strEscapeToToken _ptValue
+					fi
+					echo -n "$_ptValue "
+				done
+				echo
+			done
+		} | column -e -t | awk 'NR==1 {print gensub(/^_/," ","g"); next}   NR==2 {print gensub(/./,"-","g")} {print $0}'
 	fi
 }
