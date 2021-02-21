@@ -102,7 +102,18 @@ while [ $# -gt 0 ]; do case $1 in
 	-q|--query)    cmd="query"  ;;
 	-s|--summary)  cmd="summary"  ;;
 	-g|--get)      cmd="get"  ;;
-	-c*|--columns*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
+
+	-c*|--columns*)      bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
+	-n|--noDirtyCheck)   bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+	-f|--forceRebuild)   bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+	-r|--refresh)        bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+	-e|--escapeOutput)   bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+	-H|--header)         bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+	-F*|--tblFormat*)    bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
+	-w|--wiki)           bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+	-p|--plainFilter)    bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+	-1|--assertOneValue) bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+
 	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 done
 

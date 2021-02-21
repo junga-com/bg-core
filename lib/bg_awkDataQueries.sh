@@ -83,6 +83,8 @@ function awkData_query()
 	local outputTemplate; templateFind -R outputTemplate "awkDataTblFmt.${outFmtType}$verticalOutputFlag"
 	[ ! "$outputTemplate" ] && [ "$outFmtType" != "txt" ] && assertError "unknown awkDataTblFmt type. No template for awkDataTblFmt.$outFmtType was found in the template path. Use bg-core templates types 'awkDataTblFmt' to see what types are available on this host. Adding a template named awkDataTblFmt.$outFmtType will enable this command to proceed"
 
+	[ "$headerFlag" ] && import bg_cui.sh ;$L1;$L2
+
 	# How this loop algorithm works. We run the lookup awk script in loop i==0 and if the awkDataID is not dirty, it rturns the data.
 	# but if the awkDataID is dirty, that first run will return quickly reporting that it needs building. We call awkData_build in
 	# that condition and then iterate to the next loop. If all is good, that second i==1 iteration will return the data but if it

@@ -442,14 +442,14 @@ function ut_Object_memberVarReadAccess() {
 	Try:
 		$obj.::doit
 	Catch: && {
-		echo "** Exception thrown and caught"
-		printfVars catch_errorClass catch_errorCode catch_errorDescription
+		echo "** caught expected exception"
+		printfVars "   " catch_errorClass catch_errorFn catch_errorCode catch_errorDescription
 	}
 	Try:
 		$obj.doit p1 p2 p3
 	Catch: && {
-		echo "** Exception thrown and caught"
-		printfVars catch_errorClass catch_errorCode catch_errorDescription
+		echo "** caught expected exception"
+		printfVars "   " catch_errorClass catch_errorFn catch_errorCode catch_errorDescription
 	}
 }
 

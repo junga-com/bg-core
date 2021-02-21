@@ -2753,17 +2753,11 @@ function assertError()
 	# 	bgtrace "error: logic error. bgExit did not stop this line from executing"
 	# fi
 
-	# this captures the current stack in a set of bgStack* global vars. It detects and adds trap invocations into the stack
-	# this is also used to freeze the stack so that when we call functions that operate on it, it wont change like the FUNCNAME
-	# and other bash maintained stack vars
-	# --logicalStart=0 means that this assertError call will be the first (zero'th) element in the stack
-	bgStackFreeze
-
 	local _ae_exitCodeLast="$?"
 	local _ae_msg _ae_exitCode=36 _ae_actionOverride _ae_contextVarName _ae_catchAction _ae_catchSubshell _ae_frameOffsetTerm=1
 	local -A _ae_dFiles _ae_contextVarsCheck=([empty]=1)
 	local _ae_dFilesList _ae_contextVars _ae_contextOutput _ae_noFuncnameFlag _ae_stackSourceFlag _ae_stackDebugFlag
-	local _ae_traceCatchFlag
+	local _ae_traceCatchFlag _ae_alreadyFrozenFlag
 
 	# TODO: we need to figure out a good way to associate assertErrorContext with the tryStack so that we stop at the right level
 	### add any assertErrorContext data to the command line parameters.
@@ -2784,13 +2778,14 @@ function assertError()
 
 	### process the command line
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		--alreadyFrozen) _ae_alreadyFrozenFlag="--alreadyFrozen" ;;
 		--traceCatch)    _ae_traceCatchFlag="--traceCatch" ;;
 		--no-funcname)   _ae_noFuncnameFlag="--no-funcname" ;;
 		--sourceInStack) _ae_stackSourceFlag="--source" ;;
 		--stackDebug)    _ae_stackDebugFlag="--stackDebug" ;;
-		--critical)     _ae_actionOverride="abort" ;;
-		-c|--continue)  _ae_actionOverride="${_ae_actionOverride:-continue}" ;;
-		--exitOneShell) _ae_actionOverride="${_ae_actionOverride:-exitOneShell}" ;;
+		--critical)      _ae_actionOverride="abort" ;;
+		-c|--continue)   _ae_actionOverride="${_ae_actionOverride:-continue}" ;;
+		--exitOneShell)  _ae_actionOverride="${_ae_actionOverride:-exitOneShell}" ;;
 		-e*) bgOptionGetOpt val: _ae_exitCode "$@" && shift
 			_ae_exitCode="${_ae_exitCode//[^0-9]}"
 			;;
@@ -2832,6 +2827,13 @@ function assertError()
 	##############################################
 	### assemble the context
 
+	# this captures the current stack in a set of bgStack* global vars. It detects and adds trap invocations into the stack
+	# this is also used to freeze the stack so that when we call functions that operate on it, it wont change like the FUNCNAME
+	# and other bash maintained stack vars
+	# --logicalStart=0 means that this assertError call will be the first (zero'th) element in the stack
+	if [ ! "$_ae_alreadyFrozenFlag" ]; then
+		bgStackFreeze --all
+	fi
 
 	# this adjusts the message format so that convenient source code formatting of the msg text over multiple lines will produce
 	# pretty output for the user.

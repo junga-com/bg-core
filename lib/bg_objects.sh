@@ -1451,7 +1451,7 @@ function _bgclassCall()
 
 			_rsvMemberName="$1"; shift
 			local _METHOD="${_VMT[_static::${_rsvMemberName}]}"
-			[ "$_METHOD" ] || assertObjExpressionError "The class '#_CLASS' does not contain a static method '$_rsvMemberName'"
+			[ "$_METHOD" ] || assertObjExpressionError -v class:_CLASS -v staticMethod:_rsvMemberName "The class '$_CLASS' does not contain a static method '$_rsvMemberName'"
 
 			# create local nameRefs for each logical static member variable that has a valid var name not starting with an '_'
 			local _memberVarName; for _memberVarName in "${!static[@]}"; do
@@ -1573,7 +1573,7 @@ function _bgclassCall()
 
 
 		# create a new object and set its reference in <objRef>
-		=new:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		=new:self) assertObjExpressionError "direct object assignment (as opposed to member variable assignment) is not yet supported" ;;
 		=new:globalVar)
 			local _className="$1"; shift
 			ConstructObject "${_className:-Object}" $_rsvMemberName "$@"
@@ -1586,7 +1586,7 @@ function _bgclassCall()
 			;;
 
 		# append to <objRef>
-		+=:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		+=:self) assertObjExpressionError "direct object assignment (as opposed to member variable assignment) is not yet supported" ;;
 		+=:globalVar)
 			printf -v "$_rsvMemberName" "%s%s" "${!_rsvMemberName}" "$*"
 			;;
@@ -1596,7 +1596,7 @@ function _bgclassCall()
 			;;
 
 		# replace the value of <objRef>
-		=:self) assertObjExpressionError "direct object asignment (as opposed to member variable assignment) is not yet supported" ;;
+		=:self) assertObjExpressionError "direct object assignment (as opposed to member variable assignment) is not yet supported" ;;
 		=:globalVar)
 			printf -v "$_rsvMemberName" "%s" "$*"
 			;;
@@ -1633,9 +1633,10 @@ function _bgclassCall()
 
 function assertObjExpressionError()
 {
-	local -A exprFrame; bgStackFrameGet _bgclassCall:+1 exprFrame; local results="$?"
-	[ ${results:-0} -gt 0 ] && echo "assertObjExpressionError could not find the obj syntax on the stack. exitcode='$results'" >&2;
-	assertError --frameOffset="_bgclassCall:+1" -v "objExpression:exprFrame[cmdSrc]" "$@"
+	bgStackFreeze --all
+	local classCallIdx; bgStackFrameFind _bgclassCall classCallIdx
+	local objectExpression="${bgSTK_cmdSrc[classCallIdx]}"
+	assertError --alreadyFrozen --frameOffset="$((classCallIdx+1))" -v objectExpression "$@"
 }
 
 function assertThisRefError()

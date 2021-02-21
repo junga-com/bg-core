@@ -19,7 +19,6 @@ function collect_osBase()
 {
 	collectPreamble || return
 
-bgtrace "here"
 	lsb_release -a  2>/dev/null | collectContents osBase/lsb_release
 	uname -a       | collectContents osBase/uname
 	dpkg -l | sort | collectContents osBase/dpkg

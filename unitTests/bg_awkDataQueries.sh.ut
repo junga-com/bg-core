@@ -10,8 +10,12 @@ function makeTestData() {
 
 
 	cat - >"$utDataFolder/manifest" <<-EOS
-		ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
+		ut awkDataSchema type1                $utDataFolder/type1.awkDataSchema
+		ut template      awkDataTblFmt.wiki   $utDataFolder/awkDataTblFmt.wiki
 	EOS
+
+	local wikiTemplate; templateFind -R wikiTemplate "awkDataTblFmt.wiki"
+	cp "$wikiTemplate" $utDataFolder/awkDataTblFmt.wiki
 
 	cat - >"$utDataFolder/type1.awkDataSchema" <<-EOS
 		columns=one(10) two(5) three(13)
@@ -26,7 +30,6 @@ function makeTestData() {
 		green     3        --
 	EOS
 
-	echo "ut awkDataSchema type1 $utDataFolder/type1.awkDataSchema" >>"$utDataFolder/manifest"
 }
 
 
@@ -37,10 +40,10 @@ function ut_awkData_lookup() {
 	cat "$bgVinstalledManifest"
 
 	ut test
-	awkData_query type1 all one:blue
-	awkData_query type1 all two:1
-	awkData_query type1 one two:1
-	awkData_query -H type1 all
-	awkData_query -e type1 all
-	awkData_query -w type1 all
+	awkData_query type1 one:blue
+	awkData_query type1.all two:1
+	awkData_query type1.one two:1
+	awkData_query -H type1
+	awkData_query -e type1
+	awkData_query -w type1
 }

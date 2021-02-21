@@ -89,7 +89,7 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
-   catch_errorFn='f1'
+   catch_errorFn='assertError'
    catch_errorCode='36'
    catch_errorDescription='
                            error: assertError: eval 'function f1() { assertError '"$1"'; }'
@@ -122,10 +122,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
-   catch_errorFn='f2'
+   catch_errorFn='f1'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: f2: eval 'function f1() { assertError '"$1"'; }'
+                           error: f1: eval 'function f1() { assertError '"$1"'; }'
                                1'
 ## bg_coreAssertError.sh:frameOffsetOption:1 finished
 ###############################################################################################################################
@@ -155,10 +155,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
-   catch_errorFn='f3'
+   catch_errorFn='f2'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: f3: eval 'function f1() { assertError '"$1"'; }'
+                           error: f2: eval 'function f1() { assertError '"$1"'; }'
                                1'
 ## bg_coreAssertError.sh:frameOffsetOption:2 finished
 ###############################################################################################################################
@@ -188,10 +188,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
-   catch_errorFn='f4'
+   catch_errorFn='f3'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: f4: eval 'function f1() { assertError '"$1"'; }'
+                           error: f3: eval 'function f1() { assertError '"$1"'; }'
                                1'
 ## bg_coreAssertError.sh:frameOffsetOption:3 finished
 ###############################################################################################################################
@@ -221,10 +221,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
-   catch_errorFn='in top level script'
+   catch_errorFn='$ bg-dev'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: in top level script: eval 'function f1() { assertError '"$1"'; }'
+                           error: $ bg-dev: eval 'function f1() { assertError '"$1"'; }'
                                1'
 ## bg_coreAssertError.sh:frameOffsetOption:40 finished
 ###############################################################################################################################
@@ -357,10 +357,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertF1'
-   catch_errorFn='f3'
+   catch_errorFn='f2'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: f3: eval 'function assertF1() { assertError '"$1"'; }'
+                           error: f2: eval 'function assertF1() { assertError '"$1"'; }'
                                1'
 ## bg_coreAssertError.sh:errorClassFeature:1 finished
 ###############################################################################################################################
@@ -392,10 +392,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertF1'
-   catch_errorFn='f4'
+   catch_errorFn='f3'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: f4: eval 'function assertF1() { assertError '"$1"'; }'
+                           error: f3: eval 'function assertF1() { assertError '"$1"'; }'
                                1'
 ## bg_coreAssertError.sh:errorClassFeature:2 finished
 ###############################################################################################################################
@@ -427,10 +427,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertF1'
-   catch_errorFn='in top level script'
+   catch_errorFn='$ bg-dev'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: in top level script: eval 'function assertF1() { assertError '"$1"'; }'
+                           error: $ bg-dev: eval 'function assertF1() { assertError '"$1"'; }'
                                1'
 ## bg_coreAssertError.sh:errorClassFeature:40 finished
 ###############################################################################################################################

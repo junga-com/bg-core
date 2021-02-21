@@ -6,40 +6,196 @@
 #        # import script libraries as needed
 #        # define one or more ut_* functions
 #        function ut_myTest() { ...}
-# This is a bash script library that is imported only by bash unit test script files.
-# A script follows these requirements to become a valid test script that can be ran under the unit test framework.
-#    1) the file should end in the .ut extension so that bash completion will work.
+# This is a bash script library that implements a unit test script system.
+# Unit test scripts are simple bash scripts that follow a minimal pattern. They can be invoked directly from the command line or
+# within the unit test framework provided by the `bg-dev` package. They get bash command line completion support automatically. The
+# command line syntax allows listing the testcase names contained within, running a specific testcase, or lauching the debugger
+# stopped at the first line of a specific testcase.
+#
+# Writing a testcase is no harder than writing a one-off test script. A unit test script contains one or more functions and the
+# command line arguments allow you to select which function will run and with what arguments.
+#
+# These test scripts can be used to test not only bash script libraries and commands, but also the output and effects of any cli
+# program written in any language. The premise of the system is that the testcase produces output on stdout, stderr, and the
+# exit codes of the commands it runs. If that output matches what is saved in the project for that testcase, it passes and if not,
+# it fails. When a testcase fails, it is either because a bug was introduced that changed the target code's behavior, or the behavior
+# of the target code was changed on purpose, in which case the saved output would be updated to reflect the new expected behavior.
+# The change history of the saved output documents how the expected behavior changes over the lifetime of the code.
+#
+# Creating a Unit Test Script:
+#    1) create a script file using these naming conventions.
+#       * end in the .ut extension. This tells the bash completion loader provided by bg-core to enable BC.
+#       * place the file in a project's ./unitTests/ folder. This allows it to participate in the project's unit testing.
+#       * by convention, use the name of the library that it will test. e.g. unitTests/bg_coreStack.sh.ut contains tests for bg_coreStack.sh
 #    2) make the file executable (chmode a+x uitTests/<file>.ut)
-#    3) use "#!/usr/bin/env bg-utRunner" as the shebang line at the top of the script
-#    4) define one or more functions starting with ut_
-#    5) the file should be in its project's ./unitTests/ folder to participate in the "bg-dev tests..." system
+#    3) put this text on the file's first line "#!/usr/bin/env bg-utRunner"
+#    4) define one or more testcase Functions starting with ut_
 #
-# This pattern produces a script that can be invoked like a command for development or invoked within the unit test framework via
-# "bg-dev tests".
+# Now you can invoke the test script from the command line, using <tab><tab> to have bash completion lead you through composing the
+# command line.  Running directly from the command line sends the normalized output of a testcase to stdout so that you can
+# quickly develop and debug each testcase. It does not tell you if the testcase passes or fails.
 #
-# Writing Testcases:
-# A testcase starts with a function named with a leading ut_*. That function will result in one or more testcases being created.
-# Each testcase is the function plus a set of command line arguments that the function will be invoked with. The optional command
-# line argument sets are defined in an array variable with the same name as the function. Each array index becomes the name of the
-# argument list that is defined in the value at that index. The array can be an associative array with alphanumeric names or a
-# regular array with only numeric names.
+# You can also run the testcases from the project's unit test system.
+#    `bg-dev tests run <fileNameWith_.ut_removed>[:<testcaseName>]`
+# The first time you run the new script, the state of its testcases will be "unintialized". Run ...
+#    `bg-dev tests show <fileNameWith_.ut_removed>[:<testcaseName>]`
+#  ...to open a comparison application (default is `meld`) which allows you to create the expected data (aka 'plato' data). Creating
+# the plato data is documenting the expected behavior of the target code being tested so make sure that you review the output of the
+# new tests carefully. If its a work-in-progress, edit the plato data to either be the exact output that it should eventually be, or
+# just type a note explaining what the output should be in the future. As long as the plato data is not a match to the actual output,
+# the testcase will report as being in the failed state, indicating that work needs to be done before the target code and testcase
+# are finished.
 #
-# Inside the testcase function, you can put any code. The prupose of the code is to invoke the target code and produce output that
-# indicates what the target code did. The testcase output is derived from what it writes to stdout and stderr, the exit code of
-# commands, and whether it ends normally or by exiting its process or calling an assert* function (aka throwing an exception).
 #
-# You can also include setup code in the testcase. The 'ut setup' and 'ut test' commands are used to identify setup vs test code.
-# Setup code can also be any code but its output is treated differently. Writing to stderr, letting a command end with a non-zero
-# exit code, exitting the process, or calling an assert* function from within setup code will result in the testcase being considered
-# as not completed and therefore any output that it may or may not have produced will not be used. A testcase ending in this way
-# is failed, but it does not mean that the target code it is testing ahs an error. Instead, the prerequisites to testing that target
-# code could not be met therfore it is unknown if the target code has a problem. Once the cause of the setup failing is fixed, the
-# testcase can be ran again.
+# Creating Testcases:
+# A unit test script can have multiple, independent testcase functions and for each function can specify multiple command lines
+# to invoke the function with. Each (function + arguments) command line is a unique testcase that run independently of other test
+# cases.
 #
-# Also, the output of setup code is merged with the testcase output prefixed by # so that it will be considered comments and not
-# part of the real output that will determine if the testcase passes or failed.
+# **Testcase Functions** : Any function defined in the file that starts with ut_* is a testcase function. By default the test
+# case function produces one testcase that invokes the function with no arguments.
+#    function ut_myTest() {
+#       echo "hello word"
+#    }
 #
-# Example
+# **Testcase Arguments** : Optionally, a bash array variable can be defined with the same name as the unit test function. Each
+# array entry in that variable will become a unique testcase that invokes the corresponding testcase function with the arguments
+# defined in that entry's value. Each space separated token in the value will be passed as a separate argument. Arguments with
+# spaces or are empty, or contain other special characters can be escaped using the convention described in
+# `man(3) strEscapeToToken`. A conventient way to do that is with the syntax `$(cmdline "arg 1" "my secound arg" ...)`.
+#
+# Note that if the array variable is defined, a testcase with empty arguments will no longer be defined automatically but you can
+# create such a testcase by including an array element with an empty value.
+#
+# The index of the array elements will become part of the testcase name. If the variable is a numeric (-a) array, the indexes will
+# only be numbers. If you make it an associative array (-A), you can use descriptive names to distinguish the testcases that all
+# use the same testcase function.
+#
+# Its good practice to explicitly name the indexes even when its a numeric array because its best if each testcase has a persistent
+# name that will not change if you insert a new testcase above it in the list.
+#     ut_myTest=(
+#        [0]=""
+#        [1]="$(cmdline "this and that" "second Arg")"
+#     )
+#  ... or ...
+#     declare -A ut_myTest=(
+#        [defaultArgs]=""
+#        [somethingCool]="$(cmdline "this and that" "second Arg")"
+#     )
+#
+# **Testcase Names** : Each testcase has a name derived from the file that its in, the testcase function and the array index of
+# the element that defines the arguments to the testcase function.
+#      <utFile*>:<utFunction*>:<utCmdlineName>
+# '*' note that  <utFile> and <utFunction> have the trailing '.ut' and leading 'ut_' removed to make the names a little shorter and
+# clearer.
+#
+#
+# Output of a Testcase:
+# Inside the testcase function, you can put any code. It can invoke external commands or bash functions. It can import bash
+# libraries as needed.
+#
+# The purpose of the testcase is to invoke some target code that the testcase professes to test and produce output that indicates
+# what that target code did. Typically, the testcase function does not try to tell if the output is correct or not. Instead, the
+# correct behavior is documented in the testcase's plato data saved in the project.
+#
+# The testcase output is derived from what it writes to stdout and stderr, the exit code of each command called directly by from
+# the testcase function, and whether it ends normally or exits its process (possibly by calling an assert* function).
+#
+# The execution of the direct code in the testcase function is monitored by a DEBUG trap which anotates the output. Each command
+# is echoed to stdout so that the arguments passed to it becomes part of the output. This also makes it easier to read the output
+# and determine what has happened. Its kind of like a captured terminal session. The goal should be that someone can read the test
+# case output and know what output is expected from the target code being excercised.
+#
+# Sometimes the expected output of the code being tested will vary from run to run. For example, if the output conatians the PID
+# of the running process. In this case, you can define a filter, either in a specific testcase or for a group of testcases that
+# will match and 'redact' that output. The `ut filter ...` directive will be described in a later section.
+#
+# Testcase States:
+# When executed under the `bg-dev tests ...` framework, each executed testcase will end in one of four states -- pass, fail,
+# unitializaed or error.
+#  * pass: means that the aggregate output is what we expect
+#  * fail: means that the aggregate output is not what we expect
+#  * unitializaed : means that the expected behavior has not yet be documented
+#  * error: means that the testcase ran into a problem that prevented it from completing so the output should not be considered.
+#           The error is typically in the behavior of code used in a setup section of the testcase so this state does not say
+#           anything about whether the target code has an error. In fact, the more likely interpretation is that the testcase would
+#           have passed if not for a prerequisite problem.
+#
+# The `bg-dev tests` system maintains '.plato' files for each unit test script file. These files contain the expected output and
+# comparing the actual output of each testcase with its corresponding section in the '.plato' file is what determines whether the
+# testcase passes or fails. The text does not have to be exact. Only differences in uncommented lines are considered important
+# which allows us to update the comments in the testcases without causing them to fail.
+#
+# 'bg-dev tests show ...' will open a comparison application to show you differences if any between the plato data and the actual
+# output of the last run. If there are differences, you need to decide if the new output of the testcase is now correct and update
+# the plato data to match, or if the new output is incorrect and the code needs to change so that it is correct again.
+#
+# Note that even though the spirit of this system is to have the testcase just reveal the bevaior of the target code and to document
+# the correct behavior in the plato data, there may be times when its more efficient to algoithmically determine pass/fail. In this
+# case, a testcase could simply output 'pass' or 'fail' and the plato data would be set to 'pass'.
+#
+# If a project already has a unit test framework that can be invoked from the command line, you could integrate it into the bg-dev
+# tests framework by creating a testcase that invokes the other system and setting the plato data to indicate the expected output
+# of that system when the tests it performs all pass.
+#
+# Running Testcases directly:
+# When developing code and testcases it is convenient to run testcases directly without the framework getting between you and
+# the direct output. Unit test scripts use the bg-utRunner interpretter line to make them indepentently runnable. They automatically
+# support bash command line completion to make it easy to run withoutout looking up the syntax or remembering the exact testcase
+# name you want to run.
+# **Syntax**
+#    <utFile> list
+#    <utFile> run <testcaseName>
+#    <utFile> debug <testcaseName>
+#
+# The idea is that writing a unit test script should be no harder than writing the simplest of one off test scripts to excercise
+# some code you are working on so it encourages you to test your code during development in a way that is repeatable and participates
+# in the ongoing software development lifecycle of the project.
+#
+# When ran this way, the output that would be compared to the plato data is just written to stdout without comparing it to plato
+# or trying to determine if it passes. If you want to know if it passes, run it with `bg-dev tests ...`.
+#
+# The debug sub command launches the debugger stopped at the start of the specified testcase. Otherwise you would have to step
+# through the unit test runner code to get there.
+#
+# It is anticipated that an IDE could use the direct run feature to show the output in various ways to achieve a tighter workflow.
+#
+# UT Directives:
+# The body of a testcase function can contain testcase directives that start with `ut ...`.
+#
+# **ut setup**
+# ** ut test**
+# All code in the testcase function is either in a setup section or a test section. The default is 'test' when the function starts.
+# The directive `ut setup` switches to 'setup' and `ut test` switches to 'test'.
+#
+# The code in a setup section is not part of the test and its output will all be commented so that it wont be part of determining
+# pass or fail. Also, if it writes to stderr or any direct command returns non-zero, the testcase will stop and its state will be
+# 'error'. That same behavior in a 'test' section is perfectly fine and just becomes part of the output.
+#
+# You can switch back and forth between setup and test sections as much as you want and having multiple setup/test sections can be
+# useful to separate logical parts of the test.
+#
+# setup sections typically create the environment needed to run the target code.
+#
+# **ut expect "..."**
+# The expect directive is a comment with the specific intention to tell the reader what to expect in the output that follows.
+#
+# **ut filter '<matchRegEx>[###<replaceText>]'**
+# When the code being tested has output that changes with each run, a filter can be used to 'redact' that output so that the output
+# will be stable and not change each time its run. Changing output would not work in this system because it would never match the
+# plato data. The filter is applied to the final output before its compared to the plato file. When ran directly filters are not
+# applied to the output to the terminal.
+#    <matchRegEx> uses the syntax supported by gawk.
+#    <replaceText> may refere to capture groups from <matchRegEx> like '\1'. The default value for <replaceText> is "redacted".
+#     example: ut filter 'heap_([^_]*)_([^_ ]*)###heap_\1_<redacted>' changes heap_Ar_87ABC to heap_Ar_<redacted>
+#
+# There are some builtin, global filters that match names of temorary files created with mktemp and heap variables used in the bash
+# object library.
+#
+# An alternative to using the filter directive would be to capture the output to a string, algorithmically test to see it it is what
+# you expect and then write output indicating if it passed your test or not.
+#
+# Example Testcase using some directives...
 #    function ut_testMyTargetFunction() {
 #       ut setup
 #       local p1="$1"
@@ -47,45 +203,13 @@
 #       prinftVars p1 p2
 #
 #       ut test
+#       ut expect "the first output to come before the last output and all M&Ms to be only green"
 #       myTargetFunction "$p1" "$p2"
 #    }
-# In the setup section, printing the p1 and p2 variables will produce commented output that wont influance whether the testcase
-# passes or fails but it serves to make the output easier to read and understand. The developer can more easily see that if the
-# output makes sense because they see the value of the arguments sent to myTargetFunction.
+# In the setup section, printing the p1 and p2 variables will produce commented output that wont influence whether the testcase
+# passes or fails but it serves to make the output easier to read and understand. The reader can more easily see that if the
+# output of myTargetFunction makes sense because they see the values of the arguments sent to it.
 #
-# Example
-#    declare -A ut_testSomething=(
-#        [one]="$(cmdLine "45" "this and that")"
-#        [two]="$(cmdLine "42" "is the answer")"
-#    )
-#    function ut_testSomething() {
-#         ...
-#    }
-# This blocks creates two testcases that both use the same function but with different arguments to invoke that function. Note that
-# using the cmdLine helper function will result in the arguments being escaped correctly so that you can write them as if you are
-# calling a function directly.
-# The utIDs created will be...
-#    testSomething:one
-#    testSomething:two
-# If the array by the same name is not defined, then a ut_ function will produce one testcase with an empty last part like...
-#    testMyTargetFunction:
-# Note that the ut_ is removed in the utIDs. With the leading ut_ the token is a utFunc (function name) and without it, the token
-# is the testcase base name.
-#
-# Debugging A Testcase:
-# While writing a new testcase or debugging a failed testcase you can invoke it directly from a terminal (as opposed to from within
-# the unit test framework). A major design goal of this system is that writing a testcase should be no harder that writing a
-# simple test script to excercise some new feature so that it encourages the creation of testcases during development. You have to
-# see if that new function works so you might as well put that test code in a testcase function and then invoke it from the
-# terminal (or IDE) to see what happens.
-#
-# When invoked directly, the script does not even pull in the framework code so its quick and light. Unit test scripts get bash
-# command completion of the testcase utIDs within them automatically so its easy to add a new test case and then go to the terminal
-# to invoke it without having to type out the whole name.
-#
-# Even though this library uses the DEBUG, EXIT, and ERR traps to monitor the testcase function's progress, it is compatible with
-# the traps set by the debugger. To run a testcase in the debugger, either use the debug subcommand to the ut script or place a
-# bgtraceBreak statement in your testcase function at the point you want to debug.
 #
 # See Also:
 #    man(1) bg-unitTest.ut

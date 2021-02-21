@@ -117,8 +117,11 @@
 #                     out to be the interupted line number but it will continue to increment with each line of the trap handler so
 #                     the handler must copy LINENO is its first line, before any carrage return in the handler string.
 function bgStackFreeze() {
-	local readCodeFlag="true"
-	local i
+	local readCodeFlag="true" allFlag i
+	while [ $# -gt 0 ]; do case $1 in
+		-a|--all) allFlag="-f" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	# what to do if we already have a frozen stack
 	# TODO: circa 2021-02: Try/Catch never calls bgStackFreezeDone because the block after Catch needs to access it and so far, we
@@ -135,7 +138,6 @@ function bgStackFreeze() {
 	local interuptedLineNo="$3"
 
 	### copy the builtin bash stack array vars. The only modification is that we optionally remove on or more frames from the bottom
-	declare -g bgStackVarNamesBUILTIN=(bgFUNCNAME bgBASH_SOURCE bgBASH_LINENO bgBASH_ARGC)
 	declare -ga bgFUNCNAME=("${FUNCNAME[@]:$ignoreFrames}")
 	declare -ga bgBASH_SOURCE=("${BASH_SOURCE[@]:$ignoreFrames}")
 	declare -ga bgBASH_LINENO=("${BASH_LINENO[@]:$ignoreFrames}")
@@ -197,12 +199,12 @@ function bgStackFreeze() {
 			# there is a quirk in BASH that if there are no additional args sent to the sourced script, the <scriptName> is in the
 			# BASH_ARGV array as the single argument to 'source'. However, if you pass args like 'source <scriptName> <arg1>..<argN>'
 			# then <arg1>..<argN> are in BASH_ARGV but <scriptName> is not. This block attempts to detect when <scriptName> is
-			# missing and add it back in. This is one, rare time when we change the bg* original stack vars.
+			# missing and add it back in.
 			local scriptPath="${bgBASH_SOURCE[@]: -1}"   # <scriptName> is the first entry in the BASH_SOURCE array b/c that is what source executes
 			local argc="${bgSTK_argc[@]: -1}"
-			if [ ${argc:-0} -gt 1 ] || [[ ! "${bgBASH_ARGV[@]: -1}" =~ ${scriptPath##*/}$ ]]; then
-				((stackSize>1)) &&  (( bgSTK_argc[${#bgSTK_argc[@]}-2]++ ))
-				bgBASH_ARGV+=("$scriptPath")
+			if [ ${argc:-0} -gt 1 ] || [[ ! "${bgSTK_argv[@]: -1}" =~ ${scriptPath##*/}$ ]]; then
+				((stackSize>1)) &&  (( bgSTK_argc[${#bgSTK_argc[@]}-1]++ ))
+				bgSTK_argv+=("$scriptPath")
 			fi
 			bgSTK_frmCtx[$stackSize-1]="top.source"
 			;;
@@ -225,8 +227,8 @@ function bgStackFreeze() {
 			# re-construct the simple command from the funcname and args
 			bgSTK_cmdLine[i]="${bgSTK_cmdName[i]}"
 			for ((j=${bgSTK_argc[i]}-1; j>=0; j--)); do
-				local sq=""; [[ "${bgBASH_ARGV[argcOffset+j]}" =~ [[:space:]] ]] && sq="'"
-				bgSTK_cmdLine[i]+=" ${sq}${bgBASH_ARGV[argcOffset+j]}${sq}"
+				local sq=""; [[ "${bgSTK_argv[argcOffset+j]}" =~ [[:space:]] ]] && sq="'"
+				bgSTK_cmdLine[i]+=" ${sq}${bgSTK_argv[argcOffset+j]}${sq}"
 			done
 			((argcOffset+=${bgSTK_argc[i]}))
 		done
@@ -338,7 +340,7 @@ function bgStackFreeze() {
 	# The <interruptedSimpleCmd> and <interuptedLineNo> parameters are passed in only when we are called from the DEBUG trap where
 	# those values are known
 	if [ "$interruptedSimpleCmd" ]; then
-		bgSTK_caller=(     "${bgFUNCNAME[0]}"             "${bgSTK_caller[@]}"    )
+		bgSTK_caller=(     "${bgFUNCNAME[0]}()"           "${bgSTK_caller[@]}"    )
 		bgSTK_cmdName=(    "${interruptedSimpleCmd%% *}"  "${bgSTK_cmdName[@]}"   )
 		bgSTK_cmdLineNo=(  "$interuptedLineNo"            "${bgSTK_cmdLineNo[@]}" )
 		bgSTK_argc=(       "0"                            "${bgSTK_argc[@]}"      )
@@ -403,6 +405,11 @@ function bgStackFreeze() {
 	# these are optional attributes filled in by other functions
 	declare -ga bgSTK_frmSummary=()
 	declare -ga bgSTK_cmdSrc=()
+
+	if [ "$allFlag" ]; then
+		bgStackFreezeAddSourceCodeLines
+		bgStackRenderFormat
+	fi
 }
 
 
@@ -416,7 +423,7 @@ function bgStackFreeze() {
 # removes the global variables created by the bgStackFreeze function
 function bgStackFreezeDone() {
 	unset ${!bgSTK_*}
-	unset "${bgStackVarNamesBUILTIN[@]}" bgBASH_ARGV
+	unset bgFUNCNAME bgBASH_SOURCE bgBASH_LINENO bgBASH_ARGC bgBASH_ARGV
 }
 
 
@@ -435,11 +442,23 @@ function bgStackFreezeAddSourceCodeLines()
 	done
 }
 
-# usage: bgStackRenderFormat
+# usage: bgStackRenderFormat [--callerColumn|--no-callerColumn]
 # this adds the bgSTK_frmSummary array to the set of stack variables created with bgStackFreeze. It loops over the stack and sets
 # each element of the new array to a formatted line suitable for using in a stack trace
+# Options:
+#    --no-callerColumn : dont include the 'caller' column in the stack trace. The 'caller' the bash function (or process) that
+#           contains the source line that caused the simple command in that stack frame to execute.
+#    --callerColumn : (default) include the 'caller' column in the stack trace. The 'caller' the bash function (or process) that
+#           contains the source line that caused the simple command in that stack frame to execute.
 function bgStackRenderFormat()
 {
+	local callerColOpt="--callerColumn"
+	while [ $# -gt 0 ]; do case $1 in
+		--no-callerColumn)     callerColOpt="--no-callerColumn" ;;
+		--callerColumn)        callerColOpt="--callerColumn" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
 	local i maxSrcLoc maxFuncname
 	for ((i=0; i<${#bgSTK_cmdFile[@]}; i++)); do
 		((maxSrcLoc=   (maxSrcLoc>${#bgSTK_cmdLoc[i]}) ? maxSrcLoc   : ${#bgSTK_cmdLoc[i]} ))
@@ -447,11 +466,16 @@ function bgStackRenderFormat()
 	done
 
 	local i; for ((i=0; i<${#bgSTK_cmdFile[@]}; i++)); do
-		# format the standard summary line which describes this stack frame
-		printf -v bgSTK_frmSummary[i] "%-*s : %-*s: %s" \
-			"$maxSrcLoc"    "${bgSTK_cmdLoc[i]}" \
-			"$((maxFuncname))"  "${bgSTK_caller[i]}" \
-			"${bgSTK_cmdLine[i]}"
+		if [ "$callerColOpt" == "--callerColumn" ]; then
+			printf -v bgSTK_frmSummary[i] "%-*s : %-*s: %s" \
+				"$maxSrcLoc"    "${bgSTK_cmdLoc[i]}" \
+				"$((maxFuncname))"  "${bgSTK_caller[i]}" \
+				"${bgSTK_cmdLine[i]}"
+		else
+			printf -v bgSTK_frmSummary[i] "%-*s : %s" \
+				"$maxSrcLoc"    "${bgSTK_cmdLoc[i]}" \
+				"${bgSTK_cmdLine[i]}"
+		fi
 	done
 }
 
@@ -487,6 +511,10 @@ function bgStackRenderFormat()
 #           stack library. Since this library provides a higher level meaning to the stack than BASH intended, there may be edge
 #           cases popping up now and then that need trouble shooting. The 'bg-debugCntr errorStack debugStack/no-debugStack' command
 #           allows turning this flag on and off easily.
+#    --no-callerColumn : dont include the 'caller' column in the stack trace. The 'caller' the bash function (or process) that
+#           contains the source line that caused the simple command in that stack frame to execute.
+#    --callerColumn : (default) include the 'caller' column in the stack trace. The 'caller' the bash function (or process) that
+#           contains the source line that caused the simple command in that stack frame to execute.
 #
 # see Also:
 #    man(1) 'bg-debugCntr trace errorStack ...' to set options for stack traces produced by assertError
@@ -494,11 +522,14 @@ function bgStackRenderFormat()
 function bgStackPrint()
 {
 	local noSrcLookupFlag onelineFlag stackDebugFlag useVarsFlag doUnFreezeFlag ignoreFramesCount showSourceFlag
+	local callerColOpt="--callerColumn"
 	while [ $# -gt 0 ]; do case $1 in
 		--ignoreFramesCount*)  bgOptionGetOpt val: ignoreFramesCount "$@" && shift ;;
-		--oneline)     onelineFlag="oneline" ;;
-		--source) showSourceFlag="--source" ;;
-		--stackDebug)  stackDebugFlag="--stackDebug" ;;
+		--oneline)             onelineFlag="oneline" ;;
+		--no-callerColumn)     callerColOpt="--no-callerColumn" ;;
+		--callerColumn)        callerColOpt="--callerColumn" ;;
+		--source)              showSourceFlag="--source" ;;
+		--stackDebug)          stackDebugFlag="--stackDebug" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
@@ -508,7 +539,7 @@ function bgStackPrint()
 	fi
 
 	[ "$showSourceFlag" ] && bgStackFreezeAddSourceCodeLines
-	bgStackRenderFormat
+	bgStackRenderFormat $callerColOpt
 
 	[ "$stackDebugFlag" ] && bgStackDump
 
@@ -525,10 +556,8 @@ function bgStackPrint()
 		fi
 		[ "$showSourceFlag" ] && echo "${bgSTK_cmdSrc[i]}" | gawk -v onelineFlag="$onelineFlag" '
 			onelineFlag && NR > 1 {exit(0)}
-			{
-				# TODO: detect the terminal size and wrap each line with a continuation indicator.
-				printf("    | %s\n")
-			}
+			NR==1 { printf("      %s\n", $0) }
+			NR>1  { printf("    | %s\n", $0) }
 		'
 	done
 	echo "=================  bottom of stack invoked the stack trace  =========================="
@@ -662,7 +691,7 @@ function bgStackFrameFind() {
 			return -1
 		fi
 	else
-		refFrame=1 # this function is '0', the function that called us is '1'
+		refFrame=0
 	fi
 
 	returnValue $((
@@ -731,8 +760,8 @@ function bgStackFrameGet() {
 		doUnFreezeFlag=1
 	fi
 
-	! varExists bgSTK_cmdSrc && [ "$readCodeFlag" ] && bgStackFreezeAddSourceCodeLines
-	! varExists bgSTK_frmSummary && bgStackRenderFormat
+	[ "${#bgSTK_cmdSrc[@]}" -eq "${#bgSTK_cmdName[@]}" ] || [ "$readCodeFlag" ] && bgStackFreezeAddSourceCodeLines
+	[ "${#bgSTK_frmSummary[@]}" -eq "${#bgSTK_cmdName[@]}" ] || bgStackRenderFormat
 
 	local targetFrame; bgStackFrameFind "$targetFrameTerm" targetFrame
 
@@ -774,7 +803,7 @@ function bgStackMarshal()
 {
 	local mFile="$1"
 
-	local varList="bgSTK_" bgFUNCNAME bgBASH_SOURCE bgBASH_LINENO bgBASH_ARGC bgBASH_ARGV bgSTK_cmdName bgSTK_cmdLineNo bgSTK_argc bgSTK_argv bgSTK_caller bgSTK_cmdFile bgSTK_cmdLine bgSTK_frmSummary bgSTK_cmdSrc
+	local varList="bgFUNCNAME bgBASH_SOURCE bgBASH_LINENO bgBASH_ARGC bgBASH_ARGV bgSTK_cmdName bgSTK_cmdLineNo bgSTK_argc bgSTK_argv bgSTK_caller bgSTK_cmdFile bgSTK_cmdLine bgSTK_frmSummary bgSTK_cmdSrc"
 
 	echo -n  > "$mFile"
 	local -n varname; for varname in $varList; do
@@ -792,7 +821,7 @@ function bgStackUnMarshal()
 {
 	local mFile="$1"
 
-	local varList="bgSTK_" bgFUNCNAME bgBASH_SOURCE bgBASH_LINENO bgBASH_ARGC bgBASH_ARGV bgSTK_cmdName bgSTK_cmdLineNo bgSTK_argc bgSTK_argv bgSTK_caller bgSTK_cmdFile bgSTK_cmdLine bgSTK_frmSummary bgSTK_cmdSrc
+	local varList="bgFUNCNAME bgBASH_SOURCE bgBASH_LINENO bgBASH_ARGC bgBASH_ARGV bgSTK_cmdName bgSTK_cmdLineNo bgSTK_argc bgSTK_argv bgSTK_caller bgSTK_cmdFile bgSTK_cmdLine bgSTK_frmSummary bgSTK_cmdSrc"
 
 	local varname; for varname in $varList; do
 		local line; read -r line

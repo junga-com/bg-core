@@ -1136,8 +1136,10 @@ cmd> $obj.::dontExist.toString
    catch_errorFn='ut_Object_toString'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: ut_Object_toString: The class '#_CLASS' does not contain a static method 'dontExist.toString'
-                               objExpression='$utFunc "${params[@]}"''
+                           error: ut_Object_toString: The class 'Object' does not contain a static method 'dontExist.toString'
+                               objectExpression='$obj.::dontExist.toString'
+                               class='Object'
+                               staticMethod='dontExist.toString''
 ## bg_objects.sh:Object_toString: finished
 ###############################################################################################################################
 
@@ -1328,21 +1330,25 @@ cmd> $obj[doit] p1 # this would look like a method call except the [] means that
 # expect that these two syntax will be interpreted as a missing method when it does not exist
 cmd> Try:
 cmd> $obj.::doit
-** Exception thrown and caught
-catch_errorClass='assertObjExpressionError'
-catch_errorCode='36'
-catch_errorDescription='
-                        error: ut_Object_memberVarReadAccess: The class '#_CLASS' does not contain a static method 'doit'
-                            objExpression='$utFunc "${params[@]}"''
-** Exception thrown and caught
-catch_errorClass='assertObjExpressionError'
-catch_errorCode='36'
-catch_errorDescription='
-                        error: ut_Object_memberVarReadAccess: object method not found
-                            objExpression='$utFunc "${params[@]}"'
-                            class='Object'
-                            methodName='doit'
-                            objectExpression='.doit p1 p2 p3''
+** caught expected exception
+   catch_errorClass='assertObjExpressionError'
+   catch_errorFn='ut_Object_memberVarReadAccess'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: ut_Object_memberVarReadAccess: The class 'Object' does not contain a static method 'doit'
+                               objectExpression='$obj.::doit'
+                               class='Object'
+                               staticMethod='doit''
+** caught expected exception
+   catch_errorClass='assertObjExpressionError'
+   catch_errorFn='ut_Object_memberVarReadAccess'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: ut_Object_memberVarReadAccess: object method not found
+                               objectExpression='$obj.doit p1 p2 p3'
+                               class='Object'
+                               methodName='doit'
+                               objectExpression='.doit p1 p2 p3''
 
 ## bg_objects.sh:Object_memberVarReadAccess: finished
 ###############################################################################################################################
@@ -1365,7 +1371,7 @@ cmd> $obj.:foo
    catch_errorCode='36'
    catch_errorDescription='
                            error: ut_expressionErrors: object method not found
-                               objExpression='$utFunc "${params[@]}"'
+                               objectExpression='$obj.:foo'
                                class='Object'
                                methodName='foo'
                                objectExpression='.:foo''

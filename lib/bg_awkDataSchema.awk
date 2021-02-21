@@ -965,10 +965,10 @@ function tblFmt_get(tblFmt, templateFile            ,rematch,name,value,fileRead
 		if (templateFile) warning("table format template '"templateFile"' not found. using default txt format")
 
 		tblFmt["colLabelType"] = "header"
-		tblFmt["headerCellPre"] = "%csiFaint%%csiReverse%"
-		tblFmt["headerCellPost"]= "%csiNorm%"
+		tblFmt["headerCellPre"] = stringExpand("%csiFaint%%csiReverse%")
+		tblFmt["headerCellPost"]= stringExpand("%csiNorm%")
 		tblFmt["headerRowPre"]   = ""
-		tblFmt["headerRowPost"]  = ""
+		tblFmt["headerRowPost"]  = "\n"
 		tblFmt["cellPre"] = ""
 		tblFmt["cellPost"]= ""
 		tblFmt["cellSep"] = " "

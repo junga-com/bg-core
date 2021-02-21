@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+
+source /usr/lib/bg_core.sh
+import unitTests/libA1.sh  ;$L1;$L2
+import unitTests/libB2.sh  ;$L1;$L2
+import unitTests/libC3.sh  ;$L1;$L2
+
+
+
+stackDebugFlag=""
+while [ $# -gt 0 ]; do case $1 in
+	--details) stackDebugFlag="--stackDebug" ;;
+	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+done
+
+function oob_printBashCompletion()
+{
+	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+
+	awk '
+		$1=="oob_invokeOutOfBandSystem" {arm=1}
+		arm && $1~/^[^ )]*[)]$/ && $1!="*)" {
+			print gensub("[)]$","","g",$1)
+		}
+	' $0
+	exit
+}
+
+function banner()
+{
+	echo "## expect stack summary = $*"
+}
+
+function f1() { bgStackPrint $stackDebugFlag; }
+function f2() { f1; }
+function f3() { f2; }
+function f4() { f3; }
+
+function aNoopCommand() { : ; }
+
+function oneDown() {
+	aNoopCommand
+	[ ! "$1" ] && bgStackPrint $stackPrintOpts
+}
+
+
+oob_invokeOutOfBandSystem "$@"
+
+cmd="$1"
+
+case $1 in
+	noop) : ;;
+	f4) f4 ;;
+	top)
+		banner scriptTop
+		bgStackPrint $stackPrintOpts ;;
+	top_DBG)
+		banner scriptTop DEBUGGER
+		builtin trap 'dbgLINENO="$LINENO"
+			if [[ "$BASH_COMMAND" =~ ^aNoopCommand ]]; then
+				bgStackFreeze --all "" "$BASH_COMMAND" "$dbgLINENO"
+				bgStackPrint $stackPrintOpts
+				builtin trap "" DEBUG
+				(exit 1)
+			fi
+		' DEBUG
+		aNoopCommand ;;
+
+	func_ExplicitFreeze)
+		banner scriptTop..func "-- call bgStackFreeze explicitly before calling bgStackPrint"
+		c3 ;;
+	func_NoFreeze)
+		banner scriptTop..func "-- call bgStackPrint relying on implicit freeze"
+		c3 a1NoFreeze ;;
+	func_DBG)
+		banner scriptTop..func DEBUGGER
+		c3 a1DBG ;;
+
+	top_USR1)
+		banner scriptTop intr:USR1
+		trap 'bgStackPrint $stackPrintOpts' USR1
+		kill -USR1 $BASHPID ;;
+	top_USR1_func)
+		banner scriptTop intr:USR1..func
+		trap 'oneDown' USR1
+		kill -USR1 $BASHPID ;;
+
+	top_USR1FirstLine_DBG)
+		banner scriptTop interuptUSR1FirstLine DEBUGGER
+		trap 'aNoopCommand' USR1
+		builtin trap 'dbgLINENO="$LINENO"
+			if [ "$LINENO" == "2" ]; then
+				bgStackFreeze --all "" "$BASH_COMMAND" "$dbgLINENO"
+				bgStackPrint $stackPrintOpts
+				builtin trap "" DEBUG
+			fi
+		' DEBUG
+		kill -USR1 $BASHPID ;;
+	top_USR1_DBG)
+		banner scriptTop intr:USR1 DEBUGGER
+		trap 'aNoopCommand' USR1
+		builtin trap 'dbgLINENO="$LINENO"
+			if [[ "$BASH_COMMAND" =~ ^aNoopCommand ]]; then
+				bgStackFreeze --all "" "$BASH_COMMAND" "$dbgLINENO"
+				bgStackPrint $stackPrintOpts
+				builtin trap "" DEBUG
+				(exit 1)
+			fi
+		' DEBUG
+		kill -USR1 $BASHPID ;;
+	top_USR1_func_DBG)
+		banner scriptTop intr:USR1..func DEBUGGER
+		trap 'oneDown off' USR1
+		builtin trap 'dbgLINENO="$LINENO"
+			if [[ "$BASH_COMMAND" =~ ^aNoopCommand ]]; then
+				bgStackFreeze --all "" "$BASH_COMMAND" "$dbgLINENO"
+				bgStackPrint $stackPrintOpts
+				builtin trap "" DEBUG
+				(exit 1)
+			fi
+		' DEBUG
+		kill -USR1 $BASHPID ;;
+
+	func_USR1)
+		banner scriptTop..func intr:USR1
+		c3USR1 ;;
+	func_USR1_func)
+		banner scriptTop..func intr:USR1..func
+		c3USR1_func ;;
+	func_USR1FirstLine_DBG)
+		banner scriptTop..func interuptUSR1FirstLine DEBUGGER
+		c3USR1FirstLine_DBG ;;
+	func_USR1_DBG)
+		banner scriptTop..func intr:USR1 DEBUGGER
+		c3USR1_DBG ;;
+	func_USR1_func_DBG)
+		banner scriptTop..func intr:USR1..func DEBUGGER
+		c3USR1_func_DBG ;;
+
+	*) assertError -v cmd "unknown command"
+esac

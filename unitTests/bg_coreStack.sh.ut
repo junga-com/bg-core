@@ -1,0 +1,145 @@
+#!/usr/bin/env bg-utRunner
+
+declare -A ut_bgStackFind=(
+	[0]="$(cmdLine "")"
+	[1]="$(cmdLine "1")"
+	[2]="$(cmdLine "2")"
+	[3]="$(cmdLine "3")"
+	[tooHigh]="$(cmdLine "40")"
+	[tooLow]="$(cmdLine "-40")"
+	[byName]="$(cmdLine "c3")"
+	[byNameAndOffset]="$(cmdLine "c3:1")"
+	[byNameAndOffsetPlus]="$(cmdLine "c3:+1")"
+	[byNameAndTooLow]="$(cmdLine "c3:-100")"
+	[byNameAndEmpty]="$(cmdLine "c3:")"
+	[byNameAndOffsetNeg]="$(cmdLine "c3:-1")"
+	[byNameReg]="$(cmdLine "c.*")"
+	[byNameRegOffset]="$(cmdLine "c.*:1")"
+	[byNameNotFound]="$(cmdLine "somethingNotOnStack")"
+	[byNameAny]="$(cmdLine ".*")"
+)
+function ut_bgStackFind()
+{
+	ut setup
+	eval 'function a1() {
+		bgStackFreeze
+		local level; bgStackFrameFind "$1" level
+		local funcname=("${FUNCNAME[@]:0:5}" "<main>")
+		printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "'"$*"'" = [$level]="${funcname[$level]}
+	}'
+	function b2() { a1 "$@"; }          ; :
+	function c3() { b2 "$@"; }          ; :
+	function d4() { c3 "$@"; }          ; :
+	type a1
+
+	ut test
+	ut expect "that the identified frame reflects '$*', the argument passed to bgStackFrameFind"
+	d4 "$@"
+}
+
+function ut_bgStackFind2()
+{
+	ut setup
+	function assertA1() { bgStackFreeze; bgStackFrameFind "assert.*" level; fname="${FUNCNAME[$level]}" ; printfVars fname; } ; :
+	function assertB2() { assertA1 "$@"; }          ; :
+	function assertC3() { assertB2 "$@"; }          ; :
+	function d4() { assertC3 "$@"; }          ; :
+	type assertA1
+
+	ut test
+	ut expect "that fname is assertC3 which is the last consequetive assert* function on the stack"
+	d4 "$@"
+}
+
+
+
+
+declare -A ut_bgStackGetFrame=(
+	[default]="$(cmdLine      )"
+	[0]="$(      cmdLine   "0")"
+	[1]="$(      cmdLine   "1")"
+	[2]="$(      cmdLine   "2")"
+# varies based on how bg-dev is invoked	[tooHigh]="$(cmdLine  "40")"
+	[tooLow]="$( cmdLine "-40")"
+	[byName]="$( cmdLine  "c3")"
+)
+function ut_bgStackGetFrame()
+{
+	ut setup
+	ut filter "[[]cmdLineNo( *)[]]='.*'###[cmdLineNo\1]='<redacted>'"
+	ut filter "[[]cmdFile( *)[]]='.*/([^/]*)'###[cmdFile\1]='<redacted>\2'"
+	ut filter "[(][0-9]*[)]:###(<redacted>):"
+
+	function a1() { local -A frame; bgStackFrameGet "$1" frame; printfVars frame; } ; :
+	function b2() { a1 "$@"; }          ; :
+	function c3() { b2 "$@"; }          ; :
+	function d4() { c3 "$@"; }          ; :
+	type a1
+
+	ut test
+	ut expect "that the frame printed reflects '$*', the argument passed to bgStackFrameGet"
+	d4 "$@"
+}
+
+
+function ut_bgStackMarshal()
+{
+	ut setup
+	ut filter '[(][0-9]*[)]:###(<redacted>):'
+	local tmpFile; bgmktemp tmpFile
+
+	function a1() { bgStackFreeze --all; bgStackMarshal "$tmpFile"; } ; :
+	function b2() { a1 "$@"; }          ; :
+	function c3() { b2 "$@"; }          ; :
+	function d4() { c3 "$@"; }          ; :
+
+	ut test
+	d4
+	ut expect "that the stack performed on the next line begins with this function "
+	bgStackFreeze --all ; echo "   [0] ${bgSTK_frmSummary[0]}"
+
+	ut expect "that now after restoring stack saved in function a1, the stack variables reflect the stack from that place "
+	bgStackUnMarshal "$tmpFile"
+
+	for ((i=0; i<5; i++)); do echo "   [$i] ${bgSTK_frmSummary[$i]}"; done
+}
+
+
+declare -A ut_bgStackFreeze=(
+	[top]="top"
+	[top_DBG]="top_DBG"
+	[func_ExplicitFreeze]="func_ExplicitFreeze"
+	[func_NoFreeze]="func_NoFreeze"
+	[func_DBG]="func_DBG"
+	[top_USR1]="top_USR1"
+	[top_USR1_func]="top_USR1_func"
+	[top_USR1FirstLine_DBG]="top_USR1FirstLine_DBG"
+	[top_USR1_DBG]="top_USR1_DBG"
+	[top_USR1_func_DBG]="top_USR1_func_DBG"
+	[func_USR1]="func_USR1"
+	[func_USR1_func]="func_USR1_func"
+	[func_USR1FirstLine_DBG]="func_USR1FirstLine_DBG"
+	[func_USR1_DBG]="func_USR1_DBG"
+	[func_USR1_func_DBG]="func_USR1_func_DBG"
+)
+function ut_bgStackFreeze()
+{
+	ut setup
+	ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+	ut test
+	unitTests/bgStackTest "$1"
+}
+
+declare -A ut_topStackTypes=(
+	[main]="main"
+	[source]="source"
+	[srcdFunc]="srcdFunc"
+)
+function ut_topStackTypes()
+{
+	case $1 in
+		main)     unitTests/bgStackTest f4 ;;
+		source)   (bash -c 'source unitTests/bgStackTest f4') ;;
+		srcdFunc) (bash -c 'source unitTests/bgStackTest noop; f4') ;;
+	esac
+}

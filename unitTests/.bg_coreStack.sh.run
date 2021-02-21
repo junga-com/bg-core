@@ -1,0 +1,1338 @@
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects '', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind  = [0]=a1
+
+## bg_coreStack.sh:bgStackFind:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "1" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects '1', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind 1 = [1]=b2
+
+## bg_coreStack.sh:bgStackFind:1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "2" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects '2', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind 2 = [2]=c3
+
+## bg_coreStack.sh:bgStackFind:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "3" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects '3', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind 3 = [3]=d4
+
+## bg_coreStack.sh:bgStackFind:3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:tooHigh start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "40" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects '40', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind 40 = [-1]=<main>
+
+## bg_coreStack.sh:bgStackFind:tooHigh finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:tooLow start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "-40" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects '-40', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind -40 = [0]=a1
+
+## bg_coreStack.sh:bgStackFind:tooLow finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byName start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "c3" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'c3', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind c3 = [2]=c3
+
+## bg_coreStack.sh:bgStackFind:byName finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameAndOffset start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "c3:1" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'c3:1', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind c3:1 = [3]=d4
+
+## bg_coreStack.sh:bgStackFind:byNameAndOffset finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameAndOffsetPlus start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "c3:+1" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'c3:+1', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind c3:+1 = [3]=d4
+
+## bg_coreStack.sh:bgStackFind:byNameAndOffsetPlus finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameAndTooLow start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "c3:-100" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'c3:-100', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind c3:-100 = [0]=a1
+
+## bg_coreStack.sh:bgStackFind:byNameAndTooLow finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameAndEmpty start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "c3:" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'c3:', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind c3: = [2]=c3
+
+## bg_coreStack.sh:bgStackFind:byNameAndEmpty finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameAndOffsetNeg start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "c3:-1" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'c3:-1', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind c3:-1 = [1]=b2
+
+## bg_coreStack.sh:bgStackFind:byNameAndOffsetNeg finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameReg start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "c.*" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'c.*', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind c.* = [2]=c3
+
+## bg_coreStack.sh:bgStackFind:byNameReg finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameRegOffset start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "c.*:1" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'c.*:1', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind c.*:1 = [3]=d4
+
+## bg_coreStack.sh:bgStackFind:byNameRegOffset finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameNotFound start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind "somethingNotOnStack" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects 'somethingNotOnStack', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind somethingNotOnStack = []=a1
+
+## bg_coreStack.sh:bgStackFind:byNameNotFound finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind:byNameAny start
+## expect: 
+
+##----------
+## setup
+##     | cmd> }'
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     local level;
+##     |     bgStackFrameFind "$1" level;
+##     |     local funcname=("${FUNCNAME[@]:0:5}" "<main>");
+##     |     printfVars --prefix="# " FUNCNAME:funcname --prefix="" -l"bgStackFrameFind ".*" = [$level]="${funcname[$level]}
+##     | }
+
+##----------
+## test
+
+# expect that the identified frame reflects '.*', the argument passed to bgStackFrameFind
+cmd> d4 "$@"
+# FUNCNAME[]
+#         [0]='a1'
+#         [1]='b2'
+#         [2]='c3'
+#         [3]='d4'
+#         [4]='ut_bgStackFind'
+#         [5]='<main>'
+bgStackFrameFind .* = [8]=
+
+## bg_coreStack.sh:bgStackFind:byNameAny finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFind2: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> function assertA1() { bgStackFreeze; bgStackFrameFind "assert.*" level; fname="${FUNCNAME[$level]}" ; printfVars fname; } ; :
+##     | cmd> function assertB2() { assertA1 "$@"; }          ; :
+##     | cmd> function assertC3() { assertB2 "$@"; }          ; :
+##     | cmd> function d4() { assertC3 "$@"; }          ; :
+##     | cmd> type assertA1
+##     | assertA1 is a function
+##     | assertA1 () 
+##     | { 
+##     |     bgStackFreeze;
+##     |     bgStackFrameFind "assert.*" level;
+##     |     fname="${FUNCNAME[$level]}";
+##     |     printfVars fname
+##     | }
+
+##----------
+## test
+
+# expect that fname is assertC3 which is the last consequetive assert* function on the stack
+cmd> d4 "$@"
+fname='assertC3'
+
+## bg_coreStack.sh:bgStackFind2: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackGetFrame:default start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '[[]cmdLineNo( *)[]]='.*'###[cmdLineNo\1]='<redacted>''
+##     | ut filter '[[]cmdFile( *)[]]='.*/([^/]*)'###[cmdFile\1]='<redacted>\2''
+##     | ut filter '[(][0-9]*[)]:###(<redacted>):'
+##     | cmd> function a1() { local -A frame; bgStackFrameGet "$1" frame; printfVars frame; } ; :
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     local -A frame;
+##     |     bgStackFrameGet "$1" frame;
+##     |     printfVars frame
+##     | }
+
+##----------
+## test
+
+# expect that the frame printed reflects '', the argument passed to bgStackFrameGet
+cmd> d4 "$@"
+frame[]
+     [cmdFile   ]='<redacted>bg_coreStack.sh.ut'
+     [frmSummary]='bg_coreStack.sh.ut(<redacted>):    : b2()                : a1'
+     [caller    ]='b2()'
+     [cmdArgc   ]='0'
+     [cmdName   ]='a1'
+     [cmdLineNo ]='<redacted>'
+     [cmdSrc    ]='function b2() { a1 "$@"; }          ; :'
+     [cmdLine   ]='a1'
+     [cmdLoc    ]='bg_coreStack.sh.ut(<redacted>):'
+
+## bg_coreStack.sh:bgStackGetFrame:default finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackGetFrame:0 start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '[[]cmdLineNo( *)[]]='.*'###[cmdLineNo\1]='<redacted>''
+##     | ut filter '[[]cmdFile( *)[]]='.*/([^/]*)'###[cmdFile\1]='<redacted>\2''
+##     | ut filter '[(][0-9]*[)]:###(<redacted>):'
+##     | cmd> function a1() { local -A frame; bgStackFrameGet "$1" frame; printfVars frame; } ; :
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     local -A frame;
+##     |     bgStackFrameGet "$1" frame;
+##     |     printfVars frame
+##     | }
+
+##----------
+## test
+
+# expect that the frame printed reflects '0', the argument passed to bgStackFrameGet
+cmd> d4 "$@"
+frame[]
+     [cmdFile   ]='<redacted>bg_coreStack.sh.ut'
+     [frmSummary]='bg_coreStack.sh.ut(<redacted>):    : b2()                : a1 0'
+     [caller    ]='b2()'
+     [cmdArgc   ]='1'
+     [cmdName   ]='a1'
+     [cmdLineNo ]='<redacted>'
+     [cmdSrc    ]='function b2() { a1 "$@"; }          ; :'
+     [cmdLine   ]='a1 0'
+     [cmdLoc    ]='bg_coreStack.sh.ut(<redacted>):'
+     [arg1      ]='0'
+
+## bg_coreStack.sh:bgStackGetFrame:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackGetFrame:1 start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '[[]cmdLineNo( *)[]]='.*'###[cmdLineNo\1]='<redacted>''
+##     | ut filter '[[]cmdFile( *)[]]='.*/([^/]*)'###[cmdFile\1]='<redacted>\2''
+##     | ut filter '[(][0-9]*[)]:###(<redacted>):'
+##     | cmd> function a1() { local -A frame; bgStackFrameGet "$1" frame; printfVars frame; } ; :
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     local -A frame;
+##     |     bgStackFrameGet "$1" frame;
+##     |     printfVars frame
+##     | }
+
+##----------
+## test
+
+# expect that the frame printed reflects '1', the argument passed to bgStackFrameGet
+cmd> d4 "$@"
+frame[]
+     [cmdFile   ]='<redacted>bg_coreStack.sh.ut'
+     [frmSummary]='bg_coreStack.sh.ut(<redacted>):    : c3()                : b2 1'
+     [caller    ]='c3()'
+     [cmdArgc   ]='1'
+     [cmdName   ]='b2'
+     [cmdLineNo ]='<redacted>'
+     [cmdSrc    ]='function c3() { b2 "$@"; }          ; :'
+     [cmdLine   ]='b2 1'
+     [cmdLoc    ]='bg_coreStack.sh.ut(<redacted>):'
+     [arg1      ]='1'
+
+## bg_coreStack.sh:bgStackGetFrame:1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackGetFrame:2 start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '[[]cmdLineNo( *)[]]='.*'###[cmdLineNo\1]='<redacted>''
+##     | ut filter '[[]cmdFile( *)[]]='.*/([^/]*)'###[cmdFile\1]='<redacted>\2''
+##     | ut filter '[(][0-9]*[)]:###(<redacted>):'
+##     | cmd> function a1() { local -A frame; bgStackFrameGet "$1" frame; printfVars frame; } ; :
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     local -A frame;
+##     |     bgStackFrameGet "$1" frame;
+##     |     printfVars frame
+##     | }
+
+##----------
+## test
+
+# expect that the frame printed reflects '2', the argument passed to bgStackFrameGet
+cmd> d4 "$@"
+frame[]
+     [cmdFile   ]='<redacted>bg_coreStack.sh.ut'
+     [frmSummary]='bg_coreStack.sh.ut(<redacted>):    : d4()                : c3 2'
+     [caller    ]='d4()'
+     [cmdArgc   ]='1'
+     [cmdName   ]='c3'
+     [cmdLineNo ]='<redacted>'
+     [cmdSrc    ]='function d4() { c3 "$@"; }          ; :'
+     [cmdLine   ]='c3 2'
+     [cmdLoc    ]='bg_coreStack.sh.ut(<redacted>):'
+     [arg1      ]='2'
+
+## bg_coreStack.sh:bgStackGetFrame:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackGetFrame:tooLow start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '[[]cmdLineNo( *)[]]='.*'###[cmdLineNo\1]='<redacted>''
+##     | ut filter '[[]cmdFile( *)[]]='.*/([^/]*)'###[cmdFile\1]='<redacted>\2''
+##     | ut filter '[(][0-9]*[)]:###(<redacted>):'
+##     | cmd> function a1() { local -A frame; bgStackFrameGet "$1" frame; printfVars frame; } ; :
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     local -A frame;
+##     |     bgStackFrameGet "$1" frame;
+##     |     printfVars frame
+##     | }
+
+##----------
+## test
+
+# expect that the frame printed reflects '-40', the argument passed to bgStackFrameGet
+cmd> d4 "$@"
+frame[]
+     [cmdFile   ]='<redacted>bg_coreStack.sh.ut'
+     [frmSummary]='bg_coreStack.sh.ut(<redacted>):    : b2()                : a1 -40'
+     [caller    ]='b2()'
+     [cmdArgc   ]='1'
+     [cmdName   ]='a1'
+     [cmdLineNo ]='<redacted>'
+     [cmdSrc    ]='function b2() { a1 "$@"; }          ; :'
+     [cmdLine   ]='a1 -40'
+     [cmdLoc    ]='bg_coreStack.sh.ut(<redacted>):'
+     [arg1      ]='-40'
+
+## bg_coreStack.sh:bgStackGetFrame:tooLow finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackGetFrame:byName start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '[[]cmdLineNo( *)[]]='.*'###[cmdLineNo\1]='<redacted>''
+##     | ut filter '[[]cmdFile( *)[]]='.*/([^/]*)'###[cmdFile\1]='<redacted>\2''
+##     | ut filter '[(][0-9]*[)]:###(<redacted>):'
+##     | cmd> function a1() { local -A frame; bgStackFrameGet "$1" frame; printfVars frame; } ; :
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+##     | cmd> type a1
+##     | a1 is a function
+##     | a1 () 
+##     | { 
+##     |     local -A frame;
+##     |     bgStackFrameGet "$1" frame;
+##     |     printfVars frame
+##     | }
+
+##----------
+## test
+
+# expect that the frame printed reflects 'c3', the argument passed to bgStackFrameGet
+cmd> d4 "$@"
+frame[]
+     [cmdFile   ]='<redacted>bg_coreStack.sh.ut'
+     [frmSummary]='bg_coreStack.sh.ut(<redacted>):    : d4()                : c3 c3'
+     [caller    ]='d4()'
+     [cmdArgc   ]='1'
+     [cmdName   ]='c3'
+     [cmdLineNo ]='<redacted>'
+     [cmdSrc    ]='function d4() { c3 "$@"; }          ; :'
+     [cmdLine   ]='c3 c3'
+     [cmdLoc    ]='bg_coreStack.sh.ut(<redacted>):'
+     [arg1      ]='c3'
+
+## bg_coreStack.sh:bgStackGetFrame:byName finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackMarshal: start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '[(][0-9]*[)]:###(<redacted>):'
+##     | cmd> local tmpFile; bgmktemp tmpFile
+##     | cmd> function a1() { bgStackFreeze --all; bgStackMarshal "$tmpFile"; } ; :
+##     | cmd> function b2() { a1 "$@"; }          ; :
+##     | cmd> function c3() { b2 "$@"; }          ; :
+##     | cmd> function d4() { c3 "$@"; }          ; :
+
+##----------
+## test
+cmd> d4
+
+# expect that the stack performed on the next line begins with this function 
+cmd> bgStackFreeze --all ; echo "   [0] ${bgSTK_frmSummary[0]}"
+   [0] bg_unitTest.sh(<redacted>):       : utfRunner_execute(<redacted>): ut_bgStackMarshal
+
+# expect that now after restoring stack saved in function a1, the stack variables reflect the stack from that place 
+cmd> bgStackUnMarshal "$tmpFile"
+cmd> for ((i=0; i<5; i++)); do echo "   [$i] ${bgSTK_frmSummary[$i]}"; done
+   [0] bg_coreStack.sh.ut(<redacted>):    : b2()               : a1
+   [1] bg_coreStack.sh.ut(<redacted>):    : c3()               : b2
+   [2] bg_coreStack.sh.ut(<redacted>):    : d4()               : c3
+   [3] bg_coreStack.sh.ut(<redacted>):    : ut_bgStackMarshal(<redacted>): d4
+   [4] bg_unitTest.sh(<redacted>):       : utfRunner_execute(<redacted>): ut_bgStackMarshal
+
+## bg_coreStack.sh:bgStackMarshal: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:top start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0): : bash(<redacted>): $ bgStackTest <extdebug off...>
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:top finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:top_DBG start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop DEBUGGER
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):        : bash(<redacted>): $ bgStackTest <extdebug off...>
+bgStackTest(67): : main()      : aNoopCommand
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:top_DBG finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:func_ExplicitFreeze start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop..func -- call bgStackFreeze explicitly before calling bgStackPrint
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):        : bash(<redacted>) : $ bgStackTest <extdebug off...>
+bgStackTest(71): : $ bgStackTest: c3 <extdebug off...>
+libC3.sh(12):    : c3()         : b2 <extdebug off...>
+libB2.sh(18):    : b2()         : a1 <extdebug off...>
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)*
+[exitCode 1]
+
+## bg_coreStack.sh:bgStackFreeze:func_ExplicitFreeze finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:func_NoFreeze start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop..func -- call bgStackPrint relying on implicit freeze
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):        : bash(<redacted>) : $ bgStackTest <extdebug off...>
+bgStackTest(74): : $ bgStackTest: c3 <extdebug off...>
+libC3.sh(12):    : c3()         : b2 <extdebug off...>
+libB2.sh(18):    : b2()         : a1 <extdebug off...>
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:func_NoFreeze finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:func_DBG start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop..func DEBUGGER
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):        : bash(<redacted>) : $ bgStackTest <extdebug off...>
+bgStackTest(77): : $ bgStackTest: c3 <extdebug off...>
+libC3.sh(12):    : c3()         : b2 <extdebug off...>
+libB2.sh(18):    : b2()         : a1 <extdebug off...>
+libA1.sh(15):    : a1()         : : noop next cmd
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:func_DBG finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:top_USR1 start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop intr:USR1
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):      : bash(<redacted>): $ bgStackTest <extdebug off...>
+bgStackTest(): : main        : kill -USR1 $BASHPID(USR1...)
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:top_USR1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:top_USR1_func start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop intr:USR1..func
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):                : bash(<redacted>): $ bgStackTest <extdebug off...>
+bgStackTest():           : main        : kill -USR1 $BASHPID(USR1...)
+----- USR1-<redacted> INTERUPT RECEIVED -------------------
+USR1-<redacted><handler>(3): : USR1_HANDLER: oneDown <extdebug off...>
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:top_USR1_func finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:top_USR1FirstLine_DBG start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop interuptUSR1FirstLine DEBUGGER
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):                : bash(<redacted>) : $ bgStackTest <extdebug off...>
+----- <UNK>-<UNK> INTERUPT RECEIVED -------------------
+<UNK>-<UNK><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:top_USR1FirstLine_DBG finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:top_USR1_DBG start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop intr:USR1 DEBUGGER
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):                : bash(<redacted>): $ bgStackTest <extdebug off...>
+bgStackTest():           : main        : kill -USR1 $BASHPID(USR1...)
+----- USR1-<redacted> INTERUPT RECEIVED -------------------
+USR1-<redacted><handler>(3): : USR1_HANDLER: aNoopCommand
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:top_USR1_DBG finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:top_USR1_func_DBG start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop intr:USR1..func DEBUGGER
+
+## bg_coreStack.sh:bgStackFreeze:top_USR1_func_DBG finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:func_USR1 start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop..func intr:USR1
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):         : bash(<redacted>) : $ bgStackTest <extdebug off...>
+bgStackTest(126): : $ bgStackTest: c3USR1 <extdebug off...>
+libC3.sh():       : c3USR1       : kill -USR1 $BASHPID(USR1...)
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:func_USR1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:func_USR1_func start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop..func intr:USR1..func
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):                : bash(<redacted>) : $ bgStackTest <extdebug off...>
+bgStackTest(129):        : $ bgStackTest: c3USR1_func <extdebug off...>
+libC3.sh():              : c3USR1_func  : kill -USR1 $BASHPID(USR1...)
+----- USR1-<redacted> INTERUPT RECEIVED -------------------
+USR1-<redacted><handler>(3): : USR1_HANDLER : oneDown <extdebug off...>
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:func_USR1_func finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:func_USR1FirstLine_DBG start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop..func interuptUSR1FirstLine DEBUGGER
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):                : bash(<redacted>) : $ bgStackTest <extdebug off...>
+bgStackTest(132):        : $ bgStackTest: c3USR1FirstLine_DBG <extdebug off...>
+----- <UNK>-<UNK> INTERUPT RECEIVED -------------------
+<UNK>-<UNK><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:func_USR1FirstLine_DBG finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:func_USR1_DBG start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop..func intr:USR1 DEBUGGER
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-<redacted>(0):                : bash(<redacted>) : $ bgStackTest <extdebug off...>
+bgStackTest(135):        : $ bgStackTest: c3USR1_DBG <extdebug off...>
+libC3.sh():              : c3USR1_DBG   : kill -USR1 $BASHPID(USR1...)
+----- USR1-<redacted> INTERUPT RECEIVED -------------------
+USR1-<redacted><handler>(3): : USR1_HANDLER : aNoopCommand
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)---bash(<redacted>)*
+
+## bg_coreStack.sh:bgStackFreeze:func_USR1_DBG finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:bgStackFreeze:func_USR1_func_DBG start
+## expect: 
+
+##----------
+## setup
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+
+##----------
+## test
+cmd> unitTests/bgStackTest "$1"
+## expect stack summary = scriptTop..func intr:USR1..func DEBUGGER
+
+## bg_coreStack.sh:bgStackFreeze:func_USR1_func_DBG finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:topStackTypes:main start
+## expect: 
+cmd> case $1 in
+cmd> main)     unitTests/bgStackTest f4 ;;
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-2(0):        : bash(<redacted>) : $ bgStackTest <extdebug off...>
+bgStackTest(53): : $ bgStackTest: f4 <extdebug off...>
+bgStackTest(37): : f4()         : f3 <extdebug off...>
+bgStackTest(36): : f3()         : f2 <extdebug off...>
+bgStackTest(35): : f2()         : f1 <extdebug off...>
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)*
+
+## bg_coreStack.sh:topStackTypes:main finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:topStackTypes:source start
+## expect: 
+cmd> case $1 in
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-2(0):        : bash(<redacted>): source unitTests/bgStackTest f4
+bgStackTest(53): : source      : f4
+bgStackTest(37): : f4()        : f3
+bgStackTest(36): : f3()        : f2
+bgStackTest(35): : f2()        : f1
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)*
+
+## bg_coreStack.sh:topStackTypes:source finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreStack.sh:topStackTypes:srcdFunc start
+## expect: 
+cmd> case $1 in
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+pts-2(0):        : bash(<redacted>): f4
+bgStackTest(37): : f4          : f3
+bgStackTest(36): : f3()        : f2
+bgStackTest(35): : f2()        : f1
+=================  bottom of stack invoked the stack trace  ==========================
+bash(<redacted>)*
+
+## bg_coreStack.sh:topStackTypes:srcdFunc finished
+###############################################################################################################################
+
