@@ -72,7 +72,7 @@ function fsIsEmpty()
 #   --release : remove the tempfile and trap. default is that a trap is set to remove the file but
 #         if its called with this and the same <fileNameVar> it will perform the cleanup before EXIT
 #         and remove the trap. If -k was specified in the original call, --release will be ignored.
-#  --will-not-release : this informs the function that is is expected that the code will rely on the
+#  --will-not-release|--auto : this informs the function that is is expected that the code will rely on the
 #         exit trap to remove the file instead of calling --release. Without this, the exit trap will
 #         print a warning about the code not calling --release
 # See Also:
@@ -91,7 +91,7 @@ function fsMakeTemp()
 		-k) keepFlag="-k" ;;
 		--release) mode="release" ;;
 		--releaseInternal) mode="releaseInternal" ;;
-		--will-not-release) willNotReleaseFlag="--will-not-release" ;;
+		--will-not-release|--auto) willNotReleaseFlag="--will-not-release" ;;
 		*)  bgOptionsEndLoop --firstParam fileNameVar "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local templateValue="${1:-bgmktemp.XXXXXXXXXX}"
@@ -158,7 +158,7 @@ function fsMakeTemp()
 			[ ! "$keepFlag" ] && rm -rf "$fileNameValue"
 
 			if [ ! "$assertError_EndingScript" ] && [ "$mode" == "releaseInternal" ] && [ ! "$willNotReleaseFlag" ] && { [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; }; then
-				(assertError -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script." &>>$_bgtraceFile)
+				(assertError --continue -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script." &>>$_bgtraceFile)
 			fi
 		fi
 	fi

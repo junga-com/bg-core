@@ -1,0 +1,63 @@
+#!/usr/bin/env bg-utRunner
+
+import bg_bgsed.sh  ;$L1;$L2
+
+# function setupTmpDir()
+# {
+# 	varExists setupTmpDir && return 0
+# 	declare -g setupTmpDir="1"
+#
+# 	declare -g tmpDir; fsMakeTemp --auto -d tmpDir
+# 	touch "$tmpDir/f_writable"
+# 	touch "$tmpDir/f_readable";  chmod a-w "$tmpDir/f_readable"
+# 	touch "$tmpDir/f_noAccess";  chmod a-rw "$tmpDir/f_noAccess"
+# }
+# setupTmpDir # call out here so that the setup is shared with the testcase subshells
+
+
+function ut_bgsed()
+{
+	ut setup
+	local tmpFile; fsMakeTemp --auto tmpFile
+	cat >"$tmpFile" <<-EOS #noecho
+		one
+		two and my shoe
+		three
+		four
+		five
+	EOS
+	cat "$tmpFile"
+
+	local tmpDir; fsMakeTemp --auto -d tmpDir
+	echo "I am grut" > "$tmpDir/writableFileInReadOnlyFolder"
+	chmod a-w "$tmpDir"
+
+	local emptyFile; fsMakeTemp --auto emptyFile
+	[ -f "$emptyFile" ] && echo "emptyFile exits" || echo "emptyFile does not exist" #noecho
+	[ -s "$emptyFile" ] && echo "emptyFile is not empty" || echo "emptyFile is empty" #noecho
+
+	ut test
+	ut expect that sed will output nothing but bgsed will output an empty line
+	sed 's/my/MY DAMN/' "$emptyFile"
+	bgsed 's/my/MY DAMN/' "$emptyFile"
+
+	ut expect that sed will fail with error but bgsed wont
+	sed 's/my/MY DAMN/' "nonExistentFile"
+	bgsed 's/my/MY DAMN/' "nonExistentFile"
+
+	ut expect that sed will not insert the line into an empty file but bgsed will
+	sed '1 iHello World' "$emptyFile"
+	bgsed '1 iHello World' "$emptyFile"
+
+	ut expect that sed will fail with error but bgsed will make a new file with the line
+	sed '1 iHello World' "nonExistentFile"
+	bgsed '1 iHello World' "nonExistentFile"
+
+	ut expect that we see "'my'" changed to "'MY DAMN'"
+	bgsed 's/my/MY DAMN/' "$tmpFile"
+
+	ut expect that sudo fails because it cant create the tmp file but bgsudo succeeds
+	sed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
+	bgsed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
+
+}

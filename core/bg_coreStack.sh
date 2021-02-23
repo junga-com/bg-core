@@ -230,7 +230,7 @@ function bgStackFreeze() {
 				local sq=""; [[ "${bgSTK_argv[argcOffset+j]}" =~ [[:space:]] ]] && sq="'"
 				bgSTK_cmdLine[i]+=" ${sq}${bgSTK_argv[argcOffset+j]}${sq}"
 			done
-			((argcOffset+=${bgSTK_argc[i]}))
+			((argcOffset+=${bgSTK_argc[i]:-0}))
 		done
 	else
 		for ((i=0; i<$stackSize; i++)); do
@@ -778,7 +778,7 @@ function bgStackFrameGet() {
 	frameData[cmdSrc]="${bgSTK_cmdSrc[$targetFrame]}"
 	frameData[frmSummary]="${bgSTK_frmSummary[$targetFrame]}"
 
-	local i; for ((i=1; i<=${bgSTK_argc[$targetFrame]}; i++)); do
+	local i; for ((i=1; i<=${bgSTK_argc[$targetFrame]:-0}; i++)); do
 		frameData["arg$i"]="${bgSTK_argv[bgSTK_argOff[$targetFrame] + bgSTK_argc[$targetFrame] - $i]}"
 	done
 

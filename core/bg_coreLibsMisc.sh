@@ -729,7 +729,7 @@ function oob_printBashCompletionDefault()
 # bgsudo has the concept of 4 privilege levels from least privilege(1) to most privilege(4).
 #     4 nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
 #     3 escalate            -> escalate to root                                      -> `sudo <cmd...>`
-#     2 noChange            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+#     2 skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
 #     1 deescalate           -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
 # The privilege level takes into account the current USER and the user who authenticated the current session (aka loguser, aka real user)
 # In generall, we start at the least priviledge and test to see if it needs to be higher. This function (and bgsudo) can be called
@@ -755,7 +755,7 @@ function oob_printBashCompletionDefault()
 # a password.
 #
 # Multiple bgsudo calls in the same context:
-# bgsudoAdjustPriv can be used once at the start of a contxt to prepare a variable with the correct options for bgsudo and then
+# _bgsudoAdjustPriv can be used once at the start of a contxt to prepare a variable with the correct options for bgsudo and then
 # bgsudo can be invoked multiple times with those options. This makes scripts more readable since the bgsudo command line options
 # can be long and obsure the real <cmdline>. It is also more efficient because the -r and -w least privilege calculation only needs
 # be done once.
@@ -782,7 +782,7 @@ function oob_printBashCompletionDefault()
 #             the -r and -w options used to create <optVar>
 #    --makeOpts <optVar> : instead of running a command, process the options and store the results in <optVar>. Subsequent calls
 #             can use -O <optVar> to specify the arguments more compactly and without repeating the work.
-#    --defaultAction : one of (nativeRoot-skipSudo|escalate|noChange|deescalate) default is deescalate. This is the starting privilege
+#    --defaultAction : one of (nativeRoot-skipSudo|escalate|skipSudo|deescalate) default is deescalate. This is the starting privilege
 #         level before any -r|-w|-c <fileN> are considered. The action taken will be either this or a higher privilege level
 #    -r <file> : adjust privilege to provide read access to <file>
 #    -w <file> : adjust privilege to provide write access to <file>
@@ -802,7 +802,7 @@ function bgsudo()
 		--makeOpts*)
 			local _bs_optVar; bgOptionGetOpt val: _bs_optVar "$@" && shift
 			shift # the rest of this option would be shifted at the end of the loop so remove it now before returning
-			bgsudoAdjustPriv "$_bs_optVar" "$@"
+			_bgsudoAdjustPriv --sudoOptsVar "$_bs_optVar" "$@"
 			return
 			;;
 		--defaultAction*) bgOptionGetOpt val: defaultAction "$@" && shift ;;
@@ -820,16 +820,14 @@ function bgsudo()
 		*)  bgOptionGetOpt opt options "$@" && shift ;;
 	esac; shift; done
 
-	# if the user passed in -r|-w|-c <fileN> resources to determine the required privilege, use bgsudoAdjustPriv to do that
+	# if the user passed in -r|-w|-c <fileN> resources to determine the required privilege, use _bgsudoAdjustPriv to do that
 	if [ ${#testFiles[@]} -gt 0 ]; then
-		local privOpts; bgsudoAdjustPriv privOpts --defaultAction="$defaultAction" "${testFiles[@]}"
-		[ "${privOpts[0]}" == "--defaultAction" ] || assertLogicError -v privOpts
-		[[ "${privOpts[1]}" =~ ^(nativeRoot-skipSudo|escalate|noChange|deescalate)$ ]] || assertLogicError -v privOpts
-		defaultAction="${privOpts[1]}"
+		# defaultAction may or may not already have a value. pass it in with the (additional) file tests and get the new one
+		_bgsudoAdjustPriv --actionVar=defaultAction --defaultAction="$defaultAction" "${testFiles[@]}"
 	fi
 
 	# cases where we dont need sudo.
-	if [[ "$defaultAction" =~ ^(noChange|nativeRoot-skipSudo)$ ]]; then
+	if [[ "$defaultAction" =~ ^(skipSudo|nativeRoot-skipSudo)$ ]]; then
 		"$@" # execute the rest of the params as a command
 		return
 	fi
@@ -879,7 +877,7 @@ function bgsudo()
 }
 
 
-# usage: bgsudoAdjustPriv <sudoOptsVar> [<sudoOptions>] [--defaultAction=<action>] [[-r|-w|-c <file1>]..[-r|-w|-c <fileN>]]
+# usage: _bgsudoAdjustPriv [--sudoOptsVar=<vname>] [--actionVar=<vname>] [<sudoOptions>] [--defaultAction=<action>] [[-r|-w|-c <file1>]..[-r|-w|-c <fileN>]]
 # Note that you typically do not call this function directly anymore. Instead call `bgsudo --makeOpts ...` which is an alias to call
 # this command.
 #
@@ -892,10 +890,11 @@ function bgsudo()
 #
 # Priviledge Adjustments:
 # bgsudo has the concept of 4 privilege levels from least privilege(1) to most privilege(4).
-#     4 nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
-#     3 escalate            -> escalate to root                                      -> `sudo <cmd...>`
-#     2 noChange            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
-#     1 deescalate           -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+#     4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+#     3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+#     2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+#     1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+#     "" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
 # The privilege level takes into account the current USER and the user who authenticated the current session (aka loguser, aka real user)
 # In generall, we start at the least priviledge and test to see if it needs to be higher. This function (and bgsudo) can be called
 # multiple times with new information to adjust the privilege further. The current privilege level is passed through to the output
@@ -920,7 +919,7 @@ function bgsudo()
 # Options:
 #    --role=<role> : Note that the posix sudo supports the short form -r <role> for --role=<role> option but this function only
 #             supports --role=<role> since it use -r for its own option which is more typical in this pattern than --role=<role>
-#    --defaultAction : one of (nativeRoot-skipSudo|escalate|noChange|deescalate) default is deescalate. This is the starting privilege
+#    --defaultAction : one of (nativeRoot-skipSudo|escalate|skipSudo|deescalate) default is deescalate. This is the starting privilege
 #         level before any -r|-w|-c <fileN> are considered. The output action will be either this or a higher privilege level
 #    -w <file> : the <cmd> will access <file> in write mode so set the privilege adjustment accordingly
 #    -r <file> : the <cmd> will access <file> in read mode so set the privilege adjustment accordingly
@@ -930,16 +929,21 @@ function bgsudo()
 #    <other options> : other sudo or bgsudo options can be specified and they will be passed through
 # See Also:
 #     bgsudo : a wrapper over sudo that supports priviledge adjustment and other additional features "
-function bgsudoAdjustPriv()
+function _bgsudoAdjustPriv()
 {
-	# this function is unusual in that it requires the positional parameter <sudoOptsVar> to appear before the options.
-	local sudoOptsVar="$1"; shift; assertNotEmpty sudoOptsVar
-	[[ "$sudoOptsVar" =~ ^- ]] && assertError "the <sudoOptsVar> parameter must be the first argument, before any options"
-
-	local testFiles testFile paramsVar action="deescalate"
+	local testFiles testFile _sapAction sudoOptsVar actionVar
 	while [[ "$1" =~ ^[-+] ]]; do case $1 in
-		--paramsVar*) bgOptionGetOpt val: paramsVar "$@" && shift ;;
-		--defaultAction*) bgOptionGetOpt val: action "$@" && shift; action="${action:-deescalate}" ;;
+		--sudoOptsVar*)
+			# this assumes that if provided, this option is first
+			# if sudoOptsVar contains options from a previous call, spread them back into the params with the new ones following
+			# so that they will override previous options.
+			bgOptionGetOpt val: sudoOptsVar "$@" && shift
+			# SECURITY: this varExists check is meant to prevent ACE
+			varExists "$sudoOptsVar" || assertError
+			shift; eval 'set -- "" "${'"$sudoOptsVar"'[@]}" "$@";  '"$sudoOptsVar"'=()'
+			;;
+		--actionVar*)   bgOptionGetOpt val: actionVar   "$@" && shift ;;
+		--defaultAction*) bgOptionGetOpt val: _sapAction "$@" && shift ;;
 		-r*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
 		-w*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
 		-c*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
@@ -950,62 +954,77 @@ function bgsudoAdjustPriv()
 		*)  bgOptionGetOpt opt "$sudoOptsVar" "$@" && shift ;;
 	esac; shift; done
 
-	# if the user is not root, deescalate is not possible.
-	local realUser
-	if (( EUID != 0 )) && [[ "$action" =~ ^(deescalate)$ ]]; then
-		action="noChange"
-	else
-		# get the loguser -- the user that authenticated the session
-		aaaGetUser realUser
+	[ $# -gt 0 ] && assertError -v "leftOver:$*" "left over cmdline arguments"
 
-		# if the realUser is root or there is no real user (i.e. cron or other daemon), there is nothing to de-escalate or escalate so
-		# just skip sudo. we don't need to process the rest of the options since sudo wont be used
-		if { [ ! "$realUser" ] || [ "$realUser" == "root" ]; }; then
-			action="nativeRoot-skipSudo"
+	# if no testFiles were specified, dont adjust the _sapAction
+	if [ ${#testFiles[@]} -gt 0 ]; then
+
+		# if the starting point action was not passed in, start at the lowest priviledge
+		_sapAction="${_sapAction:-deescalate}"
+
+		# if the user is not root, deescalate is not possible.
+		# 2021-02: we dont try to deescalate non-root systemusers to the real user for 2 reasons with about 80% confidence.
+		#          1) an arbitrary system user should not have sudo rights to change to a real user
+		#          2) if something escalates a real user to a non-root system user, files should probably be owned by them.
+		#             if the intention is to track users that create files, use a group instead of escalation.
+		local realUser
+		if (( EUID != 0 )) && [[ "$_sapAction" =~ ^(deescalate)$ ]]; then
+			_sapAction="skipSudo"
+		else
+			# get the loguser -- the user that authenticated the session
+			aaaGetUser realUser
+
+			# if the realUser is root or there is no real user (i.e. cron or other daemon), there is nothing to de-escalate or escalate so
+			# just skip sudo. we don't need to process the rest of the options since sudo wont be used
+			if { [ ! "$realUser" ] || [ "$realUser" == "root" ]; }; then
+				_sapAction="nativeRoot-skipSudo"
+			fi
 		fi
+
+		# iterate the -r/-w <file> options and adjust the priviledge action as needed to provide sufficient access
+		local term; for term in "${testFiles[@]}"; do
+			local testMode="${term:0:2}"
+			local fileToAccess="${term:2}"
+			{ [[ ! "$testMode" =~ ^-[rwc]$ ]] || [ ! "$fileToAccess" ]; } && assertLogicError -v testMode -v fileToAccess
+
+			# handle the case where we need to check the parent's permissions because fileToAccess does not exist or -c was specified
+			local path="${fileToAccess%/}"
+			if [ ! -e "$path" ] || [ "$testMode" == "-c" ]; then
+				# if the file is read access and does not exist, it might be an error, but its not a permission issue. If the caller is going
+				# to create the missing file, it should have specified that it needs write or create access
+				[ "$testMode" == "-r" ] && continue
+
+				# both -w and -c at this point need write access to the parent folder
+				testMode=-w
+
+				# if we need to create or remove the file, we need write access to the first existing parent so set the path to it
+				# instead of the target file itself
+				[[ "$path" =~ / ]] && path="${path%/*}" || path="."
+				local found=""; while [ ! "$found" ] && [ "$path" != "." ]; do
+					if [ -e "$path" ]; then
+						found="1"
+					else
+						[[ "$path" =~ / ]] && path="${path%/*}" || path="."
+					fi
+				done
+			fi
+
+			# if we are still considering de-escalation, check to see if the realUser can access this file
+			if [ "$_sapAction" == "deescalate" ]; then
+				# if we find any any file that can not be accessed by the realUser, we need at least the 'skipSudo' level
+				sudo -u "$realUser" test $testMode "$path" || _sapAction="skipSudo"
+			fi
+
+			# if we are still considering 'skipSudo' check that the current user can access this file
+			# note that if _sapAction==deescalate at this point, it passed the realUser access test above
+			if [ "$_sapAction" == "skipSudo" ]; then
+				test $testMode "$path" || _sapAction="escalate"
+			fi
+		done
 	fi
 
-	# iterate the -r/-w <file> options and adjust the priviledge action as needed to provide sufficient access
-	local term; for term in "${testFiles[@]}"; do
-		local testMode="${term:0:2}"
-		local fileToAccess="${term:2}"
-		{ [[ ! "$testMode" =~ ^-[rwc]$ ]] || [ ! "$fileToAccess" ]; } && assertLogicError
-
-		# handle the case where we need to check the parent's permissions because fileToAccess does not exist or -c was specified
-		local path="${fileToAccess%/}"
-		if [ ! -e "$path" ] || [ "$testMode" == "-c" ]; then
-			# if the file is read access and does not exist, it might be an error, but its not a permission issue. If the caller is going
-			# to create the missing file, it should have specified that it needs write access
-			[ "$testMode" == "-r" ] && continue
-
-			# if we need to create or remove the file, we need write access to the first existing parent so set the path to it
-			# instead of the target file itself
-			[[ "$path" =~ / ]] && path="${path%/*}" || path="."
-			local found=""; while [ ! "$found" ] && [ "$path" != "." ]; do
-				if [ -e "$path" ]; then
-					found="1"
-				else
-					[[ "$path" =~ / ]] && path="${path%/*}" || path="."
-				fi
-			done
-		fi
-
-		# if we are still considering de-escalation, check to see if the realUser can access this file
-		if [ "$action" == "deescalate" ]; then
-			# if we find any any file that can not be accessed by the realUser, we need at least the 'noChange' level
-			sudo -u "$realUser" test $testMode "$path" || action="noChange"
-		fi
-
-		# if we are still considering 'noChange' check that the current user can access this file
-		# note that if action==deescalate at this point, it passed the realUser access test above
-		if [ "$action" == "noChange" ]; then
-			test $testMode "$path" || action="escalate"
-		fi
-	done
-
-	setReturnValue --array --append "$sudoOptsVar" "--defaultAction" "$action"
-
-	setReturnValue --array "$paramsVar" "$@"
+	[ "$_sapAction" ] && setReturnValue --array --append "$sudoOptsVar" "--defaultAction" "$_sapAction"
+	setReturnValue "$actionVar" "$_sapAction"
 }
 
 
@@ -1040,7 +1059,7 @@ function genRandomKey()
 
 # usage: bgGetLoginuid [-n] [<varname>]
 # returns the uid/name of the user who's authority the script is running by. aka the 'real' user.
-# This is the user that should be logged. It is also used by bgsudoAdjustPriv to drop privilege when
+# This is the user that should be logged. It is also used by _bgsudoAdjustPriv to drop privilege when
 # calling external utilities when its able. Files created by this proc should be owned by this uid by
 # default.
 #
@@ -1193,18 +1212,24 @@ function cmdline() { utEsc "$@" ; }
 function cmdLine() { utEsc "$@" ; }
 function utEsc()
 {
-	local params=("$@")
-	params=("${params[@]// /%20}")
-	params=("${params[@]//$'\t'/%09}")
-	params=("${params[@]//$'\n'/%0A}")
-	params=("${params[@]//$'\r'/%0D}")
-	params=("${params[@]//$'*'/%2A}")
-
-	local i; for i in "${!params[@]}"; do
-		[ "${params[$i]}" == "--" ] && params[$i]="%2D%2D"
-		params[$i]="${params[$i]:---}"
-	done
-
+	if [ "$1" == "-q" ]; then
+		shift
+		local params=("$@")
+		local i; for i in "${!params[@]}"; do
+			[[ "${params[$i]}" =~ [\ ] ]] && params[$i]="'${params[$i]}'"
+		done
+	else
+		local params=("$@")
+		params=("${params[@]// /%20}")
+		params=("${params[@]//$'\t'/%09}")
+		params=("${params[@]//$'\n'/%0A}")
+		params=("${params[@]//$'\r'/%0D}")
+		params=("${params[@]//$'*'/%2A}")
+		local i; for i in "${!params[@]}"; do
+			[ "${params[$i]}" == "--" ] && params[$i]="%2D%2D"
+			params[$i]="${params[$i]:---}"
+		done
+	fi
 	echo "${params[*]}"
 }
 
@@ -3474,15 +3499,18 @@ function fsExists()
 #                      Its safer to use without -p because you know that the base part of the path should exist. If you make a mistake
 #                      in the base path, without -p you will get an error but with it it will create the wrong path. Be particularely
 #                      wary of using -p when sudo is in effect.
+#    --prompt=<msg>  : if sudo is required to perform the operation and the user is prompted to enter their password, <msg> provides
+#                      context to what operation they are entering a password to complete.
 function fsTouch()
 {
-	local recurseMkdirFlag typeMode="-f" existOnlyFlag
+	local recurseMkdirFlag typeMode="-f" existOnlyFlag sudoPrompt
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		--existOnly) existOnlyFlag="--existOnly" ;;
 		-p) recurseMkdirFlag="-p" ;;
 		-d|--directory) typeMode="-d" ;;
+		--prompt*)  bgOptionGetOpt val: sudoPrompt "$@" && shift; sudoPrompt=(-p "$sudoPrompt") ;;
 	esac; shift; done
-	local fileOrFolder="$1"
+	local fileOrFolder="$1"; assertNotEmpty fileOrFolder
 
 	# if <fileOrFolder> ends in a '/', force fileMode to be -d
 	[ "${fileOrFolder: -1}" == "/" ] && typeMode="-d"
@@ -3492,7 +3520,7 @@ function fsTouch()
 	if [ ! -e "$fileOrFolder" ]; then
 		local parentFolder="${fileOrFolder%/*}"
 		[ ! -d "$parentFolder" ] && {
-			bgsudo -w "$parentFolder" mkdir $recurseMkdirFlag "$parentFolder" || assertError
+			bgsudo "${sudoPrompt[@]}" -w "$parentFolder" mkdir $recurseMkdirFlag "$parentFolder" || assertError
 		}
 	fi
 
@@ -3505,14 +3533,14 @@ function fsTouch()
 			[[ "$(stat -c"%F" "$fileOrFolder/")" =~ ^directory ]] || assertError -v fileOrFolder "fsTouch trying to make <fileOrFolder> a directory but it is already a '$(stat -c"%F" "$fileOrFolder/")'"
 		fi
 		# update the timestamp
-		[ ! "$existOnlyFlag" ] && bgsudo -w "$fileOrFolder" touch "$fileOrFolder"
+		[ ! "$existOnlyFlag" ] && bgsudo "${sudoPrompt[@]}" -w "$fileOrFolder" touch "$fileOrFolder"
 
 	elif [ ! -e "$fileOrFolder" ]; then
 		# at this point, we know the parent exists but fileOrFolder does not so create it
 		if [ "$typeMode" == "-f" ]; then
-			bgsudo -w "$fileOrFolder" touch "$fileOrFolder"
+			bgsudo "${sudoPrompt[@]}" -w "$fileOrFolder" touch "$fileOrFolder"
 		elif [ "$typeMode" == "-d" ]; then
-			bgsudo -w "$fileOrFolder" mkdir "$fileOrFolder"
+			bgsudo "${sudoPrompt[@]}" -w "$fileOrFolder" mkdir "$fileOrFolder"
 		fi
 	fi
 }

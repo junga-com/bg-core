@@ -1,0 +1,712 @@
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:default start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@=
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:default finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:prompt start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -p 'my sudo prompt'
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='-pmy sudo prompt'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='-pmy sudo prompt'
+        [1]='--defaultAction'
+        [2]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='-pmy sudo prompt'
+        [1]='--defaultAction'
+        [2]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:prompt finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:w_writable start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -w $tmpDir/f_writable
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:w_writable finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:r_writable start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -r $tmpDir/f_writable
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:r_writable finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:c_writable start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -c $tmpDir/f_writable
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:c_writable finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:w_readable start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -w $tmpDir/f_readable
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:w_readable finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:r_readable start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -r $tmpDir/f_readable
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:r_readable finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:c_readable start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -c $tmpDir/f_readable
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:c_readable finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:w_noAccess start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -w $tmpDir/f_noAccess
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:w_noAccess finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:r_noAccess start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -r $tmpDir/f_noAccess
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:r_noAccess finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:c_noAccess start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -c $tmpDir/f_noAccess
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:c_noAccess finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:w_noExist start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -w $tmpDir/f_noExist
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:w_noExist finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:r_noExist start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -r $tmpDir/f_noExist
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:r_noExist finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv:c_noExist start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> params=("${@//$tmpDir/\$tmpDir}")
+##     | cmd> local sudoOpts
+##     | cmd> '
+##     | 
+##     | 	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+##     | 	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+##     | 	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+##     | 	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+##     | 	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+##     | 	
+
+##----------
+## test
+$@= -c $tmpDir/f_noExist
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this only changes the action if it did not exist yet
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='skipSudo'
+
+# expect that this makes the action at least escalate
+cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+sudoOpts[]
+        [0]='--defaultAction'
+        [1]='escalate'
+
+## bg_security.sh:_bgsudoAdjustPriv:c_noExist finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv2:0default start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> local action
+
+##----------
+## test
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1"
+Action starts as ''  and becomes ''
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -r "$tmpDir/f_readable"
+Action starts as ''  and becomes 'skipSudo'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -w "$tmpDir/f_readable"
+Action starts as ''  and becomes 'escalate'
+
+
+## bg_security.sh:_bgsudoAdjustPriv2:0default finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv2:1deescalate start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> local action
+
+##----------
+## test
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1"
+Action starts as 'deescalate'  and becomes 'deescalate'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -r "$tmpDir/f_readable"
+Action starts as 'deescalate'  and becomes 'skipSudo'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -w "$tmpDir/f_readable"
+Action starts as 'deescalate'  and becomes 'escalate'
+
+
+## bg_security.sh:_bgsudoAdjustPriv2:1deescalate finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv2:2skipSudo start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> local action
+
+##----------
+## test
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1"
+Action starts as 'skipSudo'  and becomes 'skipSudo'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -r "$tmpDir/f_readable"
+Action starts as 'skipSudo'  and becomes 'skipSudo'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -w "$tmpDir/f_readable"
+Action starts as 'skipSudo'  and becomes 'escalate'
+
+
+## bg_security.sh:_bgsudoAdjustPriv2:2skipSudo finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv2:3escalate start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> local action
+
+##----------
+## test
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1"
+Action starts as 'escalate'  and becomes 'escalate'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -r "$tmpDir/f_readable"
+Action starts as 'escalate'  and becomes 'escalate'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -w "$tmpDir/f_readable"
+Action starts as 'escalate'  and becomes 'escalate'
+
+
+## bg_security.sh:_bgsudoAdjustPriv2:3escalate finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_security.sh:_bgsudoAdjustPriv2:4nativeRoot-skipSudo start
+## expect: 
+
+##----------
+## setup
+##     | cmd> setupTmpDir
+##     | cmd> local action
+
+##----------
+## test
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1"
+Action starts as 'nativeRoot-skipSudo'  and becomes 'nativeRoot-skipSudo'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -r "$tmpDir/f_readable"
+Action starts as 'nativeRoot-skipSudo'  and becomes 'nativeRoot-skipSudo'
+
+cmd> _bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -w "$tmpDir/f_readable"
+Action starts as 'nativeRoot-skipSudo'  and becomes 'nativeRoot-skipSudo'
+
+
+## bg_security.sh:_bgsudoAdjustPriv2:4nativeRoot-skipSudo finished
+###############################################################################################################################
+

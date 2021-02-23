@@ -1,5 +1,6 @@
 #!/usr/bin/env bg-utRunner
 
+
 declare -A ut_bgStackFind=(
 	[0]="$(cmdLine "")"
 	[1]="$(cmdLine "1")"
@@ -21,6 +22,7 @@ declare -A ut_bgStackFind=(
 function ut_bgStackFind()
 {
 	ut setup
+	shopt -s extdebug
 	eval 'function a1() {
 		bgStackFreeze
 		local level; bgStackFrameFind "$1" level
@@ -40,6 +42,7 @@ function ut_bgStackFind()
 function ut_bgStackFind2()
 {
 	ut setup
+	shopt -s extdebug
 	function assertA1() { bgStackFreeze; bgStackFrameFind "assert.*" level; fname="${FUNCNAME[$level]}" ; printfVars fname; } ; :
 	function assertB2() { assertA1 "$@"; }          ; :
 	function assertC3() { assertB2 "$@"; }          ; :
@@ -66,6 +69,7 @@ declare -A ut_bgStackGetFrame=(
 function ut_bgStackGetFrame()
 {
 	ut setup
+	shopt -s extdebug
 	ut filter "[[]cmdLineNo( *)[]]='.*'###[cmdLineNo\1]='<redacted>'"
 	ut filter "[[]cmdFile( *)[]]='.*/([^/]*)'###[cmdFile\1]='<redacted>\2'"
 	ut filter "[(][0-9]*[)]:###(<redacted>):"
@@ -85,6 +89,7 @@ function ut_bgStackGetFrame()
 function ut_bgStackMarshal()
 {
 	ut setup
+	shopt -s extdebug
 	ut filter '[(][0-9]*[)]:###(<redacted>):'
 	local tmpFile; bgmktemp tmpFile
 
@@ -125,6 +130,7 @@ declare -A ut_bgStackFreeze=(
 function ut_bgStackFreeze()
 {
 	ut setup
+	shopt -s extdebug
 	ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
 	ut test
 	unitTests/bgStackTest "$1"

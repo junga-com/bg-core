@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+# this is not a unit test testcase because it sudo priviledge and entering the sudo password.
+#    1) we cant assume that the unit tests will be ran as a user with sudo priviledges
+#    2) we dont want to be prompted for a password -- which might happen at a random point, not at the start of the run
+# Maybe someday we can make a fakeSudo user who will be able complete the this test without password prompts and with just enough priviledge
+
+source /usr/lib/bg_core.sh
+
+import bg_bgsed.sh  ;$L1;$L2
+
+function setup()
+{
+	fsMakeTemp -d testFolder  fsTouchTest.XXXXXXX
+
+}
+
+
+case $1 in
+	asroot)
+		;;
+	*)	setup
+
+		sudo -E $0 asroot "$testFolder"
+
+		sudo tree -pug "$testFolder"
+
+		fsMakeTemp -k --release testFolder
+		;;
+esac

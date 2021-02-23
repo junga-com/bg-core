@@ -104,7 +104,8 @@
 # The execution of the direct code in the testcase function is monitored by a DEBUG trap which anotates the output. Each command
 # is echoed to stdout so that the arguments passed to it becomes part of the output. This also makes it easier to read the output
 # and determine what has happened. Its kind of like a captured terminal session. The goal should be that someone can read the test
-# case output and know what output is expected from the target code being excercised.
+# case output and know what output is expected from the target code being excercised. You can suppress printing the command by
+# appending it with the comment ` #noecho`
 #
 # Sometimes the expected output of the code being tested will vary from run to run. For example, if the output conatians the PID
 # of the running process. In this case, you can define a filter, either in a specific testcase or for a group of testcases that
@@ -194,6 +195,10 @@
 #
 # An alternative to using the filter directive would be to capture the output to a string, algorithmically test to see it it is what
 # you expect and then write output indicating if it passed your test or not.
+#
+# ** #noecho**
+# When you end a command source line with `#noecho`, it suppresses the printing of that line. This can make for cleaner output particularly
+# for commands that print the results of the real command being tested.
 #
 # Example Testcase using some directives...
 #    function ut_testMyTargetFunction() {
@@ -317,7 +322,8 @@ function ut()
 		local srcLine="$2"
 		# print the  source line that we are about to start executing so that its output will appear after it
 		local trimmedLine="${srcLine#[]}"; stringTrim -i trimmedLine
-		printf "cmd> %s\n" "${trimmedLine}"
+		[[ ! "$srcLine" =~ [#][[:space:]]*noecho ]] && printf "cmd> %s\n" "${trimmedLine}"
+		true
 		;;
 
 	  onAfterSrcLine)

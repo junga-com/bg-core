@@ -5,6 +5,7 @@ import unitTests/libA1.sh  ;$L1;$L2
 import unitTests/libB2.sh  ;$L1;$L2
 import unitTests/libC3.sh  ;$L1;$L2
 
+shopt -s extdebug
 
 
 stackDebugFlag=""

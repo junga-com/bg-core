@@ -1,0 +1,85 @@
+#!/usr/bin/env bg-utRunner
+
+function setupTmpDir()
+{
+	varExists setupTmpDir && return 0
+	declare -g setupTmpDir="1"
+
+	declare -g tmpDir; fsMakeTemp --auto -d tmpDir
+	touch "$tmpDir/f_writable"
+	touch "$tmpDir/f_readable";  chmod a-w "$tmpDir/f_readable"
+	touch "$tmpDir/f_noAccess";  chmod a-rw "$tmpDir/f_noAccess"
+}
+setupTmpDir # call out here so that the setup is shared with the testcase subshells
+
+declare -A ut__bgsudoAdjustPriv=(
+	[default]=
+	[prompt]="$(cmdline -p "my sudo prompt")"
+
+	[w_writable]="$(cmdline -w "$tmpDir/f_writable")"
+	[r_writable]="$(cmdline -r "$tmpDir/f_writable")"
+	[c_writable]="$(cmdline -c "$tmpDir/f_writable")"
+
+	[w_readable]="$(cmdline -w "$tmpDir/f_readable")"
+	[r_readable]="$(cmdline -r "$tmpDir/f_readable")"
+	[c_readable]="$(cmdline -c "$tmpDir/f_readable")"
+
+	[w_noAccess]="$(cmdline -w "$tmpDir/f_noAccess")"
+	[r_noAccess]="$(cmdline -r "$tmpDir/f_noAccess")"
+	[c_noAccess]="$(cmdline -c "$tmpDir/f_noAccess")"
+
+	[w_noExist]="$(cmdline -w "$tmpDir/f_noExist")"
+	[r_noExist]="$(cmdline -r "$tmpDir/f_noExist")"
+	[c_noExist]="$(cmdline -c "$tmpDir/f_noExist")"
+)
+function ut__bgsudoAdjustPriv()
+{
+	ut setup
+	setupTmpDir
+	params=("${@//$tmpDir/\$tmpDir}")
+	local sudoOpts
+	echo '
+	4  nativeRoot-skipSudo -> AuthUser is root so no sudo needed                    -> `<cmd...>`
+	3  escalate            -> escalate to root                                      -> `sudo <cmd...>`
+	2  skipSudo            -> AuthUser has privilege so no sudo needed              -> `<cmd...>`
+	1  deescalate          -> we are already running escalated, but dont need to be -> `sudo -u<realUser> <cmd...>`
+	"" unknown             -> if no testFiles are given we dont know so use sudo    -> `sudo <cmd...>`
+	'
+
+	ut test
+	cmdline -q "\$@=" "${params[@]}" #noecho
+	_bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
+	printfVars sudoOpts #noecho
+
+	ut expect that this only changes the action if it did not exist yet
+	_bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
+	printfVars sudoOpts #noecho
+
+	ut expect that this makes the action at least escalate
+	_bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
+	printfVars sudoOpts #noecho
+
+}
+
+declare -A ut__bgsudoAdjustPriv2=(
+	[0default]="$(cmdline "")"
+	[1deescalate]="$(cmdline "deescalate")"
+	[2skipSudo]="$(cmdline "skipSudo")"
+	[3escalate]="$(cmdline "escalate")"
+	[4nativeRoot-skipSudo]="$(cmdline "nativeRoot-skipSudo")"
+)
+function ut__bgsudoAdjustPriv2() {
+	ut setup
+	setupTmpDir
+	local action
+
+	ut test
+	_bgsudoAdjustPriv --actionVar=action --defaultAction="$1"
+	echo -e "Action starts as '$1'  and becomes '$action'\n" #noecho
+
+	_bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -r "$tmpDir/f_readable"
+	echo -e "Action starts as '$1'  and becomes '$action'\n" #noecho
+
+	_bgsudoAdjustPriv --actionVar=action --defaultAction="$1" -w "$tmpDir/f_readable"
+	echo -e "Action starts as '$1'  and becomes '$action'\n" #noecho
+}

@@ -1,0 +1,70 @@
+
+###############################################################################################################################
+## bg_bgsed.sh:bgsed: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local tmpFile; fsMakeTemp --auto tmpFile
+##     | cmd> cat "$tmpFile"
+##     | one
+##     | two and my shoe
+##     | three
+##     | four
+##     | five
+##     | cmd> local tmpDir; fsMakeTemp --auto -d tmpDir
+##     | cmd> echo "I am grut" > "$tmpDir/writableFileInReadOnlyFolder"
+##     | cmd> chmod a-w "$tmpDir"
+##     | cmd> local emptyFile; fsMakeTemp --auto emptyFile
+##     | emptyFile exits
+##     | emptyFile is empty
+
+##----------
+## test
+
+# expect that bgsed will output an empty line but sed will not
+cmd> sed 's/my/MY DAMN/' "$emptyFile"
+cmd> bgsed 's/my/MY DAMN/' "$emptyFile"
+
+
+# expect that bgsed wont have an error but sed will
+cmd> sed 's/my/MY DAMN/' "nonExistentFile"
+stderr> sed: can't read nonExistentFile: No such file or directory
+[exitCode 2]
+cmd> bgsed 's/my/MY DAMN/' "nonExistentFile"
+
+
+# expect that bgsed will insert the line but sed will not
+cmd> sed '1 iHello World' "$emptyFile"
+cmd> bgsed '1 iHello World' "$emptyFile"
+Hello World
+
+
+# expect that bgsed will insert the line but sed will error
+cmd> sed '1 iHello World' "nonExistentFile"
+stderr> sed: can't read nonExistentFile: No such file or directory
+[exitCode 2]
+cmd> bgsed '1 iHello World' "nonExistentFile"
+Hello World
+
+
+# expect that we see 'my' changed to 'MY DAMN'
+cmd> bgsed 's/my/MY DAMN/' "$tmpFile"
+one
+two and MY DAMN shoe
+three
+four
+five
+
+# expect that sudo fails but bgsudo succeeds
+cmd> sed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
+stderr> sed: couldn't open temporary file /tmp/bgmktemp.<redacted>
+I am grut
+[exitCode 4]
+cmd> bgsed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
+I am grut
+yoyo ma
+
+## bg_bgsed.sh:bgsed: finished
+###############################################################################################################################
+

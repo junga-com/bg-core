@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+# this is not a unit test testcase because it sudo priviledge and entering the sudo password.
+#    1) we cant assume that the unit tests will be ran as a user with sudo priviledges
+#    2) we dont want to be prompted for a password -- which might happen at a random point, not at the start of the run
+# Maybe someday we can make a fakeSudo user who will be able complete the this test without password prompts and with just enough priviledge
+
+source /usr/lib/bg_core.sh
+
+forcePrompt=""
+#forcePrompt="1"
+
+declare testFolder
+
+function setup()
+{
+	fsMakeTemp -d testFolder  fsTouchTest.XXXXXXX
+
+	touch "$testFolder/fall"
+
+	touch "$testFolder/fNoWrite"
+	chmod a-w "$testFolder/fNoWrite"
+
+	touch "$testFolder/fNoRead"
+	chmod a-rw "$testFolder/fNoRead"
+
+	mkdir "$testFolder/dall"
+
+	mkdir "$testFolder/dNoWrite"
+	chmod a-w "$testFolder/dNoWrite"
+
+	mkdir "$testFolder/dNoRead"
+	chmod a-rw "$testFolder/dNoRead"
+
+}
+
+case $1 in
+
+	asroot)
+		bgtrace "here as root"
+		testFolder="$2"
+
+		echo "(asroot) make a file in dall -- all access"
+		fsTouch "$testFolder/dall/asroot"
+
+		echo "(asroot) make a file in dNoWrite -- needs sudo to write"
+		sudo -k
+		fsTouch "$testFolder/dNoWrite/asroot"
+
+		echo "(asroot) make a file in dNoRead -- needs sudo to read and write"
+		sudo -k
+		fsTouch "$testFolder/dNoRead/asroot"
+		;;
+
+	*)	[ "$USER" == "root" ] && assertError
+		setup
+
+		#tree -pug "$testFolder"
+
+		echo "make a file in dall -- all access"
+		fsTouch "$testFolder/dall/testFile"
+		fsTouch "$testFolder/dall/testFile"
+
+		echo "make a file in dNoWrite -- needs sudo to write"
+		[ "$forcePrompt" ] && sudo -k
+		fsTouch "$testFolder/dNoWrite/testFile"
+		fsTouch "$testFolder/dNoWrite/testFile"
+
+		echo "make a file in dNoRead -- needs sudo to read and write"
+		[ "$forcePrompt" ] && sudo -k
+		fsTouch "$testFolder/dNoRead/testFile"
+		fsTouch "$testFolder/dNoRead/testFile"
+
+		fsTouch "$testFolder/fall"
+		fsTouch "$testFolder/fNoWrite"
+		fsTouch "$testFolder/fNoRead"
+
+		sudo -E $0 asroot "$testFolder"
+
+		sudo tree -pug "$testFolder"
+
+		fsMakeTemp -k --release testFolder
+		;;
+esac
