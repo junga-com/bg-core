@@ -713,7 +713,7 @@ function stringToBashToken()
 # modifies the contents of each variable passed in to undo what stringToBashToken did and return it to normal strings that could
 # be empty and could contain whitespace
 # Options:
-#    -q : quotes. If the resulting string contains whitespace or is an empty string, surrond it with quotes
+#    -q : quotes. If the resulting string contains whitespace or is an empty string, surround it with quotes
 function strUnescapeFromToken() { stringFromBashToken "$@"; }
 function unescapeTokens() { stringFromBashToken "$@"; }
 function varUnescapeContents() { stringFromBashToken "$@"; }
@@ -1420,8 +1420,17 @@ function dedent() { stringRemoveLeadingIndents "$@"; }
 function strRemoveLeadingIndents() { stringRemoveLeadingIndents "$@"; }
 function stringRemoveLeadingIndents()
 {
-	local msg="$1"
-	type -t awk &>/dev/null && awk '
+	local dd_retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-R*|--retVar*)  bgOptionGetOpt val: dd_retVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	if [ "$dd_retVar" ]; then
+		local msg="${!dd_retVar}"
+	else
+		local msg="$1"
+	fi
+	local outStr="$(type -t awk &>/dev/null && awk '
 		BEGIN {
 			# start if off larger than it should ever be
 			for (i=1;i<100;i++) leadingTabsToRemove+="\t";
@@ -1448,7 +1457,8 @@ function stringRemoveLeadingIndents()
 				print line
 			}
 		}
-	' <<< "$msg"
+	' <<< "$msg")"
+	returnValue "$outStr" "$dd_retVar"
 }
 
 

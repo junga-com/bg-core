@@ -88,5 +88,46 @@ ut_pathGetCanonStr() {
 	export PWD="/myPWD"
 
 	ut test
-	echo "$1" | awk "$awkScript" 2>&1
+	echo "$1" | gawk "$awkScript" 2>&1
+}
+
+
+declare -A ut_parserStartBashStyleTokenizer=(
+	[0]="$(cmdline "name=value"     )"
+	[0s]="$(cmdline " "$'\t'"name"$'\t'" = "$'\t'" value  "     )"
+
+	[1]="$( cmdline "name=value" )"
+	[1c]="$(cmdline "name=value # comm " )"
+	[2]="$( cmdline 'name=value with = in it ' )"
+	[2c]="$(cmdline 'name=value with = in it # comm' )"
+	[3]="$( cmdline 'name=value with  = in it # comm' )"
+
+	[4]="$(cmdline 'name="quoted string with # in it "' )"
+	[4c]="$(cmdline 'name="quoted string with # in it " # comm ' )"
+
+	[9]="$(cmdline 'name=line with two # in it  # comm ' )"
+
+	[dq0]="$(cmdline 'name="quoted string"' )"
+	[dq1]="$(cmdline 'name="quoted string with \"escaped\" quotes"' )"
+	[dq2]="$(cmdline 'name="quoted string with one escaped\" quotes"' )"
+	[dq3]="$(cmdline 'name="quoted string with one escaped\" quotes" # and comments' )"
+	[dq4]="$(cmdline 'name="#" # and comments' )"
+
+	# dg5: important case. its because of this case it would be wrong to have the regex try to do EOL comments if we cant get the regex
+	# to not break on escaped \". The # should be quoted and not consume the remainder of the line but it wont be wrt the regex.
+	[dq5]="$(cmdline 'name="\"#" # and comments' )"
+
+	# dq6: important case. its this case that made me abandon the approach to let the regex breakup a quoted string if it contains an
+	# escaped dblQuote and then try to join them later. the problem is that the regex relies on the quote alternation to eat up
+	# all the characters that would otherwise be part of other alternations, but between the first escaped dblQuote and the next,
+	# a lone single quote would incorectly eatup everything between it and another lone quote past the end of the string.
+	[dq6]="$(cmdline 'name="\" bob'\''s book" # and bob'\''s comments"' )"
+
+	[sect1]="[sectname]"
+	[sect2]=" [ sectname ] "
+)
+function ut_parserStartBashStyleTokenizer()
+{
+	echo "|$1|  |${2:---parseChars==[]%20}|" #noecho
+	echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
 }

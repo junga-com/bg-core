@@ -26,7 +26,8 @@
 # -q : quietFlag. don't assert an error if the script returns non zero. This does not apply when -i is specified.
 #      When -i is not specified, you only need this if your script must return 1 and you want to process that result.
 #      If your script returns codes >1, they will be passed back to you anyway. awk uses 1 to indicate a syntax error
-# -i : behaves like sed's -i. It causes the file to be changed in place. It makes a temp file and then
+# -i : Note that awk uses -i as the short form of --include. you must use the long form for that option. bgawk changes -i meaning.
+#      behaves like sed's -i. It causes the file to be changed in place. It makes a temp file and then
 #      overwrites the <file>. If the awk exits with a non-zero code, it will not overwrite the original file
 #      The script needs to exit 0 for -i to be sucessful
 #      Anything written to stdout will be become the file contents. See -n.
@@ -36,7 +37,8 @@
 #      return true(0) if the file was modified or false(1) if it was not
 # --checkOnly : when -i is specified, do not change file. return true(0) if the file would be modified
 #       or false(1) if it would not be. no effect without -i
-# -n : behaves like sed's -n. unlike plain awk, this command prints each line by default. -n suppresses that
+# -n : behaves like sed's -n. unlike plain awk, this command prints each line by default. -n suppresses that. you can suppress
+#      just some lines by having your script call deleteLine() while on any line that you want to suppress
 # -d : debug. When specified with the -i option, it will not overwrite the configFile and it will launch meld
 #      to compare the confFile with the modified tempFile. Without the -i it will print the final script to
 #      stderr instead of running it
@@ -72,8 +74,8 @@
 #                  awk reporting a syntax error in the script but we can not distinguish between that and
 #                  the script returning 1. A script used in -i mode must return 0 or an assertError will
 #                  be thrown and the file will not be considered for change
-# Note that these options explicitly state which was will return true/false and whether the operation will be
-# performed in needed. This can override the default exit code meanings
+# Note that these options explicitly state what condition will return true/false and whether the operation will be
+# performed if needed or only checked. This overrides the default exit code meanings
 #    --isAlreadySet            : check only (never change the file)  : true(0) means no change needed
 #    --wouldChangeFile         : check only (never change the file)  : true(0) means file would change
 #    --returnTrueIfAlreadySet  : change the file if needed           : true(0) means no change needed
@@ -85,7 +87,7 @@ function bgawk()
 {
 	local file awkScript inplace quietFlag debugFlag outOffFlag cols1Flag cols2Flag outputDefaultOff
 	local useCols checkOnlyFlag stripCommentsFlag passThruOpts=("--re-interval") returnTrueIfChanged="1" returnTrueIfSuccessful
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-i)  inplace="-i" ;;
 		-q)  quietFlag="-q" ;;
 		-d)  debugFlag="-d" ;;
@@ -96,13 +98,15 @@ function bgawk()
 		-B)  stripCommentsFlag="-B" ;;
 		-v*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
 		-F*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
+		--include*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
 		--checkOnly|--check)      checkOnlyFlag="--checkOnly"; returnTrueIfChanged="1" ;;
 		--wouldChangeFile)        checkOnlyFlag="--checkOnly"; returnTrueIfChanged="1" ;;
 		--isAlreadySet)           checkOnlyFlag="--checkOnly"; returnTrueIfChanged=""   ;;
 		--returnTrueIfChanged)                                 returnTrueIfChanged="1" ;;
 		--returnTrueIfAlreadySet)                              returnTrueIfChanged=""  ;;
 		--returnTrueIfSuccessful) returnTrueIfSuccessful="1" ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	# it is useful sometimes to run this command without a script (like with -S) so if the user forgot to include '' we
 	# make it ok

@@ -350,7 +350,6 @@ function awkData_parseID()
 #   1(false) : no schema data was found. the parsed awkDataID information is still returned
 # See Also:
 #    awkData_parseID
-#    awkDataLibraryReadSchema
 function awkData_getSchema()
 {
 	#bgtimerStartTrace -T awkData_getSchema

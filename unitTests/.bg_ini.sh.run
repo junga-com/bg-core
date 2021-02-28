@@ -1,11 +1,47 @@
 
 ###############################################################################################################################
+## bg_ini.sh:iniParamGet:0 start
+## expect: 
+
+##----------
+## setup
+##     | foo=5
+
+##----------
+## test
+iniParamGet $iniFile . foo <defValue>
+5
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:iniParamGet:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniParamSet:0 start
+## expect: 
+
+##----------
+## setup
+
+##----------
+## test
+iniParamSet $iniFile . foo 5
+iniFile:
+   [1]: foo=5
+   [2]: 
+
+## bg_ini.sh:iniParamSet:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
 ## bg_ini.sh:getIniParam:empty start
 ## expect: 
 
 ##----------
 ## setup
-##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
 ##     | cmd> echo "$1" | tee "$iniFile"
 ##     | 
 
@@ -36,30 +72,15 @@ cmd> getIniParam "$iniFile" 'sect1' noExist
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' p1
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect2' p2
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect2' honey
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect2' noExist
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p1
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p2
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' honey
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' noExist
-
-[exitCode 1]
-
+stderr> rm: cannot remove '': No such file or directory
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
 ## bg_ini.sh:getIniParam:empty finished
 ###############################################################################################################################
 
@@ -70,7 +91,7 @@ cmd> getIniParam "$iniFile" 'sect:1' noExist
 
 ##----------
 ## setup
-##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
 ##     | cmd> echo "$1" | tee "$iniFile"
 ##     | 
 ##     | p1=foo
@@ -87,10 +108,13 @@ cmd> getIniParam "$iniFile" '.' p1
 foo
 cmd> getIniParam "$iniFile" '.' p2
 3
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" '.' honey
 good
 cmd> getIniParam "$iniFile" '.' noExist
 
+stderr> rm: cannot remove '': No such file or directory
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect1' p1
 
@@ -114,21 +138,14 @@ cmd> getIniParam "$iniFile" 'sect2' honey
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' noExist
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p1
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p2
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' honey
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' noExist
-
-[exitCode 1]
-
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
 ## bg_ini.sh:getIniParam:noSections finished
 ###############################################################################################################################
 
@@ -139,7 +156,7 @@ cmd> getIniParam "$iniFile" 'sect:1' noExist
 
 ##----------
 ## setup
-##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
 ##     | cmd> echo "$1" | tee "$iniFile"
 ##     | 
 ##     | [ sect1 ]
@@ -171,6 +188,8 @@ cmd> getIniParam "$iniFile" 'sect1' p1
 foo
 cmd> getIniParam "$iniFile" 'sect1' p2
 3
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" 'sect1' honey
 
 [exitCode 1]
@@ -178,29 +197,15 @@ cmd> getIniParam "$iniFile" 'sect1' noExist
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' p1
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect2' p2
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect2' honey
-good
-cmd> getIniParam "$iniFile" 'sect2' noExist
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p1
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p2
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' honey
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' noExist
-
-[exitCode 1]
-
+stderr> rm: cannot remove '': No such file or directory
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
 ## bg_ini.sh:getIniParam:noTopLevel finished
 ###############################################################################################################################
 
@@ -211,7 +216,7 @@ cmd> getIniParam "$iniFile" 'sect:1' noExist
 
 ##----------
 ## setup
-##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
 ##     | cmd> echo "$1" | tee "$iniFile"
 ##     | 
 ##     | p1=topFoo
@@ -231,6 +236,8 @@ cmd> getIniParam "$iniFile" '.' p1
 topFoo
 cmd> getIniParam "$iniFile" '.' p2
 0
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" '.' honey
 
 [exitCode 1]
@@ -241,6 +248,8 @@ cmd> getIniParam "$iniFile" 'sect1' p1
 foo
 cmd> getIniParam "$iniFile" 'sect1' p2
 3
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" 'sect1' honey
 
 [exitCode 1]
@@ -251,26 +260,14 @@ cmd> getIniParam "$iniFile" 'sect2' p1
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' p2
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect2' honey
-good
-cmd> getIniParam "$iniFile" 'sect2' noExist
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p1
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p2
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' honey
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' noExist
-
-[exitCode 1]
-
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
 ## bg_ini.sh:getIniParam:topAndSections finished
 ###############################################################################################################################
 
@@ -281,7 +278,7 @@ cmd> getIniParam "$iniFile" 'sect:1' noExist
 
 ##----------
 ## setup
-##     | cmd> local iniFile="$(mktemp)"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
 ##     | cmd> echo "$1" | tee "$iniFile"
 ##     | 
 ##     | p1=topFoo
@@ -302,6 +299,8 @@ cmd> getIniParam "$iniFile" '.' p1
 topFoo
 cmd> getIniParam "$iniFile" '.' p2
 0
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" '.' honey
 
 [exitCode 1]
@@ -327,22 +326,3061 @@ cmd> getIniParam "$iniFile" 'sect2' p2
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' honey
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect2' noExist
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' p1
-foo
-cmd> getIniParam "$iniFile" 'sect:1' p2
-3
-cmd> getIniParam "$iniFile" 'sect:1' honey
-
-[exitCode 1]
-cmd> getIniParam "$iniFile" 'sect:1' noExist
-
-[exitCode 1]
-
+stderr> rm: cannot remove '': No such file or directory
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>''
 ## bg_ini.sh:getIniParam:colonInSectNames finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniSection:empty start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+
+##----------
+## test
+cmd> getIniSection "$iniFile" '.'
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect1'
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect2'
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect:1'
+
+stderr> rm: cannot remove '': No such file or directory
+
+## bg_ini.sh:getIniSection:empty finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniSection:noSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=foo
+##     | p2 = 3
+##     | p3.a = "hello world"
+##     | 
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> getIniSection "$iniFile" '.'
+
+
+p1=foo
+p1=foo
+p2 = 3
+p2 = 3
+p3.a = "hello world"
+p3.a = "hello world"
+
+
+honey=good
+honey=good
+
+
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect1'
+
+p1=foo
+p2 = 3
+p3.a = "hello world"
+
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect2'
+
+p1=foo
+p2 = 3
+p3.a = "hello world"
+
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect:1'
+
+p1=foo
+p2 = 3
+p3.a = "hello world"
+
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+
+## bg_ini.sh:getIniSection:noSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniSection:noTopLevel start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+##     | [ sect14 ]
+##     | this=that
+##     | 
+
+##----------
+## test
+cmd> getIniSection "$iniFile" '.'
+
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+[ sect14 ]
+this=that
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect1'
+
+[ sect1 ]
+p1=foo
+p1=foo
+p2=3
+p2=3
+
+
+[ sect2 ]
+honey=good
+
+[ sect14 ]
+this=that
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect2'
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+honey=good
+
+
+[ sect14 ]
+this=that
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect:1'
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+[ sect14 ]
+this=that
+
+stderr> rm: cannot remove '': No such file or directory
+
+## bg_ini.sh:getIniSection:noTopLevel finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniSection:topAndSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+
+##----------
+## test
+cmd> getIniSection "$iniFile" '.'
+
+
+p1=topFoo
+p1=topFoo
+p2=0
+p2=0
+
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect1'
+
+p1=topFoo
+p2=0
+
+[ sect1 ]
+p1=foo
+p1=foo
+p2=3
+p2=3
+
+
+[ sect2 ]
+honey=good
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect2'
+
+p1=topFoo
+p2=0
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect:1'
+
+p1=topFoo
+p2=0
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+stderr> rm: cannot remove '': No such file or directory
+
+## bg_ini.sh:getIniSection:topAndSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:getIniSection:colonInSectNames start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect:1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect:2 ]
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> getIniSection "$iniFile" '.'
+
+
+p1=topFoo
+p1=topFoo
+p2=0
+p2=0
+
+
+[ sect:1 ]
+p1=foo
+p2=3
+
+[ sect:2 ]
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect1'
+
+p1=topFoo
+p2=0
+
+[ sect:1 ]
+p1=foo
+p2=3
+
+[ sect:2 ]
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect2'
+
+p1=topFoo
+p2=0
+
+[ sect:1 ]
+p1=foo
+p2=3
+
+[ sect:2 ]
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> getIniSection "$iniFile" 'sect:1'
+
+p1=topFoo
+p2=0
+
+[ sect:1 ]
+p1=foo
+p1=foo
+p2=3
+p2=3
+
+
+[ sect:2 ]
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+
+## bg_ini.sh:getIniSection:colonInSectNames finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniParamExists:empty start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+
+##----------
+## test
+cmd> iniParamExists    "$iniFile" '.' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect1' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect:1' p1
+[exitCode 2]
+
+## bg_ini.sh:iniParamExists:empty finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniParamExists:noSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=foo
+##     | p2 = 3
+##     | p3.a = "hello world"
+##     | 
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> iniParamExists    "$iniFile" '.' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect1' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect:1' p1
+[exitCode 2]
+
+## bg_ini.sh:iniParamExists:noSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniParamExists:noTopLevel start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+##     | [ sect14 ]
+##     | this=that
+##     | 
+
+##----------
+## test
+cmd> iniParamExists    "$iniFile" '.' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect1' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect:1' p1
+[exitCode 2]
+
+## bg_ini.sh:iniParamExists:noTopLevel finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniParamExists:topAndSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+
+##----------
+## test
+cmd> iniParamExists    "$iniFile" '.' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect1' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect:1' p1
+[exitCode 2]
+
+## bg_ini.sh:iniParamExists:topAndSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniParamExists:colonInSectNames start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect:1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect:2 ]
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> iniParamExists    "$iniFile" '.' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect1' p1
+[exitCode 2]
+cmd> iniParamExists    "$iniFile" 'sect:1' p1
+[exitCode 2]
+
+## bg_ini.sh:iniParamExists:colonInSectNames finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniSectionExists:empty start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+
+##----------
+## test
+cmd> iniSectionExists    "$iniFile" '.'
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect'
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect1'
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect:1'
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+
+## bg_ini.sh:iniSectionExists:empty finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniSectionExists:noSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=foo
+##     | p2 = 3
+##     | p3.a = "hello world"
+##     | 
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> iniSectionExists    "$iniFile" '.'
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> iniSectionExists    "$iniFile" 'sect'
+
+p1=foo
+p2 = 3
+p3.a = "hello world"
+
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect1'
+
+p1=foo
+p2 = 3
+p3.a = "hello world"
+
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect:1'
+
+p1=foo
+p2 = 3
+p3.a = "hello world"
+
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+
+## bg_ini.sh:iniSectionExists:noSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniSectionExists:noTopLevel start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+##     | [ sect14 ]
+##     | this=that
+##     | 
+
+##----------
+## test
+cmd> iniSectionExists    "$iniFile" '.'
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+[ sect14 ]
+this=that
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect'
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+[ sect14 ]
+this=that
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect1'
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> iniSectionExists    "$iniFile" 'sect:1'
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+[ sect14 ]
+this=that
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+
+## bg_ini.sh:iniSectionExists:noTopLevel finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniSectionExists:topAndSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+
+##----------
+## test
+cmd> iniSectionExists    "$iniFile" '.'
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> iniSectionExists    "$iniFile" 'sect'
+
+p1=topFoo
+p2=0
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect1'
+
+p1=topFoo
+p2=0
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> iniSectionExists    "$iniFile" 'sect:1'
+
+p1=topFoo
+p2=0
+
+[ sect1 ]
+p1=foo
+p2=3
+
+[ sect2 ]
+honey=good
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+
+## bg_ini.sh:iniSectionExists:topAndSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:iniSectionExists:colonInSectNames start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect:1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect:2 ]
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> iniSectionExists    "$iniFile" '.'
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> iniSectionExists    "$iniFile" 'sect'
+
+p1=topFoo
+p2=0
+
+[ sect:1 ]
+p1=foo
+p2=3
+
+[ sect:2 ]
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect1'
+
+p1=topFoo
+p2=0
+
+[ sect:1 ]
+p1=foo
+p2=3
+
+[ sect:2 ]
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 2]
+cmd> iniSectionExists    "$iniFile" 'sect:1'
+
+p1=topFoo
+p2=0
+
+stderr> rm: cannot remove '': No such file or directory
+
+## bg_ini.sh:iniSectionExists:colonInSectNames finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniParam:empty start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+
+##----------
+## test
+cmd> listIniParam "$iniFile" '.'
+[exitCode 1]
+cmd> listIniParam "$iniFile" 'sect1'
+[exitCode 1]
+cmd> listIniParam "$iniFile" 'sect2'
+[exitCode 1]
+cmd> listIniParam "$iniFile" 'sect:1'
+[exitCode 1]
+
+## bg_ini.sh:listIniParam:empty finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniParam:noSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=foo
+##     | p2 = 3
+##     | p3.a = "hello world"
+##     | 
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> listIniParam "$iniFile" '.'
+p1
+p2
+p3.a
+honey
+cmd> listIniParam "$iniFile" 'sect1'
+[exitCode 1]
+cmd> listIniParam "$iniFile" 'sect2'
+[exitCode 1]
+cmd> listIniParam "$iniFile" 'sect:1'
+[exitCode 1]
+
+## bg_ini.sh:listIniParam:noSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniParam:noTopLevel start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+##     | [ sect14 ]
+##     | this=that
+##     | 
+
+##----------
+## test
+cmd> listIniParam "$iniFile" '.'
+[exitCode 1]
+cmd> listIniParam "$iniFile" 'sect1'
+p1
+p2
+cmd> listIniParam "$iniFile" 'sect2'
+honey
+cmd> listIniParam "$iniFile" 'sect:1'
+[exitCode 1]
+
+## bg_ini.sh:listIniParam:noTopLevel finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniParam:topAndSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+
+##----------
+## test
+cmd> listIniParam "$iniFile" '.'
+p1
+p2
+cmd> listIniParam "$iniFile" 'sect1'
+p1
+p2
+cmd> listIniParam "$iniFile" 'sect2'
+honey
+cmd> listIniParam "$iniFile" 'sect:1'
+[exitCode 1]
+
+## bg_ini.sh:listIniParam:topAndSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniParam:colonInSectNames start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect:1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect:2 ]
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> listIniParam "$iniFile" '.'
+p1
+p2
+cmd> listIniParam "$iniFile" 'sect1'
+[exitCode 1]
+cmd> listIniParam "$iniFile" 'sect2'
+[exitCode 1]
+cmd> listIniParam "$iniFile" 'sect:1'
+p1
+p2
+
+## bg_ini.sh:listIniParam:colonInSectNames finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniSection:empty start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+
+##----------
+## test
+cmd> listIniSection "$iniFile"
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> listIniSection "$iniFile" 'sect.*'
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 1]
+cmd> listIniSection "$iniFile" "sect:.*"
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 1]
+
+## bg_ini.sh:listIniSection:empty finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniSection:noSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=foo
+##     | p2 = 3
+##     | p3.a = "hello world"
+##     | 
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> listIniSection "$iniFile"
+
+p1=foo
+p2 = 3
+p3.a = "hello world"
+
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> listIniSection "$iniFile" 'sect.*'
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 1]
+cmd> listIniSection "$iniFile" "sect:.*"
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 1]
+
+## bg_ini.sh:listIniSection:noSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniSection:noTopLevel start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+##     | [ sect14 ]
+##     | this=that
+##     | 
+
+##----------
+## test
+cmd> listIniSection "$iniFile"
+
+sect1
+[ sect1 ]
+p1=foo
+p2=3
+
+sect2
+[ sect2 ]
+honey=good
+
+sect14
+[ sect14 ]
+this=that
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> listIniSection "$iniFile" 'sect.*'
+sect1
+sect2
+sect14
+stderr> rm: cannot remove '': No such file or directory
+cmd> listIniSection "$iniFile" "sect:.*"
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 1]
+
+## bg_ini.sh:listIniSection:noTopLevel finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniSection:topAndSections start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect2 ]
+##     | honey=good
+##     | 
+
+##----------
+## test
+cmd> listIniSection "$iniFile"
+
+p1=topFoo
+p2=0
+
+sect1
+[ sect1 ]
+p1=foo
+p2=3
+
+sect2
+[ sect2 ]
+honey=good
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> listIniSection "$iniFile" 'sect.*'
+sect1
+sect2
+stderr> rm: cannot remove '': No such file or directory
+cmd> listIniSection "$iniFile" "sect:.*"
+stderr> rm: cannot remove '': No such file or directory
+[exitCode 1]
+
+## bg_ini.sh:listIniSection:topAndSections finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:listIniSection:colonInSectNames start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "$1" | tee "$iniFile"
+##     | 
+##     | p1=topFoo
+##     | p2=0
+##     | 
+##     | [ sect:1 ]
+##     | p1=foo
+##     | p2=3
+##     | 
+##     | [ sect:2 ]
+##     | honey=good
+##     | 
+##     | 
+
+##----------
+## test
+cmd> listIniSection "$iniFile"
+
+p1=topFoo
+p2=0
+
+sect:1
+[ sect:1 ]
+p1=foo
+p2=3
+
+sect:2
+[ sect:2 ]
+honey=good
+
+
+stderr> rm: cannot remove '': No such file or directory
+cmd> listIniSection "$iniFile" 'sect.*'
+sect:1
+sect:2
+stderr> rm: cannot remove '': No such file or directory
+cmd> listIniSection "$iniFile" "sect:.*"
+sect:1
+sect:2
+stderr> rm: cannot remove '': No such file or directory
+
+## bg_ini.sh:listIniSection:colonInSectNames finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:setIniParam: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> touch "$iniFile"
+##     | cmd> cat "$iniFile"
+
+##----------
+## test
+cmd> setIniParam "$iniFile" "." p1 one
+cmd> setIniParam "$iniFile" "." p2 "one two"
+cmd> setIniParam "$iniFile" "." honey ""
+cmd> setIniParam "$iniFile" "sect1" p1 "=4"
+cmd> setIniParam "$iniFile" "sect1" p2 "j/l"
+cmd> setIniParam "$iniFile" "sect:1" p1 1
+cmd> setIniParam "$iniFile" "sect:1" p2 2
+cmd> setIniParam "$iniFile" "sect:1" honey 3
+cmd> cat "$iniFile"
+p1=one
+p2=one two
+honey=
+
+
+[ sect1 ]
+p1==4
+p2=j/l
+
+
+[ sect:1 ]
+p1=1
+p2=2
+honey=3
+
+
+## bg_ini.sh:setIniParam: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:minus start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c-c
+##     | test-Name=hello
+##     | 
+##     | [ test-Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c-c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c-c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c-c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c-c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test-Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test-Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test-Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection-Name]foo as = 'howdy'
+PASS    : char '-' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '-' can be used in single quoted value
+PASS    : char '-' can be used in double quoted value
+PASS    : char '-' can be used in parameter name
+PASS    : char '-' can be used in section name
+
+## bg_ini.sh:ini_validChars:minus finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:underscore start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c_c
+##     | test_Name=hello
+##     | 
+##     | [ test_Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c_c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c_c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c_c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c_c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test_Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test_Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test_Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection_Name]foo as = 'howdy'
+PASS    : char '_' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '_' can be used in single quoted value
+PASS    : char '_' can be used in double quoted value
+PASS    : char '_' can be used in parameter name
+PASS    : char '_' can be used in section name
+
+## bg_ini.sh:ini_validChars:underscore finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:plus start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c+c
+##     | test+Name=hello
+##     | 
+##     | [ test+Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c+c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c+c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c+c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c+c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test+Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test+Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test+Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection+Name]foo as = 'howdy'
+PASS    : char '+' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '+' can be used in single quoted value
+PASS    : char '+' can be used in double quoted value
+PASS    : char '+' can be used in parameter name
+PASS    : char '+' can be used in section name
+
+## bg_ini.sh:ini_validChars:plus finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:equal start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c=c
+##     | test=Name=hello
+##     | 
+##     | [ test=Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c=c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c=c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c=c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c=c'
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test=Name'      (expect 'hello') as = 'badValue'
+written and read back from [writeParamNameTest]test=Name' as = 'badValue'
+read from [test=Name]p1        (expect 'howdy') as = 'howdy'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
+## bg_ini.sh:ini_validChars:equal finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:leftBracket start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c[c
+##     | test[Name=hello
+##     | 
+##     | [ test[Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c[c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c[c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c[c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c[c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test[Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test[Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test[Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection[Name]foo as = 'howdy'
+PASS    : char '[' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '[' can be used in single quoted value
+PASS    : char '[' can be used in double quoted value
+PASS    : char '[' can be used in parameter name
+PASS    : char '[' can be used in section name
+
+## bg_ini.sh:ini_validChars:leftBracket finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:rightBracket start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c]c
+##     | test]Name=hello
+##     | 
+##     | [ test]Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c]c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c]c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c]c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c]c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test]Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test]Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+read from [test]Name]p1        (expect 'howdy') as = 'badValue'
+written and read back from [NewSection]Name]foo as = 'badValue'
+PASS    : char ']' can be used in unquoted value
+PASS    : char ']' can be used in single quoted value
+PASS    : char ']' can be used in double quoted value
+PASS    : char ']' can be used in parameter name
+INVALID : char ']' can NOT be used in section name
+
+## bg_ini.sh:ini_validChars:rightBracket finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:leftBrace start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c{c
+##     | test{Name=hello
+##     | 
+##     | [ test{Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c{c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c{c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c{c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c{c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test{Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test{Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test{Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection{Name]foo as = 'howdy'
+PASS    : char '{' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '{' can be used in single quoted value
+PASS    : char '{' can be used in double quoted value
+PASS    : char '{' can be used in parameter name
+PASS    : char '{' can be used in section name
+
+## bg_ini.sh:ini_validChars:leftBrace finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:rightBrace start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c}c
+##     | test}Name=hello
+##     | 
+##     | [ test}Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c}c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c}c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c}c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c}c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test}Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test}Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test}Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection}Name]foo as = 'howdy'
+PASS    : char '}' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '}' can be used in single quoted value
+PASS    : char '}' can be used in double quoted value
+PASS    : char '}' can be used in parameter name
+PASS    : char '}' can be used in section name
+
+## bg_ini.sh:ini_validChars:rightBrace finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:singleQuote start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c'c
+##     | test'Name=hello
+##     | 
+##     | [ test'Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c'c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c'c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'cc''
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'cc''
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test'Name'      (expect 'hello') as = 'badValue'
+written and read back from [writeParamNameTest]test'Name' as = 'badValue'
+read from [test'Name]p1        (expect 'howdy') as = 'badValue'
+stderr> rm: cannot remove '': No such file or directory
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
+## bg_ini.sh:ini_validChars:singleQuote finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:doubleQuote start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c"c
+##     | test"Name=hello
+##     | 
+##     | [ test"Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c"c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+unquoted      value written and reread = 'badValue'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+single quoted value written and reread = 'badValue'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+double quoted value written and reread = 'badValue'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+read from [readDataTest]'test"Name'      (expect 'hello') as = ''
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+written and read back from [writeParamNameTest]test"Name' as = ''
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+read from [test"Name]p1        (expect 'howdy') as = ''
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
+## bg_ini.sh:ini_validChars:doubleQuote finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:semiColon start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c;c
+##     | test;Name=hello
+##     | 
+##     | [ test;Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c;c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c;c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c;c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c;c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test;Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test;Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test;Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection;Name]foo as = 'howdy'
+PASS    : char ';' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char ';' can be used in single quoted value
+PASS    : char ';' can be used in double quoted value
+PASS    : char ';' can be used in parameter name
+PASS    : char ';' can be used in section name
+
+## bg_ini.sh:ini_validChars:semiColon finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:colon start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c:c
+##     | test:Name=hello
+##     | 
+##     | [ test:Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c:c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c:c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c:c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c:c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test:Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test:Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test:Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection:Name]foo as = 'howdy'
+PASS    : char ':' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char ':' can be used in single quoted value
+PASS    : char ':' can be used in double quoted value
+PASS    : char ':' can be used in parameter name
+PASS    : char ':' can be used in section name
+
+## bg_ini.sh:ini_validChars:colon finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:backslash start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c\c
+##     | test\Name=hello
+##     | 
+##     | [ test\Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c\c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> awk: warning: escape sequence `\c' treated as plain `c'
+unquoted      value written and reread = 'cc'
+stderr> rm: cannot remove '': No such file or directory
+stderr> awk: warning: escape sequence `\c' treated as plain `c'
+single quoted value written and reread = 'cc'
+stderr> rm: cannot remove '': No such file or directory
+stderr> awk: warning: escape sequence `\c' treated as plain `c'
+double quoted value written and reread = 'cc'
+stderr> rm: cannot remove '': No such file or directory
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
+read from [readDataTest]'test\Name'      (expect 'hello') as = 'badValue'
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
+stderr> rm: cannot remove '': No such file or directory
+written and read back from [writeParamNameTest]test\Name' as = 'hello'
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
+read from [test\Name]p1        (expect 'howdy') as = 'badValue'
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
+## bg_ini.sh:ini_validChars:backslash finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:pipe start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c|c
+##     | test|Name=hello
+##     | 
+##     | [ test|Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c|c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c|c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c|c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c|c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test|Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test|Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test|Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection|Name]foo as = 'howdy'
+PASS    : char '|' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '|' can be used in single quoted value
+PASS    : char '|' can be used in double quoted value
+PASS    : char '|' can be used in parameter name
+PASS    : char '|' can be used in section name
+
+## bg_ini.sh:ini_validChars:pipe finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:question start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c?c
+##     | test?Name=hello
+##     | 
+##     | [ test?Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c?c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c?c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c?c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c?c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test?Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test?Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test?Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection?Name]foo as = 'howdy'
+PASS    : char '?' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '?' can be used in single quoted value
+PASS    : char '?' can be used in double quoted value
+PASS    : char '?' can be used in parameter name
+PASS    : char '?' can be used in section name
+
+## bg_ini.sh:ini_validChars:question finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:slash start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c/c
+##     | test/Name=hello
+##     | 
+##     | [ test/Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c/c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c/c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c/c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c/c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test/Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test/Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test/Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection/Name]foo as = 'howdy'
+PASS    : char '/' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '/' can be used in single quoted value
+PASS    : char '/' can be used in double quoted value
+PASS    : char '/' can be used in parameter name
+PASS    : char '/' can be used in section name
+
+## bg_ini.sh:ini_validChars:slash finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:period start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c.c
+##     | test.Name=hello
+##     | 
+##     | [ test.Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c.c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c.c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c.c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c.c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test.Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test.Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test.Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection.Name]foo as = 'howdy'
+PASS    : char '.' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '.' can be used in single quoted value
+PASS    : char '.' can be used in double quoted value
+PASS    : char '.' can be used in parameter name
+PASS    : char '.' can be used in section name
+
+## bg_ini.sh:ini_validChars:period finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:greaterThan start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c>c
+##     | test>Name=hello
+##     | 
+##     | [ test>Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c>c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c>c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c>c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c>c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test>Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test>Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove ''
+read from [test>Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection>Name]foo as = 'howdy'
+PASS    : char '>' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '>' can be used in single quoted value
+PASS    : char '>' can be used in double quoted value
+PASS    : char '>' can be used in parameter name
+PASS    : char '>' can be used in section name
+
+## bg_ini.sh:ini_validChars:greaterThan finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:comma start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c,c
+##     | test,Name=hello
+##     | 
+##     | [ test,Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c,c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c,c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c,c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c,c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test,Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test,Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test,Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection,Name]foo as = 'howdy'
+PASS    : char ',' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char ',' can be used in single quoted value
+PASS    : char ',' can be used in double quoted value
+PASS    : char ',' can be used in parameter name
+PASS    : char ',' can be used in section name
+
+## bg_ini.sh:ini_validChars:comma finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:lessThan start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c<c
+##     | test<Name=hello
+##     | 
+##     | [ test<Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c<c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c<c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c<c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c<c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove ''
+read from [readDataTest]'test<Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test<Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test<Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection<Name]foo as = 'howdy'
+PASS    : char '<' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '<' can be used in single quoted value
+PASS    : char '<' can be used in double quoted value
+PASS    : char '<' can be used in parameter name
+PASS    : char '<' can be used in section name
+
+## bg_ini.sh:ini_validChars:lessThan finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:tilde start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c~c
+##     | test~Name=hello
+##     | 
+##     | [ test~Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c~c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c~c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c~c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c~c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test~Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test~Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test~Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection~Name]foo as = 'howdy'
+PASS    : char '~' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '~' can be used in single quoted value
+PASS    : char '~' can be used in double quoted value
+PASS    : char '~' can be used in parameter name
+PASS    : char '~' can be used in section name
+
+## bg_ini.sh:ini_validChars:tilde finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:tickMark start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c`c
+##     | test`Name=hello
+##     | 
+##     | [ test`Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c`c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+unquoted      value written and reread = 'badValue'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+single quoted value written and reread = 'badValue'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+double quoted value written and reread = 'badValue'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+read from [readDataTest]'test`Name'      (expect 'hello') as = ''
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+written and read back from [writeParamNameTest]test`Name' as = ''
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+read from [test`Name]p1        (expect 'howdy') as = ''
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
+## bg_ini.sh:ini_validChars:tickMark finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:bang start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c!c
+##     | test!Name=hello
+##     | 
+##     | [ test!Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c!c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c!c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c!c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c!c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test!Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test!Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test!Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection!Name]foo as = 'howdy'
+PASS    : char '!' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '!' can be used in single quoted value
+PASS    : char '!' can be used in double quoted value
+PASS    : char '!' can be used in parameter name
+PASS    : char '!' can be used in section name
+
+## bg_ini.sh:ini_validChars:bang finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:atSign start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c@c
+##     | test@Name=hello
+##     | 
+##     | [ test@Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c@c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c@c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c@c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c@c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test@Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test@Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test@Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection@Name]foo as = 'howdy'
+PASS    : char '@' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '@' can be used in single quoted value
+PASS    : char '@' can be used in double quoted value
+PASS    : char '@' can be used in parameter name
+PASS    : char '@' can be used in section name
+
+## bg_ini.sh:ini_validChars:atSign finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:hash start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c#c
+##     | test#Name=hello
+##     | 
+##     | [ test#Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c#c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c#c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c#c'
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test#Name'      (expect 'hello') as = 'badValue'
+written and read back from [writeParamNameTest]test#Name' as = 'badValue'
+read from [test#Name]p1        (expect 'howdy') as = 'badValue'
+stderr> rm: cannot remove '': No such file or directory
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
+## bg_ini.sh:ini_validChars:hash finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:dollar start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c$c
+##     | test$Name=hello
+##     | 
+##     | [ test$Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c$c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c'
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test$Name'      (expect 'hello') as = 'badValue'
+written and read back from [writeParamNameTest]test$Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+read from [test$Name]p1        (expect 'howdy') as = 'badValue'
+stderr> rm: cannot remove '': No such file or directory
+** Exception thrown by testcase **
+   catch_errorClass='assertError'
+   catch_errorFn='bgawk'
+   catch_errorCode='1'
+   catch_errorDescription='
+                           error: bgawk: likely error in awk script
+                               scriptFile='/tmp/tmp.<redacted>'
+                               exitCode='1''
+## bg_ini.sh:ini_validChars:dollar finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:percent start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c%c
+##     | test%Name=hello
+##     | 
+##     | [ test%Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c%c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c%c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c%c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c%c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test%Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test%Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test%Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection%Name]foo as = 'howdy'
+PASS    : char '%' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '%' can be used in single quoted value
+PASS    : char '%' can be used in double quoted value
+PASS    : char '%' can be used in parameter name
+PASS    : char '%' can be used in section name
+
+## bg_ini.sh:ini_validChars:percent finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:caret start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c^c
+##     | test^Name=hello
+##     | 
+##     | [ test^Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c^c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c^c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c^c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c^c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test^Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test^Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test^Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection^Name]foo as = 'howdy'
+PASS    : char '^' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '^' can be used in single quoted value
+PASS    : char '^' can be used in double quoted value
+PASS    : char '^' can be used in parameter name
+PASS    : char '^' can be used in section name
+
+## bg_ini.sh:ini_validChars:caret finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:apersand start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c&c
+##     | test&Name=hello
+##     | 
+##     | [ test&Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c&c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c&c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c&c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c&c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test&Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test&Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test&Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection&Name]foo as = 'howdy'
+PASS    : char '&' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '&' can be used in single quoted value
+PASS    : char '&' can be used in double quoted value
+PASS    : char '&' can be used in parameter name
+PASS    : char '&' can be used in section name
+
+## bg_ini.sh:ini_validChars:apersand finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:asterisk start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c*c
+##     | test*Name=hello
+##     | 
+##     | [ test*Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c*c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c*c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c*c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c*c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test*Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test*Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test*Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection*Name]foo as = 'howdy'
+PASS    : char '*' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '*' can be used in single quoted value
+PASS    : char '*' can be used in double quoted value
+PASS    : char '*' can be used in parameter name
+PASS    : char '*' can be used in section name
+
+## bg_ini.sh:ini_validChars:asterisk finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:leftParens start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c(c
+##     | test(Name=hello
+##     | 
+##     | [ test(Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c(c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c(c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c(c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c(c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test(Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test(Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test(Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection(Name]foo as = 'howdy'
+PASS    : char '(' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char '(' can be used in single quoted value
+PASS    : char '(' can be used in double quoted value
+PASS    : char '(' can be used in parameter name
+PASS    : char '(' can be used in section name
+
+## bg_ini.sh:ini_validChars:leftParens finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validChars:rightParens start
+## expect: to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+
+##----------
+## setup
+##     | <iniFile>
+##     | [ readDataTest ]
+##     | p1=c)c
+##     | test)Name=hello
+##     | 
+##     | [ test)Name ]
+##     | p1=howdy
+
+##----------
+## test
+value read from [readDataTest]p1       = 'c)c'
+stderr> rm: cannot remove '': No such file or directory
+unquoted      value written and reread = 'c)c'
+stderr> rm: cannot remove '': No such file or directory
+single quoted value written and reread = 'c)c'
+stderr> rm: cannot remove '': No such file or directory
+double quoted value written and reread = 'c)c'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [readDataTest]'test)Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test)Name' as = 'hello'
+stderr> rm: cannot remove '': No such file or directory
+stderr> rm: cannot remove '': No such file or directory
+read from [test)Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection)Name]foo as = 'howdy'
+PASS    : char ')' can be used in unquoted value
+stderr> rm: cannot remove '': No such file or directory
+PASS    : char ')' can be used in single quoted value
+PASS    : char ')' can be used in double quoted value
+PASS    : char ')' can be used in parameter name
+PASS    : char ')' can be used in section name
+
+## bg_ini.sh:ini_validChars:rightParens finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |'hello'|
+##     | expected value: |'hello'|
+##     | cmd> cat "$iniFile"
+##     | p=hello
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p=hello
+p=hello  <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |'hello world'|
+##     | expected value: |'hello world'|
+##     | cmd> cat "$iniFile"
+##     | p=hello world
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello world
+hello world  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p=hello world
+p=hello world  <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello world
+hello world  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:3 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |' hello '|
+##     | expected value: |'hello'|
+##     | cmd> cat "$iniFile"
+##     | p= hello 
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p=hello
+p= hello   <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:4 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |' hello world '|
+##     | expected value: |'hello world'|
+##     | cmd> cat "$iniFile"
+##     | p= hello world 
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello world
+hello world  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p=hello world
+p= hello world   <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello world
+hello world  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:4 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:5 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |' hello#world '|
+##     | expected value: |'hello'|
+##     | cmd> cat "$iniFile"
+##     | p= hello#world 
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p= hello#world 
+p= hello#world   <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:5 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:6 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |'hello# comment'|
+##     | expected value: |'hello'|
+##     | cmd> cat "$iniFile"
+##     | p=hello# comment
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p=hello# comment
+p=hello# comment  <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:6 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:7 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |'hello world # comment'|
+##     | expected value: |'hello world'|
+##     | cmd> cat "$iniFile"
+##     | p=hello world # comment
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello world
+hello world  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p=hello world # comment
+p=hello world # comment  <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello world
+hello world  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:7 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:8 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |' hello # comment'|
+##     | expected value: |'hello'|
+##     | cmd> cat "$iniFile"
+##     | p= hello  # comment
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p= hello  # comment
+p= hello  # comment  <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:8 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:9 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |' hello world # comment'|
+##     | expected value: |'hello world'|
+##     | cmd> cat "$iniFile"
+##     | p= hello world  # comment
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello world
+hello world  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p= hello world  # comment
+p= hello world  # comment  <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello world
+hello world  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:9 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:10 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |' hello#world # comment'|
+##     | expected value: |'hello'|
+##     | cmd> cat "$iniFile"
+##     | p= hello#world  # comment
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p= hello#world  # comment
+p= hello#world  # comment  <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello
+hello  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:10 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.sh:ini_validLineFormats:11 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local line="$1"
+##     | cmd> local expectedValue="$2"
+##     | cmd> local iniFile; bgmktemp --auto iniFile
+##     | cmd> echo "p=$line" > $iniFile
+##     | line in file:   |' 'hello#world' # comment'|
+##     | expected value: |'hello#world'|
+##     | cmd> cat "$iniFile"
+##     | p= 'hello#world'  # comment
+
+##----------
+## test
+
+# expect to see if the format in the file reads the expected value
+cmd> getIniParam "$iniFile" '.' p
+hello#world
+hello#world  <- expected
+
+# expect that the line in the file does not change since the value written is the same
+cmd> setIniParam "$iniFile" '.' p "$expectedValue"
+stderr> rm: cannot remove '': No such file or directory
+cmd> cat "$iniFile"
+p= 'hello#world'  # comment
+p= 'hello#world'  # comment  <- expected
+
+# expect that the value read back is the same as the value we just wrote
+cmd> getIniParam "$iniFile" '.' p
+hello#world
+hello#world  <- expected
+
+stderr> rm: cannot remove '': No such file or directory
+## bg_ini.sh:ini_validLineFormats:11 finished
 ###############################################################################################################################
 

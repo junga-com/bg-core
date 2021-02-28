@@ -164,8 +164,8 @@
 # UT Directives:
 # The body of a testcase function can contain testcase directives that start with `ut ...`.
 #
-# **ut setup**
-# ** ut test**
+# **ut setup [noecho|echo] [noexitcodes|exitcodes]**
+# ** ut test [noecho|echo] [noexitcodes|exitcodes]**
 # All code in the testcase function is either in a setup section or a test section. The default is 'test' when the function starts.
 # The directive `ut setup` switches to 'setup' and `ut test` switches to 'test'.
 #
@@ -196,9 +196,10 @@
 # An alternative to using the filter directive would be to capture the output to a string, algorithmically test to see it it is what
 # you expect and then write output indicating if it passed your test or not.
 #
-# ** #noecho**
-# When you end a command source line with `#noecho`, it suppresses the printing of that line. This can make for cleaner output particularly
-# for commands that print the results of the real command being tested.
+# **ut noecho** and **ut echo**
+# These directives turn on and off the feature that echos the testcase commands to the output.
+# While echoing is off, a single command can be echoed by appending the line comment ` #echo`.
+# Likewise, while echoing is on, a single command's echo can be suppressed by appending the line comment ` #noecho`
 #
 # Example Testcase using some directives...
 #    function ut_testMyTargetFunction() {
@@ -248,7 +249,7 @@ assertNotEmpty bgUnitTestScript
 #
 # Also, the utf calls this function to signals various events in the testcase run.
 #
-# ut setup:
+# ut setup [noecho] [noexitcodes]:
 # Used when writing testcases to signal that the follow code is setup and not the taget of the testcase. The output of setup code
 # is not significant for determining if the testcase passes. Also, if any setup code exits with non-zero or writes to stderr,
 # the testcase will terminate and be considered not elgible for running because its setup is failing.
@@ -275,8 +276,6 @@ assertNotEmpty bgUnitTestScript
 # called after the last simple command on a src line is called.
 function ut()
 {
-	local event="$1"; shift
-
 	# if the last command produced stderr output, flush it
 	if [ -s "$errOut" ]; then
 		sync
@@ -285,6 +284,7 @@ function ut()
 		[ "$_utRun_section" == "setup" ] && ut setupFailed
 	fi
 
+	local event="$1"; shift
 	case $event in
 	  setup)
 		echo >&$stdoutFD
@@ -292,6 +292,12 @@ function ut()
 		echo "## $event" >&$stdoutFD
 		_utRun_section="$event"
 		exec >&$setupOutFD
+
+		# this allows combining some directives with the setup like
+		#     ut setup noecho noexitcodes
+		while [ $# -gt 0 ]; do
+			ut "$1"; shift
+		done
 		;;
 
 	  test)
@@ -301,6 +307,12 @@ function ut()
 		echo "##----------" >&$stdoutFD
 		echo "## $event" >&$stdoutFD
 		_utRun_section="$event"
+
+		# this allows combining some directives with the test like
+		#     ut test noecho noexitcodes
+		while [ $# -gt 0 ]; do
+			ut "$1"; shift
+		done
 		;;
 
 	  expect|expect:)
@@ -316,13 +328,21 @@ function ut()
 		printf "ut filter '%s'\n" "$1"
 		;;
 
+	  echo)   utEchoOff="" ;;
+	  noecho) utEchoOff="noecho" ;;
+	  exitcodes)   utExitCodesOff="" ;;
+	  noexitcodes) utExitCodesOff="noexitcodes" ;;
 
 	  onBeforeSrcLine)
 		local lineNo="$1"
 		local srcLine="$2"
 		# print the  source line that we are about to start executing so that its output will appear after it
 		local trimmedLine="${srcLine#[]}"; stringTrim -i trimmedLine
-		[[ ! "$srcLine" =~ [#][[:space:]]*noecho ]] && printf "cmd> %s\n" "${trimmedLine}"
+		if [ ! "$utEchoOff" ]; then
+			[[ ! "$srcLine" =~ [#][[:space:]]*noecho ]] && printf "cmd> %s\n" "${trimmedLine}"
+		else
+			[[   "$srcLine" =~ [#][[:space:]]*echo   ]] && printf "cmd> %s\n" "${trimmedLine}"
+		fi
 		true
 		;;
 
@@ -336,7 +356,7 @@ function ut()
 		# we get the cmd that produced a non-zero code in $2 but we dont display it b/c when the testcase invokes a function that
 		# returns non-zero, the last cmd is the last cmd in the function. That is confusing to the output because it does not match
 		# the cmd that the testcase ran.
-		_utRun_lineInfo+="[exitCode $1]"
+		[ ! "$utExitCodesOff" ] && _utRun_lineInfo+="[exitCode $1]"
 		[ "$_utRun_section" == "setup" ] && ut setupFailed
 		;;
 

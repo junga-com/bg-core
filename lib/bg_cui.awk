@@ -1,4 +1,154 @@
 
+@include "bg_core.awk"
+
+function winCreate(buf, x1, y1, x2, y2) {
+	cuiRealizeFmtToTerm("on")
+	arrayCreate(buf)
+	arrayCreate2(buf, "lines")
+	buf["x1"]=x1
+	buf["y1"]=y1
+	buf["x2"]=x2
+	buf["y2"]=y2
+	buf["width"]=x2-x1
+	buf["height"]=y2-y1
+	buf["curX"]=1
+	buf["curY"]=1
+#	buf["defaultFont"]=(defaultFont)?defaultFont:(csiWhite""csiBkBlack)
+}
+
+function winWriteLine(buf, line) {
+	if (buf["curY"]<=buf["height"]) {
+		buf["lines"][buf["curY"]]=buf["lines"][buf["curY"]]""csiSubstr(line, 1, (buf["width"]-buf["curX"]+1) )
+		buf["curX"]=1
+		buf["curY"]++
+	}
+}
+
+function winWriteAt(buf, cx, cy, line                ,cpStart,cpLen,len) {
+	if ((cx > buf["x2"]) || (cy < buf["y1"]) || (cy > buf["y2"])) return
+	cpStart=max(1, 1-cx)
+	cx=max(1, cx)
+	cpLen=(buf["width"]-cx+1)
+	buf["lines"][cy]=csiSubstr(buf["lines"][cy], 1, cy)""csiSubstr(line, cpStart, cpLen )""csiSubstr(buf["lines"][cy], cy+cpLen)
+}
+
+function winPaint(buf                      ,i) {
+	printf(_CSI""cSave)
+	for (i=1; i<=buf["height"]; i++) {
+		printf(_CSI""(buf["y1"]+i)";"buf["x1"]""cMoveAbs"%s%*s", buf["lines"][i], max(0,buf["width"]-length(buf["lines"][i])), " ")
+	}
+	printf(_CSI""cRestore)
+}
+
+function winClear(buf                      ,i) {
+	for (i=1; i<=buf["height"]; i++)
+		buf["lines"][i]=""
+	buf["curX"]=1
+	buf["curY"]=1
+}
+
+
+function pushOutLine(lineNo, content, hlStart, hlEnd                   ,line,contentArray,headLen) {
+	line=""
+	headLen=0
+	if (lineNo>0) {
+		line=sprintf("%1s%s ",  (lineNo==cursorLineNo)?">":" ", lineNo)
+		headLen=length(line)
+	}
+	line=line""content
+	if (length(line)>viewColWidth-1) {
+		line=substr(line, 1, viewColWidth-2)"+"
+	} else {
+		line=line""sprintf("%*s", viewColWidth-1-length(line),"")
+	}
+	if (hlStart!="" && (hlStart+headLen)<(viewColWidth-2)) {
+		hlStart+=headLen
+		hlEnd+=headLen
+		if (hlEnd>viewColWidth-1)
+			hlEnd=viewColWidth-1
+		line=sprintf("{highlightedCodeFont}%s{highlightedCodeFont2}%s{highlightedCodeFont}%s{codeSectionFont}", substr(line,1,hlStart-1), substr(line,hlStart,hlEnd-hlStart), substr(line,hlEnd) )
+	}
+	if (lineNo==focusedLineNo)
+		line=sprintf("{highlightedCodeFont}%s{codeSectionFont}", line)
+	arrayPush(out, line)
+	if (lineNo==startLineNo)
+		startLineNoOffset=length(out)
+}
+
+
+
+
+
+# # usage: csiStrClip(line, clipLen)
+# # truncates <line> to <clipLen> taking into account that <line> may contain CSI sequences that will not contribute to the
+# # length when printed to a terminal but do contribute to length(<line>)
+# # All the CSI sequences are added to the output even if some are in the clipped portion that did not make it into the output because
+# # its common to change the font settings and then change them back at the end of the string and we want to leave the font settings
+# # in the correct state.
+# function csiStrClip(line, clipLen                   ,out,outLen,rematch,cpLen) {
+# 	while (line!="") {
+# 		if ( ! match(line, /^([^\033]*)(\033\[([0-9;]*)?([\x20-\x2F]*)?[\x40-\x7E])?(.*)$/, rematch))
+# 			assert("logical error. regex should always match")
+#
+# 		cpLen=min((clipLen-outLen), length(rematch[1]))
+# 		out=out""substr(rematch[1], 1, cpLen)
+# 		outLen+=cpLen
+#
+# 		# cp _CSI term without inc outLen
+# 		out=out""rematch[2]
+#
+# 		line=rematch[5]
+# 	}
+# 	return out
+# }
+
+# usage: csiLength(line)
+# returns the length of <line> taking into account that <line> may contain CSI sequences that will not contribute to the length
+# when printed to a terminal but do contribute to length(<line>)
+function csiLength(line                   ,out,outLen,rematch) {
+	while (line!="") {
+		if ( ! match(line, /^([^\033]*)(\033\[([0-9;]*)?([\x20-\x2F]*)?[\x40-\x7E])?(.*)$/, rematch))
+			assert("logical error. regex should always match")
+		outLen+=length(rematch[1])
+		line=rematch[5]
+	}
+	return outLen
+}
+
+function csiSubstr(line, start, len, optionsStr                   ,out,outLen,rematch,rmLen,cpLen) {
+	outLen=0
+	if (len=="") len=10000
+	if ((optionsStr~/--pad/) && start<1) {
+		outLen=min(1-start,len)
+		out=sprintf("%*s", outLen, "")
+	}
+	while (line!="") {
+		if ( ! match(line, /^([^\033]*)(\033\[([0-9;]*)?([\x20-\x2F]*)?[\x40-\x7E])?(.*)$/, rematch))
+			assert("logical error. regex should always match")
+
+		if (start>1) {
+			rmLen=min((start-1), length(rematch[1]))
+			rematch[1]=substr(rematch[1], rmLen+1)
+			start-=rmLen
+		}
+
+		if (start<=1 && outLen<len) {
+			cpLen=min((len-outLen), length(rematch[1]))
+			out=out""substr(rematch[1], 1, cpLen)
+			outLen+=cpLen
+		}
+
+		# cp _CSI term without inc outLen
+		out=out""rematch[2]
+
+		line=rematch[5]
+	}
+	if (optionsStr~/--pad/)
+		out=sprintf("%s%*s", out, (len-outLen), "")
+	return out
+}
+
+
 function cuiRealizeFmtToTerm(onOff               ,csiName,csiValue) {
 	cuiDeclareGlobals()
 	if (onOff && onOff!="off") {
@@ -8,16 +158,25 @@ function cuiRealizeFmtToTerm(onOff               ,csiName,csiValue) {
 			sub("^c","csi",csiName)
 			SYMTAB[csiName]=_CSI""csiValue
 		}
+		for (csiName in _csiCMD_pN) {
+			SYMTAB[csiName]=_csiCMD_pN[csiName]
+		}
 	} else {
 		for (csiName in _csiCMD_p0) {
 			SYMTAB[csiName]=""
 			sub("^c","csi",csiName)
 			SYMTAB[csiName]=""
 		}
+		for (csiName in _csiCMD_pN) {
+			SYMTAB[csiName]=""
+		}
 	}
 }
 
 function cuiDeclareGlobals() {
+	cToCol="G"				# <col>
+	cMoveAbs="H"			# <line> <col>
+	cSetScrollRegion="r"	# <lineStartNum> <lineEndNum>
 	cHide="?25l"
 	csiHide=_CSI"?25l"
 	cShow="?25h"
@@ -160,6 +319,10 @@ BEGIN {
 # most useful stuff is CSI. Set Window title is an OSC code
 _CSI="\033["
 _OSC="\033]"
+
+_csiCMD_pN["cToCol"]="G"				# <col>
+_csiCMD_pN["cMoveAbs"]="H"			# <line> <col>
+_csiCMD_pN["cSetScrollRegion"]="r"	# <lineStartNum> <lineEndNum>
 
 # cursor movement
 _csiCMD_p0["cHide"]="?25l"

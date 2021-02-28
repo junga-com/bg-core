@@ -1,6 +1,7 @@
 #!/bin/bash
 
 import bg_bgawk.sh  ;$L1;$L2
+import bg_bgsed.sh  ;$L1;$L2
 
 # this is a generic hidden user config that any script can use to store config
 iniUserConfFile=~/.bg-lib.conf
@@ -109,72 +110,6 @@ iniUserConfFile=~/.bg-lib.conf
 
 
 
-# AWKLIB : awkLibINIFiles : provides iniSection, iniParamName, iniValue, and iniLineType variables
-# This awk library string can be included in an awk script and any script that apears after it can
-# rely on a set of ini* variables to be defined while processing each line.
-# The default delimiter for settings lines in "=". You can change the delimiter by adding a cmd line
-# option '-v iniDelim="<delim>"'. A line's first ocurance of iniDelim will separate <iniParamName> and
-# iniValue therefore iniParamName can not contain iniDelim but iniValue can.
-# Input Variables:
-#    iniTargetSection: a section to focus on. inTarget will be true only when processing this section. Several special values are recognized
-#              "<sectName>"   : <sectName> matches the word inbetween bracket on section lines.
-#              "." or "--"    : matches the top section before the first section line
-#              ""             : (empty string) matches no section and inTarget will never be true
-#              "]all"         : matches all sections so that inTarget always be true
-#    iniDelim        : default is "=". This character is used to separate the iniParamName from the iniValue. Only the first occruence
-#                      is recognized so the iniValue may contain iniDelim but the iniParamName may not. Whitespace before and after the
-#                      iniDelim is ignored and will not be part of the iniParamName or iniValue. Trailing whitespace at the end of iniValue
-#                      will also be ignored but whitespec in the middle of iniValue will be preserved
-#                      Note that the full line is always available in $0 so a script can do different parsing if it wants.
-# Provided Variables:
-#    iniSection      : the section name that the current line is in or empty string, "", if its before the first section header line
-#    iniSectionNorm  : the section name that the current line is in or "." if its before the first section header line
-#    iniParamName    : the name of the parameter (using iniDelim to parse) for the current line or empty if current line is not a setting
-#    iniValue        : the vaue of the parameter (using iniDelim to parse) for the current line or empty if current line is not a setting
-#    iniLineType     : the type of line of the current line
-#            "comment"    : the first non-whitespace character is a "#".
-#            "whitespace" : the line is empty or contains only whitespace
-#            "section"    : the line is a section header of the form "[ <sectionName> ]"
-#            "setting"    : the line is not any of the other lines. Note that this means that the line might not contain a iniDelim
-#    inTarget        : true(1) or false(0) indicating if the current line is in the section specified in iniTargetSection
-awkLibINIFiles='
-	#'"$awkDataLibrary"'
-	BEGIN {
-		# if the caller does not set iniTargetSection with -v iniTargetSection="", we set it to a
-		# value that is not likely to be a real section. If the caller wants to specify the top/empty
-		# section, they must use iniTargetSection="." or iniTargetSection="--"
-		iniTargetSection=(iniTargetSection=="")?"]!#<noSection>#!":iniTargetSection
-		iniTargetSection=(iniTargetSection=="." || iniTargetSection=="--")?"":iniTargetSection
-		#bgtrace("lib begin")
-	}
-	BEGINFILE {
-		iniSection=""
-		iniSectionNorm="."
-		iniDelim=(iniDelim=="")?"=":iniDelim
-		inTarget=(iniTargetSection=="" || iniTargetSection=="]all")?1:0
-		#bgtrace("lib beginfile")
-		#bgtrace("iniTargetSection="iniTargetSection)
-	}
-	{iniLineType=""; iniParamName=""; iniValue=""}
-	$1~"^[[]" && $NF~"[]]$" {
-		iniSection=$0
-		gsub("((^[[:space:]]*[[][[:space:]]*)|([[:space:]]*[]][[:space:]]*$))","", iniSection)
-		if (iniSection ~ /(^".*"$)|(^'\''.*'\''$)/)
-			iniSection=substr(iniSection,2,length($0)-2)
-		iniSectionNorm=(iniSection!="")?iniSection:"."
-		iniLineType="section"
-		inTarget=(iniTargetSection==iniSection || iniTargetSection=="]all")?1:0
-		##bgtrace("lib section")
-	}
-	$0~"^[[:space:]]*$" {iniLineType="whitespace"}
-	$0~"^[[:space:]]*#" {iniLineType="comment"}
-	iniLineType == "" {
-		iniLineType="setting"
-		iniParamName=$0; gsub("((^[[:space:]]*)|([[:space:]]*"iniDelim".*$))","", iniParamName)
-		iniValue=$0;     gsub("(^[^"iniDelim"]*"iniDelim"[[:space:]]*)|([[:space:]]*)$","", iniValue)
-		#bgtrace("lib setting")
-	}
-'
 
 # usage: cat $file | escapeIniSectionData
 # This facilitates storing arbitrary data in an INI section of a file
@@ -216,50 +151,20 @@ function unescapeIniSectionData()
 #                     line before the first section line
 function iniSectionExists()
 {
-	local verboseFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-v)  verboseFlag="-v" ;;
-	esac; shift; done
-	local iniFile="$1"
-	local sectionName="$2"
+	local iniFile="$1";     assertNotEmpty iniFile
+	local sectionName="$2"; assertNotEmpty sectionName
 
-	awk -v iniTargetSection="${sectionName:---}"  '
-		'"$awkLibINIFiles"'
-
+	bgawk -v iniTargetSection="${sectionName:-]none}" --include bg_ini.awk '
 		# the top/empty section does not have a section line so we consider it to exist if there is
 		# at least one setting line in it. In this condition, when iniLineType=="section", it will be the actual section line for targetSection
 		inTarget && ( iniLineType=="setting" || iniLineType=="section") {
 			found=1
-			exit (found)?0:1
+			exit (found)?0:2
 		}
 		END {
-			exit (found)?0:1
+			exit (found)?0:2
 		}
 	' $(fsExpandFiles -f $iniFile)
-	local result=$?
-	return $result
-}
-
-# usage: assertINISectionExists <inifile> <sectionName> <errorDescription>
-# If the specified section in the <inifile> does not exist, an exception will be raised. see assertError
-function assertINISectionExists()
-{
-	if ! iniSectionExists "$1" "$2"; then
-		local data="$1 $2"
-		shift 2
-		assertError "${*:-the ini section '$data' should exist}"
-	fi
-}
-
-# usage: assertINISectionNotExists <inifile> <sectionName> <errorDescription>
-# If the specified section in the <inifile> *does* exist, an exception will be raised. see assertError
-function assertINISectionNotExists()
-{
-	if iniSectionExists "$1" "$2"; then
-		local data="$1 $2"
-		shift 2
-		assertError "${*:-the ini section '$data' should not exist}"
-	fi
 }
 
 
@@ -272,10 +177,8 @@ function iniSectionList()
 	local iniFile="$1"; assertNotEmpty iniFile
 	local filterRegex="${2:-".*"}"
 
-	awk '
-		'"$awkLibINIFiles"'
-		iniLineType=="setting" && iniSection="" {print "."};
-		iniLineType=="section" {print iniSection};
+	bgawk --include bg_ini.awk '
+		iniLineType=="section" {print iniSectionNorm};
 	' $(fsExpandFiles -f $iniFile) | grep "^$filterRegex$"
 }
 
@@ -292,20 +195,18 @@ function getIniSection() { iniSectionGet "$@"; }
 function iniSectionGet()
 {
 	local includeSectionHeaderToo
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-p) includeSectionHeaderToo="1" ;;
-	esac; shift; done
-	local iniFile="$1"
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local iniFile="$1";     assertNotEmpty iniFile
 	local sectionName="$2"
 
-	awk -v iniTargetSection="${sectionName:---}"  '
-		'"$awkLibINIFiles"'
-
+	bgawk -v iniTargetSection="$sectionName" --include bg_ini.awk '
 		inTarget {
 			if (iniLineType!="section" || "'"$includeSectionHeaderToo"'")
 				print $0
 		}
-
 	' $(fsExpandFiles -f $iniFile) | unescapeIniSectionData
 }
 
@@ -318,27 +219,22 @@ function removeIniSection() { iniSectionRemove "$@"; }
 function iniSectionRemove()
 {
 	local deleteSectionHeaderToo="1"
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-p) deleteSectionHeaderToo="" ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local iniFile="$1";     assertNotEmpty iniFile
+	local sectionName="$2"; assertNotEmpty sectionName
 
-	local iniFile="$1"; assertNotEmpty iniFile
-	local sectionName="$2"
-
-	[ -e "$iniFile" ] || return 0
-
-	bgawk -i -n -v iniTargetSection="${sectionName:---}" '
-		'"$awkLibINIFiles"'
-
+	bgawk -i -n -v iniTargetSection="${sectionName:-]none}" --include bg_ini.awk '
 		inTarget && iniLineType=="section" && ! "'"$deleteSectionHeaderToo"'" {
 			print $0
 		}
-
 		! inTarget {
 			print $0
 		}
-
 	' "$iniFile"
+	# bgawk returns 0(true) if it changes the file or 1(false) if the file did not change
 }
 
 
@@ -348,12 +244,11 @@ function iniSectionRemove()
 function replaceIniSection() { iniSectionReplace "$@"; }
 function iniSectionReplace()
 {
-	local iniFile="$1"
-	local sectionName="$2"
+	local iniFile="$1";     assertNotEmpty iniFile
+	local sectionName="$2"; assertNotEmpty sectionName
 
-	escapeIniSectionData <&0 | bgawk -i -n -v iniTargetSection="${sectionName:---}" '
-		'"$awkLibINIFiles"'
-
+	escapeIniSectionData <&0 | \
+		bgawk -i -n -v iniTargetSection="${sectionName:-]none}" --include bg_ini.awk '
 		BEGINFILE {
 			if (inTarget) {
 				hit=1
@@ -382,26 +277,20 @@ function iniSectionReplace()
 			}
 		}
 	' "$iniFile"
+	# bgawk returns 0(true) if it changes the file or 1(false) if the file did not change
 }
 
 # usage: cr_iniSectionNotExists <filename> <sectionName>
 # declares that the ini section should not exist
 # apply removes the section
-function cr_iniSectionNotExists()
-{
-	case $objectMethod in
-		objectVars) echo "filename sectionName " ;;
-		construct)
-			filename="$1"
-			sectionName="$2"
-			displayName="$filename:[$sectionName] should not exist"
-			;;
-
-		check) ! iniSectionExists "$filename" "$sectionName" ;;
-		apply) removeIniSection -i "$filename" "$sectionName" ;;
-
-		*) cr_baseClass "$@" ;;
-	esac
+DeclareCreqClass cr_iniSectionNotExists
+function cr_iniSectionNotExists::check() {
+	filename="$1"
+	sectionName="$2"
+	! iniSectionExists "$filename" "$sectionName"
+}
+function cr_iniSectionNotExists::apply() {
+	removeIniSection "$filename" "$sectionName"
 }
 
 
@@ -424,45 +313,41 @@ function cr_iniSectionNotExists()
 # If you need to know the existing value is AND whether it exists or not, its efficient to use getIniParam
 # specifying a default value that is not a valid value that could be set in the file. If it returns the default value
 # then the param does not exist. Any other value including "" means that a line does exist in the file
+# Params:
+#    <inifile>     : a text file to operate on
+#    <sectionName> : the name of the section that <paramName> is in. '' or '.' specifies the top section before any section.
+#    <paramName>   : the name of the setting
+# Options:
+#    -d <delimChar> : default is "=". set the character used to separate name and value on settings lines
 function iniParamExists()
 {
-	local verboseFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-v)  verboseFlag="-v" ;;
-	esac; shift; done
+	local ipg_iniDelim
+	while [ $# -gt 0 ]; do case $1 in
+		-d*) bgOptionGetOpt val: ipg_iniDelim "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
-	local iniFile="$1"
-	local sectionNameRaw="$2"
-	local paramNameRaw="$3"; assertNotEmpty paramNameRaw
+	local ipg_iniFiles="$1"
+	local sectionName="$2"
+	local paramName="$3"; assertNotEmpty paramName
 
-	[ -s "$iniFile" ] || return 1
+	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
 
-	local existingValue="$(getIniParam "$iniFile" "$sectionNameRaw" "$paramNameRaw" "|!@#NOTEXISTS#@!|")"
+	bgsudo "${ipg_iniFiles[@]/#/-r}" -p"reading conf file ${ipg_iniFiles[*]##*/} [sudo]:"  gawk \
+		-v iniTargetSection="${ipg_sectionName:---}" \
+		-v paramDelim="$ipg_iniDelim" \
+		-v paramName="$ipg_paramName" \
+		--include bg_ini.awk '
 
-	[ "$verboseFlag" ] && echo "$existingValue"
+		inTarget && iniLineType=="setting" && iniParamName==paramName {
+			found=1
+			exit
+		}
 
-	# set return code to true if its set to anything in the file (even "") so that the default value was not returned
-	[ "$existingValue" != "|!@#NOTEXISTS#@!|" ]
-}
-
-# usage: assertINIParamExists <inifile> sectionName paramName "error description to display if it fails"
-function assertINIParamExists()
-{
-	if ! iniParamExists "$1" "$2" "$3"; then
-		local msg="the ini parameter should exist. \n\tfile:$1\n\tsect:[$2]\n\tname:$3"
-		shift 3
-		assertError "${*:-$msg}"
-	fi
-}
-
-# usage: assertINIParamNotExists <inifile> <sectionName> <paramName> "error description to display if it fails"
-function assertINIParamNotExists()
-{
-	if iniParamExists "$1" "$2" "$3"; then
-		local msg="the ini parameter should not exist. \n\tfile:$1\n\tsect:[$2]\n\tname:$3"
-		shift 3
-		assertError "${*:-$msg}"
-	fi
+		END {
+			exit (found)?0:2
+		}
+	' "${ipg_iniFiles[@]}"
 }
 
 
@@ -475,8 +360,7 @@ function iniParamList()
 	local sectionName="$2"
 	local filterRegex="${3:-".*"}"
 
-	awk -v iniTargetSection="${sectionName:---}"  '
-		'"$awkLibINIFiles"'
+	awk -v iniTargetSection="${sectionName:-]none}" --include bg_ini.awk '
 
 		inTarget && iniLineType=="setting" {print iniParamName}
 
@@ -512,6 +396,7 @@ function iniParamList()
 #    man(5) bgTemplateFileFormat
 function getIniParam() { iniParamGet "$@"; }
 function iniParamGet() { iniParamGetNewImpl "$@"; }
+#function iniParamGet() { iniParamGetOldImpl "$@"; }
 function iniParamGetOldImpl()
 {
 	local addFlag templateFlag retVar
@@ -597,7 +482,7 @@ function iniParamGetOldImpl()
 		value="$defaultValue"
 		[ "$templateFlag" ] && value="$(expandString2 "$value")"
 		[ "$retVar" ] && eval $retVar='"$value"' || echo "$value"
-		return 0
+		return 1
 	else
 		# since it was found, we need to remove the '='. This works fine even if the value is = because the first = is always extra
 		value="${value#=}"
@@ -619,18 +504,20 @@ function iniParamGetOldImpl()
 
 	[ "$templateFlag" ] && value="$(expandString2 "$value")"
 	[ "$retVar" ] && eval $retVar='"$value"' || echo "$value"
+	return 0
 }
 
 function iniParamGetNewImpl()
 {
 	local ipg_addFlag ipg_iniDelim ipg_templateFlag retVar ipg_sectPad
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-R*) bgOptionGetOpt val: retVar       "$@" && shift ;;
 		-d*) bgOptionGetOpt val: ipg_iniDelim "$@" && shift ;;
 		-a)  ipg_addFlag="-a" ;;
 		-t)  ipg_templateFlag="-t" ;;
 		-x)  ipg_sectPad="-x" ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local ipg_iniFileSpec="$1"
 	local ipg_sectionName="$2"
 	local ipg_paramName="$3";  assertNotEmpty ipg_paramName
@@ -646,12 +533,12 @@ function iniParamGetNewImpl()
 
 	# normal case that at least one existing file was specified
 	else
-		read -r ipg_foundInFile ipg_value < <(bgsudo "${ipg_iniFiles[@]/#/-r}" -p"reading conf file ${ipg_iniFiles[*]##*/} [sudo]:"  awk \
+		read -r ipg_foundInFile ipg_value < <(bgawk -n \
 			-v iniTargetSection="${ipg_sectionName:---}" \
 			-v defaultValue="$ipg_defaultValue" \
-			-v iniDelim="$ipg_iniDelim" \
-			-v paramName="$ipg_paramName" '
-			'"$awkLibINIFiles"'
+			-v paramDelim="$ipg_iniDelim" \
+			-v paramName="$ipg_paramName" \
+			--include bg_ini.awk '
 
 			inTarget && iniLineType=="setting" && iniParamName==paramName {
 				print "1 "iniValue
@@ -667,15 +554,13 @@ function iniParamGetNewImpl()
 		' "${ipg_iniFiles[@]}")
 	fi
 
-	if [ ! "$ipg_foundInFile" ] && [ "$ipg_addFlag" ]; then
+	if [ "$ipg_foundInFile" == "0" ] && [ "$ipg_addFlag" ]; then
 		setIniParam $ipg_sectPad "$ipg_iniFileSpec" "$ipg_sectionName" "$ipg_paramName" "$ipg_defaultValue"
 	fi
 
-	if [ "$ipg_templateFlag" ]; then
-		templateExpandStr -R "$retVar" "$ipg_value"
-	else
-		returnValue "$ipg_value" "$retVar"
-	fi
+	[ "$ipg_templateFlag" ] && templateExpandStr -R ipg_value "$ipg_value"
+
+	returnValue "$ipg_value" "$retVar"
 
 	# set the return code
 	[ "${ipg_foundInFile}" == "1" ]
@@ -684,232 +569,269 @@ function iniParamGetNewImpl()
 
 
 
-# usage: getAllIniParams [-t] [-A <retArrayName>] [-P <retPrefix>] <inifile> [<sectionName>]
-# retrieves a set of the ini style settings from a config file. The default is to print them to stdout but if either -A or -P
-# is specified, the output will be returned in the specified variable(s) and there will be nothing written to stdout.
+# usage: getAllIniParams [-t] [-A <retArrayName>] <inifile> [<sectionName>]
+# retrieves a set of the ini style settings from a config file. The default is to print them to stdout but the -A
+# options , the output will be returned in the specified variable(s) and there will be nothing written to stdout.
 #
 # Params:
 #    <inifile>     : filename of config file. Can be a comma separated list of config files in which case the value of the first file
 #                    that defines <sectionName> <paramName> will be used or <defaultValue> if none define it
 #    <sectionName> : If specified, only params in that section will be returned and names will NOT be prefixed with the <sectionName>
 # Options:
-#    -t  : expand the value as a template before returning it
-#    -A <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>)
+#    -f|--fullyQualified : determines if the names returned include the <sectionName>.
+#           By default, if <sectionName> is used to specify a single section, the returned names will not be fully qualified
+#           will be fully qualified otherwise. This option makes the returned names be fully qualified regardless of <sectionName>
+#    -d|--scopeDelim : default is '.'. determines how the <sectionName> and <paramName> are combined to form a fully qualified name
+#           '[' or ']'  : use the format [<sectionName>]<paramName>
+#           '.'         : (default) use the format <sectionName>.<paramName>
+#           ':'         : use the format <sectionName>:<paramName>
+#           '<delim>'   : use the format <sectionName><delim><paramName>
+#    -t|--expandValue   : expand each value as a template before returning it
+#    -A|--array <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>)
 #          that will be filled in with the values <retArrayName>[[sect.]name]=value
-#    -P <retPrefix>    : the values will be returned in variables named like <retPrefix>_[<sect>_]<name>=<value>
-#          special characters in <sect> and <name> in the the conig file are replaced with _ so that they make valid
-#          variable names. so this is only practical with files that use simple names
 function getAllIniParams() { iniParamGetAll "$@"; }
 function iniParamGetAll()
 {
-	local templateFlag retArray retArray
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-t)  templateFlag="-t" ;;
-		-A*) bgOptionGetOpt val: retArray "$@" && shift ;;
-		-P*) bgOptionGetOpt val: retPrefix "$@" && shift; retPrefix="${retPrefix%_}_" ;;
-	esac; shift; done
-
+	local templateFlag retArray scopeDelim fullyQualifiedFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-f|--fullyQualified) fullyQualifiedFlag="full" ;;
+		-d|--scopeDelim*)  bgOptionGetOpt val: scopeDelim "$@" && shift ;;
+		-t|--expandValue)  templateFlag="-t" ;;
+		-A*|--array*) bgOptionGetOpt val: retArray "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local iniFile="$1"
 	local sectionName="$2"
 
-	if [ ! -f "$iniFile" ]; then
-		return 3
-	fi
-
-	[ ! -r "$iniFile" ] && assertError "can not read from file '$iniFile'" >&2
-
-	while read -r name value; do
-		if [ "$name" == "__ReT_info__" ]; then
-			nameColWidth="$value"
-		elif [ "$retArray$retPrefix" ]; then
-			[ "$retArray" ]  && eval $retArray[\$name]='"$value"'
-			[ "$retPrefix" ] && declare -g $retPrefix${name//[.$;<>|:() ]/_}='"$value"'
-		else
-			printf "%-${nameColWidth:-13}s = %s\n" "$name" "$value"
-		fi
-	done < <(awk '
+	local maxNameLen
+	{
+		read -r maxNameLen
+		while read -r name value; do
+			strUnescapeFromToken name
+			[ "$ipg_templateFlag" ] && templateExpandStr -R value "$value"
+			if [ "$retArray" ]; then
+				mapSet "$retArray" "$name" "$value"
+			else
+				printf "%*s = %s\n" "$maxNameLen" "$name" "$value"
+			fi
+		done
+	} < <(bgawk -n \
+		-v iniTargetSection="${sectionName:-]all}" \
+		-v fullyQualifiedFlag="$fullyQualifiedFlag" \
+		-v scopeDelim="$scopeDelim" \
+		--include bg_ini.awk '
 		BEGIN {
-			names[0]="" # needed so awk knows name is an array
-			sectionName="'"$sectionName"'"
-			if (sectionName) sectFlag="1"
-			if (sectionName==".") sectionName=""
+			arrayCreate(settings)
+			arrayCreate(fullNames)
+			maxNameLen=0
+			if (iniTargetSection == "]all" && !fullyQualifiedFlag)
+				fullyQualifiedFlag="full"
+			if (!scopeDelim)
+				scopeDelim="."
 		}
-
-		# match section start lines
-		$0~"^[[:space:]]*[[]" {
-			curSect=$0
-			sub("^[[:space:]]*[[][[:space:]]*","", curSect)
-			sub("[[:space:]]*[]][[:space:]]*$","", curSect)
+		inTarget && iniLineType=="setting" {
+			switch (fullyQualifiedFlag":"scopeDelim) {
+				case /^:/:        name=iniParamName; break
+				case /full:[][]/: name="["iniSectionNorm"]"iniParamName; break
+				default:          name=iniSectionNorm""scopeDelim""iniParamName; break
+			}
+			maxNameLen=max(maxNameLen, length(name))
+			settings[name]=iniValue
 		}
-
-		# match parameter setting lines
-		$0~"^[^#]*=" {
-			if (sectFlag && sectionName!=curSect)
-				next
-			name=$0; sub("^[[:space:]]*","",name); sub("[[:space:]]*=.*$","",name)
-			value=$0; sub("^[^=]*=[[:space:]]*","",value);
-			if (value ~ "^\"") {
-				sub("^\"","",value)
-				sub("\".*$","",value)
-			}
-			else if (value ~ "^'\''") {
-				sub("^'\''","",value)
-				sub("'\''.*$","",value)
-			}
-			else {
-				sub("#.*$","",value)
-			}
-			if (name) {
-				if (!sectFlag && curSect) name=curSect"."name
-				data[name]=value
-				maxLen=(maxLen<length(name)) ? length(name) : maxLen
-				names[length(names)]=name
-			}
-		}
-
 		END {
-			print "__ReT_info__  " maxLen
-			for (i=1; i<length(names); i++) {
-				print names[i] " " data[names[i]]
-			}
+			print maxNameLen
+			for (name in settings)
+				printf("%*s = %s\n", -maxNameLen, norm(name), settings[name])
 		}
 	' "$iniFile")
 }
 
-# usage: _getIniParamMultipleFiles <inifile> (sectionName | . ) paramName [ defaultValue ]
-# this is a private helper function for getIniParam.
-# It implements the multiple <inifile> search feature by separating the inifiles and calling back
-# getIniParam for each one as needed.
-function _getIniParamMultipleFiles()
-{
-	local inifiles="$1"
-	local sectionName="$2"
-	local paramName="$3"
-	local defaultValue="$4"
-
-	local inifile value="#$%__DEF__"
-	for inifile in ${inifiles//,/ }; do
-		value=$(getIniParam $inifile "$sectionName" "$paramName" "#$%__DEF__")
-		if [ "$value" != "#$%__DEF__" ]; then
-			echo "$value"
-			return
-		fi
-	done
-	echo "$defaultValue"
-}
-
-
-# usage: bgsed [-p] <sedOptionsAndParameters>
-# This is a wrapper over the linux utility sed. It adds several features
-#   1) if -i is given and the user does not have permission to write to the file, it will use sudo
-#   2) if -i is given, it will create the file if it does not exist
-#   3) if -i is given and the user can write to the file but not the folder to create the temporary file,
-#      it will edit the file in the /tmp folder and then move it back into the destination file.
-# Options:
-#     -p   : if this is the first parameter, it is not passed on to sed and if -i is given, its taken
-#            that the parent folder should be created if needed so that the file can be created in it
-function bgsed()
-{
-	local noDashI mkdirFlag
-	if [ "$1" == "-p" ]; then
-		mkdirFlag="-p"
-		shift
-	fi
-	local -a origCmdLine=("$@")
-	local iniFile="${@: -1}"
-	if [[ "$@" =~ -i\  ]]; then
-		local sudoOpts; bgsudo --makeOpts sudoOpts -w "$iniFile" -p "modifying $iniFile [sudo]: "
-		local parentFolder="${iniFile%/*}"
-
-		if [ ! -d "$parentFolder" ]; then
-			[ ! "$mkdirFlag" ] && assertError "the folder that contains the <inifile> does not exist. use -p to forces its creation. '$iniFile'"
-			bgsudo -O sudoOpts mkdir -p "$parentFolder"
-		fi
-
-		# we need to be able to write to the parent folder as well to use "sed -i ..."
-		# we test this separately b/c if we can write to the file without sudo but cant make the temp file in the parent folder,
-		# this function will do the temp file logic itself instead of using -i
-		bgsudo -O sudoOpts test -w "$parentFolder" || noDashI="1"
-
-		# make sure the file exists and has at least on line
-		if [ ! -s "$iniFile" ]; then
-			# the idea behind this line is that any config file that this function creates will have the default policy that
-			# local admins can modify it. It should not effect existing files and if something specifically sets the access policy
-			# this will not override it b/c it only sets the policy if the file does not exist
-			[ ! -f "$iniFile" ] && grep -q "adm:" /etc/group &>/dev/null && which aaaTouch &>/dev/null && aaaTouch -d "" "$iniFile" group:adm:writable
-
-			# sed does not work on a truely empty file so give it a empty line
-			bgsudo -O sudoOpts bash -c "echo > \"$iniFile\""
-		fi
-
-		if [ "$noDashI" ]; then
-			local tmpFile="$(bgsudo -O sudoOpts mktemp)"
-			bgsudo -O sudoOpts cp "$iniFile" "$tmpFile"
-			bgsudo -O sudoOpts sed "${origCmdLine[@]//$iniFile/$tmpFile}"
-			local result=$?
-			bgsudo -O sudoOpts cat "$tmpFile" | bgsudo -w "$iniFile" -p "writing to $iniFile" tee "$iniFile" >/dev/null
-			bgsudo -O sudoOpts rm "$tmpFile"
-			return $result
-		fi
-	fi
-
-	local sudoOpts; bgsudo --makeOpts sudoOpts -r "$iniFile" -p "reading $iniFile [sudo]: "
-	bgsudo -O sudoOpts sed "$@"
-}
-
-
-
-# usage: setIniParam [-q1] [-q2] [-p] [-c <comment>] [-S statusVarName] [-x] <inifile> sectionName paramName paramValue
-# replaces the existing value for the named sectionName:paramName with the new value
-# * When a value is replaced, it preserves the position of the param in the file
-# * When a value is replaced, it preserves end of line comments that could exist after the value
+# usage: setIniParam [<options>] <inifile> <sectionName> <paramName> [<paramValue>]
+# Changes or adds the specified parameter (aka setting) in an ini style configuration file with the minimal change required.
+# If the parameter is already present and set to the specified value (and command and quoting options), the file is not touched.
+# If an existing parameter needs to be changed, it preserves that parameter's position and existing comment if any.
+# If the parameter is added to an existing section, it is places after the last non-comment, non-whitespace line in that section
+# If the specified section does not yet exist, a new section will be added at the end of the file.
+#
 # Parameters:
-#   <inifile> :
-#       the file to modify.
+#   <inifile> : the file to modify.
 #       * if the file does not exist, it will be created
 #       * if the parent folder of the file does not exist, it will only be created if the -p option is specified
 #       * if the user does not have permission to modify or create the file, sudo will be used which may prompt the user
-#   sectionName :
-#       The INI style section heading that the paramName will be placed it
+#   <sectionName> : The INI style section heading that the paramName will be placed it
 #       Use '.' or "" as the sectionName to indicate parameters in the beginning of a file, outside any section
-#       * if the section does not exist, it will be added at the end of the file.
-#   paramName :
-#       The left hand side of the parameter/setting assignment. e.g. "paramName=paramValue"
-#   paramValue :
-#       The right hand side of the parameter/setting assignment. e.g. "paramName=paramValue"
+#       if the section does not exist, it will be added at the end of the file.
+#   <paramName>  : The left hand side of the parameter/setting assignment. e.g. "paramName=paramValue"
+#   <paramValue> : The right hand side of the parameter/setting assignment. e.g. "paramName=paramValue"
 #       an empty value will leave the param in the file with an empty right hand side. This is means that
 #       the value is the empty string. Use removeIniParam to remove it completely which means that the paramName
 #       is not set. The default value of the getIniParam function will only be used if the paramName is not set
 # Options:
+#   -p|--mkdir : If the parent folder of <inifile> does not exist it will attempt to create it with `mkdir -p`
+#   -R|--resultsVar=<var> : a variable name to receive the result of the operation. It will be one of these words.
+#         * nochange : this parameter was already set to the specified value
+#         * changedExistingSetting : the value of an existing setting was changed
+#         * addedToExistingSection : a new setting/parameter line was added to an existing section
+#         * addedSectionAndSetting : a new section containing this setting/parameter line was added
+#   -S|--statusVar=<var> : a variable name that will be set to "changed" if the <iniFile> was changed as a result of this command.
+#         This is a "one shot" status meaning that this function call may set it to 'changed' but it will not clear it if the file
+#         was not changed. This facilitates passing the status variable to multiple function calls and in the end, if any
+#         changed the file, this status variable will be set to "changed". Use -R <var> if you want to know the actual result.
+#   -c <comment> : place this comment after the assignment like "name=value # comment"
+#
+# Ini File Protocol Options...
+# Note that this library is tolerant most padding and quoting variations when reading so those options are mainly used to force
+# the creation of content that is compatible with other systems that require a more strict padding or quoting protocol.
+#   -d|--delim=<delim> : default is '='. This determines the delimiter used between name and value for this ini file.
+#   --paramPad=<paramPad> : default is ''. Typically this is set to '' or ' ' and is the padding around the <paramDelim>
+#   --sectPad=<sectPad> : default is ' '. Typically this is set to '' or ' ' and is the padding between the <sectionName> and the
+#         surrounding brackets. Some file protocols require a space and some require there not to be a space.
+#   -x  : alias for `--sectPad=`. suppress section padding. e.g. [sectionname] instead of [ sectionname ]
+#   -qN : do not write quotes around the value. Some foriegn config files require this
 #   -q1 : put single quotes around the value. Some foriegn config files require this
 #   -q2 : put double quotes around the value. Some foriegn config files require this
-#   -p  : this works like mkdir -p. If the parent folder of <inifile> does not exist it will attempt to create it
-#   -S <statusVarName> : statusVarName is a output variable. Pass in the string name of the variable to return
-#         the status of whether or not iniffile was changed. If the value set in the <inifile> is already set to the
-#         specified value, it will return without modifying the file and statusVarName will also, not be changed.
-#         if the <inifile> gets changed, statusVarName will be set to "changed". The reason statusVarName is not explicitly
-#         set to indicated that its not changed is a typical pattern is for the caller to initialize statusVarName=""
-#         and then pass it to multiple setIniParam calles. At the end, it can check to see if any of the calls
-#         resulted in the <inifile> being changed.
-#   -c <comment> : place this comment after the assignment like "name=value # comment"
-#   -x  : suppress section padding. don't add space around the section name when adding a section. This support compatibility to foreign formats
-#         that need [user] instead of [ user ]
-#   -s  : depriciated. does nothing. used to indicate that sudo should be used by now that is automatic
+#         If the value being set contains a '#' and neither -q1 nor -q2 nor -qN were specified, the value will get double quotes
+#         automatically to prevent the '#' from being interpretted as an EOL comment
+#   --commentsStyle=<NONE|EOL|BEFORE> : default is EOL. Note that full line comments are always supported. This determines how
+#         comments are associated with section and settings lines.
+#         'NONE' : unquoted "#" on section and setting lines will not be special and can be used in names and values.
+#                  if comments are specified, they will be ignored and not written to the file
+#         'BEFORE' : unquoted "#" on section and setting lines will not be special and can be used in names and values.
+#                  if a single line comment is specified, it will be written immediately before the section or setting as a comment line.
+#         'EOL'    : single line comments are added to the end of section and settings lines. The '#' char can be escaped in single
+#                    or double quotes to use in in the data. Otherwise it will begine an EOL comment regardless where it appears
 function setIniParam() { iniParamSet "$@"; }
-function iniParamSet()
+function iniParamSet() { iniParamSet_NewImpl "$@"; }
+function iniParamSet_NewImpl()
 {
-	local quoteMode=""
-	local comment=""
-	local statusVarName=""
+	local quoteMode comment sectComment statusVarName resultsVarName mkdirFlag paramDelim paramPad commentsStyle
+	local sectPad=" " verbosity="$verbosity"
+	while [ $# -gt 0 ]; do case $1 in
+		-p|--mkdir)         mkdirFlag="-p" ;;
+		-S*|--statusVar)    bgOptionGetOpt val: statusVarName  "$@" && shift ;;
+		-R*|--resultsVar*)  bgOptionGetOpt val: resultsVarName "$@" && shift ;;
+		-c*|--comment*)     bgOptionGetOpt val: comment        "$@" && shift ;;
+		--sectionComment*)  bgOptionGetOpt val: sectComment    "$@" && shift ;;
+		-qN|--noQuote)      quoteMode="none" ;;
+		-q1|--singleQuote)  quoteMode="single" ;;
+		-q2|--doubleQuote)  quoteMode="double" ;;
+		-d*|--delim*)       bgOptionGetOpt val: paramDelim     "$@" && shift ;;
+		--sectPad*)         bgOptionGetOpt val: sectPad        "$@" && shift ;;
+		--paramPad*)        bgOptionGetOpt val: paramPad       "$@" && shift ;;
+		-x|--noSectionPad)  sectPad="" ;;
+		--commentsStyle*)   bgOptionGetOpt val: commentsStyle  "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	local iniFile="$1";     assertValidFilename iniFile
+	local sectionName="$2"
+	local paramName="$3";   assertNotEmpty paramName
+	local paramValue="$4"
+
+	local _ipsResults="$(bgawk -i -n  \
+		-v iniTargetSection="$sectionName" \
+		-v setName="$paramName" \
+		-v setValue="$paramValue" \
+		-v setComment="$comment" \
+		-v setSectionComment="$sectComment" \
+		-v quoteMode="$quoteMode" \
+		-v sectPad="$sectPad" \
+		-v paramDelim="$paramDelim" \
+		-v paramPad="$paramPad" \
+		-v commentsStyle="$commentsStyle" \
+		-v verbosity="$verbosity" \
+		--include bg_ini.awk '
+
+		# called at the end of each section. We make sure that our param/setting is present and then flush it to the output stream
+		function onSectionDone() {
+			# if this is the target section and we did not find an existing setting, add it before flushing the section
+			if (iniSectBufLast == iniTargetSection && !settingFoundOrDone) {
+				# to find the best insertion point we start at the end and then go backwards over comments and whitespace
+				idx=length(iniSectBuf)
+				while (idx>0 && iniSectBuf[idx]["lineType"] ~ /^(whitespace)|(comment)$/) idx--
+				arrayCreate2(iniSectBuf, idx".5")
+				iniSectBuf[idx".5"]["line"] = makeNewSettingLine(setName, setValue, setComment)
+				if (idx+1==length(iniSectBuf)) {
+					arrayCreate2(iniSectBuf, idx".6")
+					iniSectBuf[idx".6"]["line"] = ""
+				}
+				settingFoundOrDone="addedToExistingSection"
+			}
+
+			# flush the section to the output stream
+			PROCINFO["sorted_in"] = "@ind_num_asc"
+			for (i in iniSectBuf) {
+				print iniSectBuf[i]["line"]
+			}
+
+			# reset the buffer for the next section
+			arrayCreate(iniSectBuf)
+			iniSectBufLast=iniSection
+		}
+
+		BEGINFILE {
+			# init/reset the section buffer for the start of the file
+			arrayCreate(iniSectBuf)
+			iniSectBufLast="" # top section
+		}
+
+		# detect the first line of a new section. before processing this line further, flush the last sections buffer
+		iniSectBufLast != iniSection {onSectionDone()}
+
+		# if we come accross the target line, change it inline before we send it to the buffer and set settingFoundOrDone
+		inTarget && iniParamName==setName {
+			if ((iniValue != setValue) || (quoteMode!="" && iniValueQuoteStyle!=quoteMode) || (setComment!="" && normalizeComment(iniComment) != normalizeComment(setComment)) ) {
+				comment=(setComment=="") ? iniComment : setComment
+				comment=(comment=="<remove>") ? "" : comment
+				$0=makeNewSettingLine(setName, setValue, comment)
+				settingFoundOrDone="changedExistingSetting"
+			} else
+				settingFoundOrDone="nochange"
+		}
+
+		# capture this the info for this line into our buffer
+		{
+			idx=arrayPushArray(iniSectBuf, "NR",NR)
+			iniSectBuf[idx]["line"]=$0
+			iniSectBuf[idx]["lineType"]=iniLineType
+			iniSectBuf[idx]["paramName"]=iniParamName
+			iniSectBuf[idx]["paramValue"]=iniValue
+			iniSectBuf[idx]["comment"]=iniComment
+		}
+
+		END {
+			# the last section needs to be flushed
+			onSectionDone()
+
+			# if the target section was not present, add it now at the end
+			if (!settingFoundOrDone) {
+				printf("\n")
+				print makeNewSectionLine(iniTargetSection, setSectionComment)
+				print makeNewSettingLine(setName, setValue, setComment)
+				settingFoundOrDone="addedSectionAndSetting"
+			}
+
+			printf("%s\n", settingFoundOrDone) >"/dev/fd/3"
+		}
+	' "$iniFile" 3>&1)"
+
+	setReturnValue "$resultsVarName" "$_ipsResults"
+	[ "$_ipsResults" != "nochange" ] && setReturnValue "$statusVarName" "changed"
+	true
+}
+
+function iniParamSet_OldImpl()
+{
+	local quoteMode comment statusVarName mkdirFlag
 	local sectPad=" "
-	local flag; while getopts  "isq:c:pS:x" flag; do
-	case $flag in
-		p) mkdirFlag="-p" ;;
-		q) quoteMode=$OPTARG ;;
-		c) comment=$OPTARG ;;
-		S) statusVarName=$OPTARG ;;
-		x) sectPad="" ;;
-	esac; done; shift $((OPTIND-1)); unset OPTIND
+	while [ $# -gt 0 ]; do case $1 in
+		-p) mkdirFlag="-p" ;;
+		-q*)  bgOptionGetOpt val: quoteMode "$@" && shift ;;
+		-c*)  bgOptionGetOpt val: comment "$@" && shift ;;
+		-S*)  bgOptionGetOpt val: statusVarName "$@" && shift ;;
+		-x) sectPad="" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	local iniFile="$1"
 	local sectionNameRaw="$2"
@@ -961,7 +883,7 @@ function iniParamSet()
 	# case where there is nothing to do becuase the value is already set
 	if [ "$existingValue" == "$paramValueRaw" ]; then
 		# we don't explicitly set statusVarName to nochange because if one thing has changed, then
-		# overall something has changes. e.i. the caller may be calling multiple setIniParam calls
+		# overall something has changed. e.i. the caller may be calling multiple setIniParam calls
 		# with the same statusVarName and at the end checks to see if anything has changed.
 				return
 
@@ -1001,119 +923,124 @@ function iniParamSet()
 	true
 }
 
-# usage: removeIniParam <inifile> sectionName paramName
-# removes sectionName:paramName from the file. If the param did not exist, its a NOP
+# usage: removeIniParam <inifile> <sectionName> <paramName>
+# removes [<sectionName>]<paramName> from the file. If the param does not exist, its a NOP
+# Options:
+#   -R|--resultsVar=<var> : a variable name to receive the result of the operation. It will be one of these words.
+#         * nochange : this parameter was not present in the file so there was nothing to remove.
+#         * changed  : the parameter was found and removed from the file.
+#   -S|--statusVar=<var> : a variable name that will be set to "changed" if the <iniFile> was changed as a result of this command.
+#         This is a "one shot" status meaning that this function call may set it to 'changed' but it will not clear it if the file
+#         was not changed. This facilitates passing the status variable to multiple function calls and in the end, if any
+#         changed the file, this status variable will be set to "changed". Use -R <var> if you want to know the actual result.
+# Ini File Protocol Options...
+#   -d|--delim=<delim> : default is '='. This determines the delimiter used between name and value for this ini file.
 function removeIniParam() { iniParamRemove "$@"; }
 function iniParamRemove()
 {
-	local iniFile="$1"
-	local sectionNameRaw="$2"
-	local sectionName="${2//\//\\/}" # replace all "/" with "\/"
-	local paramNameRaw="$3"
-	local paramName="${3//\//\\/}" # replace all "/" with "\/"
+	local statusVarName resultsVarName paramDelim
+	local verbosity="$verbosity"
+	while [ $# -gt 0 ]; do case $1 in
+		-S*|--statusVar)    bgOptionGetOpt val: statusVarName  "$@" && shift ;;
+		-R*|--resultsVar*)  bgOptionGetOpt val: resultsVarName "$@" && shift ;;
+		-d*|--delim*)       bgOptionGetOpt val: paramDelim     "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local iniFile="$1";     assertNotEmpty iniFile
+	local sectionName="$2"
+	local paramName="$3";   assertNotEmpty paramName
 
-	if [ "$paramName" == "" ]; then
-		echo "error: removeIniParam requires three parameters -- <inifile> sectionName paramName " >&2
-		exit 15
-	fi
+	local _ipsResults="$(bgawk -i  \
+		-v iniTargetSection="$sectionName" \
+		-v removeName="$paramName" \
+		-v paramDelim="$paramDelim" \
+		-v verbosity="$verbosity" \
+		--include bg_ini.awk '
 
-	# if its not in the file, there is nothing for us to do
-	iniParamExists "$iniFile" "$sectionNameRaw" "$paramNameRaw" || return 0
+		inTarget && iniParamName==removeName {
+			found=1
+			deleteLine()
+		}
+		END {
+			print (found) ? "changed" : "nochange"
+		}
+	' "$iniFile" 3>&1)"
 
-	local startLinePattern=""
-	if [ ! "$sectionName" ] || [ "$sectionName" == "." ]; then
-		startLinePattern="1{/[ \t]*[[]/q}; 1"
-	else
-		startLinePattern="/^[ \t]*[[ \t]*$sectionName[ \t]*][ \t]*$/"
-	fi
-	local endLinePattern="/^[ \t]*\[.*\][ \t]*$/"
-
-	if [ ! -s $iniFile ]; then
-		return
-	fi
-
-	# the format of the sed command is...
-	# /StartLinePattern/,/EndLinePattern/ s/regExForLineWithNameSaved/SavedName $paramValue/
-	# The startLinePattern matches the sectionName start line
-	# The EndLinePattern matches all section lines which includes the next section line that ends our section
-	bgsed -i -e " \
-		$startLinePattern,$endLinePattern {/^\([ \t]*$paramName[ \t]*=\)[ \t]*\\\"*\([^\\\"#]*\)\\\"*\([ \t]*#.*\)*$/d} \
-	" "$iniFile"
+	setReturnValue "$resultsVarName" "$_ipsResults"
+	[ "$_ipsResults" != "nochange" ] && setReturnValue "$statusVarName" "changed"
+	[ "$_ipsResults" != "nochange" ]
 }
 
-# usage: cr_iniParamSet <filename> sectionName paramName paramValue [ acceptableValueRegEx ]
-# declares that the ini parameter should be set
-# if acceptableValueRegEx is specified, any value that matches the regex is acceptable
-# otherwise, the value must match paramValue
-# apply sets the value to paramValue
-function cr_iniParamSet()
-{
-	case $objectMethod in
-		objectVars) echo 'opts= filename sectionName paramName paramValue acceptableValueRegEx' ;;
-		construct)
-			while [[ "$1" =~ ^- ]]; do
-				case $1 in
-					-q) shift; opts="$opts -q$1" ;;
-					-q*) opts="$opts $1" ;;
-				esac
-				shift
-			done
-			filename="$1"
-			sectionName="$2"
-			paramName="$3"
-			paramValue="$4"
-			acceptableValueRegEx="${5:-^$paramValue$}"
-			;;
+# usage: cr_iniParamSet <filename> <sectionName> <paramName> <paramValue> [<acceptableValueRegEx>]
+# declares that the ini parameter should be set in the <iniFile>
+# if acceptableValueRegEx is specified, any value that matches the regex is acceptable and will pass the check. The default is to
+# require an exact match with <paramValue>
+# apply will set the parameter with all the given options.
+#
+# Options:
+# Any option to iniParamGet or iniParamSet is accepted.
+#
+# See Also:
+#    man(3) iniParamGet (used in ::check)
+#    man(3) iniParamSet (used in ::apply)
+DeclareCreqClass cr_iniParamSet
+function cr_iniParamSet::check() {
+	# accept all the options that either iniParamGet or iniParamSet accept and pass them through.
+	while [ $# -gt 0 ]; do case $1 in
+		-d*|--delim*)
+			local delimOpt; bgOptionGetOpt opt: delimOpt   "$@" && shift
+			getOpt+=("${delimOpt[@]}")
+			setOpt+=("${delimOpt[@]}")
+		;;
+		-t|--expandValue)
+			getOpt+=("$1")
+			setOpt+=("$1")
+		;;
+		-c*|--sectionComment*|--sectPad*|--paramPad*|--commentsStyle*)
+			bgOptionGetOpt opt: setOpts "$@" && shift
+		;;
+		-qN|--noQuote|-q1|--singleQuote|-q2|--doubleQuote|-x|--noSectionPad|-p|--mkdir)
+			bgOptionGetOpt opt setOpts "$@" && shift
+		;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	filename="$1"
+	sectionName="$2"
+	paramName="$3"
+	paramValue="$4"
+	acceptableValueRegEx="${5:-^$paramValue$}"
 
-		displayName)
-			local sectDisplay=""
-			[ "$sectionName" ] && [ "$sectionName" != "." ] && sectDisplay="[$sectionName]"
-			echo "$filename:${sectDisplay}$paramName should be $acceptableValueRegEx"
-			;;
-
-		check)
-			local value="$(getIniParam "$filename" "$sectionName" "$paramName")"
-			[[ "$value" =~ $acceptableValueRegEx ]]
-			;;
-
-		apply)
-			setIniParam -i $opts "$filename" "$sectionName" "$paramName" "$paramValue"
-			;;
-
-		*) 	cr_baseClass "$@" ;;
-	esac
+	iniParamGet "${getOpts[@]}" -R actualValue "$filename" "$sectionName" "$paramName"; foundInfile=$?
+	[[ "$actualValue" =~ $acceptableValueRegEx ]]
+}
+function cr_iniParamSet::apply() {
+	iniParamSet "${setOpts[@]}" "$filename" "$sectionName" "$paramName" "$paramValue"
 }
 
-# usage: cr_iniParamNotSet <filename> sectionName paramName
-# declares that the ini parameter should not be set. This means that it is not in the file
-# an ini parameter can be set to the empty string and that is still 'set'
-# apply removes the paramName
-function cr_iniParamNotSet()
-{
-	case $objectMethod in
-		objectVars) echo "filename sectionName paramName" ;;
-		construct)
-			filename="$1"
-			sectionName="$2"
-			paramName="$3"
-			;;
 
-		displayName)
-			local sectDisplay=""
-			[ "$sectionName" ] && [ "$sectionName" != "." ] && sectDisplay="[$sectionName]"
-			echo "$filename:${sectDisplay}$paramName should not be set"
-			;;
+# usage: cr_iniParamNotSet [-d*|--delim=<paramDelim>] <filename> <sectionName> <paramName>
+# declares that the ini parameter should not be set. This means that it is not present in the file. An ini parameter that is present
+# in the file with the value of "" (empty string) is still considered 'set'
+# Apply removes the parameter from the file
+# Options:
+#    -d|--delim=<paramDelim> : determines how settings (aka parameter) lines are parsed to determine <paramName>
+# Seel Also:
+#    man(3) iniParamExists (used in ::check)
+#    man(3) iniParamRemove (used in ::apply)
+DeclareCreqClass cr_iniParamNotSet
+function cr_iniParamNotSet::check() {
+	while [ $# -gt 0 ]; do case $1 in
+		-d*|--delim*) bgOptionGetOpt opt: passThruOpts   "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	filename="$1"
+	sectionName="$2"
+	paramName="$3"
 
-		check)
-			! iniParamExists -q "$filename" "$sectionName" "$paramName"
-			;;
-
-		apply)
-			removeIniParam "$filename" "$sectionName" "$paramName"
-			;;
-
-		*) cr_baseClass "$@" ;;
-	esac
+	! iniParamExists "${passThruOpts[@]}" "$filename" "$sectionName" "$paramName"
+}
+function cr_iniParamNotSet::apply() {
+	iniParamRemove "${passThruOpts[@]}" "$filename" "$sectionName" "$paramName"
 }
 
 
@@ -1721,7 +1648,7 @@ function configLineReplace()
 		-v forceFlag="$forceFlag" \
 		-v commentAction="$commentAction" \
 		-v knownToContainAMatchingLine="$knownToContainAMatchingLine" \
-		"$awkDataLibrary"'
+		'
 
 		# when the algorithm has choosen that its at the file position that the line should be, it
 		# calls this function to write it out. This function does one of 3 actions

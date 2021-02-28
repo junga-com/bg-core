@@ -19,6 +19,7 @@ function manifestGet(assetTypeMatch, assetNameMatch, array                    ,m
 	close(cmd)
 }
 
+# TODO: change to use splitOptions() function
 function templateFind(templateName, options                      ,manFile,templatePath,cmd) {
 	manFile=manifestGetFile()
 	while ((getline < manFile) >0) {
@@ -108,6 +109,7 @@ function queueFilesToScan(fileSpec,where             ,i,pathlist,addCount,insert
 ### Output functions
 
 # usage: printfVars("<varName1>|<opt1> [...<varNameN>|<optN>]"                ,optionsStr)
+# TODO: change to use splitOptions() function
 # The input is a string of space separated global variable names and optional parameters that start with '-'
 # This prints the listed awk global vars in a reasonable format.
 # Note that you must use printfVars2 to print local function variables. printfVars2 works with global variobles also but the trade
@@ -127,6 +129,7 @@ function queueFilesToScan(fileSpec,where             ,i,pathlist,addCount,insert
 function printfVars(varNameListStr            ,optionsStr,level, varNameList, i,options,outFile) {
 	level=0
 	outFile="/dev/stderr"
+	# TODO: change to use splitOptions() function
 	spliti(optionsStr, options)
 	lineEnd="\n"; if ("-1" in options) lineEnd=" "
 	split(varNameListStr, varNameList)
@@ -154,6 +157,7 @@ function printfVars(varNameListStr            ,optionsStr,level, varNameList, i,
 }
 
 # usage: printfVars2(level, varName, varValue, optionsStr)
+# TODO: change to use splitOptions() function
 # This is an alternate form of printfVars that allows descending nested arrays of arrays and printing local variables but only
 # accepts one variable with the name and value passed separately to print instead of a string list.
 # printfVars is implemented with this function.
@@ -168,6 +172,11 @@ function printfVars(varNameListStr            ,optionsStr,level, varNameList, i,
 function printfVars2(level, varName, varValue, optionsStr,      i,optToken,options,lineEnd,maxWidth,outFile) {
 	outFile="/dev/stderr"
 	maxWidth=0
+	if (match(varName,/(.*) (.*)$/, options)) {
+		optionsStr=options[1]" "optionsStr
+		varName=options[2]
+	}
+	# TODO: change to use splitOptions() function
 	spliti(optionsStr, options)
 	lineEnd="\n"; if ("-1" in options) lineEnd=" "
 	for (optToken in options) switch (optToken) {
@@ -206,6 +215,19 @@ function arrayPush(array, element) {
 	array[length(array)+1]=element
 }
 
+# usage: arrayPushArray(array)
+# add a new,  empty array element to the end of <array>
+function arrayPushArray(array, key, value                ,idx) {
+	idx=length(array)+1
+	if (key=="") {
+		array[idx][1]=""
+		split("", array[idx])
+	} else {
+		array[idx][key]=value
+	}
+	return(idx)
+}
+
 # usage: arrayPop(array)
 # remove and return the last element from the end of <array>
 function arrayPop(array                      , element) {
@@ -240,7 +262,7 @@ function arrayIndexOf(array, element           , i) {
 # copy the contents of one array var into another
 # Return Value:
 #   <count>  : the number of elements copied including in sub-arrays
-function arrayCopy(source, dest,   i, count)
+function arrayCopy(source, dest,         i, count)
 {
 	delete dest
 	for (i in source) {
@@ -339,28 +361,34 @@ function bgtraceVars(s) {
 	printfVars("-o"_bgtraceFile" "s)
 	fflush(_bgtraceFile)
 }
+# TODO: change to use splitOptions() function
 function bgtraceVars2(level, varName, varValue, optionsStr                                     ,i) {
 	if (!bgtraceIsActive()) return
 	printfVars2(level, varName, varValue, optionsStr" -o"_bgtraceFile)
 	fflush(_bgtraceFile)
 }
-function assert(msg) {
+function assert(msg                 ,outStr) {
 	_fnName=_FILENAME; if (_fnName=="") _fnName=FILENAME
 	_fnLine=_INDESC;   if (_fnLine=="") _fnLine=FNR
 	_fnLineTxt=$0;     if (_INDESC~"((BEGIN)|(END))") _fnLineTxt="N/A"
-	printf("awk assert error (%s) : %s\n   inputFile= %s : %s\n   input line= '%s'\n\n", scriptName, msg, _fnName, _fnLine, _fnLineTxt ) > "/dev/stderr"
+	outStr=sprintf("awk assert error (%s) : %s\n   inputFile= %s : %s\n   input line= '%s'\n\n", scriptName, msg, _fnName, _fnLine, _fnLineTxt )
+	print(outStr) > "/dev/stderr"
+	bgtrace(outStr)
 	hardExit(222)
 }
-function warning(msg, verbose,       _fnName, _fnLine, _fnLineTxt) {
+function warning(msg, verbose       ,i,_fnName, _fnLine, _fnLineTxt,  outStr) {
 	if (verbose) {
 		_fnName=_FILENAME; if (_fnName=="") _fnName=FILENAME; gsub("^.*/","", _fnName)
+		if (_fnName == "-") _fnName="stdin"
 		_fnLine=_INDESC;   if (_fnLine=="") _fnLine=FNR
 		_fnLineTxt=$0;     if (_INDESC~"((BEGIN)|(END))") _fnLineTxt="N/A"
-		if (!scriptName) scriptName="awkDataLibrary"
-		printf("awk warning ($%s) : %s\n   %s(%s): '%s'\n\n", scriptName, msg, _fnName, _fnLine, _fnLineTxt ) > "/dev/stderr"
+		if (!scriptName) scriptName="<unknown>"
+		outStr=sprintf("awk warning (%s) : %s\n   %s(%s): '%s'\n", scriptName, msg, _fnName, _fnLine, _fnLineTxt )
 	} else {
-		printf("awk warning ($awkDataLibrary) : %s\n", msg) > "/dev/stderr"
+		outStr=sprintf("awk warning : %s", msg)
 	}
+	print(outStr) > "/dev/stderr"
+	bgtrace(outStr)
 }
 BEGIN {
 	_INDESC="BEGIN"
@@ -368,10 +396,19 @@ BEGIN {
 {_INDESC=NR}
 END {_INDESC="END"}
 
+function dumpPatsplit(parts,seps) {
+	printf("leading sep = |%s|\n", seps[0])
+	for (i=1; i<=length(parts); i++)
+		printf("  [%2s] %-30s |%s|\n", i, "|""parts[i]""|", "seps[i]")
+}
 
 
 #################################################################################################################################
 ### String functions
+
+function strpad(str, len) {
+	return sprintf("%s%*s", str, max(0,len-length(str)), "")
+}
 
 function appendStr(str,strToAdd,sep) {
 	if (!sep) sep=","
@@ -394,6 +431,401 @@ function strExtract(s, leadingRegEx, trailingRegEx) {
 	return s
 }
 
+# usage: splitOptions(optStrOrArray, optionsOut)
+# This is the latest (circa 2020-02) standard for passing options in awk function.
+# Options can be passed in either as a string like "-fdata.txt --file=data.txt" or as an array where the option (-f --file) is the
+# key and the argument if any is the value.
+function splitOptions(optionsAryOrStr, options                    ,parts,i,rematch) {
+	arrayCreate(options)
+	if (!isarray(optionsAryOrStr)) {
+		split(optionsAryOrStr, parts)
+		for (i in parts) {
+			gsub(/%20/," ", parts[i])
+			if (match(parts[i], /^(-[^-])(.*)$/, rematch))
+				options[rematch[1]]=rematch[2]
+			else if (match(parts[i], /^(--[^=]*)(=(.*))?$/, rematch))
+				options[rematch[1]]=rematch[3]
+			else
+				options[parts[i]]=""
+		}
+	} else {
+		arrayCopy(optionsAryOrStr, options)
+	}
+}
+
+
+#################################################################################################################################
+### Newer Parsing functions.
+
+# usage: parserStartQuotingTokenizer(line, parser,optionsAryOrStr)
+# This creates a parser object to parse the input line. It completes a lexical operation that creates an array of lexical tokens
+# and returns the parser array object ready to perform semantic iteration over those tokens.
+#
+# Lexical Tokenization:
+# It performs a lexical tokenization of the input <line> by using the awk patsplit function. It uses a builtin regex express that
+# can be modified with the --parseChars and --parseWords options. By default it follows these rules.
+#      * "..."  double quoted strings (following bash rules) are returned as one token
+#      * '...'  single quoted strings (following bash rules) are returned as one token
+#      * $'...' quoted strings (following bash rules) are returned as one token
+#      * EOL comments (following bash rules) are returned as one token
+#      * sequences of whitespace are returned as one token
+#      * sequences of characters that do not match any of the above are returned as one token.
+# The --parserChar="<listOfChars>|minimal|all" modifies the above behavior. The 3 string types and EOL comments are always done
+# but the tokenization of unquoted sequences before any unquoted # can be controled.
+#    minimal  : this suppresses breaking tokens on whitespace.
+#    all      : this adds all (is it all?) non alpha-numeric characters as break characters
+#    <listOfChars> : a custom list of characters to use as break characters. Including a single space causes runs of whitespace to
+#               be one token. Note that a space can not be passed as in the value to optionsAryOrStr as a string but you can use
+#               %20 to indicate a space.
+# Note that the default value and 'all' will result in a non-computed awk regex being used which may be more performant so its possible
+# that better performance would be attained by using "all" and dealing with the extra tokens in the semantic parsing step.
+#
+# Semanitic Parsing:
+# When the function returns, the <parser> array object is ready to iterate over the lexical tokens. The parse* functions can be used
+# implement the specific semantics of the parser.
+# Here is an example from bg_ini.awk. This is just the top level. The helper functions parseSectionLine and parseSettingLine parse
+# those types of lines further.
+#    parserStartQuotingTokenizer(line, parser, "--parseChars==[]")
+#    parserEatWhitespace(parser)
+#    if (parserIsDone(parser)) {
+#       iniLineType="whitespace"
+#    } else if (parserGet(parser) == "[") {
+#       parseSectionLine(parser)
+#    } else if (parserGet(parser) ~ /^#/) {
+#       iniComment=parserNext(parser)
+#       iniLineType="comment"
+#    } else {
+#       parseSettingLine(parser)
+#    }
+#
+# The Returned Parser Object:
+# The <parser> parameter passed in must be either unitialized or an array. It will be cleared and filled in with the lexical state
+# of the input <line>. There are a number of functions that start with parse* that operate on the parser object. Typically, you
+# only need to use those functions and do not need to reference the array element (aka member variables) of the <parser> array object.
+# Member variables.  (aka array elements of the <parser> object)
+#     ["len"]     : the number of lexical tokens in the "tokens" array. Note that the real array may have some junk left over past
+#                   ["len"] so its important to use this var and not the length() function on ["tokens"]
+#     ["tokens"]  : an array containing the lexical tokens that make of the input <line>
+#     ["types"]   : an array containing the type name of each coresponding ["tokens"] element.
+#                   'double'  : the token is a double quoted string ("..."). The quotes are removed from the token
+#                   'single'  : the token is a single quoted string ('...'). The quotes are removed from the token
+#                   'dollar'  : the token is a $'' quoted string ($'...'). The quotes are removed from the token
+#                   'comment' : the token is an EOL comment string. the first character is always '#'
+#      ["idx"]    : the index of the current token. parserGet() will return the token this points to.
+# Methods. (aka functions that take a <parser> object as their first argument)
+#      parserIsDone(<parser>)    : returns true if there are no more lexicl tokens to consume.
+#      parserGet(<parser>)       : returns the current token being considered by the semanitic parsing algorithm
+#      parserNext(<parser>)      : return the same token that parserGet would and also advances the idx pointer to the next
+#                                  non-whitespace token.
+#      parserPeek(<parser>)      : returns the next token or -1 if the current token is the last.
+#      parserEatWhitespace(<parser>) : if the current token is whitespace, advances idx to the first non-whitespace token
+#      parseUpToWithTrim(<parser>, <targetRE>) : returns the concatonated string from current to the first token after current that
+#                                 matches the <targetRE> regexp. The matched token is not consumed. It is not present in the returned
+#                                 string and current is left pointing at that token. If no matching token is found, all the remaining
+#                                 tokens are consumed and current is left pointing at -1 which is the end and parserIsDone will
+#                                 return true in that case.  If the last token before the matched token is whitespace, it is consumed
+#                                 but not added to the returned string.
+#
+# Params:
+#    <line>       : the input line to parse
+#    <parser>     : an array variable that will be reset and filled in with the tokens produced by lexical breakup, ready for
+#                   semantic parsing.
+# Options:
+# See splitOptions for details of passing options.
+#    --parseChars=<chars>|all|default|minimal : See the "Lexical Tokenization" section for details.
+function parserStartQuotingTokenizer(line, parser,optionsAryOrStr                    ,options,idxOut,idxIn,state) {
+	splitOptions(optionsAryOrStr, options)
+	arrayCreate(parser)
+	arrayCreate2(parser,"tokens")
+	arrayCreate2(parser,"types")
+	arrayCreate2(parser,"seps")
+	parser["line"]=line
+
+	# process the --parseChars option.
+	if (options["--parseChars"]=="") options["--parseChars"]="default"
+	if (options["--parseChars"]=="minimal") options["--parseChars"]=""
+	if (options["--parseChars"]!~ /^(default|all)$/) {
+		# we allow the user to specify the characters in any order, but the [..] RE syntax is very particular as to where a '[',']'
+		# or '-' can be placed so that they do not have special meaning. Also, we have to make sure our mandatory break characters
+		# are in the set and not in the wrong place.
+		options["--parseChars"]=options["--parseChars"]"'\"#\\\\"
+		if (options["--parseChars"]~/[[]/) options["--parseChars"]=gensub(/[[]/,"","g",options["--parseChars"])"["
+		if (options["--parseChars"]~/[-]/) options["--parseChars"]=gensub(/[-]/,"","g",options["--parseChars"])"-"
+		if (options["--parseChars"]~/[]]/) options["--parseChars"]="]"gensub(/[]]/,"","g",options["--parseChars"])
+	}
+	parser["parseChars"]=options["--parseChars"]
+
+	# this splits the input into anithing that might be a quoted string start or end and the runs inbetween
+	switch (options["--parseChars"]) {
+		case "default": parser["len"]=patsplit(line, parser["tokens"], /(['"#\\ ])|([^'"#\\ ]*)|(\s+)|([$]')|(\\")|(\\')/, parser["seps"]); break
+		case "all":     parser["len"]=patsplit(line, parser["tokens"], /([]'"#\\|&;()<>=+{}:/,`!@$%^*~?.[:space:][-])|([^]'"#\\|&;()<>=+{}:/,`!@$%^*~?.[:space:][-]*)|(\s+)|([$]')|(\\")|(\\')/, parser["seps"]); break
+		default:        parser["len"]=patsplit(line, parser["tokens"], "(["options["--parseChars"]"])|([^"options["--parseChars"]"]*)|(\\s+)|([$]')|(\\\\\")|(\\\\')", parser["seps"]); break
+	}
+
+	# this loop contracts the tokens in place. The idxOut will always be <= idxIn when we do an assignment so we will never overwrite
+	# something that we have not yet considered and copied. As we join quouted string tokens, idxIn will get ahead of idxOut. We are
+	# done when idxIn goes past the original length. idxOut at the end will be the new length of the token array
+	idxOut=0 # this will be the last token in the output
+	idxIn=1  # this will be the next token to test. This advance faster than idxOut as we concatonate tokens
+	state="unquoted"
+	while (idxIn<=parser["len"]) {
+		#if (parser["seps"][idx-1]) warning("parser regex error. There should be no tokens not matched by an alternation term. unmatche token='"parser["seps"][idx-1]"'")
+		#bgtrace(sprintf("  [%2s/%2s] %-10s %-13s %s", idxOut, idxIn, "("state")", "("parser["tokens"][idxIn]")", "|"parser["tokens"][idxOut]"|" ))
+		switch (state" "parser["tokens"][idxIn]) {
+			# starting the three different types of quoted bash strings
+			case "unquoted $'": #'
+				parser["openningQuote"]=parser["tokens"][idxIn++]
+				parser["tokens"][++idxOut]=""
+				state="dollar"
+				parser["types"][idxOut]=state
+			break;
+			case "unquoted \"":
+				parser["openningQuote"]=parser["tokens"][idxIn++]
+				parser["tokens"][++idxOut]=""
+				state="double"
+				parser["types"][idxOut]=state
+			break;
+			case "unquoted '":
+				parser["openningQuote"]=parser["tokens"][idxIn++]
+				parser["tokens"][++idxOut]=""
+				state="single"
+				parser["types"][idxOut]=state
+			break;
+			case "unquoted #":
+				parser["tokens"][++idxOut]="#"
+				idxIn++
+				state="comment"
+				parser["types"][idxOut]=state
+			break;
+
+			# ending any type of string and going back to unquoted state
+			# note that single ends with a ' or a \' because \ is not special inside single quotes
+			case "double \"":
+			case "dollar '":
+			case "single '":
+			case "single \\'":
+				idxIn++
+				state="unquoted"
+			break
+
+			# inside a double quoted string, \" gets changed to "
+			case "double \\\"":
+				parser["tokens"][idxOut]=parser["tokens"][idxOut]"\""
+				idxIn++
+			break
+
+			# escaped ", ', and \ prevents them from starting a string or \ escaping the next char
+			case "unquoted \\\"":
+			case "unquoted \\'":
+			case "unquoted \\\\":
+				parser["tokens"][++idxOut]=substr(parser["tokens"][idxIn++], 2, 1)
+			break
+
+			# outside of any type of string, we just move the next idxIn token into the next idxOut spot.
+			# note that in the fist run of unquoted tokens, this assignment is copying the same element into itself which is not
+			# neccesary but does no harm.
+			case /unquoted.*/:
+				parser["tokens"][++idxOut]=parser["tokens"][idxIn++]
+			break
+
+			# inside any of the string types, we concatonate the current idxIn token into the current idxOut token
+			default:
+				parser["tokens"][idxOut]=parser["tokens"][idxOut]""parser["tokens"][idxIn++]
+			break
+		}
+	}
+
+	if (state == "unquoted" || state == "comment")
+		state="wellformed"
+	else {
+		parser["tokens"][idxOut]=parser["openningQuote"]""parser["tokens"][idxOut]
+		state="unterminated."state"String"
+	}
+
+	parser["quotedStringState"]=state
+	parser["idx"]=1
+	parser["len"]=idxOut
+}
+
+# OBSOLETE: replaced by parserStartQuotingTokenizer. This version uses the patsplit regex to group quoted strings into tokens, ignoring
+#           the special meaning of characters within the string, It comes very close, but ultimately can not parse these lines correctly,
+#           with the same code.  The problem is that regex cant treat \' differently than ' WRT determining where to end the string.
+#           Double quotes have a similar problem which can be solved by replacing \" with %5C%22 and then replacing it back afterwards,
+#           but since $'' and '' treat \' differently and we cant selelectively replace only the one inside $'' differently than those
+#           inside '', the same trick does not seem to be workable. parserStartQuotingTokenizer avoids the problem by not trying to
+#           group strings with the regex but instead breaking apart on all characters and tokens that might be the start or stop
+#           of a string and then combining them after the fact.
+#               foo=$'bob\'s #delemia'
+#               foo='bob'\''s #delemia'
+# usage: parserStartBashStyleTokenizer(inputLine, outArray)
+# breaks <inputLine> into tokens which are returned in <outArray>
+# Whitespace delimits tokens.
+function parserStartBashStyleTokenizer(line,parser,optionsAryOrStr                           ,options,out,i,j,parts,unparts,seps,count,len,first,last,state) {
+	splitOptions(optionsAryOrStr, options)
+	arrayCreate(out)
+
+	# the regex is good at reconizing quoted strings so that the data inside wont be parsed, except for the convention that a double
+	# quote can be escaped inside a double quoted string by putting a '\' in front of it. So we escape that another way by replacing
+	# '\"' with its %<hex> equivalent and them replacing them back in the token array.
+	# We dont know at this point if the things we replace are inside a quoted string or not, so we also modify the regex to treat
+	# %5C and %22 as tokens to split on.
+	gsub(/\\\\"/,"%5C%5C\"",line) # we cant mistake \\" for an escaped double quote.
+	gsub(/\\"/,"%5C%22",line)
+	gsub(/%5C%5C"/,"\\\\\"",line) # we arent really interested in this case, so put it back now
+
+	# even though \' has no special menaning in single quoted strings, it does in $'...' strings.
+	# this is problematic because I see no way of recognizing in the regex that 'bla.. \' should end at \' but $'bla.. \' bla..' should not
+	# 'bla.. \' this and that      ### $'bla.. \' bla..' this and that
+	# 'bla.. 'MKR'  this and that   ### $'bla.. 'MKR' bla..' this and that
+	# 'bla.. 'MKR'  this and that   ### $'bla.. 'MKR' bla..' this and that
+	# <------><-><><--><   |
+	gsub(/\\\\'/,"%5C%5C'",line) # if two '\' preceed the '"', we cant mistake it for an escaped double quote.
+	gsub(/\\"/,"%5C%27",line)
+	gsub(/%5C%5C'/,"\\\\'",line) # we arent really interested in this case, so put it back now
+
+	# this regex should match everything. If it does not, the unmatched token will end up in a seps entry which is an error.
+	# When I iterated seps to assert it was empty, I hit a very strange bug that would produce an ininite loop so its not checking
+	# We use /<regex>/ style expresssions even though we have to conditionally choose them because we want the efficiency of it being compliled
+	if ("--no-eolComments" in options)
+		count=patsplit(line, out, /([a-zA-Z_][a-zA-Z0-9_]*)|([+-]?[0-9]+)|('[^']+')|(')|('[^']*$)|("[^"]+")|(")|("[^"]*$)|(\s+)|([|&;()<>])|([]=#+{}:/,`!@$%^*~?\\.[-])|(%5C)|(%22)|(%27)|([#].*$)/, seps)
+		#                               <varname>           numbers        sQStr     sQ  unTermSQ  dQStr     dQ  unTermDQ  spces  metaChar       brCh                    escd\"'          EOLComm
+	else
+		count=patsplit(line, out, /([a-zA-Z_][a-zA-Z0-9_]*)|([+-]?[0-9]+)|('[^']+')|(')|('[^']*$)|("[^"]+")|(")|("[^"]*$)|(\s+)|([|&;()<>])|([]=#+{}:/,`!@$%^*~?\\.[-])|(%5C)|(%22)|(%27)/, seps)
+		#                               <varname>           numbers        sQStr     sQ  unTermSQ  dQStr     dQ  unTermDQ  spces  metaChar       brCh                    escd\"'
+
+	for (i=1; i<=length(out); i++) {
+		# we dont have to decide
+		gsub(/%5C%27/,"\\'",out[i])
+
+		# double quoted strings
+		if (out[i] ~ /^"[^"]*"$/) {
+			out[i]=substr(out[i], 2, length(out[i])-2)
+			# since we processed the special meaning of \" inside double quotes, remove the leading \ when we convert the " back
+			gsub(/%5C%22/,"\"",out[i])
+
+			# inside a double quote, `man bash` says that \ has special meaning when followed by $, `, ", \, or <newline>
+			# we dont remove the leading \ from those other chars besides " because we did not preform the functions that make
+			# those other chars special. If in a latter step some code does, it will need the \ to know that that char is not special
+			# to it.
+
+		# put back the escaped '\' and '"' that were not inside quoted strings so were separated into separate tokens
+		} else if (out[i] == "%5C") {
+			out[i]="\\"
+		} else if (out[i] == "%22") {
+			out[i]="\""
+		# anywhere else where %5C%22 stayed together, put them back to \" . That sequence in these token dont have meaning at this
+		# point but might latter when those tokens are processed.
+		} else {
+			gsub(/%5C%22/,"\\\"",out[i])
+		}
+
+		# $'...' quoted strings
+		if (out[i] ~ /^[$]'[^']*'$/) {
+			out[i]=substr(out[i], 2, length(out[i])-2)
+			# in single quotes these sequences have no special meaning so put them back as they were
+			gsub(/%5C%22/,"\"",out[i])
+			gsub(/%5C%5C/,"\\",out[i])
+		# other tokens
+		} else {
+			gsub(/%5C%22/,"\"",out[i])
+			gsub(/%5C%5C/,"\\",out[i])
+		}
+	}
+
+	parserCreate(out, parser)
+	arrayCreate2(parser,"seps")
+	arrayCopy(seps, parser["seps"])
+
+	#dumpPatsplit(out,seps)
+}
+
+function parserDump(parser                          ,i) {
+	#dumpPatsplit(parser["tokens"],parser["seps"])
+	printf("len=%s\n", parser["len"])
+	for (i=1; i<=parser["len"]; i++) {
+		printf("%2s[%2s] |%s|\n", ((i==parser["idx"])?"->":""), i, parser["tokens"][i])
+	}
+}
+
+function parserCreate(inputArray, parserArray) {
+	arrayCreate(parserArray)
+	arrayCreate2(parserArray,"tokens")
+	parserArray["len"]=arrayCopy(inputArray, parserArray["tokens"])
+	parserArray["idx"]=1
+}
+
+
+# return the token that idx currently points at
+function parserGet(parser) {
+	if (parser["idx"]>parser["len"])
+		return(-1)
+	return(parser["tokens"][parser["idx"]])
+}
+
+
+# return the type of the token that idx currently points at
+function parserGetType(parser) {
+	if (parser["idx"]>parser["len"])
+		return("")
+	return(parser["types"][parser["idx"]])
+}
+
+# peek ahead to see the value of the next token. Returns -1 if at the end.
+function parserPeek(parser) {
+	return( (parser["idx"]<parser["len"]) ? parser["tokens"][parser["idx"]+1] : -1 )
+}
+
+# return the current token and advance idx to the next non-whitespace token
+function parserNext(parser                ,current) {
+	if (parser["idx"]>parser["len"])
+		return(-1)
+
+	current=parser["tokens"][parser["idx"]]
+	parser["idx"]++
+
+	# eat whitespace
+	while (parser["idx"]<=parser["len"] && parser["tokens"][parser["idx"]]~/^\s*$/)
+	 	parser["idx"]++
+
+	return( current )
+}
+
+# if current is whitespace, advance to the next non-whitespace token
+function parserEatWhitespace(parser) {
+	while (parser["idx"]<=parser["len"] && parser["tokens"][parser["idx"]]~/^\s*$/)
+		parser["idx"]++
+}
+
+# true if either current is the end token or NOT equal to <target>
+function parserIsDone(parser) {
+	return(parser["idx"]>parser["len"])
+}
+
+# return the result of concatonating the current token with the following tokens up to the token before the first that <targetRE>
+# matches. The token matching <targetRE> is not consumed and not present in the returned value. The current token is left pointing
+# at the token that matches <targetRE>. If no tokens match <targetRE> all the remaining tokens are concatonated into the returned
+# value and the current pointer (idx) will be one past the end indicating that parserIsDone will then return true.
+# Whitespace is consumed into the return value except if the last token consumed is whitespace, it is not concatonated into the
+# return value
+function parseUpToWithTrim(parser, targetRE                ,token) {
+	token=""
+	while (!parserIsDone(parser) && parserGet(parser) !~ targetRE) {
+		# dont append a trailing space
+		if (parserGet(parser) !~ /^\s*$/  ||  parserPeek(parser) !~ targetRE)
+			token=token""parserGet(parser)
+		parser["idx"]++
+	}
+	return token
+}
+
+
+
+
+
+
+#################################################################################################################################
+### Older Parsing functions.
+
 # This initializes parseState as an array and fills in attributes for it to parse inputStr based on delimChars
 # other parserCreate* functions can set it up to parse on other types of delimiters
 # Params:
@@ -401,7 +833,7 @@ function strExtract(s, leadingRegEx, trailingRegEx) {
 #    <inputStr>      : the target of the parsing. This entry will be consumed and when its empty, the next call to parserConsume* will return false
 #    <delimChars>    : a string of one or more characters that will split the input on
 #    <inclDelimFlag> : if truthy, the trailing delimieter will be included in each consumed token
-function parserCreateFromDelimList(parseState, inputStr, delimChars, inclDelimFlag) {
+function reParserCreateFromDelimList(parseState, inputStr, delimChars, inclDelimFlag) {
 	arrayCreate(parseState)
 	parseState["input"] = inputStr
 	parseState["delim"] = delimChars
@@ -411,14 +843,14 @@ function parserCreateFromDelimList(parseState, inputStr, delimChars, inclDelimFl
 }
 
 # run the parser once. The input string will be reduced by some amount of leading characters and those characters will be placed in token
-function parserConsumeNext(parseState                       ,rematch) {
-	return parserConsumeNextFromRE(parseState, parseState["matchRegexp"])
+function reParserConsumeNext(parseState                       ,rematch) {
+	return reParserConsumeNextFromRE(parseState, parseState["matchRegexp"])
 }
 
-# like  parserConsumeNext but the caller can specify the exact regex to use, overrided any that was initiallized by the parserCreate
+# like  reParserConsumeNext but the caller can specify the exact regex to use, overrided any that was initiallized by the parserCreate
 # function. The regex must contain 3 () groups. [1] matches the consumed token, [2] the delimeter found at the end of token, [3] the
 # remainder of the input left onconsumed
-function parserConsumeNextFromRE(parseState, regex                       ,rematch) {
+function reParserConsumeNextFromRE(parseState, regex                       ,rematch) {
 	if (match( parseState["input"], regex, rematch)) {
 		parseState["token"] = (parseState["includeDelim"]) ? rematch[1]""rematch[2]  : rematch[1];
 		parseState["input"] = rematch[3];
@@ -702,13 +1134,13 @@ function fsRemove(file) {
 #   out = /var/lib/
 function pathGetCommon(p1, p2                                   ,t1,t2,out,finished)
 {
-	parserCreateFromDelimList(t1, p1, "/", 1)
-	parserCreateFromDelimList(t2, p2, "/", 1)
+	reParserCreateFromDelimList(t1, p1, "/", 1)
+	reParserCreateFromDelimList(t2, p2, "/", 1)
 
 	while ( t1["token"] == t2["token"] && ! finished ) {
 		out=out""t1["token"]
-		if (!parserConsumeNext(t1)) finished="1"
-		if (!parserConsumeNext(t2)) finished="1"
+		if (!reParserConsumeNext(t1)) finished="1"
+		if (!reParserConsumeNext(t2)) finished="1"
 	}
 
 	return out
@@ -760,8 +1192,8 @@ function pathGetCanonStr(path, useEnvFlag                                , parse
 		fi
 	}
 
-	parserCreateFromDelimList(parser, path, "/")
-	while ( parserConsumeNext(parser) ) {
+	reParserCreateFromDelimList(parser, path, "/")
+	while ( reParserConsumeNext(parser) ) {
 		switch (parser["token"]) {
 			case "..":
 				if (length(pathArray)==0 || (length(pathArray)==1 && pathArray[0]=="")) {

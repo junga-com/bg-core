@@ -658,6 +658,7 @@ stderr> awk assert error () : expr_compile: unknown operator '!>='
 stderr>    inputFile=  : BEGIN
 stderr>    input line= 'N/A'
 stderr> 
+stderr> 
 [exitCode 222]
 
 ## bg_awkDataSchema.awk:expr_compile:invalidOp finished

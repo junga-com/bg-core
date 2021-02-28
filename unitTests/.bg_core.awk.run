@@ -24,16 +24,16 @@
 
 ##----------
 ## test
-cmd> echo "$1" | awk "$awkScript" 2>&1
+cmd> echo "$1" | gawk "$awkScript" 2>&1
 
 inputPath:'../'
-awk warning ($awkDataLibrary) : invalid path path=../
+awk warning : invalid path path=../
     plain:''
     w/env:'/'
 inputPath:'../..'
-awk warning ($awkDataLibrary) : invalid path path=../..
+awk warning : invalid path path=../..
     plain:''
-awk warning ($awkDataLibrary) : invalid path path=../..
+awk warning : invalid path path=../..
     w/env:''
 inputPath:'d./..'
     plain:''
@@ -43,36 +43,36 @@ inputPath:'.d/..'
     w/env:'/myPWD'
 
 inputPath:'./..'
-awk warning ($awkDataLibrary) : invalid path path=./..
+awk warning : invalid path path=./..
     plain:''
     w/env:'/'
 inputPath:'.//..'
-awk warning ($awkDataLibrary) : invalid path path=.//..
+awk warning : invalid path path=.//..
     plain:''
     w/env:'/'
 inputPath:'../foo'
-awk warning ($awkDataLibrary) : invalid path path=../foo
+awk warning : invalid path path=../foo
     plain:''
     w/env:'/foo'
 inputPath:'../../foo'
-awk warning ($awkDataLibrary) : invalid path path=../../foo
+awk warning : invalid path path=../../foo
     plain:''
-awk warning ($awkDataLibrary) : invalid path path=../../foo
+awk warning : invalid path path=../../foo
     w/env:''
 inputPath:'../../../foo'
-awk warning ($awkDataLibrary) : invalid path path=../../../foo
+awk warning : invalid path path=../../../foo
     plain:''
-awk warning ($awkDataLibrary) : invalid path path=../../../foo
+awk warning : invalid path path=../../../foo
     w/env:''
 inputPath:'/../../../foo'
-awk warning ($awkDataLibrary) : invalid path path=/../../../foo
+awk warning : invalid path path=/../../../foo
     plain:''
-awk warning ($awkDataLibrary) : invalid path path=/../../../foo
+awk warning : invalid path path=/../../../foo
     w/env:''
 inputPath:'/../../one/two/../newTwo'
-awk warning ($awkDataLibrary) : invalid path path=/../../one/two/../newTwo
+awk warning : invalid path path=/../../one/two/../newTwo
     plain:''
-awk warning ($awkDataLibrary) : invalid path path=/../../one/two/../newTwo
+awk warning : invalid path path=/../../one/two/../newTwo
     w/env:''
 
 inputPath:'1/2/3/4/5/6/7/8/../../foo.txt'
@@ -91,13 +91,13 @@ inputPath:'.1/2/3/4/5/6/7/8/../../../../../../../../.foo.txt'
     plain:'.foo.txt'
     w/env:'/myPWD/.foo.txt'
 inputPath:'.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt'
-awk warning ($awkDataLibrary) : invalid path path=.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+awk warning : invalid path path=.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
     plain:''
     w/env:'/.foo.txt'
 inputPath:'/.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt'
-awk warning ($awkDataLibrary) : invalid path path=/.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+awk warning : invalid path path=/.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
     plain:''
-awk warning ($awkDataLibrary) : invalid path path=/.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+awk warning : invalid path path=/.1/2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
     w/env:''
 inputPath:'/.1/2/3/4/5/6/7/8/.../.foo.txt'
     plain:'/.1/2/3/4/5/6/7/8/.../.foo.txt'
@@ -113,19 +113,19 @@ inputPath:'.../2/3/4/5/6/7/8/../../../../../../../../.foo.txt'
     plain:'.foo.txt'
     w/env:'/myPWD/.foo.txt'
 inputPath:'.../2/3/4/5/6/7/8/../../../../../../../../../.foo.txt'
-awk warning ($awkDataLibrary) : invalid path path=.../2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
+awk warning : invalid path path=.../2/3/4/5/6/7/8/../../../../../../../../../.foo.txt
     plain:''
     w/env:'/.foo.txt'
 
 inputPath:'one/../../../../foo'
-awk warning ($awkDataLibrary) : invalid path path=one/../../../../foo
+awk warning : invalid path path=one/../../../../foo
     plain:''
-awk warning ($awkDataLibrary) : invalid path path=one/../../../../foo
+awk warning : invalid path path=one/../../../../foo
     w/env:''
 inputPath:'/one/../../../../foo'
-awk warning ($awkDataLibrary) : invalid path path=/one/../../../../foo
+awk warning : invalid path path=/one/../../../../foo
     plain:''
-awk warning ($awkDataLibrary) : invalid path path=/one/../../../../foo
+awk warning : invalid path path=/one/../../../../foo
     w/env:''
 inputPath:'/one/two/././../foo'
     plain:'/one/foo'
@@ -227,5 +227,320 @@ inputPath:'one/two/this.that/'
 
 
 ## bg_core.awk:pathGetCanonStr:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:0 start
+## expect: 
+|name=value|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=3
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |value|
+
+## bg_core.awk:parserStartBashStyleTokenizer:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:0s start
+## expect: 
+| 	name	 = 	 value  |  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=7
+->[ 1] | 	|
+  [ 2] |name	|
+  [ 3] | |
+  [ 4] |=|
+  [ 5] | 	 |
+  [ 6] |value|
+  [ 7] |  |
+
+## bg_core.awk:parserStartBashStyleTokenizer:0s finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:1 start
+## expect: 
+|name=value|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=3
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |value|
+
+## bg_core.awk:parserStartBashStyleTokenizer:1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:1c start
+## expect: 
+|name=value # comm |  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=5
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |value|
+  [ 4] | |
+  [ 5] |# comm |
+
+## bg_core.awk:parserStartBashStyleTokenizer:1c finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:2 start
+## expect: 
+|name=value with = in it |  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=12
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |value|
+  [ 4] | |
+  [ 5] |with|
+  [ 6] | |
+  [ 7] |=|
+  [ 8] | |
+  [ 9] |in|
+  [10] | |
+  [11] |it|
+  [12] | |
+
+## bg_core.awk:parserStartBashStyleTokenizer:2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:2c start
+## expect: 
+|name=value with = in it # comm|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=13
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |value|
+  [ 4] | |
+  [ 5] |with|
+  [ 6] | |
+  [ 7] |=|
+  [ 8] | |
+  [ 9] |in|
+  [10] | |
+  [11] |it|
+  [12] | |
+  [13] |# comm|
+
+## bg_core.awk:parserStartBashStyleTokenizer:2c finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:3 start
+## expect: 
+|name=value with  = in it # comm|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=13
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |value|
+  [ 4] | |
+  [ 5] |with|
+  [ 6] |  |
+  [ 7] |=|
+  [ 8] | |
+  [ 9] |in|
+  [10] | |
+  [11] |it|
+  [12] | |
+  [13] |# comm|
+
+## bg_core.awk:parserStartBashStyleTokenizer:3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:4 start
+## expect: 
+|name="quoted string with # in it "|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=3
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |quoted string with # in it |
+
+## bg_core.awk:parserStartBashStyleTokenizer:4 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:4c start
+## expect: 
+|name="quoted string with # in it " # comm |  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=5
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |quoted string with # in it |
+  [ 4] | |
+  [ 5] |# comm |
+
+## bg_core.awk:parserStartBashStyleTokenizer:4c finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:9 start
+## expect: 
+|name=line with two # in it  # comm |  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=9
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |line|
+  [ 4] | |
+  [ 5] |with|
+  [ 6] | |
+  [ 7] |two|
+  [ 8] | |
+  [ 9] |# in it  # comm |
+
+## bg_core.awk:parserStartBashStyleTokenizer:9 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:dq0 start
+## expect: 
+|name="quoted string"|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=3
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |quoted string|
+
+## bg_core.awk:parserStartBashStyleTokenizer:dq0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:dq1 start
+## expect: 
+|name="quoted string with \"escaped\" quotes"|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=3
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |quoted string with "escaped" quotes|
+
+## bg_core.awk:parserStartBashStyleTokenizer:dq1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:dq2 start
+## expect: 
+|name="quoted string with one escaped\" quotes"|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=3
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |quoted string with one escaped" quotes|
+
+## bg_core.awk:parserStartBashStyleTokenizer:dq2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:dq3 start
+## expect: 
+|name="quoted string with one escaped\" quotes" # and comments|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=5
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |quoted string with one escaped" quotes|
+  [ 4] | |
+  [ 5] |# and comments|
+
+## bg_core.awk:parserStartBashStyleTokenizer:dq3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:dq4 start
+## expect: 
+|name="#" # and comments|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=5
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |#|
+  [ 4] | |
+  [ 5] |# and comments|
+
+## bg_core.awk:parserStartBashStyleTokenizer:dq4 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:dq5 start
+## expect: 
+|name="\"#" # and comments|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=5
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |"#|
+  [ 4] | |
+  [ 5] |# and comments|
+
+## bg_core.awk:parserStartBashStyleTokenizer:dq5 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:dq6 start
+## expect: 
+|name="\" bob's book" # and bob's comments"|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=5
+->[ 1] |name|
+  [ 2] |=|
+  [ 3] |" bob's book|
+  [ 4] | |
+  [ 5] |# and bob's comments"|
+
+## bg_core.awk:parserStartBashStyleTokenizer:dq6 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:sect1 start
+## expect: 
+|[sectname]|  |--parseChars==[]%20|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=3
+->[ 1] |[|
+  [ 2] |sectname|
+  [ 3] |]|
+
+## bg_core.awk:parserStartBashStyleTokenizer:sect1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_core.awk:parserStartBashStyleTokenizer:sect2 start
+## expect: 
+|[|  |sectname|
+cmd> echo "$1" | gawk --include bg_core.awk ' { parserStartQuotingTokenizer($0, out, "'"${2:---parseChars==[]%20}"'"); parserDump(out) } '
+len=1
+->[ 1] |[|
+
+## bg_core.awk:parserStartBashStyleTokenizer:sect2 finished
 ###############################################################################################################################
 

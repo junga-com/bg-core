@@ -53,8 +53,50 @@ honey=good
 
 '
 
+
+function setupIniFileFromLastParameter()
+{
+	local iniFile="$1"; shift
+	local iniFileData="${@: -1}"
+	if [[ "$iniFileData" =~ ^($'\n'|--) ]]; then
+		set -- "${@:1:$(($#-1))}"
+		dedent -R iniFileData
+		echo "${iniFileData#--}" | tee "$iniFile"
+	fi
+	NEWPARAMS=("$@")
+}
+
 ###################################################################################################
 ### Unit Tests
+
+declare -A ut_iniParamGet=(
+	[0]="$(cmdline "." "foo" "<defValue>" "
+		foo=5
+	")"
+)
+function ut_iniParamGet() {
+	ut setup noecho
+	local iniFile; bgmktemp --auto iniFile
+	setupIniFileFromLastParameter "$iniFile" "$@"; set -- "${NEWPARAMS[@]}"
+
+	ut test
+	echo iniParamGet \$iniFile "$@"
+	iniParamGet "$iniFile" "$@"
+}
+
+declare -A ut_iniParamSet=(
+	[0]="$(cmdline "." "foo" "5" )"
+)
+function ut_iniParamSet() {
+	ut setup noecho
+	local iniFile; bgmktemp --auto iniFile
+
+	ut test
+	echo iniParamSet \$iniFile "$@"
+	iniParamSet "$iniFile" "$@"
+	awk 'BEGIN {print "iniFile:"} {printf("   [%s]: %s\n", NR, $0)}' "$iniFile"
+}
+
 
 declare -A ut_getIniParam=(
 	[empty]="$(cmdline "$iniFileData_empty")"
@@ -66,7 +108,7 @@ declare -A ut_getIniParam=(
 function ut_getIniParam()
 {
 	ut setup
-	local iniFile="$(mktemp)"
+	local iniFile; bgmktemp --auto iniFile
 	echo "$1" | tee "$iniFile"
 
 	ut test
@@ -92,138 +134,123 @@ function ut_getIniParam()
 }
 
 
-# ut_getIniSection_inputParams[1]="$iniFileData_empty"
-# ut_getIniSection_inputParams[2]="$iniFileData_noSections"
-# ut_getIniSection_inputParams[3]="$iniFileData_noTopLevel"
-# ut_getIniSection_inputParams[4]="$iniFileData_topAndSections"
-# ut_getIniSection_inputParams[5]="$iniFileData_colonInSectNames"
-#
-# function ut_getIniSection()
-# {
-# 	local iniFileData="$1"
-#
-# 	utRunScript -x '
-# 		#setup
-# 		local iniFile="$(mktemp)"
-# 		echo "$iniFileData" | tee "$iniFile"
-# 		#test
-# 		getIniSection "$iniFile" '.'
-# 		getIniSection "$iniFile" 'sect1'
-# 		getIniSection "$iniFile" 'sect2'
-# 		getIniSection "$iniFile" 'sect:1'
-# 	'
-#
-# }
-#
-#
-#
-#
-#
-# ut_iniParamExists_inputParams[1]="$iniFileData_empty"
-# ut_iniParamExists_inputParams[2]="$iniFileData_noSections"
-# ut_iniParamExists_inputParams[3]="$iniFileData_noTopLevel"
-# ut_iniParamExists_inputParams[4]="$iniFileData_topAndSections"
-# ut_iniParamExists_inputParams[5]="$iniFileData_colonInSectNames"
-#
-# function ut_iniParamExists()
-# {
-# 	local iniFileData="$1"
-#
-# 	utRunScript -x '
-# 		#setup
-# 		local iniFile="$(mktemp)"
-# 		echo "$iniFileData" | tee "$iniFile"
-# 		#test
-# 		iniParamExists    "$iniFile" '.' p1
-# 		iniParamExists -v "$iniFile" '.' p1
-#
-# 		iniParamExists    "$iniFile" 'sect1' p1
-# 		iniParamExists -v "$iniFile" 'sect1' p1
-#
-# 		iniParamExists    "$iniFile" 'sect:1' p1
-# 		iniParamExists -v "$iniFile" 'sect:1' p1
-# 	'
-# }
-#
-#
-#
-#
-# ut_iniSectionExists_inputParams[1]="$iniFileData_empty"
-# ut_iniSectionExists_inputParams[2]="$iniFileData_noSections"
-# ut_iniSectionExists_inputParams[3]="$iniFileData_noTopLevel"
-# ut_iniSectionExists_inputParams[4]="$iniFileData_topAndSections"
-# ut_iniSectionExists_inputParams[5]="$iniFileData_colonInSectNames"
-#
-# function ut_iniSectionExists()
-# {
-# 	local iniFileData="$1"
-#
-# 	utRunScript -x '
-# 		#setup
-# 		local iniFile="$(mktemp)"
-# 		echo "$iniFileData" | tee "$iniFile"
-# 		#test
-# 		iniSectionExists    "$iniFile" '.'
-#
-# 		iniSectionExists    "$iniFile" 'sect'
-#
-# 		iniSectionExists    "$iniFile" 'sect1'
-#
-# 		iniSectionExists    "$iniFile" 'sect:1'
-# 	'
-# }
-#
-#
-#
-# ut_listIniParam_inputParams[1]="$iniFileData_empty"
-# ut_listIniParam_inputParams[2]="$iniFileData_noSections"
-# ut_listIniParam_inputParams[3]="$iniFileData_noTopLevel"
-# ut_listIniParam_inputParams[4]="$iniFileData_topAndSections"
-# ut_listIniParam_inputParams[5]="$iniFileData_colonInSectNames"
-#
-# function ut_listIniParam()
-# {
-# 	local iniFileData="$1"
-#
-# 	utRunScript -x '
-# 		#setup
-# 		local iniFile="$(mktemp)"
-# 		echo "$iniFileData" | tee "$iniFile"
-# 		#test
-# 		listIniParam "$iniFile" '.'
-# 		listIniParam "$iniFile" 'sect1'
-# 		listIniParam "$iniFile" 'sect2'
-# 		listIniParam "$iniFile" 'sect:1'
-# 	'
-# }
-#
-#
-#
-# ut_listIniSection_inputParams[1]="$iniFileData_empty"
-# ut_listIniSection_inputParams[2]="$iniFileData_noSections"
-# ut_listIniSection_inputParams[3]="$iniFileData_noTopLevel"
-# ut_listIniSection_inputParams[4]="$iniFileData_topAndSections"
-# ut_listIniSection_inputParams[5]="$iniFileData_colonInSectNames"
-#
-# function ut_listIniSection()
-# {
-# 	local iniFileData="$1"
-#
-# 	utRunScript -x '
-# 		#setup
-# 		local iniFile="$(mktemp)"
-# 		echo "$iniFileData" | tee "$iniFile"
-# 		#test
-# 		listIniSection "$iniFile"
-# 		listIniSection "$iniFile" 'sect.*'
-# 		listIniSection "$iniFile" "sect:.*"
-# 	'
-# }
-#
-#
-#
-#
-#
+declare -A ut_getIniSection=(
+	[empty]="$(cmdline "$iniFileData_empty")"
+	[noSections]="$(cmdline "$iniFileData_noSections")"
+	[noTopLevel]="$(cmdline "$iniFileData_noTopLevel")"
+	[topAndSections]="$(cmdline "$iniFileData_topAndSections")"
+	[colonInSectNames]="$(cmdline "$iniFileData_colonInSectNames")"
+)
+function ut_getIniSection()
+{
+	ut setup
+	local iniFile; bgmktemp --auto iniFile
+	echo "$1" | tee "$iniFile"
+
+	ut test
+	getIniSection "$iniFile" '.'
+	getIniSection "$iniFile" 'sect1'
+	getIniSection "$iniFile" 'sect2'
+	getIniSection "$iniFile" 'sect:1'
+}
+
+
+
+declare -A ut_iniParamExists=(
+	[empty]="$(cmdline "$iniFileData_empty")"
+	[noSections]="$(cmdline "$iniFileData_noSections")"
+	[noTopLevel]="$(cmdline "$iniFileData_noTopLevel")"
+	[topAndSections]="$(cmdline "$iniFileData_topAndSections")"
+	[colonInSectNames]="$(cmdline "$iniFileData_colonInSectNames")"
+)
+function ut_iniParamExists()
+{
+	ut setup
+	local iniFile; bgmktemp --auto iniFile
+	echo "$1" | tee "$iniFile"
+
+	ut test
+	iniParamExists    "$iniFile" '.' p1
+
+	iniParamExists    "$iniFile" 'sect1' p1
+
+	iniParamExists    "$iniFile" 'sect:1' p1
+}
+
+
+
+
+declare -A ut_iniSectionExists=(
+	[empty]="$(cmdline "$iniFileData_empty")"
+	[noSections]="$(cmdline "$iniFileData_noSections")"
+	[noTopLevel]="$(cmdline "$iniFileData_noTopLevel")"
+	[topAndSections]="$(cmdline "$iniFileData_topAndSections")"
+	[colonInSectNames]="$(cmdline "$iniFileData_colonInSectNames")"
+)
+function ut_iniSectionExists()
+{
+	ut setup
+	local iniFile; bgmktemp --auto iniFile
+	echo "$1" | tee "$iniFile"
+
+	ut test
+	iniSectionExists    "$iniFile" '.'
+
+	iniSectionExists    "$iniFile" 'sect'
+
+	iniSectionExists    "$iniFile" 'sect1'
+
+	iniSectionExists    "$iniFile" 'sect:1'
+}
+
+
+
+
+declare -A ut_listIniParam=(
+	[empty]="$(cmdline "$iniFileData_empty")"
+	[noSections]="$(cmdline "$iniFileData_noSections")"
+	[noTopLevel]="$(cmdline "$iniFileData_noTopLevel")"
+	[topAndSections]="$(cmdline "$iniFileData_topAndSections")"
+	[colonInSectNames]="$(cmdline "$iniFileData_colonInSectNames")"
+)
+function ut_listIniParam()
+{
+	ut setup
+	local iniFile; bgmktemp --auto iniFile
+	echo "$1" | tee "$iniFile"
+
+	ut test
+	listIniParam "$iniFile" '.'
+	listIniParam "$iniFile" 'sect1'
+	listIniParam "$iniFile" 'sect2'
+	listIniParam "$iniFile" 'sect:1'
+}
+
+
+
+
+
+declare -A ut_listIniSection=(
+	[empty]="$(cmdline "$iniFileData_empty")"
+	[noSections]="$(cmdline "$iniFileData_noSections")"
+	[noTopLevel]="$(cmdline "$iniFileData_noTopLevel")"
+	[topAndSections]="$(cmdline "$iniFileData_topAndSections")"
+	[colonInSectNames]="$(cmdline "$iniFileData_colonInSectNames")"
+)
+function ut_listIniSection()
+{
+	ut setup
+	local iniFile; bgmktemp --auto iniFile
+	echo "$1" | tee "$iniFile"
+
+	ut test
+	listIniSection "$iniFile"
+	listIniSection "$iniFile" 'sect.*'
+	listIniSection "$iniFile" "sect:.*"
+}
+
+
+
 # ut_cr_iniParamSetCheckMode_inputParams[0]="iniFile0"
 # ut_cr_iniParamSetCheckMode_inputParams[1]="iniFile1"
 # ut_cr_iniParamSetCheckMode_inputParams[2]="iniFile2"
@@ -252,195 +279,196 @@ function ut_getIniParam()
 # 	[ "$tmpDir" ] && rm -rf "$tmpDir" 2>/dev/null
 # 	return $exitCode
 # }
-#
-#
-#
-# ut_setIniParam_inputParams[1]=""
-#
-# function ut_setIniParam()
-# {
-# 	local iniFile="$(mktemp)"
-#
-# 	utRunScript -x '
-# 		#setup
-# 		touch "$iniFile"
-# 		cat "$iniFile"
-#
-# 		#test
-# 		setIniParam "$iniFile" "." p1 one
-# 		setIniParam "$iniFile" "." p2 "one two"
-# 		setIniParam "$iniFile" "." honey ""
-# 		setIniParam "$iniFile" "sect1" p1 "=4"
-# 		setIniParam "$iniFile" "sect1" p2 "j/l"
-# 		setIniParam "$iniFile" "sect:1" p1 1
-# 		setIniParam "$iniFile" "sect:1" p2 2
-# 		setIniParam "$iniFile" "sect:1" honey 3
-# 		cat "$iniFile"
-# 	'
-# }
-#
-#
-#
-#
-#
-# declare -A testChars=(
-# 	[minus]='-'
-# 	[underscore]='_'
-# 	[plus]='+'
-# 	[equal]='='
-# 	[leftBracket]='['
-# 	[rightBracket]=']'
-# 	[leftBrace]='{'
-# 	[rightBrace]='}'
-# 	[singleQuote]="'"
-# 	[doubleQuote]='"'
-# 	[semiColon]=';'
-# 	[colon]=':'
-# 	[backslash]='\'
-# 	[pipe]='|'
-# 	[question]='?'
-# 	[slash]='/'
-# 	[period]='.'
-# 	[greaterThan]='>'
-# 	[comma]=','
-# 	[lessThan]='<'
-# 	[tilde]='~'
-# 	[tickMark]='`'
-# 	[bang]='!'
-# 	[atSign]='@'
-# 	[hash]='#'
-# 	[dollar]='$'
-# 	[percent]='%'
-# 	[caret]='^'
-# 	[apersand]='&'
-# 	[asterisk]='*'
-# 	[leftParens]='('
-# 	[rightParens]=')'
-# )
-#
-# declare -A ut_ini_validChars_inputParams
-# for i in "${!testChars[@]}"; do
-# 	ut_ini_validChars_inputParams[$i]="${testChars[$i]}"
-# done
-#
-# function ut_ini_validChars()
-# {
-# 	local testChar="$1"
-#
-# 	local iniFile="$(mktemp)"
-# 	cat >"$iniFile" <<-EOS
-# 		[ readDataTest ]
-# 		p1=c${testChar}c
-# 		test${testChar}Name=hello
-#
-# 		[ test${testChar}Name ]
-# 		p1=howdy
-# 	EOS
-#
-# 	echo "c${testChar}c" > "$iniFile.t1"
-# 	echo "c${testChar}c" > "$iniFile.t2"
-# 	echo "c${testChar}c" > "$iniFile.t3"
-# 	echo "hello" > "$iniFile.t4"
-# 	echo "howdy" > "$iniFile.t5"
-#
-# 	function report()
-# 	{
-# 		local testFile="$1"
-# 		[ "$(sort -u "$testFile" | wc -l)" == "1" ] && echo "PASS" || echo "FAIL"
-# 	}
-#
-# 	utRunScript -x '
-# 		#setup
-# 		# the testChar: '"$testChar"'
-# 		cat "$iniFile"
-#
-# 		#test
-# 		# Using the character in a data string
-# 		getIniParam -R var "$iniFile" readDataTest  p1 badValue; echo "$var"; echo "$var" >> "$iniFile.t1"
-# 		setIniParam        "$iniFile" writeDataTest p1 "c${testChar}c"
-# 		getIniParam -R var "$iniFile" readDataTest  p1 badValue; echo "$var"; echo "$var" >> "$iniFile.t1"
-# 		getIniSection      "$iniFile" writeDataTest
-# 		report "$iniFile.t1"
-#
-# 		# Using the character in a data string with single quotes
-# 		setIniParam -q1    "$iniFile" singleQuoteSection p1 "c${testChar}c"
-# 		getIniParam -R var "$iniFile" singleQuoteSection p1 badValue; echo "$var"; echo "$var" >> "$iniFile.t2"
-# 		getIniSection "$iniFile" singleQuoteSection
-# 		report "$iniFile.t2"
-#
-# 		# Using the character in a data string with double quotes
-# 		setIniParam -q2    "$iniFile" doubleQuoteSection p1 "c${testChar}c"
-# 		getIniParam -R var "$iniFile" doubleQuoteSection p1 badValue; echo "$var"; echo "$var" >> "$iniFile.t3"
-# 		getIniSection "$iniFile" doubleQuoteSection
-# 		report "$iniFile.t3"
-#
-# 		# Using the character in a parameter name
-# 		getIniParam -R var   "$iniFile" readDataTest  "test${testChar}Name" badValue; echo "$var"; echo "$var" >> "$iniFile.t4"
-# 		setIniParam   "$iniFile" writeParamNameTest "test${testChar}Name" "hello"
-# 		getIniParam -R var "$iniFile" writeParamNameTest  "test${testChar}Name" badValue; echo "$var"; echo "$var" >> "$iniFile.t4"
-# 		getIniSection "$iniFile" writeParamNameTest
-# 		report "$iniFile.t4"
-#
-# 		# Using the character in a section name
-# 		getIniParam -R var "$iniFile" "test${testChar}Name" p1 badValue; echo "$var"; echo "$var" >> "$iniFile.t5"
-# 		setIniParam   "$iniFile" "NewSection${testChar}Name" foo "howdy"
-# 		getIniParam -R var "$iniFile" "NewSection${testChar}Name" foo badValue; echo "$var"; echo "$var" >> "$iniFile.t5"
-# 		getIniSection "$iniFile" "NewSection${testChar}Name"
-# 		report "$iniFile.t5"
-# 	'
-# }
-#
-#
-#
-#
-# ut_ini_validLineFormatsData[1]="hello|||hello"
-# ut_ini_validLineFormatsData[2]="hello world|||hello world"
-# ut_ini_validLineFormatsData[3]=" hello |||hello"
-# ut_ini_validLineFormatsData[4]=" hello world |||hello world"
-# ut_ini_validLineFormatsData[5]=" hello#world |||hello"
-#
-# ut_ini_validLineFormatsData[6]="hello# comment|||hello"
-# ut_ini_validLineFormatsData[7]="hello world # comment|||hello world"
-# ut_ini_validLineFormatsData[8]=" hello  # comment|||hello"
-# ut_ini_validLineFormatsData[9]=" hello world  # comment|||hello world"
-# ut_ini_validLineFormatsData[10]=" hello#world  # comment|||hello#world"
-#
-# function ut_ini_validLineFormats()
-# {
-# 	local data="${ut_ini_validLineFormatsData[$1]}"
-# 	local line="${data%|||*}"
-# 	local value="${data#*|||}"
-#
-# 	local iniFile="$(mktemp)"
-# 	echo "p=$line" > $iniFile
-#
-# 	utRunScript -x '
-# 		#setup
-# 		# line:  |'"$line"'|
-# 		# value: |'"$value"'|
-# 		cat "$iniFile"
-# 		#test
-# 		getIniParam "$iniFile" '.' p
-# 		setIniParam "$iniFile" '.' p "'"$value"'"
-# 		getIniParam "$iniFile" '.' p
-# 		cat "$iniFile"
-# 	'
-# }
-# ut_ini_validLineFormats_inputParams[1]="1"
-# ut_ini_validLineFormats_inputParams[2]="2"
-# ut_ini_validLineFormats_inputParams[3]="3"
-# ut_ini_validLineFormats_inputParams[4]="4"
-# ut_ini_validLineFormats_inputParams[5]="5"
-#
-# ut_ini_validLineFormats_inputParams[6]="6"
-# ut_ini_validLineFormats_inputParams[7]="7"
-# ut_ini_validLineFormats_inputParams[8]="8"
-# ut_ini_validLineFormats_inputParams[9]="9"
-# ut_ini_validLineFormats_inputParams[10]="10"
-#
-#
-#
-#
+
+
+
+
+
+
+function ut_setIniParam()
+{
+	ut setup
+	local iniFile; bgmktemp --auto iniFile
+	touch "$iniFile"
+	cat "$iniFile"
+
+	ut test
+	setIniParam "$iniFile" "." p1 one
+	setIniParam "$iniFile" "." p2 "one two"
+	setIniParam "$iniFile" "." honey ""
+	setIniParam "$iniFile" "sect1" p1 "=4"
+	setIniParam "$iniFile" "sect1" p2 "j/l"
+	setIniParam "$iniFile" "sect:1" p1 1
+	setIniParam "$iniFile" "sect:1" p2 2
+	setIniParam "$iniFile" "sect:1" honey 3
+	cat "$iniFile"
+}
+
+
+
+declare -A ut_ini_validChars=(
+	[minus]="$(        cmdline '-' )"
+	[underscore]="$(   cmdline '_' )"
+	[plus]="$(         cmdline '+' )"
+	[equal]="$(        cmdline '=' )"
+	[leftBracket]="$(  cmdline '[' )"
+	[rightBracket]="$( cmdline ']' )"
+	[leftBrace]="$(    cmdline '{' )"
+	[rightBrace]="$(   cmdline '}' )"
+	[singleQuote]="$(  cmdline "'" )"
+	[doubleQuote]="$(  cmdline '"' )"
+	[semiColon]="$(    cmdline ';' )"
+	[colon]="$(        cmdline ':' )"
+	[backslash]="$(    cmdline '\' )"
+	[pipe]="$(         cmdline '|' )"
+	[question]="$(     cmdline '?' )"
+	[slash]="$(        cmdline '/' )"
+	[period]="$(       cmdline '.' )"
+	[greaterThan]="$(  cmdline '>' )"
+	[comma]="$(        cmdline ',' )"
+	[lessThan]="$(     cmdline '<' )"
+	[tilde]="$(        cmdline '~' )"
+	[tickMark]="$(     cmdline '`' )"
+	[bang]="$(         cmdline '!' )"
+	[atSign]="$(       cmdline '@' )"
+	[hash]="$(         cmdline '#' )"
+	[dollar]="$(       cmdline '$' )"
+	[percent]="$(      cmdline '%' )"
+	[caret]="$(        cmdline '^' )"
+	[apersand]="$(     cmdline '&' )"
+	[asterisk]="$(     cmdline '*' )"
+	[leftParens]="$(   cmdline '(' )"
+	[rightParens]="$(  cmdline ')' )"
+)
+function ut_ini_validChars()
+{
+	ut setup
+	# expect to document if this character can be used in 1) a value, 2) a parameter name, 3) a section name
+	ut noecho
+	ut noexitcodes
+	local testChar="$1"
+	local iniFile; bgmktemp --auto iniFile
+	cat >"$iniFile" <<-EOS
+		[ readDataTest ]
+		p1=c${testChar}c
+		test${testChar}Name=hello
+
+		[ test${testChar}Name ]
+		p1=howdy
+	EOS
+	echo "<iniFile>"
+	cat "$iniFile"
+
+	echo "c${testChar}c" > "$iniFile.t1"
+	echo "c${testChar}c" > "$iniFile.t2"
+	echo "c${testChar}c" > "$iniFile.t3"
+	echo "hello" > "$iniFile.t4"
+	echo "howdy" > "$iniFile.t5"
+
+
+	function report()
+	{
+		local testFile="$1"
+		local type="$2"
+		if [ "$(sort -u "$testFile" | wc -l)" == "1" ]; then
+			echo "PASS    : char '$testChar' can be used in $type"
+		else
+			echo "INVALID : char '$testChar' can NOT be used in $type"
+			#awk '{printf("   line=|%s|\n", $0)}' < <(sort -u "$testFile")
+		fi
+	}
+
+	ut test
+	# Can the character be used in an unquoted value string
+	getIniParam -R var "$iniFile" readDataTest  p1 badValue; echo "$var" >> "$iniFile.t1"
+	echo "value read from [readDataTest]p1       = '$var'"
+	setIniParam        "$iniFile" writeDataTest p1 "c${testChar}c"
+	var=""
+	getIniParam -R var "$iniFile" writeDataTest p1 badValue; echo "$var" >> "$iniFile.t1"
+	echo "unquoted      value written and reread = '$var'"
+
+	# Can the character be used in a value string with single quotes
+	setIniParam -q1    "$iniFile" singleQuoteSection p1 "c${testChar}c"
+	var=""
+	getIniParam -R var "$iniFile" singleQuoteSection p1 badValue; echo "$var" >> "$iniFile.t2"
+	echo "single quoted value written and reread = '$var'"
+
+	# Can the character be used in a value string with double quotes
+	setIniParam -q2    "$iniFile" doubleQuoteSection p1 "c${testChar}c"
+	var=""
+	getIniParam -R var "$iniFile" doubleQuoteSection p1 badValue; echo "$var" >> "$iniFile.t3"
+	echo "double quoted value written and reread = '$var'"
+
+	# Can the character be used in a parameter name
+	var=""
+	getIniParam -R var   "$iniFile" readDataTest  "test${testChar}Name" badValue; echo "$var" >> "$iniFile.t4"
+	echo "read from [readDataTest]'test${testChar}Name'      (expect 'hello') as = '$var'"
+	setIniParam   "$iniFile" writeParamNameTest "test${testChar}Name" "hello"
+	var=""
+	getIniParam -R var "$iniFile" writeParamNameTest  "test${testChar}Name" badValue; echo "$var" >> "$iniFile.t4"
+	echo "written and read back from [writeParamNameTest]test${testChar}Name' as = '$var'"
+
+	# Can the character be used in a section name
+	var=""
+	getIniParam -R var "$iniFile" "test${testChar}Name" p1 badValue; echo "$var" >> "$iniFile.t5"
+	echo "read from [test${testChar}Name]p1        (expect 'howdy') as = '$var'"
+	setIniParam   "$iniFile" "NewSection${testChar}Name" foo "howdy"
+	var=""
+	getIniParam -R var "$iniFile" "NewSection${testChar}Name" foo badValue; echo "$var" >> "$iniFile.t5"
+	echo "written and read back from [NewSection${testChar}Name]foo as = '$var'"
+
+	report "$iniFile.t1" "unquoted value"
+	report "$iniFile.t2" "single quoted value"
+	report "$iniFile.t3" "double quoted value"
+	report "$iniFile.t4" "parameter name"
+	report "$iniFile.t5" "section name"
+}
+
+
+
+
+declare -A ut_ini_validLineFormats=(
+	[1]="$( cmdline "hello"                     "hello")"
+	[2]="$( cmdline "hello world"               "hello world")"
+	[3]="$( cmdline " hello "                   "hello")"
+	[4]="$( cmdline " hello world "             "hello world")"
+	[5]="$( cmdline " hello#world "             "hello")"
+	[6]="$( cmdline "hello# comment"            "hello")"
+	[7]="$( cmdline "hello world # comment"     "hello world")"
+	[8]="$( cmdline " hello  # comment"         "hello")"
+	[9]="$( cmdline " hello world  # comment"   "hello world")"
+	[10]="$(cmdline " hello#world  # comment"   "hello")"
+	[11]="$(cmdline " 'hello#world'  # comment" "hello#world")"
+)
+function ut_ini_validLineFormats()
+{
+	ut setup
+	local line="$1"
+	local expectedValue="$2"
+	local iniFile; bgmktemp --auto iniFile
+	echo "p=$line" > $iniFile
+	echo "line in file:   |'"$line"'|" #noecho
+	echo "expected value: |'"$expectedValue"'|" #noecho
+	cat "$iniFile"
+
+	ut test
+	ut expect "to see if the format in the file reads the expected value"
+	getIniParam "$iniFile" '.' p
+	echo "$expectedValue  <- expected" #noecho
+
+	ut expect "that the line in the file does not change since the value written is the same"
+	setIniParam "$iniFile" '.' p "$expectedValue"
+	cat "$iniFile"
+	echo "p=$line  <- expected" #noecho
+
+	ut expect "that the value read back is the same as the value we just wrote"
+	getIniParam "$iniFile" '.' p
+	echo "$expectedValue  <- expected" #noecho
+}
+
+
+
+
 # function ut_configLineReplace()
 # {
 # 	local fileData="$1"
@@ -449,7 +477,7 @@ function ut_getIniParam()
 #
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test
@@ -460,7 +488,7 @@ function ut_getIniParam()
 # 	'
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test
@@ -469,7 +497,7 @@ function ut_getIniParam()
 # 	'
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test
@@ -478,7 +506,7 @@ function ut_getIniParam()
 # 	'
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test
@@ -487,7 +515,7 @@ function ut_getIniParam()
 # 	'
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test
@@ -496,7 +524,7 @@ function ut_getIniParam()
 # 		'
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test
@@ -505,7 +533,7 @@ function ut_getIniParam()
 # 	'
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test
@@ -514,7 +542,7 @@ function ut_getIniParam()
 # 	'
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test
@@ -523,7 +551,7 @@ function ut_getIniParam()
 # 	'
 # 	utRunScript -x '
 # 		#setup
-# 		local iniFile="$(mktemp)"
+# 		local iniFile; bgmktemp --auto iniFile
 # 		echo "$fileData" | tee "$iniFile"
 # 		cp "$iniFile" "${iniFile}.orig"
 # 		#test

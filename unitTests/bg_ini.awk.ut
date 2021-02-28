@@ -1,0 +1,91 @@
+#!/usr/bin/env bg-utRunner
+
+
+syntaxTestFile='
+
+p1=5
+name = my name
+name = my name# some comment
+ name=" my name "
+name=" my # '\''name'\'' " # comments
+name='\''was up?'\''
+
+# start of comments
+#[ my:Sect ] # this is a comment, not a section
+#foo="bar" # this is a comment, not a setting
+  # this comment has leading space
+
+# start of sections
+[sect1]
+p1=55 something # my comment
+[ sect2 ]
+[ sect2 ] # comment it
+
+# the following are invalid lines
+was up, joe? (no equal)
+was#=(equal escaped as a comment )
+was'\''= '\''(equal escaped as a quaoted string )
+[ (no closing bracket)
+[ yo# ] (comment escapes the closing bracket)
+[ yo '\'']'\'' (single quote escapes the closing bracket)
+[ yo'\'' ] (unterminated single quote escapes the closing bracket)
+[ yo ] (junk after brackets)
+'
+
+declare -A ut_lineIdentification=(
+	[0]="$(cmdline "$syntaxTestFile")"
+)
+function ut_lineIdentification()
+{
+	# echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+	# 	{
+	# 		printf("%-20s: %s\n", iniLineType, $0)
+	# 		switch (iniLineType) {
+	# 			case "section":
+	# 				printf("   iniSection=|%s|\n", iniSection)
+	# 				break
+	# 			case "setting":
+	# 				printf("   name=|%s|\n", iniParamName)
+	# 				printf("   value=|%s|\n", iniValue)
+	# 				break
+	# 		}
+	# 	}
+	# '
+	echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+		BEGIN {
+			dumpLineState("-H")
+		}
+		{
+			dumpLineState()
+		}
+	'
+}
+
+
+declare -A ut_lineIdentificationDetails=(
+	[comm1]="$(cmdline "# a comment")"
+	[comm2]="$(cmdline " # a comment")"
+	[sect1]="$(cmdline "[sectname]")"
+	[sect2]="$(cmdline " [ sectname ] ")"
+	[sect3]="$(cmdline " [ sect{name ] ")"
+	[sect4]="$(cmdline " [ sect:name ] ")"
+	[sectComm]="$(cmdline " [ sectname ] # comm")"
+	[set1]="$(cmdline "p1=5")"
+	[set2]="$(cmdline " p1 = 5 ")"
+	[invSectUntermSQ]="$( cmdline '[ yo'\'' ] (unterminated single quote escapes the closing bracket)')"
+	[invSectUntermDQ]="$( cmdline '[ yo" ] (unterminated double quote escapes the closing bracket)')"
+	[invSectEscByComm]="$(cmdline '[ yo# ] (comment escapes the closing bracket)')"
+	[invSectEscByDQ]="$(  cmdline '[ yo "]" (double quotes escape the closing bracket)')"
+	[invSectEscBySQ]="$(  cmdline '[ yo '\'']'\'' (single quotes escape the closing bracket)')"
+	[invSetEscByCommWDQ]="$(  cmdline '#foo="bar" # this is a comment, not a setting')"
+
+)
+function ut_lineIdentificationDetails()
+{
+	echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+		{
+			printf("%-20s: %s\n", iniLineType, $0)
+			parserDump(parser)
+		}
+	'
+}

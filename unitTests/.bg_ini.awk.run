@@ -1,0 +1,286 @@
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentification:0 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+in iniLineType      Sect     PName      iniValue        iniComment                     sourceLine
+ 1 whitespace                                                                          |
+ 1 whitespace                                                                          |
+ 1 setting                   [.]p1      5                                              |p1=5
+ 1 setting                   [.]name    my name                                        |name = my name
+ 1 setting                   [.]name    my name         # some comment                 |name = my name# some comment
+ 1 setting                   [.]name     my name                                       | name=" my name "
+ 1 setting                   [.]name     my # 'name'    # comments                     |name=" my # 'name' " # comments
+ 1 setting                   [.]name    was up?                                        |name='was up?'
+ 1 whitespace                                                                          |
+ 1 comment                                              # start of comments            |# start of comments
+ 1 comment                                              #[ my:Sect ] # this is a co... |#[ my:Sect ] # this is a comment, not a section
+ 1 comment                                              #foo="bar" # this is a comm... |#foo="bar" # this is a comment, not a setting
+ 1 comment                                              # this comment has leading ... |  # this comment has leading space
+ 1 whitespace                                                                          |
+ 1 comment                                              # start of sections            |# start of sections
+ 0 section          sect1                                                              |[sect1]
+ 0 setting          sect1    [sect1]p1  55 something    # my comment                   |p1=55 something # my comment
+ 0 section          sect2                                                              |[ sect2 ]
+ 0 section          sect2                               # comment it                   |[ sect2 ] # comment it
+ 0 whitespace       sect2                                                              |
+ 0 comment          sect2                               # the following are invalid... |# the following are invalid lines
+ 0 invalid.setting  sect2                                                              |was up, joe? (no equal)
+ 0 invalid.setting  sect2                                                              |was#=(equal escaped as a comment )
+ 0 invalid.setting  sect2                                                              |was'= '(equal escaped as a quaoted string )
+ 0 invalid.section  sect2                                                              |[ (no closing bracket)
+ 0 invalid.section  sect2                                                              |[ yo# ] (comment escapes the closing bracket)
+ 0 invalid.section  sect2                                                              |[ yo ']' (single quote escapes the closing bracket)
+ 0 invalid.section  sect2                                                              |[ yo' ] (unterminated single quote escapes the closing bracket)
+ 0 invalid.section  sect2                                                              |[ yo ] (junk after brackets)
+ 0 whitespace       sect2                                                              |
+
+## bg_ini.awk:lineIdentification:0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:comm1 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+comment             : # a comment
+leading sep = ||
+  [ 1] |# a comment|                  ||
+
+## bg_ini.awk:lineIdentificationDetails:comm1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:comm2 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+comment             :  # a comment
+leading sep = ||
+  [ 1] | |                            ||
+  [ 2] |# a comment|                  ||
+
+## bg_ini.awk:lineIdentificationDetails:comm2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:sect1 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+section             : [sectname]
+leading sep = ||
+  [ 1] |[|                            ||
+  [ 2] |sectname|                     ||
+  [ 3] |]|                            ||
+
+## bg_ini.awk:lineIdentificationDetails:sect1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:sect2 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+section             :  [ sectname ] 
+leading sep = ||
+  [ 1] | |                            ||
+  [ 2] |[|                            ||
+  [ 3] | |                            ||
+  [ 4] |sectname|                     ||
+  [ 5] | |                            ||
+  [ 6] |]|                            ||
+  [ 7] | |                            ||
+
+## bg_ini.awk:lineIdentificationDetails:sect2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:sect3 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+section             :  [ sect{name ] 
+leading sep = ||
+  [ 1] | |                            ||
+  [ 2] |[|                            ||
+  [ 3] | |                            ||
+  [ 4] |sect|                         ||
+  [ 5] |{|                            ||
+  [ 6] |name|                         ||
+  [ 7] | |                            ||
+  [ 8] |]|                            ||
+  [ 9] | |                            ||
+
+## bg_ini.awk:lineIdentificationDetails:sect3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:sect4 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+section             :  [ sect:name ] 
+leading sep = ||
+  [ 1] | |                            ||
+  [ 2] |[|                            ||
+  [ 3] | |                            ||
+  [ 4] |sect|                         ||
+  [ 5] |:|                            ||
+  [ 6] |name|                         ||
+  [ 7] | |                            ||
+  [ 8] |]|                            ||
+  [ 9] | |                            ||
+
+## bg_ini.awk:lineIdentificationDetails:sect4 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:set1 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+setting             : p1=5
+leading sep = ||
+  [ 1] |p1|                           ||
+  [ 2] |=|                            ||
+  [ 3] |5|                            ||
+
+## bg_ini.awk:lineIdentificationDetails:set1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:set2 start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+setting             :  p1 = 5 
+leading sep = ||
+  [ 1] | |                            ||
+  [ 2] |p1|                           ||
+  [ 3] | |                            ||
+  [ 4] |=|                            ||
+  [ 5] | |                            ||
+  [ 6] |5|                            ||
+  [ 7] | |                            ||
+
+## bg_ini.awk:lineIdentificationDetails:set2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:invSectUntermSQ start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+invalid.section     : [ yo' ] (unterminated single quote escapes the closing bracket)
+leading sep = ||
+  [ 1] |[|                            ||
+  [ 2] | |                            ||
+  [ 3] |yo|                           ||
+  [ 4] |' ] (unterminated single quote escapes the closing bracket)| ||
+
+## bg_ini.awk:lineIdentificationDetails:invSectUntermSQ finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:invSectUntermDQ start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+invalid.section     : [ yo" ] (unterminated double quote escapes the closing bracket)
+leading sep = ||
+  [ 1] |[|                            ||
+  [ 2] | |                            ||
+  [ 3] |yo|                           ||
+  [ 4] |" ] (unterminated double quote escapes the closing bracket)| ||
+
+## bg_ini.awk:lineIdentificationDetails:invSectUntermDQ finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:invSectEscByComm start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+invalid.section     : [ yo# ] (comment escapes the closing bracket)
+leading sep = ||
+  [ 1] |[|                            ||
+  [ 2] | |                            ||
+  [ 3] |yo|                           ||
+  [ 4] |# ] (comment escapes the closing bracket)| ||
+
+## bg_ini.awk:lineIdentificationDetails:invSectEscByComm finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:invSectEscByDQ start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+invalid.section     : [ yo "]" (double quotes escape the closing bracket)
+leading sep = ||
+  [ 1] |[|                            ||
+  [ 2] | |                            ||
+  [ 3] |yo|                           ||
+  [ 4] | |                            ||
+  [ 5] |]|                            ||
+  [ 6] | |                            ||
+  [ 7] |(|                            ||
+  [ 8] |double|                       ||
+  [ 9] | |                            ||
+  [10] |quotes|                       ||
+  [11] | |                            ||
+  [12] |escape|                       ||
+  [13] | |                            ||
+  [14] |the|                          ||
+  [15] | |                            ||
+  [16] |closing|                      ||
+  [17] | |                            ||
+  [18] |bracket|                      ||
+  [19] |)|                            ||
+
+## bg_ini.awk:lineIdentificationDetails:invSectEscByDQ finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:invSectEscBySQ start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+invalid.section     : [ yo ']' (single quotes escape the closing bracket)
+leading sep = ||
+  [ 1] |[|                            ||
+  [ 2] | |                            ||
+  [ 3] |yo|                           ||
+  [ 4] | |                            ||
+  [ 5] |]|                            ||
+  [ 6] | |                            ||
+  [ 7] |(|                            ||
+  [ 8] |single|                       ||
+  [ 9] | |                            ||
+  [10] |quotes|                       ||
+  [11] | |                            ||
+  [12] |escape|                       ||
+  [13] | |                            ||
+  [14] |the|                          ||
+  [15] | |                            ||
+  [16] |closing|                      ||
+  [17] | |                            ||
+  [18] |bracket|                      ||
+  [19] |)|                            ||
+
+## bg_ini.awk:lineIdentificationDetails:invSectEscBySQ finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_ini.awk:lineIdentificationDetails:invSetEscByCommWDQ start
+## expect: 
+cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
+comment             : #foo="bar" # this is a comment, not a setting
+leading sep = ||
+  [ 1] |#foo="bar" # this is a comment, not a setting| ||
+
+## bg_ini.awk:lineIdentificationDetails:invSetEscByCommWDQ finished
+###############################################################################################################################
+
