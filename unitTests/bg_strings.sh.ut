@@ -1,0 +1,42 @@
+#!/usr/bin/env bg-utRunner
+
+declare -A ut_stringSplit_retArray=(
+	[0]="$(cmdline "one two three")"
+	[1]="$(cmdline -d "," "one,two,three")"
+	[2]="$(cmdline -d $'\n' "line one
+line two
+line three")"
+	[3]="$(cmdline  -d, "v1   , v2  ,v3,v4")"
+	[4]="$(cmdline -t -d, "v1   , v2  ,v3,v4")"
+)
+function ut_stringSplit_retArray() {
+	ut test noecho
+	cmdline -q stringSplit -a myArray "$@"
+	stringSplit -a myArray "$@"
+	printfVars myArray
+}
+
+declare -A ut_stringSplit_retVars=(
+	[0]="$(cmdline "one two three")"
+	[1]="$(cmdline -d: "<pluginType>:<pluginName>")"
+	[2]="$(cmdline -d= "name=value and what knot")"
+	[3]="$(cmdline "v1 v2 v3 v4 v5 v6 v7 v8 v9")"
+	[4]="$(cmdline  -d, "v1   , v2  ,v3,v4")"
+	[5]="$(cmdline -t -d, "v1   , v2  ,v3,v4")"
+)
+function ut_stringSplit_retVars() {
+	ut test noecho
+	cmdline -q stringSplit "$@" p1 p2 p3 p4
+	stringSplit "$@" p1 p2 p3 p4
+	printfVars p1 p2 p3 p4
+}
+
+declare -A ut_stringSplit_missingVar=(
+	[0]="$(cmdline "v1 v2 v3 v4 v5 v6 v7 v8 v9")"
+)
+function ut_stringSplit_missingVar() {
+	ut test noecho
+	cmdline -q stringSplit "$@" p1 "" p3 p4
+	stringSplit "$@" p1 "" p3 p4
+	printfVars p1 p2 p3 p4
+}

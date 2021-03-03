@@ -164,8 +164,8 @@
 # UT Directives:
 # The body of a testcase function can contain testcase directives that start with `ut ...`.
 #
-# **ut setup [noecho|echo] [noexitcodes|exitcodes]**
-# ** ut test [noecho|echo] [noexitcodes|exitcodes]**
+# **ut setup [noecho|echo] [noexitcodes|exitcodes] [normWhitespace]**
+# ** ut test [noecho|echo] [noexitcodes|exitcodes] [normWhitespace]**
 # All code in the testcase function is either in a setup section or a test section. The default is 'test' when the function starts.
 # The directive `ut setup` switches to 'setup' and `ut test` switches to 'test'.
 #
@@ -200,6 +200,10 @@
 # These directives turn on and off the feature that echos the testcase commands to the output.
 # While echoing is off, a single command can be echoed by appending the line comment ` #echo`.
 # Likewise, while echoing is on, a single command's echo can be suppressed by appending the line comment ` #noecho`
+#
+# ** ut normWhitespace**
+# use a filter on the output that normalizes runs of spaces and tabs to a single space so that runs that vary only in indenting will
+# continue to pass
 #
 # Example Testcase using some directives...
 #    function ut_testMyTargetFunction() {
@@ -249,17 +253,18 @@ assertNotEmpty bgUnitTestScript
 #
 # Also, the utf calls this function to signals various events in the testcase run.
 #
-# ut setup [noecho] [noexitcodes]:
+# ut setup [noecho] [noexitcodes] [normWhitespace]:
 # Used when writing testcases to signal that the follow code is setup and not the taget of the testcase. The output of setup code
 # is not significant for determining if the testcase passes. Also, if any setup code exits with non-zero or writes to stderr,
 # the testcase will terminate and be considered not elgible for running because its setup is failing.
 #
-# ut test
+# ut test [noecho] [noexitcodes] [normWhitespace]:
 # Used when writing testcases to signal that the follow code is the target of the testcase that is being tested. There is nothing
 # that test code can do that is considered wrong. All actions from writing to stderr, to having a command that exits non-zero, to
 # exiting the function prematurely (with exit; or assert*) will produce output in the testcase's stdout stream which will be compared
 # to the 'plato' output. If its identical, then the testcase passes and if not it fails.
 #
+# Internal Cmds:
 # ut onStart
 # Called before the first line of the test function is executed.
 #
@@ -332,6 +337,7 @@ function ut()
 	  noecho) utEchoOff="noecho" ;;
 	  exitcodes)   utExitCodesOff="" ;;
 	  noexitcodes) utExitCodesOff="noexitcodes" ;;
+	  normWhitespace)  printf "ut filter '%s'\n" "[ \t]+### " ;;
 
 	  onBeforeSrcLine)
 		local lineNo="$1"

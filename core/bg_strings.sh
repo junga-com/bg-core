@@ -29,79 +29,50 @@
 #   arrayCopy()       (core function)
 
 
-# usage: stringSplit [-d delimChar] [-t] [-a] <inputStr> <varName1> [ ... <varNameN> ]
+# usage: stringSplit [-d delimChar] [-t] [-a <retArray>] <inputStr> <varName1> [ ... <varNameN> ]
 # assigns sections of the input str separated by a delimiter to a list of named variables or array elements
-# This is a thin wrapper over IFS="$delimChar" read -r <name1> <name2> ... <<<"$inputStr".
-# arguably, splitString has better semantics than the read syntax which makes scripts easier to read.
-# It also works in Ubuntu 12.04 which the read ysntax does not.
-# Added features over read <varlist> <<<"$inputStr""
-#  * if not enough variables are specified, the extra tokens in the input string are ignored instead
-#    of being concatenated into the last var.
-#  * if any <varName> is the empty string "", that position is ignored
-#  * -t can be used to trim each returned part
+#  * if not enough variables are specified, the extra tokens in the input string are ignored
+#  * if any <varName> is the empty string "", the token in that position is ignored
 # Options:
 #    -d <delimChar> : single char to use to split the string
 #    -t             : trim flag. remove whitespace from ends of returned tokens
 #    -a <aryVarName>: assign each token to array elements of <aryVarName> starting at 0. ignore any <varNameN>
 # See Also:
-#    comment at top of bg_strings.sh
-#    stringSplit       : use to split a string when the parts are delimeted with the same, single char
-#    stringConsumeNext : use to split a string when the parts are delimeted with different tokens
-#                        i.e. the delimeter needs to be a string and can be different for each part
-#    stringConsumeNextBashToken : use when the string can contain quoted tokens. This is much less
-#                        efficient than stringConsumeNext
-#    stringParseURL    : dedicated stringSplit for URL parts
+#    `help read` : IFS="$delimChar" read -r <name1> <name2> ... <<<"$inputStr"
+#    `help mapfile`
 function splitString() { stringSplit "$@"; }
 function stringSplit()
 {
-	local delim="$IFS" trimFlag="" arrayFlag ssVarNames__
-
-	# the string 's' might start with a '-' so we can not use getopts or assume that ^- is an option
-	while [[ "$1" =~ ^((-t)|(-a.*)|(-d.{0,1})|(-td.{0,1})|--)$ ]]; do case $1 in
-		-t)   trimFlag="1" ;;
-		-d)   delim=$2; shift ;;
-		-d*)  delim=${1#-d} ;;
-		-td)  delim=$2; shift; trimFlag="1" ;;
-		-td*) delim=${1#-td}; trimFlag="1" ;;
-		-a)   arrayFlag="-a"; ssVarNames__="$2"; shift ;;
-		-a*)  arrayFlag="-a"; ssVarNames__="${1#-a}" ;;
-		--)   shift; break ;;
-	esac; shift; done
-
-	local ssSubj__="$1"; [ $# -gt 0 ] && shift
+	local _ssTrimFlag _ssDelim="$IFS" _ssRetArray
+	while [ $# -gt 0 ]; do case $1 in
+		-t)   _ssTrimFlag="-t" ;;
+		-d*)  bgOptionGetOpt val: _ssDelim "$@" && shift ;;
+		-a*|--array*|--retArray*)  bgOptionGetOpt val: _ssRetArray "$@" && shift ;;
+		--) shift; break ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local _ssInputString="$1"; shift
 
 	# make a list of names, replacing any empty names "" with ssThrowAwayGJFHJIIE__ so that it eats a spot
-	local ssThrowAwayGJFHJIIE__
+	local _ssVarList _ssScrap
 	while [ $# -gt 0 ]; do
-		ssVarNames__="$ssVarNames__ ${1:-ssThrowAwayGJFHJIIE__}"
+		_ssVarList+="${1:-_ssScrap} "
 		shift
 	done
 
-	if lsbBashVersionAtLeast 4.0.0; then
-		IFS="$delim" read -r $arrayFlag $ssVarNames__ ssThrowAwayGJFHJIIE__ <<< "$ssSubj__"
-	else
-		## !!! wierd ubuntu 12.04 bug. related to < <(cmd...) coprocs and IFS="<d>" cmd ... In some cases, the IFS is ignored.
-		local IFSSave="$IFS"
-		IFS="$delim"
-		local -a ssParts__
-		read -r -a ssParts__ <<< "$ssSubj__"
-		IFS="$IFSSave"
+	local _ssReadOpts; [ "$_ssDelim" == $'\n' ] && _ssReadOpts=(-d "")
+	IFS="$_ssDelim" read "${_ssReadOpts[@]}" -r ${_ssRetArray:+ -a $_ssRetArray} $_ssVarList _ssScrap <<<"$_ssInputString"
 
-		if [ "$arrayFlag" ]; then
-			eval $ssVarNames__='("${ssParts__[@]}")'
-		else
-			local ssCount__=0
-			local ssVarName__; for ssVarName__ in $ssVarNames__; do
-				printf -v "$ssVarName__" "%s"  "${ssParts__[$((ssCount__++))]}"
+	if [ "$_ssTrimFlag" ]; then
+		local _ssVarName; for _ssVarName in $_ssVarList; do
+			read $_ssVarName <<< "${!_ssVarName}"
+		done
+		if [ "$_ssRetArray" ]; then
+			local -n _ssRetArrayRef="$_ssRetArray"
+			local _ssVarName; for _ssVarName in ${!_ssRetArrayRef[@]}; do
+				read "$_ssRetArray[$_ssVarName]" <<< "${_ssRetArrayRef[$_ssVarName]}"
 			done
 		fi
-	fi
-
-	if [ "$trimFlag" ]; then
-		local vname__
-		for vname__ in $ssVarNames__; do
-			read $vname__ <<< "${!vname__}"
-		done
 	fi
 }
 

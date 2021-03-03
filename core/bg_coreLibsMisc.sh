@@ -210,7 +210,7 @@ function bgOptionsEndLoop()
 		return 0
 
 	# short and long options ... (e.g. -f or --file*)
-	elif [[ "$1" =~ ^[+-].?$ ]] || [[ "$1" =~ ^(--|\+\+) ]]; then
+	elif [[ "$1" =~ ^[+-].?$ ]] || [[ "$1" =~ ^(--[^-]|\+\+[^+]) ]]; then
 		bgOptionsExpandedOpts=("$@")
 		local result=1
 		if [ "$(type -t bgOptionsOnUnknown)" == "function" ]; then
@@ -390,7 +390,7 @@ function bgOptionGetOpt()
 				return 1
 			# handle "-o <value>"
 			elif [[ "$1" =~ ^[+-].$ ]]; then
-				arrayAdd "$_oga_varNameVar" "${1}${2}"
+				arrayAdd "$_oga_varNameVar" "${1}${2:---}"
 				return 0
 			# handle "--long-opt <value>"
 			elif [[ "$1" =~ ^(--|\+\+) ]]; then
@@ -424,6 +424,10 @@ function bgOptionGetOpt()
 			elif [[ "$1" =~ ^(--|\+\+) ]]; then
 				returnValue "$2" "$_oga_varNameVar"
 				return 0
+			# handle  "-o--". when passing through via opt:  -o "" becomes -o-- so now is the time to put it back
+		elif [[ "$1" =~ ^[+-].-- ]]; then
+				returnValue "" "$_oga_varNameVar"
+				return 1
 			# handle "-o<value>"
 			else
 				returnValue "${1:2}" "$_oga_varNameVar"
@@ -439,6 +443,10 @@ function bgOptionGetOpt()
 			elif [[ "$1" =~ ^-.$ ]] || [[ "$1" =~ ^-- ]]; then
 				arrayAdd "$_oga_varNameVar" "$2"
 				return 0
+			# handle  "-o--". when passing through via opt:  -o "" becomes -o-- so now is the time to put it back
+		elif [[ "$1" =~ ^[+-].-- ]]; then
+				arrayAdd "$_oga_varNameVar" ""
+				return 1
 			# handle "-o<value>"
 			else
 				arrayAdd "$_oga_varNameVar" "${1:2}"
@@ -2650,18 +2658,25 @@ function command_not_found_handle()
 {
 	local cmdName="$1"
 	local cmdline="$*"
-	if [ "${command_not_found_handle}" == "1" ]; then
-		assertError -e127 --critical -v cmdline "Command not found -- recursion detected"
-	fi
+	# if [ "${command_not_found_handle}" == "1" ]; then
+	# 	assertError -e127 --critical -v cmdline "Command not found -- recursion detected"
+	# fi
 	export command_not_found_handle=1
 
 	# recognize $foo.something... object syntax where the $foo variable is empty
 	if [[ "$cmdName" =~ ^[.[] ]]; then
 		local -A exprFrame; bgStackFrameGet  command_not_found_handle:+1 exprFrame
-		assertError -e127 --critical  --no-funcname -v "objExpression:exprFrame[cmdSrc]" "empty object variable referenced"
+
+		msg="empty object variable referenced. '${exprFrame[cmdSrc]}'  cmdline='$cmdline'"
+#		assertError -e127 --continue  --no-funcname -v "objExpression:exprFrame[cmdSrc]" "empty object variable referenced"
+	else
+		msg="Command not found. cmdline='$cmdline'"
+	#	assertError -e127 --continue --no-funcname --frameOffset=+1 -v cmdline "Command not found"
 	fi
 
-	assertError -e127 --critical --no-funcname --frameOffset=+1 -v cmdline "Command not found"
+	bgtraceStack
+	bgtrace "$msg"
+	echo "$msg" >&2
 }
 
 
@@ -2884,7 +2899,6 @@ function assertError()
 	# the caller can use the --critical, --exitOneShell, or --continue options to override the action
 	local tryStateAction="${bgBASH_tryStackAction[@]:0:1}"; tryStateAction="${tryStateAction:-abort}"
 	[ "$_ae_actionOverride" ] && tryStateAction="$_ae_actionOverride"
-
 
 
 
@@ -3392,12 +3406,19 @@ function assertDefaultFormatter()
 #         like cmd >$assertOut and it will take a bit of work to make this generic enough to proved that separately
 function extractVariableRefsFromSrc()
 {
-	local existsFlag
+	local existsFlag functionName
 	while [ $# -gt 0 ]; do case $1 in
+		-f*|--func*)  bgOptionGetOpt val: functionName "$@" && shift ;;
 		-e|--exists) existsFlag='-e' ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local srcCode="$1"
+
+	if [ ! "$srcCode" ] && [ "$(type -t "$functionName")" == "function" ]; then
+		bgtrace "!!!in it"
+		local srcFile srcLine; bgStackGetFunctionLocation "$functionName" srcFile srcLine
+		srcCode="$(awk -v srcLine="$srcLine" 'NR>srcLine {print $@} NR>srcLine && /^}\s*$/ {exit} ' "$srcFile")"
+	fi
 
 	# this is the term that assertDefaultFormatter would need if it is changed to use this function
 	local reRedirectToVar='>[[:space:]]*[$]([^;|&[:space:]]*)'
@@ -3424,8 +3445,7 @@ function extractVariableRefsFromSrc()
 
 			# varName can be match by any of the expressions but it ends up in a different rematch locations. There should be exactly
 			# 1 non empty element besides [0] and that match can not include whitespace so this assignment works
-			rematch[0]=""
-			local varName=(${rematch[*]})
+			local varName="${rematch[1]:-${rematch[2]:-${rematch[3]}}}"
 
 			[ "$existsFlag" ] &&  ! varExists "$varName" && continue
 

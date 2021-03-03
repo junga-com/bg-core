@@ -129,7 +129,8 @@ declare -A ut_bgStackFreeze=(
 )
 function ut_bgStackFreeze()
 {
-	ut setup
+	ut setup normWhitespace
+	ut filter 'pts-[0-9]+###pts-<redacted>'
 	shopt -s extdebug
 	ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
 	ut test
@@ -143,6 +144,9 @@ declare -A ut_topStackTypes=(
 )
 function ut_topStackTypes()
 {
+	ut setup normWhitespace
+	ut filter 'pts-[0-9]+###pts-<redacted>'
+	ut test
 	case $1 in
 		main)     unitTests/bgStackTest f4 ;;
 		source)   (bash -c 'source unitTests/bgStackTest f4') ;;

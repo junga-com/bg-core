@@ -400,8 +400,8 @@ function varOutput()
 		+1)               _sr_delim=' ' ;;
 		-a|--append)      _sr_appendFlag="-a" ;;
 		+a|++append)      _sr_appendFlag="" ;;
-		-R*|--string*)    _sr_varType="--string";   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
-		-A*|--array*)     _sr_varType="--array" ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
+		-R*|--string*|--retVar)    _sr_varType="--string";   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
+		-A*|--array*|--retArray)   _sr_varType="--array" ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
 		-S*|--set*)       _sr_varType="--set"   ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
 		-e|--echo)        _sr_varType="--echo"  ;;
 		-d*|--delim*)     bgOptionGetOpt val: _sr_delim "$@" && shift ;;
@@ -421,8 +421,8 @@ function varOutput()
 
 		# these use the -n syntax now because they used to use eval. If we need to be compaitble with older bashes, this will have
 		# to change
-		--array::*)   local -n __sr_varRef="$_sr_varRef"; __sr_varRef=("$@") ;;
-		--array:-a:*) local -n __sr_varRef="$_sr_varRef"; __sr_varRef+=("$@") ;;
+		--array::*)   local -n __sr_varRef="$_sr_varRef" || assertError; __sr_varRef=("$@")   ;;
+		--array:-a:*) local -n __sr_varRef="$_sr_varRef" || assertError; __sr_varRef+=("$@")  ;;
 
 		--string::" ")   printf -v "$_sr_varRef" "%s" "$*" ;;
 		--string:-a:" ") printf -v "$_sr_varRef" "%s%s%s" "${!_sr_varRef}" "${!_sr_varRef:+ }" "$*" ;;
@@ -489,8 +489,8 @@ function bgOptions_DoOutputVarOpts()
 		[+-]1)            bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
 		-a|--append)      bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
 		+a|++append)      bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
-		-R*|--string*)    bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
-		-A*|--array*)     bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
+		-R*|--string*|--retVar*)  bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
+		-A*|--array*|--retArray*) bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
 		-S*|--set*)       bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
 		-e|--echo)        bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
 		-d*|--delim*)     bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;

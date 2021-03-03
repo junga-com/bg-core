@@ -541,20 +541,20 @@ function iniParamGetNewImpl()
 			--include bg_ini.awk '
 
 			inTarget && iniLineType=="setting" && iniParamName==paramName {
-				print "1 "iniValue
+				print "found "iniValue
 				found=1
 				exit
 			}
 
 			END {
 				if (!found)
-					print "0 "defaultValue
-				exit (found)?0:1
+					print "notset "defaultValue
+				exit (found)?0:2
 			}
 		' "${ipg_iniFiles[@]}")
 	fi
 
-	if [ "$ipg_foundInFile" == "0" ] && [ "$ipg_addFlag" ]; then
+	if [ "$ipg_foundInFile" == "notset" ] && [ "$ipg_addFlag" ]; then
 		setIniParam $ipg_sectPad "$ipg_iniFileSpec" "$ipg_sectionName" "$ipg_paramName" "$ipg_defaultValue"
 	fi
 
@@ -563,7 +563,7 @@ function iniParamGetNewImpl()
 	returnValue "$ipg_value" "$retVar"
 
 	# set the return code
-	[ "${ipg_foundInFile}" == "1" ]
+	[ "${ipg_foundInFile}" == "found" ]
 }
 
 
@@ -2218,9 +2218,9 @@ function cr_configNoEmptyLines()
 			[ ! -f "$filename" ] && return 0
 
 			# enable the exit jump for each place we are looking for
-			local begExit=""; [[ "$places" =~ doBeg ]] && begExit='abort=1; res=1; exit 1'
-			local midExit=""; [[ "$places" =~ doMid ]] && midExit='abort=1; res=1; exit 1'
-			local endExit=""; [[ "$places" =~ doEnd ]] && endExit='abort=1; res=1; exit 1'
+			local begExit=""; [[ "$places" =~ doBeg ]] && begExit='abort=1; res=2; exit 2'
+			local midExit=""; [[ "$places" =~ doMid ]] && midExit='abort=1; res=2; exit 2'
+			local endExit=""; [[ "$places" =~ doEnd ]] && endExit='abort=1; res=2; exit 2'
 
 			# if we are only looking for beginning lines, and we encounter a non-blank line at the start, return true immediately
 			local trueOnFirstNonBlankLine=""; [ "$places" == "doBeg" ] && trueOnFirstNonBlankLine='/[^ \t]/   {abort=1; res=0; exit 0}'
@@ -2295,10 +2295,10 @@ function cr_configNoCommentLines()
 			[ ! -f "$filename" ] && return 0
 
 			# add whitespace checking if called for
-			local whiteSpaceClause=""; [ "$whiteSpaceFlag" ] && whiteSpaceClause='/^[ \t]*$/ {exit 1}'
+			local whiteSpaceClause=""; [ "$whiteSpaceFlag" ] && whiteSpaceClause='/^[ \t]*$/ {exit 2}'
 
 			awk '
-				/^[ \t]*#/ {exit 1}
+				/^[ \t]*#/ {exit 2}
 				'"$whiteSpaceClause"'
 			' "$filename"
 			;;

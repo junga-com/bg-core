@@ -569,11 +569,11 @@ p2=3
 ##----------
 ## test
 cmd> iniParamExists    "$iniFile" '.' p1
-[exitCode 1]
+[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect1' p1
-[exitCode 1]
+[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
-[exitCode 1]
+[exitCode 2]
 
 ## bg_ini.sh:iniParamExists:empty finished
 ###############################################################################################################################
@@ -600,9 +600,9 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ## test
 cmd> iniParamExists    "$iniFile" '.' p1
 cmd> iniParamExists    "$iniFile" 'sect1' p1
-[exitCode 1]
+[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
-[exitCode 1]
+[exitCode 2]
 
 ## bg_ini.sh:iniParamExists:noSections finished
 ###############################################################################################################################
@@ -631,10 +631,10 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ##----------
 ## test
 cmd> iniParamExists    "$iniFile" '.' p1
-[exitCode 1]
+[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect1' p1
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
-[exitCode 1]
+[exitCode 2]
 
 ## bg_ini.sh:iniParamExists:noTopLevel finished
 ###############################################################################################################################
@@ -665,7 +665,7 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 cmd> iniParamExists    "$iniFile" '.' p1
 cmd> iniParamExists    "$iniFile" 'sect1' p1
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
-[exitCode 1]
+[exitCode 2]
 
 ## bg_ini.sh:iniParamExists:topAndSections finished
 ###############################################################################################################################
@@ -696,7 +696,7 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ## test
 cmd> iniParamExists    "$iniFile" '.' p1
 cmd> iniParamExists    "$iniFile" 'sect1' p1
-[exitCode 1]
+[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
 
 ## bg_ini.sh:iniParamExists:colonInSectNames finished
@@ -716,13 +716,13 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ##----------
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-[exitCode 1]
+[exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:empty finished
 ###############################################################################################################################
@@ -749,11 +749,11 @@ cmd> iniSectionExists    "$iniFile" 'sect:1'
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
 cmd> iniSectionExists    "$iniFile" 'sect'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-[exitCode 1]
+[exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:noSections finished
 ###############################################################################################################################
@@ -782,12 +782,12 @@ cmd> iniSectionExists    "$iniFile" 'sect:1'
 ##----------
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-[exitCode 1]
+[exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:noTopLevel finished
 ###############################################################################################################################
@@ -817,10 +817,10 @@ cmd> iniSectionExists    "$iniFile" 'sect:1'
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
 cmd> iniSectionExists    "$iniFile" 'sect'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-[exitCode 1]
+[exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:topAndSections finished
 ###############################################################################################################################
@@ -851,9 +851,9 @@ cmd> iniSectionExists    "$iniFile" 'sect:1'
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
 cmd> iniSectionExists    "$iniFile" 'sect'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
-[exitCode 1]
+[exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
 
 ## bg_ini.sh:iniSectionExists:colonInSectNames finished

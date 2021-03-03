@@ -22,25 +22,25 @@
 ##----------
 ## test
 
-# expect that bgsed will output an empty line but sed will not
+# expect that sed will output nothing but bgsed will output an empty line
 cmd> sed 's/my/MY DAMN/' "$emptyFile"
 cmd> bgsed 's/my/MY DAMN/' "$emptyFile"
 
 
-# expect that bgsed wont have an error but sed will
+# expect that sed will fail with error but bgsed wont
 cmd> sed 's/my/MY DAMN/' "nonExistentFile"
 stderr> sed: can't read nonExistentFile: No such file or directory
 [exitCode 2]
 cmd> bgsed 's/my/MY DAMN/' "nonExistentFile"
 
 
-# expect that bgsed will insert the line but sed will not
+# expect that sed will not insert the line into an empty file but bgsed will
 cmd> sed '1 iHello World' "$emptyFile"
 cmd> bgsed '1 iHello World' "$emptyFile"
 Hello World
 
 
-# expect that bgsed will insert the line but sed will error
+# expect that sed will fail with error but bgsed will make a new file with the line
 cmd> sed '1 iHello World' "nonExistentFile"
 stderr> sed: can't read nonExistentFile: No such file or directory
 [exitCode 2]
@@ -56,7 +56,7 @@ three
 four
 five
 
-# expect that sudo fails but bgsudo succeeds
+# expect that sudo fails because it cant create the tmp file but bgsudo succeeds
 cmd> sed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
 stderr> sed: couldn't open temporary file /tmp/bgmktemp.<redacted>
 I am grut

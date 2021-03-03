@@ -9,8 +9,8 @@ function winCreate(buf, x1, y1, x2, y2) {
 	buf["y1"]=y1
 	buf["x2"]=x2
 	buf["y2"]=y2
-	buf["width"]=x2-x1
-	buf["height"]=y2-y1
+	buf["width"]=x2-x1+1
+	buf["height"]=y2-y1+1
 	buf["curX"]=1
 	buf["curY"]=1
 #	buf["defaultFont"]=(defaultFont)?defaultFont:(csiWhite""csiBkBlack)
@@ -18,13 +18,13 @@ function winCreate(buf, x1, y1, x2, y2) {
 
 function winWriteLine(buf, line) {
 	if (buf["curY"]<=buf["height"]) {
-		buf["lines"][buf["curY"]]=buf["lines"][buf["curY"]]""csiSubstr(line, 1, (buf["width"]-buf["curX"]+1) )
+		buf["lines"][buf["curY"]]=buf["lines"][buf["curY"]]""line
 		buf["curX"]=1
 		buf["curY"]++
 	}
 }
 
-function winWriteAt(buf, cx, cy, line                ,cpStart,cpLen,len) {
+function winWriteAt(buf, cx, cy, line                ,cpStart,cpLen) {
 	if ((cx > buf["x2"]) || (cy < buf["y1"]) || (cy > buf["y2"])) return
 	cpStart=max(1, 1-cx)
 	cx=max(1, cx)
@@ -35,7 +35,7 @@ function winWriteAt(buf, cx, cy, line                ,cpStart,cpLen,len) {
 function winPaint(buf                      ,i) {
 	printf(_CSI""cSave)
 	for (i=1; i<=buf["height"]; i++) {
-		printf(_CSI""(buf["y1"]+i)";"buf["x1"]""cMoveAbs"%s%*s", buf["lines"][i], max(0,buf["width"]-length(buf["lines"][i])), " ")
+		printf(_CSI""(buf["y1"]+i-1)";"buf["x1"]""cMoveAbs"%s",   csiSubstr(buf["lines"][i], 1, buf["width"], "--pad") )
 	}
 	printf(_CSI""cRestore)
 }
@@ -47,33 +47,6 @@ function winClear(buf                      ,i) {
 	buf["curY"]=1
 }
 
-
-function pushOutLine(lineNo, content, hlStart, hlEnd                   ,line,contentArray,headLen) {
-	line=""
-	headLen=0
-	if (lineNo>0) {
-		line=sprintf("%1s%s ",  (lineNo==cursorLineNo)?">":" ", lineNo)
-		headLen=length(line)
-	}
-	line=line""content
-	if (length(line)>viewColWidth-1) {
-		line=substr(line, 1, viewColWidth-2)"+"
-	} else {
-		line=line""sprintf("%*s", viewColWidth-1-length(line),"")
-	}
-	if (hlStart!="" && (hlStart+headLen)<(viewColWidth-2)) {
-		hlStart+=headLen
-		hlEnd+=headLen
-		if (hlEnd>viewColWidth-1)
-			hlEnd=viewColWidth-1
-		line=sprintf("{highlightedCodeFont}%s{highlightedCodeFont2}%s{highlightedCodeFont}%s{codeSectionFont}", substr(line,1,hlStart-1), substr(line,hlStart,hlEnd-hlStart), substr(line,hlEnd) )
-	}
-	if (lineNo==focusedLineNo)
-		line=sprintf("{highlightedCodeFont}%s{codeSectionFont}", line)
-	arrayPush(out, line)
-	if (lineNo==startLineNo)
-		startLineNoOffset=length(out)
-}
 
 
 
@@ -118,9 +91,12 @@ function csiLength(line                   ,out,outLen,rematch) {
 function csiSubstr(line, start, len, optionsStr                   ,out,outLen,rematch,rmLen,cpLen) {
 	outLen=0
 	if (len=="") len=10000
-	if ((optionsStr~/--pad/) && start<1) {
-		outLen=min(1-start,len)
-		out=sprintf("%*s", outLen, "")
+	if (start<1) {
+		outLen=1-start
+		start==1
+		if (optionsStr~/--pad/) {
+			out=sprintf("%*s", min(outLen,len), "")
+		}
 	}
 	while (line!="") {
 		if ( ! match(line, /^([^\033]*)(\033\[([0-9;]*)?([\x20-\x2F]*)?[\x40-\x7E])?(.*)$/, rematch))
@@ -148,6 +124,17 @@ function csiSubstr(line, start, len, optionsStr                   ,out,outLen,re
 	return out
 }
 
+# usage: csiStrip(line)
+# returns <line> with any CSI escape sequences removed.
+function csiStrip(line                   ,out,rematch) {
+	while (line!="") {
+		if ( ! match(line, /^([^\033]*)(\033\[([0-9;]*)?([\x20-\x2F]*)?[\x40-\x7E])?(.*)$/, rematch))
+			assert("logical error. regex should always match")
+		out=out""rematch[1]
+		line=rematch[5]
+	}
+	return out
+}
 
 function cuiRealizeFmtToTerm(onOff               ,csiName,csiValue) {
 	cuiDeclareGlobals()
@@ -219,6 +206,10 @@ function cuiDeclareGlobals() {
 	csiScrollUp=_CSI"S"
 	cScrollDown="T"
 	csiScrollDown=_CSI"T"
+	cLineWrapOn="?7h"
+	csiLineWrapOn=_CSI"?7h"
+	cLineWrapOff="?7l"
+	csiLineWrapOff=_CSI"?7l"
 	cSwitchToAltScreen="?47h"
 	csiSwitchToAltScreen=_CSI"?47h"
 	cSwitchToNormScreen="?47l"
@@ -350,6 +341,10 @@ _csiCMD_p0["cDeleteChars"]="P"
 # scroll
 _csiCMD_p0["cScrollUp"]="S"
 _csiCMD_p0["cScrollDown"]="T"
+
+# line wrapping
+_csiCMD_p0["cLineWrapOn"]="?7h"
+_csiCMD_p0["cLineWrapOff"]="?7l"
 
 # pages
 _csiCMD_p0["cSwitchToAltScreen"]="?47h"

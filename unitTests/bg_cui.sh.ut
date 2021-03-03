@@ -1,0 +1,68 @@
+#!/usr/bin/env bg-utRunner
+
+import bg_cui.sh  ;$L1;$L2
+
+
+
+declare -A ut_csiSplitOnCSI=(
+	[0]="$(cmdline "\033[34mHello \033[34mWorld\033[34m")"
+)
+function ut_csiSplitOnCSI() {
+	ut test noecho
+	cmdline -q csiSplitOnCSI "$@" out
+	csiSplitOnCSI "$@" out
+	printfVars out
+}
+
+
+
+declare -A ut_csiStrip=(
+	[0]="$(cmdline "Hello \033[34mWorld")"
+)
+function ut_csiStrip() {
+	ut test noecho
+	cmdline -q csiStrip -R out "$@"
+	csiStrip -R out "$@"
+	printfVars out
+}
+
+declare -A ut_csiStrlen=(
+	[0]="$(cmdline "Hello \033[34mWorld")"
+)
+function ut_csiStrlen() {
+	ut test noecho
+	cmdline -q csiStrlen -R length "$@"
+	csiStrlen -R length "$@"
+	printfVars length
+}
+
+declare -A ut_csiSubstr=(
+	[0]="$(cmdline "Hello \033[34mWorld" "4" "3")"
+)
+function ut_csiSubstr() {
+	ut test noecho
+	cmdline -q csiSubstr -R out "$@"
+	local out
+	csiSubstr -R out "$@"
+	printfVars out
+}
+
+
+declare -A ut_csiSubstrCmp=(
+	[0]="$(cmdline "Hello"                      "Hello World" "0" "5")"
+	[1]="$(cmdline "\033[34mHello"              "\033[34mHello World" "0" "5")"
+	[2]="$(cmdline "\033[34mWorld"              "\033[34mHello World" "6" "5")"
+	[3]="$(cmdline "Hello\033[34m"              "Hello World\033[34m" "0" "5")"
+	[4]="$(cmdline "Hello\033[34m"              "Hello World\033[34m" "0" "5")"
+	[5]="$(cmdline "Hello \033[34mWorld"        "Hello \033[34mWorld" "0" "11")"
+	[6]="$(cmdline "\033[34m\033[34m\033[34m"   "\033[34mHello \033[34mWorld\033[34m" "4" "0")"
+)
+function ut_csiSubstrCmp() {
+	ut test noecho
+	local expectedValue="$1"; shift
+	local out
+	cmdline -q csiSubstr -R out "$@"
+	csiSubstr -R out "$@"
+	printfVars -w14 out expectedValue
+	[ "$out" == "$expectedValue" ] && echo "PASS" || echo "!!FAIL: not equal"
+}

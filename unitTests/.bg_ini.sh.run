@@ -12,7 +12,6 @@
 iniParamGet $iniFile . foo <defValue>
 5
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:iniParamGet:0 finished
 ###############################################################################################################################
 
@@ -72,15 +71,30 @@ cmd> getIniParam "$iniFile" 'sect1' noExist
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' p1
-stderr> rm: cannot remove '': No such file or directory
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect2' p2
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect2' honey
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+[exitCode 1]
+
 ## bg_ini.sh:getIniParam:empty finished
 ###############################################################################################################################
 
@@ -108,13 +122,10 @@ cmd> getIniParam "$iniFile" '.' p1
 foo
 cmd> getIniParam "$iniFile" '.' p2
 3
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" '.' honey
 good
 cmd> getIniParam "$iniFile" '.' noExist
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect1' p1
 
@@ -138,14 +149,21 @@ cmd> getIniParam "$iniFile" 'sect2' honey
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' noExist
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+[exitCode 1]
+
 ## bg_ini.sh:getIniParam:noSections finished
 ###############################################################################################################################
 
@@ -188,8 +206,6 @@ cmd> getIniParam "$iniFile" 'sect1' p1
 foo
 cmd> getIniParam "$iniFile" 'sect1' p2
 3
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" 'sect1' honey
 
 [exitCode 1]
@@ -197,15 +213,29 @@ cmd> getIniParam "$iniFile" 'sect1' noExist
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' p1
-stderr> rm: cannot remove '': No such file or directory
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect2' p2
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect2' honey
+good
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+[exitCode 1]
+
 ## bg_ini.sh:getIniParam:noTopLevel finished
 ###############################################################################################################################
 
@@ -236,8 +266,6 @@ cmd> getIniParam "$iniFile" '.' p1
 topFoo
 cmd> getIniParam "$iniFile" '.' p2
 0
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" '.' honey
 
 [exitCode 1]
@@ -248,8 +276,6 @@ cmd> getIniParam "$iniFile" 'sect1' p1
 foo
 cmd> getIniParam "$iniFile" 'sect1' p2
 3
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" 'sect1' honey
 
 [exitCode 1]
@@ -260,14 +286,26 @@ cmd> getIniParam "$iniFile" 'sect2' p1
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' p2
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect2' honey
+good
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p2
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+[exitCode 1]
+
 ## bg_ini.sh:getIniParam:topAndSections finished
 ###############################################################################################################################
 
@@ -299,8 +337,6 @@ cmd> getIniParam "$iniFile" '.' p1
 topFoo
 cmd> getIniParam "$iniFile" '.' p2
 0
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniParam "$iniFile" '.' honey
 
 [exitCode 1]
@@ -326,14 +362,22 @@ cmd> getIniParam "$iniFile" 'sect2' p2
 
 [exitCode 1]
 cmd> getIniParam "$iniFile" 'sect2' honey
-stderr> rm: cannot remove '': No such file or directory
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>''
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect2' noExist
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' p1
+foo
+cmd> getIniParam "$iniFile" 'sect:1' p2
+3
+cmd> getIniParam "$iniFile" 'sect:1' honey
+
+[exitCode 1]
+cmd> getIniParam "$iniFile" 'sect:1' noExist
+
+[exitCode 1]
+
 ## bg_ini.sh:getIniParam:colonInSectNames finished
 ###############################################################################################################################
 
@@ -353,16 +397,12 @@ stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" '.'
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect1'
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect2'
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect:1'
 
-stderr> rm: cannot remove '': No such file or directory
 
 ## bg_ini.sh:getIniSection:empty finished
 ###############################################################################################################################
@@ -404,7 +444,6 @@ honey=good
 
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect1'
 
 p1=foo
@@ -414,7 +453,6 @@ p3.a = "hello world"
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect2'
 
 p1=foo
@@ -424,7 +462,6 @@ p3.a = "hello world"
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect:1'
 
 p1=foo
@@ -434,7 +471,6 @@ p3.a = "hello world"
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 
 ## bg_ini.sh:getIniSection:noSections finished
 ###############################################################################################################################
@@ -475,7 +511,6 @@ honey=good
 [ sect14 ]
 this=that
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect1'
 
 [ sect1 ]
@@ -491,7 +526,6 @@ honey=good
 [ sect14 ]
 this=that
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect2'
 
 [ sect1 ]
@@ -506,7 +540,6 @@ honey=good
 [ sect14 ]
 this=that
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect:1'
 
 [ sect1 ]
@@ -519,7 +552,6 @@ honey=good
 [ sect14 ]
 this=that
 
-stderr> rm: cannot remove '': No such file or directory
 
 ## bg_ini.sh:getIniSection:noTopLevel finished
 ###############################################################################################################################
@@ -563,7 +595,6 @@ p2=3
 [ sect2 ]
 honey=good
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect1'
 
 p1=topFoo
@@ -579,7 +610,6 @@ p2=3
 [ sect2 ]
 honey=good
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect2'
 
 p1=topFoo
@@ -594,7 +624,6 @@ honey=good
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect:1'
 
 p1=topFoo
@@ -607,7 +636,6 @@ p2=3
 [ sect2 ]
 honey=good
 
-stderr> rm: cannot remove '': No such file or directory
 
 ## bg_ini.sh:getIniSection:topAndSections finished
 ###############################################################################################################################
@@ -653,7 +681,6 @@ p2=3
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect1'
 
 p1=topFoo
@@ -667,7 +694,6 @@ p2=3
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect2'
 
 p1=topFoo
@@ -681,7 +707,6 @@ p2=3
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> getIniSection "$iniFile" 'sect:1'
 
 p1=topFoo
@@ -698,7 +723,6 @@ p2=3
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 
 ## bg_ini.sh:getIniSection:colonInSectNames finished
 ###############################################################################################################################
@@ -871,19 +895,15 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect'
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:empty finished
@@ -911,7 +931,6 @@ stderr> rm: cannot remove '': No such file or directory
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> iniSectionExists    "$iniFile" 'sect'
 
 p1=foo
@@ -921,7 +940,6 @@ p3.a = "hello world"
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
 
@@ -932,7 +950,6 @@ p3.a = "hello world"
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
 
@@ -943,7 +960,6 @@ p3.a = "hello world"
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:noSections finished
@@ -984,7 +1000,6 @@ honey=good
 [ sect14 ]
 this=that
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect'
 
@@ -998,11 +1013,9 @@ honey=good
 [ sect14 ]
 this=that
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> iniSectionExists    "$iniFile" 'sect:1'
 
 [ sect1 ]
@@ -1015,7 +1028,6 @@ honey=good
 [ sect14 ]
 this=that
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:noTopLevel finished
@@ -1046,7 +1058,6 @@ stderr> rm: cannot remove '': No such file or directory
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> iniSectionExists    "$iniFile" 'sect'
 
 p1=topFoo
@@ -1059,14 +1070,12 @@ p2=3
 [ sect2 ]
 honey=good
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
 
 p1=topFoo
 p2=0
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> iniSectionExists    "$iniFile" 'sect:1'
 
 p1=topFoo
@@ -1079,7 +1088,6 @@ p2=3
 [ sect2 ]
 honey=good
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:topAndSections finished
@@ -1111,7 +1119,6 @@ stderr> rm: cannot remove '': No such file or directory
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> iniSectionExists    "$iniFile" 'sect'
 
 p1=topFoo
@@ -1125,7 +1132,6 @@ p2=3
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
 
@@ -1140,14 +1146,12 @@ p2=3
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
 
 p1=topFoo
 p2=0
 
-stderr> rm: cannot remove '': No such file or directory
 
 ## bg_ini.sh:iniSectionExists:colonInSectNames finished
 ###############################################################################################################################
@@ -1338,12 +1342,9 @@ p2
 ## test
 cmd> listIniSection "$iniFile"
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> listIniSection "$iniFile" 'sect.*'
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 1]
 cmd> listIniSection "$iniFile" "sect:.*"
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 1]
 
 ## bg_ini.sh:listIniSection:empty finished
@@ -1378,12 +1379,9 @@ p3.a = "hello world"
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> listIniSection "$iniFile" 'sect.*'
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 1]
 cmd> listIniSection "$iniFile" "sect:.*"
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 1]
 
 ## bg_ini.sh:listIniSection:noSections finished
@@ -1427,14 +1425,11 @@ sect14
 [ sect14 ]
 this=that
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> listIniSection "$iniFile" 'sect.*'
 sect1
 sect2
 sect14
-stderr> rm: cannot remove '': No such file or directory
 cmd> listIniSection "$iniFile" "sect:.*"
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 1]
 
 ## bg_ini.sh:listIniSection:noTopLevel finished
@@ -1477,13 +1472,10 @@ sect2
 [ sect2 ]
 honey=good
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> listIniSection "$iniFile" 'sect.*'
 sect1
 sect2
-stderr> rm: cannot remove '': No such file or directory
 cmd> listIniSection "$iniFile" "sect:.*"
-stderr> rm: cannot remove '': No such file or directory
 [exitCode 1]
 
 ## bg_ini.sh:listIniSection:topAndSections finished
@@ -1528,15 +1520,12 @@ sect:2
 honey=good
 
 
-stderr> rm: cannot remove '': No such file or directory
 cmd> listIniSection "$iniFile" 'sect.*'
 sect:1
 sect:2
-stderr> rm: cannot remove '': No such file or directory
 cmd> listIniSection "$iniFile" "sect:.*"
 sect:1
 sect:2
-stderr> rm: cannot remove '': No such file or directory
 
 ## bg_ini.sh:listIniSection:colonInSectNames finished
 ###############################################################################################################################
@@ -1600,22 +1589,14 @@ honey=3
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c-c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c-c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c-c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c-c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test-Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test-Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test-Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection-Name]foo as = 'howdy'
 PASS    : char '-' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '-' can be used in single quoted value
 PASS    : char '-' can be used in double quoted value
 PASS    : char '-' can be used in parameter name
@@ -1642,22 +1623,14 @@ PASS    : char '-' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c_c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c_c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c_c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c_c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test_Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test_Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test_Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection_Name]foo as = 'howdy'
 PASS    : char '_' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '_' can be used in single quoted value
 PASS    : char '_' can be used in double quoted value
 PASS    : char '_' can be used in parameter name
@@ -1684,22 +1657,14 @@ PASS    : char '_' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c+c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c+c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c+c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c+c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test+Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test+Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test+Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection+Name]foo as = 'howdy'
 PASS    : char '+' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '+' can be used in single quoted value
 PASS    : char '+' can be used in double quoted value
 PASS    : char '+' can be used in parameter name
@@ -1726,26 +1691,19 @@ PASS    : char '+' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c=c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c=c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c=c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c=c'
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test=Name'      (expect 'hello') as = 'badValue'
 written and read back from [writeParamNameTest]test=Name' as = 'badValue'
 read from [test=Name]p1        (expect 'howdy') as = 'howdy'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+written and read back from [NewSection=Name]foo as = 'howdy'
+PASS    : char '=' can be used in unquoted value
+PASS    : char '=' can be used in single quoted value
+PASS    : char '=' can be used in double quoted value
+INVALID : char '=' can NOT be used in parameter name
+PASS    : char '=' can be used in section name
+
 ## bg_ini.sh:ini_validChars:equal finished
 ###############################################################################################################################
 
@@ -1767,22 +1725,14 @@ stderr> rm: cannot remove '': No such file or directory
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c[c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c[c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c[c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c[c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test[Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test[Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test[Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection[Name]foo as = 'howdy'
 PASS    : char '[' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '[' can be used in single quoted value
 PASS    : char '[' can be used in double quoted value
 PASS    : char '[' can be used in parameter name
@@ -1809,17 +1759,11 @@ PASS    : char '[' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c]c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c]c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c]c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c]c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test]Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test]Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
 read from [test]Name]p1        (expect 'howdy') as = 'badValue'
 written and read back from [NewSection]Name]foo as = 'badValue'
 PASS    : char ']' can be used in unquoted value
@@ -1849,22 +1793,14 @@ INVALID : char ']' can NOT be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c{c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c{c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c{c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c{c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test{Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test{Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test{Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection{Name]foo as = 'howdy'
 PASS    : char '{' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '{' can be used in single quoted value
 PASS    : char '{' can be used in double quoted value
 PASS    : char '{' can be used in parameter name
@@ -1891,22 +1827,14 @@ PASS    : char '{' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c}c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c}c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c}c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c}c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test}Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test}Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test}Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection}Name]foo as = 'howdy'
 PASS    : char '}' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '}' can be used in single quoted value
 PASS    : char '}' can be used in double quoted value
 PASS    : char '}' can be used in parameter name
@@ -1933,25 +1861,19 @@ PASS    : char '}' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c'c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c'c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'cc''
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'cc''
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test'Name'      (expect 'hello') as = 'badValue'
 written and read back from [writeParamNameTest]test'Name' as = 'badValue'
 read from [test'Name]p1        (expect 'howdy') as = 'badValue'
-stderr> rm: cannot remove '': No such file or directory
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+written and read back from [NewSection'Name]foo as = 'badValue'
+PASS    : char ''' can be used in unquoted value
+INVALID : char ''' can NOT be used in single quoted value
+INVALID : char ''' can NOT be used in double quoted value
+INVALID : char ''' can NOT be used in parameter name
+INVALID : char ''' can NOT be used in section name
+
 ## bg_ini.sh:ini_validChars:singleQuote finished
 ###############################################################################################################################
 
@@ -1973,37 +1895,37 @@ stderr> rm: cannot remove '': No such file or directory
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c"c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 unquoted      value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 single quoted value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 double quoted value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 read from [readDataTest]'test"Name'      (expect 'hello') as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 written and read back from [writeParamNameTest]test"Name' as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 read from [test"Name]p1        (expect 'howdy') as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
+written and read back from [NewSection"Name]foo as = ''
+INVALID : char '"' can NOT be used in unquoted value
+INVALID : char '"' can NOT be used in single quoted value
+INVALID : char '"' can NOT be used in double quoted value
+INVALID : char '"' can NOT be used in parameter name
+INVALID : char '"' can NOT be used in section name
+
 ## bg_ini.sh:ini_validChars:doubleQuote finished
 ###############################################################################################################################
 
@@ -2025,22 +1947,14 @@ stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval:
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c;c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c;c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c;c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c;c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test;Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test;Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test;Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection;Name]foo as = 'howdy'
 PASS    : char ';' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char ';' can be used in single quoted value
 PASS    : char ';' can be used in double quoted value
 PASS    : char ';' can be used in parameter name
@@ -2067,22 +1981,14 @@ PASS    : char ';' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c:c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c:c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c:c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c:c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test:Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test:Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test:Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection:Name]foo as = 'howdy'
 PASS    : char ':' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char ':' can be used in single quoted value
 PASS    : char ':' can be used in double quoted value
 PASS    : char ':' can be used in parameter name
@@ -2109,33 +2015,28 @@ PASS    : char ':' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c\c'
-stderr> rm: cannot remove '': No such file or directory
 stderr> awk: warning: escape sequence `\c' treated as plain `c'
 unquoted      value written and reread = 'cc'
-stderr> rm: cannot remove '': No such file or directory
 stderr> awk: warning: escape sequence `\c' treated as plain `c'
 single quoted value written and reread = 'cc'
-stderr> rm: cannot remove '': No such file or directory
 stderr> awk: warning: escape sequence `\c' treated as plain `c'
 double quoted value written and reread = 'cc'
-stderr> rm: cannot remove '': No such file or directory
 stderr> awk: warning: escape sequence `\N' treated as plain `N'
 read from [readDataTest]'test\Name'      (expect 'hello') as = 'badValue'
 stderr> awk: warning: escape sequence `\N' treated as plain `N'
 stderr> awk: warning: escape sequence `\N' treated as plain `N'
-stderr> rm: cannot remove '': No such file or directory
 written and read back from [writeParamNameTest]test\Name' as = 'hello'
 stderr> awk: warning: escape sequence `\N' treated as plain `N'
 read from [test\Name]p1        (expect 'howdy') as = 'badValue'
 stderr> awk: warning: escape sequence `\N' treated as plain `N'
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
+written and read back from [NewSection\Name]foo as = 'howdy'
+INVALID : char '\' can NOT be used in unquoted value
+INVALID : char '\' can NOT be used in single quoted value
+INVALID : char '\' can NOT be used in double quoted value
+INVALID : char '\' can NOT be used in parameter name
+INVALID : char '\' can NOT be used in section name
+
 ## bg_ini.sh:ini_validChars:backslash finished
 ###############################################################################################################################
 
@@ -2157,22 +2058,14 @@ stderr> awk: warning: escape sequence `\N' treated as plain `N'
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c|c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c|c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c|c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c|c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test|Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test|Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test|Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection|Name]foo as = 'howdy'
 PASS    : char '|' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '|' can be used in single quoted value
 PASS    : char '|' can be used in double quoted value
 PASS    : char '|' can be used in parameter name
@@ -2199,22 +2092,14 @@ PASS    : char '|' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c?c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c?c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c?c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c?c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test?Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test?Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test?Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection?Name]foo as = 'howdy'
 PASS    : char '?' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '?' can be used in single quoted value
 PASS    : char '?' can be used in double quoted value
 PASS    : char '?' can be used in parameter name
@@ -2241,22 +2126,14 @@ PASS    : char '?' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c/c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c/c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c/c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c/c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test/Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test/Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test/Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection/Name]foo as = 'howdy'
 PASS    : char '/' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '/' can be used in single quoted value
 PASS    : char '/' can be used in double quoted value
 PASS    : char '/' can be used in parameter name
@@ -2283,22 +2160,14 @@ PASS    : char '/' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c.c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c.c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c.c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c.c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test.Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test.Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test.Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection.Name]foo as = 'howdy'
 PASS    : char '.' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '.' can be used in single quoted value
 PASS    : char '.' can be used in double quoted value
 PASS    : char '.' can be used in parameter name
@@ -2325,22 +2194,14 @@ PASS    : char '.' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c>c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c>c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c>c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c>c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test>Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test>Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove ''
 read from [test>Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection>Name]foo as = 'howdy'
 PASS    : char '>' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '>' can be used in single quoted value
 PASS    : char '>' can be used in double quoted value
 PASS    : char '>' can be used in parameter name
@@ -2367,22 +2228,14 @@ PASS    : char '>' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c,c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c,c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c,c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c,c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test,Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test,Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test,Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection,Name]foo as = 'howdy'
 PASS    : char ',' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char ',' can be used in single quoted value
 PASS    : char ',' can be used in double quoted value
 PASS    : char ',' can be used in parameter name
@@ -2409,22 +2262,14 @@ PASS    : char ',' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c<c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c<c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c<c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c<c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove ''
 read from [readDataTest]'test<Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test<Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test<Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection<Name]foo as = 'howdy'
 PASS    : char '<' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '<' can be used in single quoted value
 PASS    : char '<' can be used in double quoted value
 PASS    : char '<' can be used in parameter name
@@ -2451,22 +2296,14 @@ PASS    : char '<' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c~c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c~c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c~c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c~c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test~Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test~Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test~Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection~Name]foo as = 'howdy'
 PASS    : char '~' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '~' can be used in single quoted value
 PASS    : char '~' can be used in double quoted value
 PASS    : char '~' can be used in parameter name
@@ -2493,37 +2330,37 @@ PASS    : char '~' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c`c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 unquoted      value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 single quoted value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 double quoted value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 read from [readDataTest]'test`Name'      (expect 'hello') as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 written and read back from [writeParamNameTest]test`Name' as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
 read from [test`Name]p1        (expect 'howdy') as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 965: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 966: syntax error: unexpected end of file
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
+stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
+written and read back from [NewSection`Name]foo as = ''
+INVALID : char '`' can NOT be used in unquoted value
+INVALID : char '`' can NOT be used in single quoted value
+INVALID : char '`' can NOT be used in double quoted value
+INVALID : char '`' can NOT be used in parameter name
+INVALID : char '`' can NOT be used in section name
+
 ## bg_ini.sh:ini_validChars:tickMark finished
 ###############################################################################################################################
 
@@ -2545,22 +2382,14 @@ stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval:
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c!c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c!c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c!c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c!c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test!Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test!Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test!Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection!Name]foo as = 'howdy'
 PASS    : char '!' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '!' can be used in single quoted value
 PASS    : char '!' can be used in double quoted value
 PASS    : char '!' can be used in parameter name
@@ -2587,22 +2416,14 @@ PASS    : char '!' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c@c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c@c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c@c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c@c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test@Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test@Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test@Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection@Name]foo as = 'howdy'
 PASS    : char '@' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '@' can be used in single quoted value
 PASS    : char '@' can be used in double quoted value
 PASS    : char '@' can be used in parameter name
@@ -2629,25 +2450,19 @@ PASS    : char '@' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c#c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c#c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c#c'
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test#Name'      (expect 'hello') as = 'badValue'
 written and read back from [writeParamNameTest]test#Name' as = 'badValue'
 read from [test#Name]p1        (expect 'howdy') as = 'badValue'
-stderr> rm: cannot remove '': No such file or directory
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+written and read back from [NewSection#Name]foo as = 'badValue'
+INVALID : char '#' can NOT be used in unquoted value
+PASS    : char '#' can be used in single quoted value
+PASS    : char '#' can be used in double quoted value
+INVALID : char '#' can NOT be used in parameter name
+INVALID : char '#' can NOT be used in section name
+
 ## bg_ini.sh:ini_validChars:hash finished
 ###############################################################################################################################
 
@@ -2669,26 +2484,19 @@ stderr> rm: cannot remove '': No such file or directory
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c$c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c'
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test$Name'      (expect 'hello') as = 'badValue'
 written and read back from [writeParamNameTest]test$Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
 read from [test$Name]p1        (expect 'howdy') as = 'badValue'
-stderr> rm: cannot remove '': No such file or directory
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='bgawk'
-   catch_errorCode='1'
-   catch_errorDescription='
-                           error: bgawk: likely error in awk script
-                               scriptFile='/tmp/tmp.<redacted>'
-                               exitCode='1''
+written and read back from [NewSection$Name]foo as = 'howdy'
+INVALID : char '$' can NOT be used in unquoted value
+INVALID : char '$' can NOT be used in single quoted value
+INVALID : char '$' can NOT be used in double quoted value
+INVALID : char '$' can NOT be used in parameter name
+INVALID : char '$' can NOT be used in section name
+
 ## bg_ini.sh:ini_validChars:dollar finished
 ###############################################################################################################################
 
@@ -2710,22 +2518,14 @@ stderr> rm: cannot remove '': No such file or directory
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c%c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c%c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c%c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c%c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test%Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test%Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test%Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection%Name]foo as = 'howdy'
 PASS    : char '%' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '%' can be used in single quoted value
 PASS    : char '%' can be used in double quoted value
 PASS    : char '%' can be used in parameter name
@@ -2752,22 +2552,14 @@ PASS    : char '%' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c^c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c^c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c^c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c^c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test^Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test^Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test^Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection^Name]foo as = 'howdy'
 PASS    : char '^' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '^' can be used in single quoted value
 PASS    : char '^' can be used in double quoted value
 PASS    : char '^' can be used in parameter name
@@ -2794,22 +2586,14 @@ PASS    : char '^' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c&c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c&c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c&c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c&c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test&Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test&Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test&Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection&Name]foo as = 'howdy'
 PASS    : char '&' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '&' can be used in single quoted value
 PASS    : char '&' can be used in double quoted value
 PASS    : char '&' can be used in parameter name
@@ -2836,22 +2620,14 @@ PASS    : char '&' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c*c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c*c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c*c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c*c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test*Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test*Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test*Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection*Name]foo as = 'howdy'
 PASS    : char '*' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '*' can be used in single quoted value
 PASS    : char '*' can be used in double quoted value
 PASS    : char '*' can be used in parameter name
@@ -2878,22 +2654,14 @@ PASS    : char '*' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c(c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c(c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c(c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c(c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test(Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test(Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test(Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection(Name]foo as = 'howdy'
 PASS    : char '(' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char '(' can be used in single quoted value
 PASS    : char '(' can be used in double quoted value
 PASS    : char '(' can be used in parameter name
@@ -2920,22 +2688,14 @@ PASS    : char '(' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c)c'
-stderr> rm: cannot remove '': No such file or directory
 unquoted      value written and reread = 'c)c'
-stderr> rm: cannot remove '': No such file or directory
 single quoted value written and reread = 'c)c'
-stderr> rm: cannot remove '': No such file or directory
 double quoted value written and reread = 'c)c'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [readDataTest]'test)Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test)Name' as = 'hello'
-stderr> rm: cannot remove '': No such file or directory
-stderr> rm: cannot remove '': No such file or directory
 read from [test)Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection)Name]foo as = 'howdy'
 PASS    : char ')' can be used in unquoted value
-stderr> rm: cannot remove '': No such file or directory
 PASS    : char ')' can be used in single quoted value
 PASS    : char ')' can be used in double quoted value
 PASS    : char ')' can be used in parameter name
@@ -2970,7 +2730,6 @@ hello  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p=hello
 p=hello  <- expected
@@ -2980,7 +2739,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello
 hello  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:1 finished
 ###############################################################################################################################
 
@@ -3010,7 +2768,6 @@ hello world  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p=hello world
 p=hello world  <- expected
@@ -3020,7 +2777,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello world
 hello world  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:2 finished
 ###############################################################################################################################
 
@@ -3050,7 +2806,6 @@ hello  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p=hello
 p= hello   <- expected
@@ -3060,7 +2815,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello
 hello  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:3 finished
 ###############################################################################################################################
 
@@ -3090,7 +2844,6 @@ hello world  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p=hello world
 p= hello world   <- expected
@@ -3100,7 +2853,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello world
 hello world  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:4 finished
 ###############################################################################################################################
 
@@ -3130,7 +2882,6 @@ hello  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p= hello#world 
 p= hello#world   <- expected
@@ -3140,7 +2891,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello
 hello  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:5 finished
 ###############################################################################################################################
 
@@ -3170,7 +2920,6 @@ hello  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p=hello# comment
 p=hello# comment  <- expected
@@ -3180,7 +2929,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello
 hello  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:6 finished
 ###############################################################################################################################
 
@@ -3210,7 +2958,6 @@ hello world  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p=hello world # comment
 p=hello world # comment  <- expected
@@ -3220,7 +2967,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello world
 hello world  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:7 finished
 ###############################################################################################################################
 
@@ -3250,7 +2996,6 @@ hello  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p= hello  # comment
 p= hello  # comment  <- expected
@@ -3260,7 +3005,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello
 hello  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:8 finished
 ###############################################################################################################################
 
@@ -3290,7 +3034,6 @@ hello world  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p= hello world  # comment
 p= hello world  # comment  <- expected
@@ -3300,7 +3043,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello world
 hello world  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:9 finished
 ###############################################################################################################################
 
@@ -3330,7 +3072,6 @@ hello  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p= hello#world  # comment
 p= hello#world  # comment  <- expected
@@ -3340,7 +3081,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello
 hello  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:10 finished
 ###############################################################################################################################
 
@@ -3370,7 +3110,6 @@ hello#world  <- expected
 
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
-stderr> rm: cannot remove '': No such file or directory
 cmd> cat "$iniFile"
 p= 'hello#world'  # comment
 p= 'hello#world'  # comment  <- expected
@@ -3380,7 +3119,6 @@ cmd> getIniParam "$iniFile" '.' p
 hello#world
 hello#world  <- expected
 
-stderr> rm: cannot remove '': No such file or directory
 ## bg_ini.sh:ini_validLineFormats:11 finished
 ###############################################################################################################################
 

@@ -377,6 +377,10 @@ declare -Ag _csiCMD_p0=(
 	[cScrollUp]="S"
 	[cScrollDown]="T"
 
+	# line wrapping
+	[cLineWrapOn]="?7h"
+	[cLineWrapOff]="?7l"
+
 	# pages
 	[cSwitchToAltScreen]="?47h"
 	[cSwitchToNormScreen]="?47l"
@@ -998,7 +1002,278 @@ function getUserBrowser()
 
 
 
+# usage: winCreate <bufVar> <x1> <y1> <x2> <y2>
+function winCreate()
+{
+	local -n _wcWin="$1"
+	_wcWin[x1]="$2"
+	_wcWin[y1]="$3"
+	_wcWin[x2]="$4"
+	_wcWin[y2]="$5"
+	_wcWin[width]=$((  _wcWin[x2] - _wcWin[x1] +1 ))
+	_wcWin[height]=$(( _wcWin[y2] - _wcWin[y1] +1 ))
+	_wcWin[curX]=1
+	_wcWin[curY]=1
+#	buf["defaultFont"]=(defaultFont)?defaultFont:(csiWhite""csiBkBlack)
+}
 
+# usage: winWriteLine <bufVar> <line>
+function winWriteLine() {
+	winWrite --linefeed "$@"
+}
+
+# usage: winWrite <bufVar> <line>
+function winWrite() {
+	local linefeedFlag
+	while [ $# -gt 0 ]; do case $1 in
+		--linefeed) linefeedFlag="--linefeed" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local -n _wcWin="$1"; shift
+	local line; printf -v line -- "$@"
+
+	local -a lines; splitString -d $'\n' -a lines "$line"
+
+	local firstLine="1"
+	for line in "${lines[@]}"; do
+		if [ ! "$firstLine" ]; then
+			_wcWin[curX]=1
+			((_wcWin[curY]++))
+		fi
+		firstLine=""
+		_wcWin[lines${_wcWin[curY]}]+="$line"
+		csiStrlen -R _wcWin[curX] -- "${_wcWin[lines${_wcWin[curY]}]}"
+	done
+	if [ "$linefeedFlag" ]; then
+		_wcWin[curX]=1
+		((_wcWin[curY]++))
+	fi
+}
+
+# usage: winWriteAt <bufVar> <cx> <cy> <line>
+function winWriteAt() {
+	local -n _wcWin="$1"; shift
+	local cx="$1"; shift;   [[ "$cx" =~ ^[0-9+-]*$ ]] || assertError
+	local cy="$1"; shift;   [[ "$cy" =~ ^[0-9+-]*$ ]] || assertError
+	local line; printf -v line -- "$@"
+
+	local cpStart cpLen tmpStr
+	(( (cx > _wcWin[x2]) || (cy < _wcWin[y1]) || (cy > _wcWin[y2]) )) && return
+	((cpStart=(1>(1-cx))? 1 : 1-cx ))
+	((cx=(1>cx)? 1 : cx ))
+	((cpLen=(_wcWin[width]-cx+1)))
+	csiSubstr -a -R tmpStr -- "${_wcWin[lines${cy}]}" "0" "$cy"
+	csiSubstr -a -R tmpStr -- "${_wcWin[lines${cy}]}" "$cpStart" "$cpLen"
+	csiSubstr -a -R tmpStr -- "${_wcWin[lines${cy}]}" "$((cy+cpLen))"
+	_wcWin[lines${cy}]="$tmpStr"
+}
+
+# usage: winPaint <bufVar>
+function winPaint() {
+	local -n _wcWin="$1"
+	local paintScript="${CSI}${cSave}"
+	local i tmpStr
+	for ((i=1; i<=_wcWin[height]; i++)); do
+		paintScript+="${CSI}$((_wcWin[y1]+i-1));${_wcWin[x1]}${cMoveAbs}"
+		csiSubstr -d "" -a -R paintScript --pad -- "${_wcWin[lines${i}]}" "0" "${_wcWin[width]}"
+	done
+	paintScript+="${CSI}${cRestore}"
+	printf "$paintScript"
+}
+
+# usage: winClear <bufVar>
+function winClear() {
+	local -n _wcWin="$1"
+	for ((i=1; i<=_wcWin[height]; i++)); do
+		_wcWin[lines${i}]=""
+	done
+	_wcWin[curX]=1
+	_wcWin[curY]=1
+}
+
+
+# usage: csiSplitOnCSI <string> [<retArray>]
+# splits apart the input <string> into alternating text and CSI escape sequences. Even elements returned ([0], [2], ...) are
+# quarteed to be text and odd elements are quaranteed to be CSI escape sequences. Text elements can "" empty string whenever a CSI
+# sequences is not preceeded by text such as when a CSI sequence appears first in the <string> or when multiple CSI sequences appear
+# next to eac other.
+#
+# Ascii vs Binary Escape:
+# This function will recognize an ESC character either as the 4 characters "\033" or "\x1b" or "\x1B" or as the single binary,
+# unprintable character $'\033' but the CSI sequences returned are always strings using the 4 charcter "\033" representation.
+#
+# In bash, "\033" is a 4 character string that respresents (to things that understand it), that those 4 characters should be replaced
+# by a single character with the unprintable value of octal 033. $'\033' on the other hand is a single character string with that
+# unprintable character.
+#
+# In bash, you almost always want to use strings with the 4 character description of the ESC character and not a string that actually
+# contains the ESC character. Otherwise, every time you reference that string, it might process the escape sequence and change the
+# string contents when you dont want to. Unlike other characters escaped by '\' (like \" or \\) bash will not remove the '\' when
+# it appears before \0 or \x which makes it stable to pass these strings around without having to know how many times the '\' needs
+# to be esascaped itself.
+#
+# We put CSI escape sequences in strings so that eventually when we pass the string to printf or echo -e, the escape character
+# strings will be recognized and converted and then when that data gets to the terminal, the sequence will be acted on. Note that
+# printf will only convert "\033" to $'\033' when it appears in the format string, not in a data argument.
+#
+function csiSplitOnCSI() {
+	while [ $# -gt 0 ]; do case $1 in
+		--) shift; break ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local _string="$1"; shift
+	local retArray="$1"; shift
+	local retOpts=(--echo -1); [ "$retArray" ] && retOpts=(-a --array "$retArray")
+	outputValue --array "$retArray" --
+	local rematch
+	# for the regex test, we convert all the string representations of ESC to the actual, binary character because regex can only
+	# stop the string of text on whether a single character matches or not. If we stopped on the '\' character, there would be false
+	# positives when '\' the 3 characters following it are not '033'. Also, since there are several different ways to represent ESC,
+	# this normalizes them so the algorithm does not have to deal with them all.
+	_string="${_string//\\033/$'\033'}"
+	_string="${_string//\\x1[bB]/$'\033'}"
+
+	while [[ "${_string//\\033/$'\033'}" =~ ^([^$'\033']*)($'\033'\[([0-9;]*)?([\ !\"#$%&\'()*+,./-]*)?[]@A-Z\^_\`a-z{|}~[])(.*)$ ]]; do
+		rematch=("${BASH_REMATCH[@]}")
+		outputValue -a --array "$retArray" -- "${rematch[1]}" "${rematch[2]//$'\033'/\\033}"
+		_string="${rematch[@]: -1}" #"
+	done
+	[ "$_string" ] && outputValue -a --array "$retArray" -- "$_string" #"
+	true
+}
+
+# usage: csiStrlen <line>
+# returns the length of <line> taking into account that <line> may contain CSI sequences that will not contribute to the length
+# when printed to a terminal but do contribute to length(<line>)
+function csiStrlen() {
+	local retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		--) shift; break ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local line="$*"
+	local outLen=0
+	local parts; csiSplitOnCSI -- "$line" parts
+	local i; for ((i=0; i<${#parts[@]}; i+=2)); do
+		((outLen += ${#parts[i]} ))
+	done
+	returnValue "$outLen" "$retVar"
+}
+
+# usage: csiSubstr [--pad] [-a] [--R=<retVar>] <string> <start> <len>
+# This is similar to the stdlib substr() function and bashes ${<string>:<start>:<len>} syntax with three differences.
+#     1) if <string> contains CSI escape sequences they will ..
+#          a) be ignored in calculating the <start> and <len> indexes into the string to return
+#          b) all be copied to the output string. They will be in their original position if they are contained in the output string
+#             or prepended or appended. If more than one is prepended/appended, they will retain their original order. CSI sequences
+#             change the state of the terminal so they must all be preserved so that the state for each character in the string and
+#             in the end will be the same as if the string was not shortened.
+#     2) if <start> is negative, it does not wrap around to the end of the <string> but instead implements the virtual window behavior.
+#     3) if the --pad option is specified, the output string will always be exactly <len> characters long, padding the front and
+#        back of <string> as required.
+#
+# Virtual Window:
+# The effect of the the <start> and --pad behavior is that the returned string is consistent with <start> and <len> describing a
+# window on a virtual infinite string where the 0 index coresponds to the first character in <string>. Before and after <string>
+# are virtual spaces. If the window contains a portion with virtual spaces, they will be included in the output string if --pad
+# is specified but not otherwise.
+#
+# Output:
+# If --pad is not specified, the output string will be what ever portion of <string> intersects the virtual window. If --pad is
+# specified, the output will correspond extactly to the virtual window which may or may not include all or part of <string> with
+# virtual spaces in the window before and after <string becoming actual spaces in the output.
+#
+# If --retVar=<retVar> is specified, the output string is assigned to the variable <retVar>. Otherwise it is written to stdout
+#
+# Params:
+#    <string>  : the input string. May contain CSI sequences (like s="hello ${csiBlue}World")
+#    <start>   : the numeric index into <string> that starts the return window. Only non-CSI characters are considered to occupy
+#                positions. CSI sequences are considered invisible to determining the index position. Negative values refer to
+#                positions filled with virtual spaces before the start of <string>. Values greater than or equal to the length of
+#                <string> refer to positions filled with virtual spaces after the end of <string>
+#    <len>     : The size of the window that describes the output string. <start> + <len> -1 is the virtual index position of the
+#                of the last character that will be a part of the output string.
+# Options:
+#    --pad     : specifies that that the output string should be exactly <len> long. If <start> is nagative, spaces will be added
+#                to the beginning of the output string up to the start of the <string> or the end of the virtual window. If <start>
+#                + <len> is greater than the length of <string> spaces wil lbe added to the end of the output string.
+#    -R|--retVar=<retVar> : <retVar> is a variable name that will receive the output string instead of it being written to stdout.
+#    -a        : append flag. If <retVar> is specified the output string will be appended to the end of the value already in <retVar>
+#                If <retVar> is not specified, -a has no affect.
+# See Also:
+#    man(3) csiSplitOnCSI
+#    man(3) csiStrlen
+#    man(3) csiSubstr
+#    man(3) csiStrip
+function csiSubstr() {
+	local retOpts padFlag
+	while [ $# -gt 0 ]; do case $1 in
+		--) shift; break ;;
+		--pad) padFlag="--pad" ;;
+		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local _cssLine="$1";         shift
+	local _cssStart="$1";        shift
+	local _cssLen="${1:-10000}"; shift
+
+	local _cssOut _cssOutLen=0 _cssRmLen=0 _cssCpLen=0
+	if ((_cssStart<0)); then
+		_cssOutLen=$(( ((-_cssStart) < _cssLen) ? (-_cssStart) : _cssLen ))
+		_cssStart=0
+		[ "$padFlag" ] && printf -v _cssOut "%*s" "$_cssOutLen"  ""
+	fi
+
+	local _cssParts; csiSplitOnCSI -- "$_cssLine" _cssParts
+	local i; for ((i=0; i<${#_cssParts[@]}; i+=2)); do
+		if ((_cssStart>0)); then
+			_cssRmLen=$(( ((_cssStart) < ${#_cssParts[i]}) ?  (_cssStart) : ${#_cssParts[i]} ))
+			_cssParts[i]="${_cssParts[i]:_cssRmLen}"
+			((_cssStart-=_cssRmLen))
+		fi
+
+		if ((_cssStart==0 && _cssOutLen<_cssLen)); then
+			_cssCpLen=$(( ((_cssLen-_cssOutLen) < ${#_cssParts[i]}) ? (_cssLen-_cssOutLen) : ${#_cssParts[i]} ))
+			_cssOut+="${_cssParts[i]:0:_cssCpLen}"
+			((_cssOutLen+=_cssCpLen))
+		fi
+
+		# cp _CSI term without inc outLen
+		_cssOut+="${_cssParts[i+1]}"
+	done
+
+	[ "$padFlag" ] && printf -v _cssOut "%s%*s" "$_cssOut"  $((_cssLen-_cssOutLen)) ""
+	outputValue "${retOpts[@]}" -- "$_cssOut"
+}
+
+# usage: csiStrip <lineVar>
+# returns <line> with any CSI escape sequences removed.
+function csiStrip() {
+	local retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		--) shift; break ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	if [ $# -gt 0 ]; then
+		local line="$*"
+	else
+		local line="${!retVar}"
+	fi
+	local  _csOut
+	local parts; csiSplitOnCSI -- "$line" parts
+	local i; for ((i=0; i<${#parts[@]}; i+=2)); do
+		_csOut+="${parts[i]}"
+	done
+	returnValue "$_csOut" "$retVar"
+}
+
+
+
+
+
+# OBSOLETE: replaced by win* functions
 function _printfAtInit()
 {
 	if [ ! "${_printfAt_xColMin+exists}" ]; then

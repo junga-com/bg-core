@@ -211,7 +211,7 @@ function bgawk()
 			[ "$inplace" ] && assertError -e "$exitCode" -v file -v tmpFile -v scriptFile -v exitCode -f output "the awk script returned a non-zero exit code in inplace edit mode (-i). Exit code 1 may mean that the script had a syntax error "
 			[ ! "$quietFlag" ] && [ $exitCode -eq 1 ] && assertError -e "$exitCode"  -v scriptFile -v exitCode "likely error in awk script"
 			rm "$scriptFile"
-			rm "$tmpFile"
+			[ "$tmpFile" ] && rm "$tmpFile"
 			return $exitCode
 		fi
 
