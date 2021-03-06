@@ -396,13 +396,9 @@ cmd> getIniParam "$iniFile" 'sect:1' noExist
 ## test
 cmd> getIniSection "$iniFile" '.'
 
-
 cmd> getIniSection "$iniFile" 'sect1'
-
 cmd> getIniSection "$iniFile" 'sect2'
-
 cmd> getIniSection "$iniFile" 'sect:1'
-
 
 ## bg_ini.sh:getIniSection:empty finished
 ###############################################################################################################################
@@ -429,48 +425,16 @@ cmd> getIniSection "$iniFile" 'sect:1'
 ## test
 cmd> getIniSection "$iniFile" '.'
 
-
-p1=foo
 p1=foo
 p2 = 3
-p2 = 3
-p3.a = "hello world"
 p3.a = "hello world"
 
-
 honey=good
-honey=good
-
-
 
 
 cmd> getIniSection "$iniFile" 'sect1'
-
-p1=foo
-p2 = 3
-p3.a = "hello world"
-
-honey=good
-
-
 cmd> getIniSection "$iniFile" 'sect2'
-
-p1=foo
-p2 = 3
-p3.a = "hello world"
-
-honey=good
-
-
 cmd> getIniSection "$iniFile" 'sect:1'
-
-p1=foo
-p2 = 3
-p3.a = "hello world"
-
-honey=good
-
-
 
 ## bg_ini.sh:getIniSection:noSections finished
 ###############################################################################################################################
@@ -500,58 +464,14 @@ honey=good
 ## test
 cmd> getIniSection "$iniFile" '.'
 
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
-
-[ sect14 ]
-this=that
-
 cmd> getIniSection "$iniFile" 'sect1'
-
-[ sect1 ]
-p1=foo
 p1=foo
 p2=3
-p2=3
-
-
-[ sect2 ]
-honey=good
-
-[ sect14 ]
-this=that
 
 cmd> getIniSection "$iniFile" 'sect2'
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
 honey=good
-honey=good
-
-
-[ sect14 ]
-this=that
 
 cmd> getIniSection "$iniFile" 'sect:1'
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
-
-[ sect14 ]
-this=that
-
 
 ## bg_ini.sh:getIniSection:noTopLevel finished
 ###############################################################################################################################
@@ -581,61 +501,17 @@ this=that
 ## test
 cmd> getIniSection "$iniFile" '.'
 
-
-p1=topFoo
 p1=topFoo
 p2=0
-p2=0
-
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
 
 cmd> getIniSection "$iniFile" 'sect1'
-
-p1=topFoo
-p2=0
-
-[ sect1 ]
-p1=foo
 p1=foo
 p2=3
-p2=3
-
-
-[ sect2 ]
-honey=good
 
 cmd> getIniSection "$iniFile" 'sect2'
-
-p1=topFoo
-p2=0
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
 honey=good
-honey=good
-
 
 cmd> getIniSection "$iniFile" 'sect:1'
-
-p1=topFoo
-p2=0
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
-
 
 ## bg_ini.sh:getIniSection:topAndSections finished
 ###############################################################################################################################
@@ -666,62 +542,14 @@ honey=good
 ## test
 cmd> getIniSection "$iniFile" '.'
 
-
-p1=topFoo
 p1=topFoo
 p2=0
-p2=0
-
-
-[ sect:1 ]
-p1=foo
-p2=3
-
-[ sect:2 ]
-honey=good
-
 
 cmd> getIniSection "$iniFile" 'sect1'
-
-p1=topFoo
-p2=0
-
-[ sect:1 ]
-p1=foo
-p2=3
-
-[ sect:2 ]
-honey=good
-
-
 cmd> getIniSection "$iniFile" 'sect2'
-
-p1=topFoo
-p2=0
-
-[ sect:1 ]
-p1=foo
-p2=3
-
-[ sect:2 ]
-honey=good
-
-
 cmd> getIniSection "$iniFile" 'sect:1'
-
-p1=topFoo
-p2=0
-
-[ sect:1 ]
-p1=foo
 p1=foo
 p2=3
-p2=3
-
-
-[ sect:2 ]
-honey=good
-
 
 
 ## bg_ini.sh:getIniSection:colonInSectNames finished
@@ -771,7 +599,6 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ##----------
 ## test
 cmd> iniParamExists    "$iniFile" '.' p1
-[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect1' p1
 [exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
@@ -806,7 +633,6 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 cmd> iniParamExists    "$iniFile" '.' p1
 [exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect1' p1
-[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
 [exitCode 2]
 
@@ -837,9 +663,7 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ##----------
 ## test
 cmd> iniParamExists    "$iniFile" '.' p1
-[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect1' p1
-[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
 [exitCode 2]
 
@@ -871,11 +695,9 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ##----------
 ## test
 cmd> iniParamExists    "$iniFile" '.' p1
-[exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect1' p1
 [exitCode 2]
 cmd> iniParamExists    "$iniFile" 'sect:1' p1
-[exitCode 2]
 
 ## bg_ini.sh:iniParamExists:colonInSectNames finished
 ###############################################################################################################################
@@ -894,16 +716,12 @@ cmd> iniParamExists    "$iniFile" 'sect:1' p1
 ##----------
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect'
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-
 [exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:empty finished
@@ -930,36 +748,11 @@ cmd> iniSectionExists    "$iniFile" 'sect:1'
 ##----------
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
-
 cmd> iniSectionExists    "$iniFile" 'sect'
-
-p1=foo
-p2 = 3
-p3.a = "hello world"
-
-honey=good
-
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
-
-p1=foo
-p2 = 3
-p3.a = "hello world"
-
-honey=good
-
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-
-p1=foo
-p2 = 3
-p3.a = "hello world"
-
-honey=good
-
-
 [exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:noSections finished
@@ -989,45 +782,11 @@ honey=good
 ##----------
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
-
-[ sect14 ]
-this=that
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect'
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
-
-[ sect14 ]
-this=that
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
-
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
-
-[ sect14 ]
-this=that
-
 [exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:noTopLevel finished
@@ -1057,37 +816,10 @@ this=that
 ##----------
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
-
 cmd> iniSectionExists    "$iniFile" 'sect'
-
-p1=topFoo
-p2=0
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
-
-p1=topFoo
-p2=0
-
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-
-p1=topFoo
-p2=0
-
-[ sect1 ]
-p1=foo
-p2=3
-
-[ sect2 ]
-honey=good
-
 [exitCode 2]
 
 ## bg_ini.sh:iniSectionExists:topAndSections finished
@@ -1118,40 +850,11 @@ honey=good
 ##----------
 ## test
 cmd> iniSectionExists    "$iniFile" '.'
-
 cmd> iniSectionExists    "$iniFile" 'sect'
-
-p1=topFoo
-p2=0
-
-[ sect:1 ]
-p1=foo
-p2=3
-
-[ sect:2 ]
-honey=good
-
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect1'
-
-p1=topFoo
-p2=0
-
-[ sect:1 ]
-p1=foo
-p2=3
-
-[ sect:2 ]
-honey=good
-
-
 [exitCode 2]
 cmd> iniSectionExists    "$iniFile" 'sect:1'
-
-p1=topFoo
-p2=0
-
 
 ## bg_ini.sh:iniSectionExists:colonInSectNames finished
 ###############################################################################################################################
@@ -1341,7 +1044,7 @@ p2
 ##----------
 ## test
 cmd> listIniSection "$iniFile"
-
+[exitCode 1]
 cmd> listIniSection "$iniFile" 'sect.*'
 [exitCode 1]
 cmd> listIniSection "$iniFile" "sect:.*"
@@ -1371,14 +1074,7 @@ cmd> listIniSection "$iniFile" "sect:.*"
 ##----------
 ## test
 cmd> listIniSection "$iniFile"
-
-p1=foo
-p2 = 3
-p3.a = "hello world"
-
-honey=good
-
-
+[exitCode 1]
 cmd> listIniSection "$iniFile" 'sect.*'
 [exitCode 1]
 cmd> listIniSection "$iniFile" "sect:.*"
@@ -1411,20 +1107,9 @@ cmd> listIniSection "$iniFile" "sect:.*"
 ##----------
 ## test
 cmd> listIniSection "$iniFile"
-
 sect1
-[ sect1 ]
-p1=foo
-p2=3
-
 sect2
-[ sect2 ]
-honey=good
-
 sect14
-[ sect14 ]
-this=that
-
 cmd> listIniSection "$iniFile" 'sect.*'
 sect1
 sect2
@@ -1459,19 +1144,8 @@ cmd> listIniSection "$iniFile" "sect:.*"
 ##----------
 ## test
 cmd> listIniSection "$iniFile"
-
-p1=topFoo
-p2=0
-
 sect1
-[ sect1 ]
-p1=foo
-p2=3
-
 sect2
-[ sect2 ]
-honey=good
-
 cmd> listIniSection "$iniFile" 'sect.*'
 sect1
 sect2
@@ -1506,20 +1180,8 @@ cmd> listIniSection "$iniFile" "sect:.*"
 ##----------
 ## test
 cmd> listIniSection "$iniFile"
-
-p1=topFoo
-p2=0
-
 sect:1
-[ sect:1 ]
-p1=foo
-p2=3
-
 sect:2
-[ sect:2 ]
-honey=good
-
-
 cmd> listIniSection "$iniFile" 'sect.*'
 sect:1
 sect:2
@@ -1863,14 +1525,14 @@ PASS    : char '}' can be used in section name
 value read from [readDataTest]p1       = 'c'c'
 unquoted      value written and reread = 'c'c'
 single quoted value written and reread = 'cc''
-double quoted value written and reread = 'cc''
+double quoted value written and reread = 'c'c'
 read from [readDataTest]'test'Name'      (expect 'hello') as = 'badValue'
 written and read back from [writeParamNameTest]test'Name' as = 'badValue'
 read from [test'Name]p1        (expect 'howdy') as = 'badValue'
 written and read back from [NewSection'Name]foo as = 'badValue'
 PASS    : char ''' can be used in unquoted value
 INVALID : char ''' can NOT be used in single quoted value
-INVALID : char ''' can NOT be used in double quoted value
+PASS    : char ''' can be used in double quoted value
 INVALID : char ''' can NOT be used in parameter name
 INVALID : char ''' can NOT be used in section name
 
@@ -1895,33 +1557,15 @@ INVALID : char ''' can NOT be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c"c'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-unquoted      value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-single quoted value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-double quoted value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-read from [readDataTest]'test"Name'      (expect 'hello') as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-written and read back from [writeParamNameTest]test"Name' as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-read from [test"Name]p1        (expect 'howdy') as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching `"'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-written and read back from [NewSection"Name]foo as = ''
-INVALID : char '"' can NOT be used in unquoted value
-INVALID : char '"' can NOT be used in single quoted value
+unquoted      value written and reread = 'c"c'
+single quoted value written and reread = 'c"c'
+double quoted value written and reread = 'cc"'
+read from [readDataTest]'test"Name'      (expect 'hello') as = 'badValue'
+written and read back from [writeParamNameTest]test"Name' as = 'badValue'
+read from [test"Name]p1        (expect 'howdy') as = 'badValue'
+written and read back from [NewSection"Name]foo as = 'badValue'
+PASS    : char '"' can be used in unquoted value
+PASS    : char '"' can be used in single quoted value
 INVALID : char '"' can NOT be used in double quoted value
 INVALID : char '"' can NOT be used in parameter name
 INVALID : char '"' can NOT be used in section name
@@ -2330,36 +1974,18 @@ PASS    : char '~' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c`c'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-unquoted      value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-single quoted value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-double quoted value written and reread = 'badValue'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-read from [readDataTest]'test`Name'      (expect 'hello') as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-written and read back from [writeParamNameTest]test`Name' as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-read from [test`Name]p1        (expect 'howdy') as = ''
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 936: unexpected EOF while looking for matching ``'
-stderr> /home/bobg/github/bg-AtomPluginSandbox/bg-core/core/bg_strings.sh: eval: line 937: syntax error: unexpected end of file
-written and read back from [NewSection`Name]foo as = ''
-INVALID : char '`' can NOT be used in unquoted value
-INVALID : char '`' can NOT be used in single quoted value
-INVALID : char '`' can NOT be used in double quoted value
-INVALID : char '`' can NOT be used in parameter name
-INVALID : char '`' can NOT be used in section name
+unquoted      value written and reread = 'c`c'
+single quoted value written and reread = 'c`c'
+double quoted value written and reread = 'c`c'
+read from [readDataTest]'test`Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test`Name' as = 'hello'
+read from [test`Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection`Name]foo as = 'howdy'
+PASS    : char '`' can be used in unquoted value
+PASS    : char '`' can be used in single quoted value
+PASS    : char '`' can be used in double quoted value
+PASS    : char '`' can be used in parameter name
+PASS    : char '`' can be used in section name
 
 ## bg_ini.sh:ini_validChars:tickMark finished
 ###############################################################################################################################
@@ -2484,18 +2110,18 @@ INVALID : char '#' can NOT be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c$c'
-unquoted      value written and reread = 'c'
-single quoted value written and reread = 'c'
-double quoted value written and reread = 'c'
-read from [readDataTest]'test$Name'      (expect 'hello') as = 'badValue'
+unquoted      value written and reread = 'c$c'
+single quoted value written and reread = 'c$c'
+double quoted value written and reread = 'c$c'
+read from [readDataTest]'test$Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test$Name' as = 'hello'
-read from [test$Name]p1        (expect 'howdy') as = 'badValue'
+read from [test$Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection$Name]foo as = 'howdy'
-INVALID : char '$' can NOT be used in unquoted value
-INVALID : char '$' can NOT be used in single quoted value
-INVALID : char '$' can NOT be used in double quoted value
-INVALID : char '$' can NOT be used in parameter name
-INVALID : char '$' can NOT be used in section name
+PASS    : char '$' can be used in unquoted value
+PASS    : char '$' can be used in single quoted value
+PASS    : char '$' can be used in double quoted value
+PASS    : char '$' can be used in parameter name
+PASS    : char '$' can be used in section name
 
 ## bg_ini.sh:ini_validChars:dollar finished
 ###############################################################################################################################
@@ -2807,7 +2433,7 @@ hello  <- expected
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
 cmd> cat "$iniFile"
-p=hello
+p= hello 
 p= hello   <- expected
 
 # expect that the value read back is the same as the value we just wrote
@@ -2845,7 +2471,7 @@ hello world  <- expected
 # expect that the line in the file does not change since the value written is the same
 cmd> setIniParam "$iniFile" '.' p "$expectedValue"
 cmd> cat "$iniFile"
-p=hello world
+p= hello world 
 p= hello world   <- expected
 
 # expect that the value read back is the same as the value we just wrote

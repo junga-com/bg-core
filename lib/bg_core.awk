@@ -811,7 +811,7 @@ function parseUpToWithTrim(parser, targetRE                ,token) {
 	token=""
 	while (!parserIsDone(parser) && parserGet(parser) !~ targetRE) {
 		# dont append a trailing space
-		if (parserGet(parser) !~ /^\s*$/  ||  parserPeek(parser) !~ targetRE)
+		if (parserGet(parser) !~ /^\s*$/  ||  (parserPeek(parser) !~ targetRE && parserPeek(parser) != "-1"))
 			token=token""parserGet(parser)
 		parser["idx"]++
 	}

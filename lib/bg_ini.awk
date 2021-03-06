@@ -85,11 +85,11 @@ function makeNewSectionLine(sectionName, comment) {
 #    <paramDelim> : is the delimiter used between the name and value. Typically it is "="
 #    <paramPad> : is used to to determine what padding if any goes around name/value delimiter. Typically it is "" or " "
 #    <commentsStyle> : ignore <comment> even if specified because this file protocol does not support comments
-function makeNewSettingLine(name, value, comment                           ,qCh,valueNeedsQuotes) {
+function makeNewSettingLine(name, value, comment, defaultQuoteStyle                           ,qCh,valueNeedsQuotes) {
 	if (quoteMode ~ /^([1']|single)$/) qCh="'"
 	if (quoteMode ~ /^([2"]|double)$/) qCh="\""
 	if (!quoteMode && value ~ /[#]/) valueNeedsQuotes="needs"
-	switch (qCh":"valueNeedsQuotes":"iniValueQuoteStyle) {
+	switch (quoteMode":"valueNeedsQuotes":"defaultQuoteStyle) {
 		case /single/: qCh="'"; break
 		case /(needs|double)/: qCh="\""; break
 	}

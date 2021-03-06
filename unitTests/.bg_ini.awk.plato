@@ -3,37 +3,37 @@
 ## bg_ini.awk:lineIdentification:0 start
 ## expect: 
 cmd> echo "$1" | gawk -v quietFlag="-q" --include bg_ini.awk '
-in iniLineType      Sect     PName      iniValue        iniComment                     sourceLine
- 1 whitespace                                                                          |
- 1 whitespace                                                                          |
- 1 setting                   [.]p1      5                                              |p1=5
- 1 setting                   [.]name    my name                                        |name = my name
- 1 setting                   [.]name    my name         # some comment                 |name = my name# some comment
- 1 setting                   [.]name     my name                                       | name=" my name "
- 1 setting                   [.]name     my # 'name'    # comments                     |name=" my # 'name' " # comments
- 1 setting                   [.]name    was up?                                        |name='was up?'
- 1 whitespace                                                                          |
- 1 comment                                              # start of comments            |# start of comments
- 1 comment                                              #[ my:Sect ] # this is a co... |#[ my:Sect ] # this is a comment, not a section
- 1 comment                                              #foo="bar" # this is a comm... |#foo="bar" # this is a comment, not a setting
- 1 comment                                              # this comment has leading ... |  # this comment has leading space
- 1 whitespace                                                                          |
- 1 comment                                              # start of sections            |# start of sections
- 0 section          sect1                                                              |[sect1]
- 0 setting          sect1    [sect1]p1  55 something    # my comment                   |p1=55 something # my comment
- 0 section          sect2                                                              |[ sect2 ]
- 0 section          sect2                               # comment it                   |[ sect2 ] # comment it
- 0 whitespace       sect2                                                              |
- 0 comment          sect2                               # the following are invalid... |# the following are invalid lines
- 0 invalid.setting  sect2                                                              |was up, joe? (no equal)
- 0 invalid.setting  sect2                                                              |was#=(equal escaped as a comment )
- 0 invalid.setting  sect2                                                              |was'= '(equal escaped as a quaoted string )
- 0 invalid.section  sect2                                                              |[ (no closing bracket)
- 0 invalid.section  sect2                                                              |[ yo# ] (comment escapes the closing bracket)
- 0 invalid.section  sect2                                                              |[ yo ']' (single quote escapes the closing bracket)
- 0 invalid.section  sect2                                                              |[ yo' ] (unterminated single quote escapes the closing bracket)
- 0 invalid.section  sect2                                                              |[ yo ] (junk after brackets)
- 0 whitespace       sect2                                                              |
+in iniLineType      Sect     PName                iniValue                       iniComment                     sourceLine
+ 1 whitespace                                                                                                   |
+ 1 whitespace                                                                                                   |
+ 1 setting                   p1                   5                                                             |p1=5
+ 1 setting                   name                 my name                                                       |name = my name
+ 1 setting                   name                 my name                        # some comment                 |name = my name# some comment
+ 1 setting                   name                  my name                                                      | name=" my name "
+ 1 setting                   name                  my # 'name'                   # comments                     |name=" my # 'name' " # comments
+ 1 setting                   name                 was up?                                                       |name='was up?'
+ 1 whitespace                                                                                                   |
+ 1 comment                                                                       # start of comments            |# start of comments
+ 1 comment                                                                       #[ my:Sect ] # this is a co... |#[ my:Sect ] # this is a comment, not a section
+ 1 comment                                                                       #foo="bar" # this is a comm... |#foo="bar" # this is a comment, not a setting
+ 1 comment                                                                       # this comment has leading ... |  # this comment has leading space
+ 1 whitespace                                                                                                   |
+ 1 comment                                                                       # start of sections            |# start of sections
+   section          sect1                                                                                       |[sect1]
+   setting          sect1    p1                   55 something                   # my comment                   |p1=55 something # my comment
+   section          sect2                                                                                       |[ sect2 ]
+   section          sect2                                                        # comment it                   |[ sect2 ] # comment it
+   whitespace       sect2                                                                                       |
+   comment          sect2                                                        # the following are invalid... |# the following are invalid lines
+   invalid.setting  sect2                                                                                       |was up, joe? (no equal)
+   invalid.setting  sect2                                                                                       |was#=(equal escaped as a comment )
+   invalid.setting  sect2                                                                                       |was'= '(equal escaped as a quaoted string )
+   invalid.section  sect2                                                                                       |[ (no closing bracket)
+   invalid.section  sect2                                                                                       |[ yo# ] (comment escapes the closing bracket)
+   invalid.section  sect2                                                                                       |[ yo ']' (single quote escapes the closing bracket)
+   invalid.section  sect2                                                                                       |[ yo' ] (unterminated single quote escapes the closing bracket)
+   invalid.section  sect2                                                                                       |[ yo ] (junk after brackets)
+   whitespace       sect2                                                                                       |
 
 ## bg_ini.awk:lineIdentification:0 finished
 ###############################################################################################################################
@@ -240,7 +240,7 @@ len=17
   [ 4] | |
   [ 5] |]|
   [ 6] | |
-  [ 7] |(double|
+->[ 7] |(double|
   [ 8] | |
   [ 9] |quotes|
   [10] | |
@@ -268,7 +268,7 @@ len=17
   [ 4] | |
   [ 5] |]|
   [ 6] | |
-  [ 7] |(single|
+->[ 7] |(single|
   [ 8] | |
   [ 9] |quotes|
   [10] | |

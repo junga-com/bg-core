@@ -933,7 +933,8 @@ function arrayJoin()
 #   varSetRef -- this man page lists all similar functions
 function arrayAdd()
 {
-	eval "$1"'+=("'"$2"'")'
+	local -n _aaArrayVarName="$1" || assertError; shift
+	_aaArrayVarName+=("$@")
 }
 
 
@@ -1381,6 +1382,23 @@ function stringShorten()
 	fi
 
 	returnValue "$_str" "$_retVar"
+}
+
+# usage: strFill [-a] [-R <stringVar>] <count> <fillChar>
+# fills the <stringVar> with <count> number of <fillChar>. If -a is specified, they are appended to the existing value, otherwise
+# they replace any existing value in <stringVar>
+function strFill()
+{
+	local retOpts
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local _sfCount="$1"
+	local _sfFillChar="$2"
+	local _sfTmp; printf -v _sfTmp "%*s" "${_sfCount:-1}" ""
+	_sfTmp="${_sfTmp// /${_sfFillChar:- }}"
+	outputValue "${retOpts[@]}" "$_sfTmp"
 }
 
 

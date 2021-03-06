@@ -56,6 +56,20 @@ declare -A ut_csiSubstrCmp=(
 	[4]="$(cmdline "Hello\033[34m"              "Hello World\033[34m" "0" "5")"
 	[5]="$(cmdline "Hello \033[34mWorld"        "Hello \033[34mWorld" "0" "11")"
 	[6]="$(cmdline "\033[34m\033[34m\033[34m"   "\033[34mHello \033[34mWorld\033[34m" "4" "0")"
+
+	#      Hello World
+	#65432101234567890
+	#  12345
+	[chop1]="$(cmdline "\033[34mHello \033[35mWorld\033[36m" --chopCSI  "\033[34mHello \033[35mWorld\033[36m" )"
+	[chop2]="$(cmdline "\033[34mHello"            --chopCSI  "\033[34mHello \033[35mWorld\033[36m" "0" "5")"
+	[chop3]="$(cmdline "\033[34mHello "           --chopCSI  "\033[34mHello \033[35mWorld\033[36m" "0" "6")"
+	[chop4]="$(cmdline "\033[34mHello \033[35mW"  --chopCSI  "\033[34mHello \033[35mWorld\033[36m" "0" "7")"
+	[chop5]="$(cmdline "\033[34mello "            --chopCSI  "\033[34mHello \033[35mWorld\033[36m" "1" "5")"
+
+	[chop6]="$(cmdline ""                         --chopCSI  "\033[34mHello \033[35mWorld\033[36m" "-6" "5")"
+	[chop7]="$(cmdline ""                         --chopCSI  "\033[34mHello \033[35mWorld\033[36m" "-5" "5")"
+	[chop8]="$(cmdline "\033[34mH"                --chopCSI  "\033[34mHello \033[35mWorld\033[36m" "-4" "5")"
+	[chop9]="$(cmdline "\033[34mHe"               --chopCSI  "\033[34mHello \033[35mWorld\033[36m" "-3" "5")"
 )
 function ut_csiSubstrCmp() {
 	ut test noecho

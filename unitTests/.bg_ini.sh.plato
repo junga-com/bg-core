@@ -1218,14 +1218,17 @@ p1=one
 p2=one two
 honey=
 
+
 [ sect1 ]
 p1==4
 p2=j/l
+
 
 [ sect:1 ]
 p1=1
 p2=2
 honey=3
+
 
 ## bg_ini.sh:setIniParam: finished
 ###############################################################################################################################
@@ -1521,14 +1524,14 @@ PASS    : char '}' can be used in section name
 ## test
 value read from [readDataTest]p1       = 'c'c'
 unquoted      value written and reread = 'c'c'
-single quoted value written and reread = 'c'c'
+single quoted value written and reread = 'cc''
 double quoted value written and reread = 'c'c'
 read from [readDataTest]'test'Name'      (expect 'hello') as = 'badValue'
 written and read back from [writeParamNameTest]test'Name' as = 'badValue'
 read from [test'Name]p1        (expect 'howdy') as = 'badValue'
 written and read back from [NewSection'Name]foo as = 'badValue'
 PASS    : char ''' can be used in unquoted value
-PASS    : char ''' can be used in single quoted value
+INVALID : char ''' can NOT be used in single quoted value
 PASS    : char ''' can be used in double quoted value
 INVALID : char ''' can NOT be used in parameter name
 INVALID : char ''' can NOT be used in section name
@@ -1556,16 +1559,16 @@ INVALID : char ''' can NOT be used in section name
 value read from [readDataTest]p1       = 'c"c'
 unquoted      value written and reread = 'c"c'
 single quoted value written and reread = 'c"c'
-double quoted value written and reread = 'c"c'
+double quoted value written and reread = 'cc"'
 read from [readDataTest]'test"Name'      (expect 'hello') as = 'badValue'
 written and read back from [writeParamNameTest]test"Name' as = 'badValue'
 read from [test"Name]p1        (expect 'howdy') as = 'badValue'
 written and read back from [NewSection"Name]foo as = 'badValue'
 PASS    : char '"' can be used in unquoted value
 PASS    : char '"' can be used in single quoted value
-# The following PASS is a little missleading.
+# If the following line is a PASS, it is a little missleading.
 # Using an unescaped " in a double quoted string will cause an EOL comment to become part of the value
-PASS    : char '"' can be used in double quoted value
+INVALID : char '"' can NOT be used in double quoted value
 INVALID : char '"' can NOT be used in parameter name
 INVALID : char '"' can NOT be used in section name
 
@@ -1664,15 +1667,15 @@ stderr> awk: warning: escape sequence `\c' treated as plain `c'
 single quoted value written and reread = 'cc'
 stderr> awk: warning: escape sequence `\c' treated as plain `c'
 double quoted value written and reread = 'cc'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
 read from [readDataTest]'test\Name'      (expect 'hello') as = 'badValue'
 stderr> awk: warning: escape sequence `\N' treated as plain `N'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
 written and read back from [writeParamNameTest]test\Name' as = 'hello'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
 read from [test\Name]p1        (expect 'howdy') as = 'badValue'
 stderr> awk: warning: escape sequence `\N' treated as plain `N'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
+stderr> awk: warning: escape sequence `\N' treated as plain `N'
 written and read back from [NewSection\Name]foo as = 'howdy'
 INVALID : char '\' can NOT be used in unquoted value
 INVALID : char '\' can NOT be used in single quoted value
@@ -1973,18 +1976,18 @@ PASS    : char '~' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c`c'
-unquoted      value written and reread = 'badValue'
-single quoted value written and reread = 'badValue'
-double quoted value written and reread = 'badValue'
+unquoted      value written and reread = 'c`c'
+single quoted value written and reread = 'c`c'
+double quoted value written and reread = 'c`c'
 read from [readDataTest]'test`Name'      (expect 'hello') as = 'hello'
-written and read back from [writeParamNameTest]test`Name' as = 'badValue'
+written and read back from [writeParamNameTest]test`Name' as = 'hello'
 read from [test`Name]p1        (expect 'howdy') as = 'howdy'
-written and read back from [NewSection`Name]foo as = 'badValue'
-INVALID : char '`' can NOT be used in unquoted value
-INVALID : char '`' can NOT be used in single quoted value
-INVALID : char '`' can NOT be used in double quoted value
-INVALID : char '`' can NOT be used in parameter name
-INVALID : char '`' can NOT be used in section name
+written and read back from [NewSection`Name]foo as = 'howdy'
+PASS    : char '`' can be used in unquoted value
+PASS    : char '`' can be used in single quoted value
+PASS    : char '`' can be used in double quoted value
+PASS    : char '`' can be used in parameter name
+PASS    : char '`' can be used in section name
 
 ## bg_ini.sh:ini_validChars:tickMark finished
 ###############################################################################################################################
@@ -2075,7 +2078,7 @@ PASS    : char '@' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c'
-unquoted      value written and reread = 'c'
+unquoted      value written and reread = 'c#c'
 single quoted value written and reread = 'c#c'
 double quoted value written and reread = 'c#c'
 read from [readDataTest]'test#Name'      (expect 'hello') as = 'badValue'

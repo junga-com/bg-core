@@ -40,7 +40,7 @@ declare -g cuiWinCntrFilePrefix="/tmp/bgtrace."
 #     close : no return (asynchronous) : tell the window to terminate and delete the control pipe.
 #        this can also be initiated by the operator at any time by closing the window.
 #     ping : Returns pingTime(ms) : checks to see if the window is open. Returning 0(open) 1(closed)
-#        are the typical, normal cases that the called should handle but 2(handler crashed) and
+#        are the typical, normal cases that the caller should handle but 2(handler crashed) and
 #        3(handler invalid) should not happen and represent a failure in the system.
 #        Exit codes:
 #           0(true) : open. the window is open and good to go.

@@ -38,6 +38,7 @@
 # functions.
 #
 # See Also:
+# see http://www.shaels.net/index.php/propterm/documents/14-ansi-protocol
 # see https://wiki.bash-hackers.org/scripting/terminalcodes
 # see http://en.wikipedia.org/wiki/ANSI_escape_code
 # see http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
@@ -147,14 +148,24 @@ function cuiGetCursor()
 # set the horizontal band of the terminal that will be subject to scrolling.
 # Note: When the scroll region is set, if a scroll is trigger by writing a new line at the bottom of the screen,
 # it will reset the scroll region to the entire screen.
+# Note that this may move the cursor to the 1,1 position
 # Params:
-#      <lineStartNum> : is the line number of the first line that will participate in scrolling (0 == top)
-#      <lineEndNum>   : is the line number of the last line that will participate in scrolling (use )
+#      <lineStartNum> : is the line number of the first line that will participate in scrolling (1 == top)
+#      <lineEndNum>   : is the line number of the last line that will participate in scrolling ( )
 function CSIsetScrollRegion() { cuiSetScrollRegion "$@"; }
 function cuiSetScrollRegion()
 {
 	[ -t 1 ] || return 1
 	printf "${CSI}${1:-0};${2:-0}$cSetScrollRegion"
+}
+
+# usage: cuiResetScrollRegion
+# reset the scroll region to the entire terminal.
+# Note that this may move the cursor to the 1,1 position
+function cuiResetScrollRegion()
+{
+	[ -t 1 ] || return 1
+	printf "${CSI}$cSetScrollRegion"
 }
 
 
@@ -371,6 +382,7 @@ declare -Ag _csiCMD_p0=(
 	[cClrSavedLines]="3J"
 	[cInsertLines]="L"
 	[cDeleteLines]="M"
+	[cInsertChars]="@"
 	[cDeleteChars]="P"
 
 	# scroll
@@ -384,6 +396,8 @@ declare -Ag _csiCMD_p0=(
 	# pages
 	[cSwitchToAltScreen]="?47h"
 	[cSwitchToNormScreen]="?47l"
+	[cSwitchToAltScreenAndBuffer]="?1049h"
+	[cSwitchToNormScreenAndBuffer]="?1049l"
 
 	# font attributes
 	# see http://misc.flogisoft.com/bash/tip_colors_and_formatting
@@ -393,6 +407,9 @@ declare -Ag _csiCMD_p0=(
 	[cFaint]="2m"
 	[cItalic]="3m"
 	[cUnderline]="4m"
+	[cNoUnderline]="24m"
+	[cOverline]="53m"
+	[cNoOverline]="55m"
 	[cBlink]="5m"
 	[cReverse]="7m"
 	[cConceal]="8m"
@@ -1002,10 +1019,17 @@ function getUserBrowser()
 
 
 
-# usage: winCreate <bufVar> <x1> <y1> <x2> <y2>
+# usage: winCreate [--borders] [--defaultFont=<csiString>] <bufVar> <x1> <y1> <x2> <y2>
 function winCreate()
 {
+	local bordersFlag defaultFont
+	while [ $# -gt 0 ]; do case $1 in
+		--borders)  bordersFlag="--borders" ;;
+		--defaultFont*)  bgOptionGetOpt val: defaultFont "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local -n _wcWin="$1"
+	[ "$bordersFlag" ] && _wcWin[bordersFlag]="$bordersFlag"
 	_wcWin[x1]="$2"
 	_wcWin[y1]="$3"
 	_wcWin[x2]="$4"
@@ -1014,7 +1038,7 @@ function winCreate()
 	_wcWin[height]=$(( _wcWin[y2] - _wcWin[y1] +1 ))
 	_wcWin[curX]=1
 	_wcWin[curY]=1
-#	buf["defaultFont"]=(defaultFont)?defaultFont:(csiWhite""csiBkBlack)
+	[ "$defaultFont" ] && _wcWin[defaultFont]="$defaultFont"
 }
 
 # usage: winWriteLine <bufVar> <line>
@@ -1053,19 +1077,40 @@ function winWrite() {
 # usage: winWriteAt <bufVar> <cx> <cy> <line>
 function winWriteAt() {
 	local -n _wcWin="$1"; shift
-	local cx="$1"; shift;   [[ "$cx" =~ ^[0-9+-]*$ ]] || assertError
-	local cy="$1"; shift;   [[ "$cy" =~ ^[0-9+-]*$ ]] || assertError
+	local cx="${1:-1}"; shift;   [[ "$cx" =~ ^[0-9+-]*$ ]] || assertError
+	local cy="${1:-1}"; shift;   [[ "$cy" =~ ^[0-9+-]*$ ]] || assertError
 	local line; printf -v line -- "$@"
 
-	local cpStart cpLen tmpStr
-	(( (cx > _wcWin[x2]) || (cy < _wcWin[y1]) || (cy > _wcWin[y2]) )) && return
-	((cpStart=(1>(1-cx))? 1 : 1-cx ))
-	((cx=(1>cx)? 1 : cx ))
-	((cpLen=(_wcWin[width]-cx+1)))
-	csiSubstr -a -R tmpStr -- "${_wcWin[lines${cy}]}" "0" "$cy"
-	csiSubstr -a -R tmpStr -- "${_wcWin[lines${cy}]}" "$cpStart" "$cpLen"
-	csiSubstr -a -R tmpStr -- "${_wcWin[lines${cy}]}" "$((cy+cpLen))"
-	_wcWin[lines${cy}]="$tmpStr"
+	local -a lines; splitString -d $'\n' -a lines "$line"
+
+	local firstLine="1"
+	for line in "${lines[@]}"; do
+		if [ ! "$firstLine" ]; then
+			((_wcWin[curX]=cx))
+			((_wcWin[curY]++))
+		fi
+		firstLine=""
+
+		#------Hello World
+		#65432101234567890
+		#   s   e           cx=-2  e=1
+		#   #### len=4
+		#   abcd
+		#   ---dello World = out
+		local lineLen tmpStr
+		csiStrlen -R lineLen "$line"
+		(( (cx-1+lineLen < 0) || (cx-1 > _wcWin[width]) || (cy < 1) || (cy > _wcWin[height]) )) && return
+		csiSubstr -d "" --chopCSI    -R tmpStr -- "${_wcWin[lines${cy}]}" "0"                          "$((cx-1))"
+		csiSubstr -d "" --chopCSI -a -R tmpStr -- "$line"                 "$((((cx-1)<0)?(-(cx-1)):0))"
+		csiSubstr -d "" --chopCSI -a -R tmpStr -- "${_wcWin[lines${cy}]}" "$((cx-1+lineLen))"
+		_wcWin[lines${cy}]="${tmpStr}"
+
+		csiStrlen -R _wcWin[curX] -- "${_wcWin[lines${_wcWin[curY]}]}"
+	done
+	if [ "$linefeedFlag" ]; then
+		_wcWin[curX]=cx
+		((_wcWin[curY]++))
+	fi
 }
 
 # usage: winPaint <bufVar>
@@ -1074,9 +1119,24 @@ function winPaint() {
 	local paintScript="${CSI}${cSave}"
 	local i tmpStr
 	for ((i=1; i<=_wcWin[height]; i++)); do
+		local line; csiSubstr -R line -- "${_wcWin[lines${i}]}"
+		local additionalFontAttributes="${_wcWin[defaultFont]}"
+		if [ "${_wcWin[bordersFlag]}" ]; then
+			if (( i == 1 && i == _wcWin[height] )); then
+				additionalFontAttributes+="${csiOverline}${csiUnderline}"
+			elif (( i == 1 )); then
+				additionalFontAttributes+="${csiOverline}${csiNoUnderline}"
+			elif (( i == _wcWin[height] )); then
+				additionalFontAttributes+="${csiUnderline}${csiNoOverline}"
+			else
+				additionalFontAttributes+="${csiNoOverline}${csiNoUnderline}"
+			fi
+		fi
+		[ "$additionalFontAttributes" ] && line="${additionalFontAttributes}${line//"${csiNorm}"/${csiNorm}${additionalFontAttributes}}"
 		paintScript+="${CSI}$((_wcWin[y1]+i-1));${_wcWin[x1]}${cMoveAbs}"
-		csiSubstr -d "" -a -R paintScript --pad -- "${_wcWin[lines${i}]}" "0" "${_wcWin[width]}"
+		csiSubstr -d "" -a -R paintScript --pad -- "$line" "0" "${_wcWin[width]}"
 	done
+	paintScript+="${csiNoOverline}${csiNoUnderline}"
 	paintScript+="${CSI}${cRestore}"
 	printf "$paintScript"
 }
@@ -1091,6 +1151,17 @@ function winClear() {
 	_wcWin[curY]=1
 }
 
+function winScrollOn() {
+	local -n _wcWin="$1"
+	[ ! "${_wcWin[xMax]}" ] && cuiGetScreenDimension _wcWin[yMax] _wcWin[xMax]
+	(( _wcWin[x1]==1 && _wcWin[x2]==_wcWin[xMax] )) || assertError "scroll region only works on windows that span the entire width of the terminal"
+	cuiSetScrollRegion "${_wcWin[y1]}" "${_wcWin[y2]}"
+	cuiMoveTo "${_wcWin[y1]}" 1
+}
+
+function winScrollOff() {
+	cuiResetScrollRegion
+}
 
 # usage: csiSplitOnCSI <string> [<retArray>]
 # splits apart the input <string> into alternating text and CSI escape sequences. Even elements returned ([0], [2], ...) are
@@ -1142,7 +1213,7 @@ function csiSplitOnCSI() {
 	true
 }
 
-# usage: csiStrlen <line>
+# usage: csiStrlen [-R <retVar>] <line>
 # returns the length of <line> taking into account that <line> may contain CSI sequences that will not contribute to the length
 # when printed to a terminal but do contribute to length(<line>)
 function csiStrlen() {
@@ -1207,16 +1278,25 @@ function csiStrlen() {
 #    man(3) csiSubstr
 #    man(3) csiStrip
 function csiSubstr() {
-	local retOpts padFlag
+	local retOpts padFlag chopCSIFlag
 	while [ $# -gt 0 ]; do case $1 in
 		--) shift; break ;;
 		--pad) padFlag="--pad" ;;
+		--chopCSI) chopCSIFlag="--chopCSI" ;;
 		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local _cssLine="$1";         shift
 	local _cssStart="$1";        shift
 	local _cssLen="${1:-10000}"; shift
+
+	local _cssEnd=$((_cssStart+_cssLen))
+
+	#      Hello World
+	#65432101234567890
+	#   s   e           s=-3  e=1
+	#   ---- len=4
+	#   ###H = out
 
 	local _cssOut _cssOutLen=0 _cssRmLen=0 _cssCpLen=0
 	if ((_cssStart<0)); then
@@ -1240,7 +1320,9 @@ function csiSubstr() {
 		fi
 
 		# cp _CSI term without inc outLen
-		_cssOut+="${_cssParts[i+1]}"
+		if [ ! "$chopCSIFlag" ] || ((  _cssOutLen < _cssLen )); then
+			_cssOut+="${_cssParts[i+1]}"
+		fi
 	done
 
 	[ "$padFlag" ] && printf -v _cssOut "%s%*s" "$_cssOut"  $((_cssLen-_cssOutLen)) ""

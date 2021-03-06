@@ -1993,7 +1993,7 @@ function BGTRAPExit()
 # usage: bgtrap -c|--clear SIG1 [.. SIGN]
 # usage: bgtrap -l|--list
 #
-# bgtrap is a wrapper over the builtin trap that extends it to allow multiple handlers to coexist.
+# bgtrap is a wrapper over the builtin trap that extends it to allow multiple handlers to coexist. See 'help trap' for the builtin trap command
 # Script authors can add and remove their handlers without regard to whether other handlers have been
 # installed. This is essential for library code that can not make assuptions about what else might
 # use a signal handler.
