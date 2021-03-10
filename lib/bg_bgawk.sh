@@ -138,7 +138,7 @@ function bgawk()
 			assertNotEmpty file "an input file must be specified when the -i inplace option it specified"
 			local tmpFile=$(mktemp --tmpdir "bgawk-${file##*/}.XXXXXXXXXX")
 			if [ ! -s "$file" ]; then
-				bgsudo -w "$file" -p "$file: writing file [sudo] " touch "$file"
+				fsTouch "$file"
 			fi
 		fi
 

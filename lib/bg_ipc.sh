@@ -15,7 +15,7 @@ function msgGet()
 	local file="$1"; shift
 
 	local _msgFD _mgMsg
-	if [ -e "$file" ]; then
+	if [ -s "$file" ]; then
 		exec {_msgFD}<"$file"
 		flock -w$timeout $_msgFD || assertError
 

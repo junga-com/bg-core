@@ -1,5 +1,6 @@
 #!/bin/bash
 
+import bg_config.sh  ;$L1;$L2
 
 #function bgtrap() moved to bg_libCore.sh
 
@@ -437,7 +438,7 @@ function cronNormSchedule()
 
 		### detected and handle SLAm keyword
 		elif [[ "$part" =~ slam ]]; then
-			domConfigGet -r slamStart SLAm start "saturday 18:00UTC"
+			configGet -r slamStart SLAm start "saturday 18:00UTC"
 			read -r slamStartDay slamStartHour slamStartMinute < <(date -d "$slamStart" +"%A %-H %-M")
 			slamStartDay="${slamStartDay,,}"
 			continue

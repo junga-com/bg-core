@@ -1142,7 +1142,7 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop intr:USR1..func
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_func
+pts-<redacted><redacted>(0): : bash(<redacted>) : $ bgStackTest top_USR1_func
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
 USR1-<redacted><handler>(3): : USR1_HANDLER: oneDown
@@ -1195,7 +1195,7 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop intr:USR1 DEBUGGER
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_DBG
+pts-<redacted><redacted>(0): : bash(<redacted>) : $ bgStackTest top_USR1_DBG
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
 USR1-<redacted><handler>(3): : USR1_HANDLER: aNoopCommand
@@ -1222,7 +1222,7 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop intr:USR1..func DEBUGGER
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_func_DBG
+pts-<redacted><redacted>(0): : bash(<redacted>) : $ bgStackTest top_USR1_func_DBG
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
 USR1-<redacted><handler>(3): : USR1_HANDLER: oneDown off

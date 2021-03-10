@@ -123,6 +123,9 @@ function static::Standards::run()
 
 	local cp; $Plugin::get "$pluginKey" cp
 
+	import bg_creqs.sh  ;$L1;$L2
+	import bg_creqsLibrary.sh  ;$L1;$L2
+
 	$cp.check
 }
 
@@ -140,6 +143,9 @@ function static::Standards::runAll()
 		-q) ((verbosity--)) ;;
 		-v) ((verbosity++)) ;;
 	esac; shift; done
+
+	import bg_creqs.sh  ;$L1;$L2
+	import bg_creqsLibrary.sh  ;$L1;$L2
 
 	local standardsPlugins; static::Standards::list -A standardsPlugins
 	local pluginKey; for pluginKey in "${standardsPlugins[@]}"; do

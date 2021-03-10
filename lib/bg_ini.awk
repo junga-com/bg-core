@@ -231,10 +231,13 @@ BEGIN {
 
 	# we create paramDelimRE because we treat the delimiter " " as being any run of consequtive whitespace
 	paramDelimRE="^"((paramDelim==" ")?("\\s+"):(paramDelim))"$"
+
+	iniFile=""
 }
 
 BEGINFILE {
 	# we parse an imaginary line at the start of the file that sets the state as being in the top section
+	iniFile=FILENAME
 	parseINIFileLine("[.]")
 }
 

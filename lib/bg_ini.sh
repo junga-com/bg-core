@@ -381,12 +381,12 @@ function iniParamList()
 #           right of the =, its value is logically set to the empty string. In this case, "" is returned and not <defaultValue>
 #
 # Options:
-#    -R <retVar>    : return the value in this variable name instead of on stdout
-#    -d <delimChar> : default is "=". set the character used to separate name and value on settings lines
-#    -a  : if the value does not exist, add the default value to the <inifile> (requires write privilege and might prompt for a sudo password)
-#    -t  : expand the value as a template before returning it. If the value has "%<varName>%" tokens they will be replaced by the
+#    -R|--retVar=<retVar>   : return the value in this variable name instead of on stdout
+#    -d|--delim=<delimChar> : default is "=". set the character used to separate name and value on settings lines
+#    -a|--addIfNotFound     : if the value does not exist, add the default value to the <inifile> (requires write privilege and might prompt for a sudo password)
+#    -t|--expandAsTemplate  : expand the value as a template before returning it. If the value has "%<varName>%" tokens they will be replaced by the
 #          value of bash environment variables of the same name. See man(5) bgTemplateFileFormat for the full supported syntax
-#    -x  : suppress section padding. if -a is specified and a new section is added this is passed through to iniParamSet.
+#    -x--noSectionPad       : suppress section padding. if -a is specified and a new section is added this is passed through to iniParamSet.
 #
 # Return Codes:
 #      0 (true)  : the parameter was found in the config file(s) and returned
@@ -399,11 +399,11 @@ function iniParamGet()
 {
 	local ipg_addFlag ipg_iniDelim ipg_templateFlag retVar ipg_sectPad
 	while [ $# -gt 0 ]; do case $1 in
-		-R*) bgOptionGetOpt val: retVar       "$@" && shift ;;
-		-d*) bgOptionGetOpt val: ipg_iniDelim "$@" && shift ;;
-		-a)  ipg_addFlag="-a" ;;
-		-t)  ipg_templateFlag="-t" ;;
-		-x)  ipg_sectPad="-x" ;;
+		-R*|--retVar*)         bgOptionGetOpt val: retVar       "$@" && shift ;;
+		-d*|--delim*)          bgOptionGetOpt val: ipg_iniDelim "$@" && shift ;;
+		-a|--addIfNotFound)    ipg_addFlag="-a" ;;
+		-t|--expandAsTemplate) ipg_templateFlag="-t" ;;
+		-x|--noSectionPad)     ipg_sectPad="-x" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local ipg_iniFileSpec="$1"
@@ -596,7 +596,7 @@ function iniParamSet()
 	local sectPad=" " verbosity="$verbosity"
 	while [ $# -gt 0 ]; do case $1 in
 		-p|--mkdir)         mkdirFlag="-p" ;;
-		-S*|--statusVar)    bgOptionGetOpt val: statusVarName  "$@" && shift ;;
+		-S*|--statusVar*)   bgOptionGetOpt val: statusVarName  "$@" && shift ;;
 		-R*|--resultsVar*)  bgOptionGetOpt val: resultsVarName "$@" && shift ;;
 		-c*|--comment*)     bgOptionGetOpt val: comment        "$@" && shift ;;
 		--sectionComment*)  bgOptionGetOpt val: sectComment    "$@" && shift ;;
@@ -749,7 +749,7 @@ function iniParamRemove()
 			deleteLine()
 		}
 		END {
-			print (found) ? "changed" : "nochange"
+			print (found) ? "changed" : "nochange" >"/dev/fd/3"
 		}
 	' "$iniFile" 3>&1)"
 

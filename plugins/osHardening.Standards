@@ -111,7 +111,7 @@ function cr_checkDNSConfig()
                  check)
 
 			configured_nameservers=$( /bin/grep ^nameserver /etc/resolv.conf | /usr/bin/awk '{ print $2 }' )
-			standard_nameservers=$( domConfigGet idmClient nameServers )
+			standard_nameservers=$( configGet idmClient nameServers )
 
 			fail=1
 			for configured_nameserver in $configured_nameservers
@@ -143,10 +143,10 @@ function cr_checkNTPConfig()
                       ;;
 
                  check)
-			[ -f /etc/ntp.conf ] || return 1
+			[ -f "/etc/ntp.conf" ] || return 1
 
 			configured_ntpservers=$( /bin/grep ^server /etc/ntp.conf | /usr/bin/awk '{ print $2 }' )
-			standard_ntpservers=$( domConfigGet idmClient ntpServers )
+			standard_ntpservers=$( configGet idmClient ntpServers )
 
 			fail=1
 			for configured_ntpserver in $configured_ntpservers
@@ -179,7 +179,7 @@ function cr_checkIPMapping()
 
                  check)
 			primary_IP=$(/usr/bin/nslookup $(/bin/hostname)|/bin/grep ^Add|/usr/bin/tail -1|/usr/bin/awk '{print $2}')
-			non_mappable_range=$( domConfigGet idmClient nonMappableIPRange )
+			non_mappable_range=$( configGet idmClient nonMappableIPRange )
 
 			[[ $primary_IP =~ $non_mappable_range ]] || return 1
 
@@ -204,7 +204,7 @@ function cr_checkDefaultAdminPW()
 
                  check)
 			# hash value = $1$OR5R2$hYK4NVMpzfBVKmvoKShaA/
-			default_localadmin_pw="$( domConfigGet idmClient defaultAdminPW )"
+			default_localadmin_pw="$( configGet idmClient defaultAdminPW )"
 			/bin/grep '^localadmin.*'"$default_localadmin_pw" /etc/shadow >/dev/null || return 1
 
 
@@ -255,7 +255,7 @@ function cr_checkAPTRepository()
 
 			configured_repo_host_list=$( ( /usr/bin/find /etc/apt/sources.list.d/ -name "*list" -exec /bin/cat {} \; ;/bin/cat /etc/apt/sources.list )| /bin/grep ^deb | /usr/bin/awk '{ print $2 }'| /usr/bin/awk -F/ '{ print $3 }' | /usr/bin/sort -u )
 
-			std_repos=$( domConfigGet idmClient aptRepository )
+			std_repos=$( configGet idmClient aptRepository )
 			for configured_repo_host in $configured_repo_host_list
 			do
 				fail=1
@@ -293,10 +293,10 @@ function cr_checkLDAPservers()
 					ldap_config_file="/etc/nslcd.conf"
 			}
 
-			[ -f $ldap_config_file ] || return 1
+			[ -f "$ldap_config_file" ] || return 1
 
 			configured_ldap_servers=$( /bin/grep ^uri $ldap_config_file | /bin/sed -e 's,^uri,,' )
-			allowed_ldap_servers=$( domConfigGet idmClient ldapServers )
+			allowed_ldap_servers=$( configGet idmClient ldapServers )
 
 			fail=1
 			for configured_ldap_server in $configured_ldap_servers
@@ -331,7 +331,7 @@ function cr_usePubKeyifPublicIP()
                       ;;
 
                  check)
-			mappable_ip_ranges=$( domConfigGet idmClient mappableIPRanges )
+			mappable_ip_ranges=$( configGet idmClient mappableIPRanges )
 			sshd_listen_addresses=$( /bin/grep ^ListenAddress /etc/ssh/sshd_config | /bin/sed -e 's,^ListenAddress,,' | /bin/sed -e 's,:.*,,' )
 
 			listening_on_public=0
@@ -375,7 +375,7 @@ function cr_checkOpenPorts()
                       ;;
 
                  check)
-			allowed_ports=$( domConfigGet idmClient allowedServerPorts )
+			allowed_ports=$( configGet idmClient allowedServerPorts )
 			open_ports=$( /bin/netstat -nlp | /bin/grep -v ^unix|/bin/grep 'LISTEN' | /usr/bin/awk '{ if ( $4 !~ /^127.0./ ) {print $4 }}' | /usr/bin/awk -F: '{print $NF }' | /usr/bin/sort -gu )
 			for open_port in $open_ports
 			do
@@ -400,34 +400,32 @@ function cr_checkOpenPorts()
 }
 function cr_ldapUseEncryption()
 {
-            case $objectMethod in
-                 objectVars) echo "p1 p2=5 localVar1" ;;
-                 construct)
-                      displayName="<Check that only LDAPS protocol -- and not LDAP -- is used>"
-                      ;;
+	case $objectMethod in
+		objectVars) echo "p1 p2=5 localVar1" ;;
+		construct)
+			displayName="<Check that only LDAPS protocol -- and not LDAP -- is used>"
+		;;
 
-                 check)
-                        /bin/egrep '(precise|trusty)' /etc/lsb-release >/dev/null 2>&1  && {
-                                        ldap_config_file="/etc/ldap.conf"
-                        }
-                        /bin/grep xenial /etc/lsb-release >/dev/null 2>&1  && {
-                                        ldap_config_file="/etc/nslcd.conf"
-                        }
+		check)
+			/bin/egrep '(precise|trusty)' /etc/lsb-release >/dev/null 2>&1  && {
+				ldap_config_file="/etc/ldap.conf"
+			}
+			/bin/grep xenial /etc/lsb-release >/dev/null 2>&1  && {
+				ldap_config_file="/etc/nslcd.conf"
+			}
 
-                        [ -f $ldap_config_file ] || return 1
+			[ -f "$ldap_config_file" ] || return 1
 
 			/bin/grep '^uri.*ldap://' $ldap_config_file && return 1
 			return 0
+		;;
+		apply)
+			# TODO: replace with code to make a config change
+			echo "Not implemented."
+		;;
 
-
-		      ;;
-                 apply)
-                      # TODO: replace with code to make a config change
-                      echo "Not implemented."
-                      ;;
-
-                 *) cr_baseClass "$@" ;;
-            esac
+		*) cr_baseClass "$@" ;;
+	esac
 }
 function cr_ldapBindDn()
 {
@@ -445,7 +443,7 @@ function cr_ldapBindDn()
                                         ldap_config_file="/etc/nslcd.conf"
                         }
 
-                        [ -f $ldap_config_file ] || return 1
+                        [ -f "$ldap_config_file" ] || return 1
 
 			/bin/egrep '^binddn +cn=AppReader,dc=avature,dc=net' $ldap_config_file && return 0
 			return 1
@@ -534,8 +532,8 @@ function cr_nsswitchPasswd()
 
 function standard_osHardening()
 {
-
-	location=$( domWhereami )
+	import bg_config.sh  ;$L1;$L2
+	#location=$( domWhereami )
 
 #	creq -p OSH021 cr_noLocalShellAccounts
 	#creq -p OSH001 cr_configLine                  /etc/allowedLoginGroups sshToServer
