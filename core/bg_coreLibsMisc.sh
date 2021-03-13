@@ -218,7 +218,7 @@ function bgOptionsEndLoop()
 			[ ${result:-0} -eq 0 ] && return 1
 		fi
 		[ ${result:-0} -eq 1 ] && bgOptionsOnUnknownDefault "$@" && return 1
-		[ ! "$eatUnknown" ] && assertError --frameOffest=2 "unknown option '$1'"
+		[ ! "$eatUnknown" ] && assertError --frameOffset=2 "unknown option '$1'"
 
 	# maybe its a set of combined options so split of the first one. Note we know that the fist one
 	# is not an option with an argument because the scripts author's cases would have matched it.
@@ -611,7 +611,7 @@ function oob_invokeOutOfBandSystem()
 		import bg_outOfBandScriptFeatures.sh ;$L1;$L2
 
 		declare -A options=()
-		local userAndGroup="$($userGroupCB "$@")"
+		local userAndGroup="$($userGroupCB 0 $0 "$@")"
 		local reqUser="${userAndGroup%%:*}"
 		local reqGroup; [[ ! "$userAndGroup" =~ : ]] && reqGroup="${userAndGroup##*:}"
 
@@ -1338,26 +1338,35 @@ function arrayFromString()
 	[[ ! "$contentStr" =~ ^[[:space:]]*$ ]] && assertError -v arrayVarName -v contentStr:"$2" -v leftOver:contentStr  "unassigned content was left over"
 }
 
-# usage: arrayCopy <cpFromArrayVar> <cpToArrayVar>
-# copy the contents of one associative array to another
+# usage: arrayCopy [-a|--append] <cpFromArrayVar> <cpToArrayVar>
+# copy the contents of one associative array to another. If either variable is empty, it is not an error and the function will not
+# do anything.
 # Options:
-#    -o : overwriteDestFlag. remove any existing elements from <cpToArrayVar> before copying
+#    -a|--append : do not remove existing elements from <cpToArrayVar> before copying
 function arrayCopy()
 {
-	local overwriteDestFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-o) overwriteDestFlag="1" ;;
-	esac; shift; done
-	local cpFromArrayVar="$1"; assertNotEmpty cpFromArrayVar
-	local cpToArrayVar="$2";   assertNotEmpty cpToArrayVar
+	local appendFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-a|--append) appendFlag="1" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	# if either are empty, it is not an error but there is nothing to do so return
+	{ [ ! "$1" ] || [ ! "$2" ]; } && return 0
+	local -n cpFromArrayVar="$1"
+	local -n cpToArrayVar="$2"
 
-	# this function still support ubuntu 12.04 which does not have the -n ref
-	eval '
-		[ "'$overwriteDestFlag'" ] && '$cpToArrayVar'=()
-		local name; for name in "${!'$cpFromArrayVar'[@]}"; do
-			'$cpToArrayVar'[$name]="${'$cpFromArrayVar'[$name]}"
-		done
-	'
+	[ ! "'$appendFlag'" ] && cpToArrayVar=()
+	local _acName; for _acName in "${!cpFromArrayVar[@]}"; do
+		cpToArrayVar["$_acName"]="${cpFromArrayVar["$_acName"]}"
+	done
+
+	# # this function still support ubuntu 12.04 which does not have the -n ref
+	# eval '
+	# 	[ ! "'$appendFlag'" ] && '$cpToArrayVar'=()
+	# 	local name; for name in "${!'$cpFromArrayVar'[@]}"; do
+	# 		'$cpToArrayVar'[$name]="${'$cpFromArrayVar'[$name]}"
+	# 	done
+	# '
 }
 
 

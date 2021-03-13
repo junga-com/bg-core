@@ -438,7 +438,7 @@ function cronNormSchedule()
 
 		### detected and handle SLAm keyword
 		elif [[ "$part" =~ slam ]]; then
-			configGet -r slamStart SLAm start "saturday 18:00UTC"
+			configGet -R slamStart SLAm start "saturday 18:00UTC"
 			read -r slamStartDay slamStartHour slamStartMinute < <(date -d "$slamStart" +"%A %-H %-M")
 			slamStartDay="${slamStartDay,,}"
 			continue
@@ -657,8 +657,8 @@ function cronGetMostRecentTime()
 #    1  : failure, it is not time to run
 function cronShouldRun()
 {
-	local runSpec="$1"      ; assertNotEmpty runSpec
-	local lastRunTime="$2"  ; assertNotEmpty lastRunTime
+	local runSpec="$1";          assertNotEmpty runSpec
+	local lastRunTime="${2:-0}"
 
 	# get the last time it should have run
 	local lastScheduledTime="$(cronGetMostRecentTime +"%s" "$runSpec")"

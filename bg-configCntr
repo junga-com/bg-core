@@ -23,8 +23,8 @@ function oob_getRequiredUserAndGroup()
 
 	local cmd="$1"
 	case $cmd in
-		activate)   echo "root" ;;
-		deactivate) echo "root" ;;
+		# activate)   echo "root" ;;
+		# deactivate) echo "root" ;;
 		*) echo "" ;;
 	esac
 }
@@ -42,12 +42,15 @@ function printBashCompletion()
 	case $cmd:$posCwords in
 		*:1) echo "$cmds" ;;
 
-		list:*) echo "--types --short --full --tree --list" ;;
+		list:*) echo "--types --short --full --tree --list --grouped" ;;
 
 		check:2) echo "<ConfigPluginName>"; $Config::list --short ;;
 		apply:2) echo "<ConfigPluginName>"; $Config::list --short ;;
 
 		activate:2)   echo "<ConfigPluginName>"; $Config::list --short ;;
+		activate:3)   echo "<activationMode> monitor enforce" ;;
+		activate:4)   echo "<schedule_man_cronNormSchedule> " ;;
+
 		deactivate:2) echo "<ConfigPluginName>"; $Config::list --short ;;
 	esac
 	exit

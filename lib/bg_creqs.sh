@@ -399,9 +399,18 @@ function creqStartSession()
 	declare -g stdoutFile; bgmktemp stdoutFile
 }
 
-# usage: creqEndSession
+# usage: creqEndSession [-R|--retVar=<mapVar>]
+# end the creqs run session and calculate the results.
+# The global associative array creqRun contains the results.
+# Params:
+#    -R|--retVar=<mapVar> : <mapVar> is an associative array that will be filled in with the results
 function creqEndSession()
 {
+	local mapVar
+	while [ $# -gt 0 ]; do case $1 in
+		-R*|--retVar*)  bgOptionGetOpt val: mapVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	creqRun[countCompliant]="$(( ${creqRun[countPass]:-0}+${creqRun[countApplied]:-0} ))"
 	creqRun[completeness]="$(( ${creqRun[countCompliant]:-0} * 100 / ${creqRun[countTotal]:-1} ))"
 
@@ -410,6 +419,8 @@ function creqEndSession()
 	for countVar in Pass Fail Applied ErrorInCheck ErrorInApply ErrorInProtocol; do
 		[ ${creqRun[count${countVar}]:-0} -gt 0 ] && printf "   %4s: %s\n"  "${creqRun[count${countVar}]}" "$countVar"
 	done
+
+	arrayCopy creqRun "$mapVar"
 
 	bgmktemp --release stderrFile
 	bgmktemp --release stdoutFile

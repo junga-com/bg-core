@@ -56,7 +56,7 @@ function bgOptionsParse()
 	done
 	unset spec type
 	local positionalParamsValue=("$@")
-	arrayCopy positionalParamsValue "${cmdlineSpecValue[positionalParamsVar]}"
+	arrayCopy -a positionalParamsValue "${cmdlineSpecValue[positionalParamsVar]}"
 }
 
 # usage: bgOptionsParseBC <cmdlineSpecVar> <prev> <cur>
@@ -148,7 +148,7 @@ function parseSyntaxSpecString()
 			tmpStr="${tmpStr#${rematch[0]}}"
 		fi
 	done
-	arrayCopy -o _psss_syntaxSpec $syntaxSpecVar
+	arrayCopy _psss_syntaxSpec $syntaxSpecVar
 }
 
 
@@ -298,7 +298,7 @@ function bgBCParse()
 {
 	# remove and process the args to this function, leaving the cmdline being parsed in "$@"
 	local optSpecs="$1"; shift
-	cword="$1"; shift
+	cword="${1:-1}"; shift; [[ ! "$cword" =~ ^[0-9]*$ ]] && assertError "the second parameter must be a number"
 	words=( "$@" )
 	shift # cmdName ($0)
 	cur=""

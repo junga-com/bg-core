@@ -1,5 +1,62 @@
 #!/bin/bash
 
+# Library
+# Bash script plugins provide a mechanism for multiple packages to collaborate to achieve features.
+#
+# This library provides a mechanism for 1) defining a PluginType used to implement some feature and 2) define Plugins of that type
+# to extend the feature concerned by the PluginType.
+#
+# Structure:
+# PluginTypes and Plugins are both implemented as files that follow a naming convention that identifies them as such. Typically
+# the file is part of a package for distributing to target hosts. The file can be implemented in any language as long as it complies
+# with the standard defined (TODO: where?). Those that are written in bash are bash script library files that contain a call to
+# either DeclarePluginType or DeclarePlugin which defines its attributes.
+#
+# DeclarePluginType declares a new Class in the bg_objects.sh system that extends the class Plugin. Static and non-static methods
+# can be added to the new Class. The PluginType author can define the class so that there are required attributes and methods of
+# Plugins defined of that PluginType.
+#
+# DeclarePlugin creates a new logical instance of the Class that corresponds to the PluginType. The author must define the required
+# attributes and methods defined by the PluginType author.
+#
+# In the bg_objects.sh mechanism, Classes are object instances of class `Class` so in both the case of Plugins and PluginTypes, we
+# are dealing with instances of objects. Also, object instances can be extended on the fly without creating a new Class so in both
+# cases, the author can define new attributes and methods. The author of the Plugin or PluginType defines the values of attributes
+# in the file/library that implements it and in that way, the file is a data source from which the instance can be restored, similar
+# to restoring an object instance from attribute values stored in a database or other data source. However, sometimes the values of
+# some attributes need to be set and changed to reflect the plugins current state in the context of the host where its installed.
+# For example, its common for PluginTypes provided by bg-core to support a notion of being activated or not on the host. The
+# PluginType author can declare that some attributes are 'mutable' which means that their value can change on the host and is not
+# confined to having the initial value set by the Plugin author.
+#
+# The values of mutable attributes are stored in the system-wide configurtaion system provided by bg_config.sh. The fully qualified
+# Plugin or PluginType name is used as the ini style section name in the config system and each ini style parameter in that section
+# defines the current dynamic value of a mutable attribute of that type. Parameter names that do not corespond to a mutable attribute
+# name are ignored so that the PluginType author can depend on some values coming from the original Plugin author.
+#
+# Fully Qualified and Relative Names:
+# The names of plugins are heriarchical using the colon (:) as the delimiter. The fully qualified name is often refered to as the
+# pluginKey and has the form...
+#    <PluginType>:<pluginID>
+# The <pluginID> can also be hirarchical. See the Config pluginType for an example of that.
+#
+# The fully qualified name of a PluginType is `PluginType:<PluginType>` where the left side of the : is the literal string
+# "PluginType". Some PluginTypes provided by bg-core are PluginType:Collect, PluginType:Standards, and PluginType:Config.
+# PluginTypes are not exactly Plugins, themselves, but that are very close to being Plugins whose PluginType is PluginType.
+#
+# When <PluginType> is known, for example in the code that implements the PluginType or when using a PluginType in most places,
+# the first part of the fully qualified name can be dropped and the second part is sufficient to uniquely identify the particular
+# plugin. Outside the context of the plugin system, the fully qualified name must be used if it is expected to stand alone and be
+# unique on the host. That is why, for example, the section names in the system configuration use the fully qualified names.
+#
+# Filenames:
+# The Command or library file that contains a Plugin or PluginType is named with the same components as the fully qualified name but
+# they are formatted differently in order to comply with long standing conventions for filenames.
+#    <pluginID>.<PluginType> or <pluginID>.PluginType
+#
+# The extension of the filename is the <PluginType> or "PluginType" to indicate the type of thing that the file contains.
+#
+# 
 
 import bg_objects.sh  ;$L1;$L2
 import bg_ini.sh  ;$L1;$L2
@@ -303,8 +360,8 @@ function static::Plugin::buildAwkDataTable()
 
 function Plugin::__construct()
 {
-	local pluginType="$1"; shift
-	local pluginID="$1"; shift
+	this[pluginType]="$1"; shift
+	this[pluginID]="$1"; shift
 
 	$this[_contructionParams]=new Array "$@"
 
@@ -371,10 +428,12 @@ function Plugin::invoke()
 
 function PluginConfigGet()
 {
-	iniParamGet /etc/bgPlugins.conf "$1" "$2" "$3"
+	configGet "$@"
+	#iniParamGet /etc/bgPlugins.conf "$1" "$2" "$3"
 }
 
 function PluginConfigSet()
 {
-	iniParamSet /etc/bgPlugins.conf "$1" "$2" "$3"
+	configSet "$@"
+	#iniParamSet /etc/bgPlugins.conf "$1" "$2" "$3"
 }

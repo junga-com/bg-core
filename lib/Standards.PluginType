@@ -59,7 +59,7 @@ function static::Standards::report()
 			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp
 		Catch: && {
 			local activationState=$(PluginConfigGet "$pluginKey" "activationState")
-			local runShedule=$(PluginConfigGet "$pluginKey" "runShedule")
+			local runSchedule=$(PluginConfigGet "$pluginKey" "runSchedule")
 			local lastRunTime=$(PluginConfigGet "$pluginKey" "lastRunTime")
 			local lastResult=$(PluginConfigGet "$pluginKey" "lastResult")
 			printf "%-20s %-11s %-12s %-12s %-12s %s\n" "${pluginKey#*:}" "${activationState:-off}"  "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunTime}" "<error: plugin will not load>"

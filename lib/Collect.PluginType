@@ -115,7 +115,7 @@ function static::Collect::report()
 			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp
 		Catch: && {
 			local activationState=$(PluginConfigGet "$pluginKey" "activationState")
-			local runShedule=$(PluginConfigGet "$pluginKey" "runShedule")
+			local runSchedule=$(PluginConfigGet "$pluginKey" "runSchedule")
 			local lastRunTime=$(PluginConfigGet "$pluginKey" "lastRunTime")
 			local lastResult=$(PluginConfigGet "$pluginKey" "lastResult")
 			printf "%-20s %-11s %-12s %-12s %-12s %s\n" "${pluginKey#*:}" "${activationState:-off}"  "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunTime}" "<error: plugin will not load>"
@@ -127,11 +127,11 @@ function static::Collect::report()
 	done < <(manifestGet plugin "Collect:.*")
 }
 
-# usage: $Collect::activate <pluginID> [<runShedule>]
+# usage: $Collect::activate <pluginID> [<runSchedule>]
 # configure <pluginID> to run automatically on this host at the specified schedule.
 # Params:
 #    <pluginID>   : the unique ID/name for the collect plugin
-#    <runShedule> : when it should be ran. See "man cronNormSchedule" for full syntax that is supported. The default value is
+#    <runSchedule> : when it should be ran. See "man cronNormSchedule" for full syntax that is supported. The default value is
 #                   provided by the plugin author.
 function static::Collect::activate()
 {
@@ -286,7 +286,7 @@ function cr_collectPluginIsActive()
 			;;
 
 		apply)
-			collect_activate "$collectPluginName" "$runShedule"
+			collect_activate "$collectPluginName" "$runSchedule"
 			;;
 
 		*) cr_baseClass "$@" ;;
@@ -314,7 +314,7 @@ function cr_collectPluginIsNotActive()
 			;;
 
 		apply)
-			collect_deactivate "$collectPluginName" "$runShedule"
+			collect_deactivate "$collectPluginName" "$runSchedule"
 			;;
 
 		*) cr_baseClass "$@" ;;

@@ -8,8 +8,65 @@ import bg_creqsLibrary.sh ;$L1;$L2
 ### This module implements an "Config"  Plugin class
 
 # Library
-# This plugin mechanism uses the creq system to implement units of configuration that can be applied to a host.
+# This pluginType uses the creq system to implement units of configuration that can be applied to a host.
 #
+# Config plugins use the bg_plugins.sh mechanism to provide units of configuration that are managed by the bg-configCntr command
+# and the Config.PluginType library. Each plugin provides an entry point script function that uses one or more  creq statements to
+# declaratively describe a desired configuration state goal. Checking the configuration means running that function in the creqs
+# 'check' mode and applying the configuration means running that function in the creqs 'apply' mode.
+#
+# Even though that entry point needs to be a bash script, the creq statements that it declares can invoke commands written in bash
+# or any language to acheive the desired configuration.
+#
+# The creqs declarative configuration language can be used in any script for various reasons, but by using it in a Config plugin,
+# it becomes a unit of configuration that can be applied and maintained in standard ways that ensure the ongoing integrity of the
+# host. The desired state of a host can be composed by activating specific plugins which causes the compliance engine daemon to either
+# monitor or enforce over time the configuration goals that they respresent.
+#
+# Like any plugin, Config plugins are distributed via packages and participate in the SDLC dictated by the repository where they are
+# uploaded.
+#
+# Config Plugin Names:
+# The names (aka pluginID) of Config plugins must conform to the form...
+#    <ConfigType>:<ConfigName>
+# A ':' is also used to separate the PluginType from the pluginID in the fully qualified name of the plugin so the full name would
+# be...
+#    Config:<ConfigType>:<ConfigName>
+#
+# The literal term 'Config' is the pluginType. Alone, it represents the group of plugins that are of the type 'Config' as opposed
+# to other types of plugins like 'Standards' and 'Collect'.
+#
+# The term <ConfigType> narrows that group to just those Config plugins that configure the thing represented by the <ConfigType>
+# term.
+#
+# The term <ConfigName> further narrows the group down to a single plugin of type 'Config' that configures the thing represented by
+# <ConfigType> in a particular way.
+#
+# ConfigType:
+# A ConfigType represents some aspect of the host that can be configured. A Config plugin of that type represents one way that that
+# ConfigType may be configured. It is a common pattern that there would be one special Config plugin for each ConfigType that
+# represents the 'off' or 'default' configuration of the subsystem that ConfigType represents and then there would be multiple
+# Config plugins that represent different ways that the subsystem can be configured.
+#
+# For example, the snmp daemon is something that can be configured on a host. SNMP:off could be the configuration where the SNMP
+# daemon is not enabled and maybe even declares that the snmpd package is not installed. SNMP:on could be a configuration where
+# the SNMP daemon is enabled and configured to perform some functionality. However, there are different reasons to run the snmp
+# daemon which lead to it being configured differently so multiple SNMP:<someName> Config plugins can be created and the sysadmin
+# of a host can decide which one to use.
+#
+# The group of Config plugins that share the same ConfigType is similar to a set of radio buttons. Activating one will implicitly
+# deactive the one previously active. If the active ConfigType is deactivated, then no Config plugin of that ConfigType will be
+# active.
+#
+# A ConfigType is created simply by creating the first Config plugin that uses it in its pluginID (aka name). However, you may want
+# to add a description and other attributes to the ConfigType so you can create a ConfigType:<ConfigType> plugin to provide that
+# information.
+#
+# ConfigName:
+# The ConfigName is used to distingshish the various ways that a ConfigType can be configured. It is the most specific part of the
+# fully qualified pluginKey (Config:<ConfigType>:<ConfigName>) so each ConfigName corresponds to one particular plugin instance.
+# There is typically one unique
+# ConfigName that
 
 DeclarePluginType Config "
 	columns: ConfigType(-18) name(-18) cmd_run(-18) activationState(-10) runSchedule(13) lastResult lastRunTime goal tags description
@@ -23,27 +80,46 @@ DeclarePluginType Config "
 ### Static members
 
 
-# usage: $Config::list [<outputValueOptions>] [--short] [--full] [--tree]
-# lists the names (--short) or keys (--full) of all the installed Config plugins on the host.
-# A name is a simple word that is unique among all Config plugins in the software repositories.
-# A key is Config:<name> and is unique among all plugins of any type in the software repositories.
+# usage: $Config::list [<outputValueOptions>] [--short|--full|--tree|--types|--grouped]
+# lists information about the installed Config plugins on the host.
+# Option determine the nature of the list returned. By default the list is written to stdout but all of the options supported by
+# the outputValue function can be used to redirect the output to a variable passed in. This function overrides the outputValue
+# -S|--set=<varName> option to return both the set of installed ConfigTypes and the list of installed ConfigNames for each.
+#
 # Options:
 #    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
-#    --short : the words returned are names without the "Config:" prefix
-#    --full  : (default) the words returned include the "Config:" prefix like "Config:<name>"
+#    -S|--set=<varName> : Fills in the associative array <varName> such that each key is an installed ConfigType whose value is a
+#                space separated list of all ConfigNames of that ConfigType installed on the host. This implies the --group option.
+#    --short   : the words returned are names without the "Config:" prefix
+#    --full    : (default) the words returned include the "Config:" prefix like "Config:<name>"
+#    --types   : return a list of configTypes
+#    --tree    : print a tree view where Config Plugins are nested under their configType
+#                if -S|--set=<varName> is specified as the method to return the results, --tree is automatically selected and the
+#                set (aka associative array, aka map) is filled in such that the keys are ConfigTypes and the values are a space
+#                separated list of Config Plugins of that type
+#    --grouped : print one line per type in the format : <ConfigType>: <plugin1> ..<pluginN>
+# See Also:
+#    man(7) Config.PluginType
 function static::Config::list()
 {
-	local retOpts shortFlag modeFlag="--list"
+	local retOpts shortFlag modeFlag="--list" setVarName
 	while [ $# -gt 0 ]; do case $1 in
-		--tree)  modeFlag="--tree" ;;
-		--types) modeFlag="--types" ;;
-		--short) retOpts+=(--short); modeFlag="--list" ;;
-		--full)  retOpts+=(--full);  modeFlag="--list" ;;
+		--grouped) modeFlag="--grouped" ;;
+		--tree)    modeFlag="--tree" ;;
+		--types)   modeFlag="--types" ;;
+		--short)   shortFlag="--short"; modeFlag="--list" ;;
+		--full)    shortFlag="--full";  modeFlag="--list" ;;
+		-S*|--set*) bgOptionGetOpt val: setVarName "$@" && shift; retOpts+=("-S$setVarName") ;;
 		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+
+	if [ "$setVarName" ] && [[ "$modeFlag" =~ ^(--list|--tree)$ ]]; then
+		modeFlag="--grouped"
+	fi
+
 	local results
-	mapfile -t results < <($Plugin::list  Config: | gawk -F: -v modeFlag="$modeFlag" '
+	mapfile -t results < <($Plugin::list $shortFlag  Config: | gawk -F: -v modeFlag="$modeFlag" '
 		@include "bg_core.awk"
 		modeFlag=="--list" {print $0; next}
 		{
@@ -54,15 +130,36 @@ function static::Config::list()
 		}
 
 		END {
-			for (type in data) {
-				print type
-				if (modeFlag=="--tree")
+			if (modeFlag=="--grouped") {
+				for (type in data) {
+					printf("%s:", type)
 					for (i in data[type])
-						print "   :"data[type][i]
+						printf(" %s", data[type][i])
+					printf("\n")
+				}
+
+			} else {
+				for (type in data) {
+					print type
+					if (modeFlag=="--tree")
+						for (i in data[type])
+							print "   :"data[type][i]
+				}
 			}
 		}
 	')
-	outputValue -1 "${retOpts[@]}" "${results[@]}"
+
+	if [ "$setVarName" ] && [ "$modeFlag" == "--grouped"  ]; then
+		mapClear "$setVarName"
+		local line; for line in "${results[@]}"; do
+			local type="${line%%:*}"
+			line="${line#*:}"
+			stringTrim -i line
+			mapSet "$setVarName" "$type" "$line"
+		done
+	else
+		outputValue -1 "${retOpts[@]}" "${results[@]}"
+	fi
 }
 
 
@@ -70,68 +167,148 @@ function static::Config::list()
 # usage: $Config::report
 # print a table to stdout that shows the current mutable state for each installed plugin of this type.
 # Columns:
-#    Name    : simple name of the Config plugin without the "Config:" prefix
-#    Enabled : [activating|off] indicates if the plugin is activated on this host
+#    ConfigType  : the report is grouped by ConfigType. Each line is one ConfigType.
+#    ActiveConfig: The ConfigName of the Config plugin of that type which is currently active. Active means that the compliance
+#                  engine daemon will run and report on its state which ultimately determines the state of the host. If no Config
+#                  is active, it does not say anything about the configuration state of the subsystem that the ConfigType represents;
+#                  rather it just means that that configuration is not being monitored on the host.
+#    RunSchedule : the run schedule determines how often and precisely when the ActiveConfig will be ran by the compliance engine.
+#    LastResult  : show the success or failure state of the last run of the ActiveConfig.
+#    When        : shows the time that the ActiveConfig last ran
+#    CandidateConfigs: show the ConfigNames installed on the host of this ConfigType
+#
+# See Also:
+#    man(7) Config.PluginType
 function static::Config::report()
 {
-	local types; static::Config::list -A types --types
+	local -A configTypes; static::Config::list -S configTypes --tree
 
-	printf "%-20s %-20s %-12s %-12s %-12s\n" "ConfigType" "ActiveConfig"   "RunSchedule"  "LastResult"  "When"
-	local configType; for configType in "${types[@]}"; do
-		local activeConfig=$(PluginConfigGet "ConfigType:$configType" "activeConfig")
-		local runShedule=$(PluginConfigGet "ConfigType:$configType" "runShedule")
-		local lastRunTime=$(PluginConfigGet "ConfigType:$configType" "lastRunTime")
-		local lastResult=$(PluginConfigGet "ConfigType:$configType" "lastResult")
-		printf "%-20s %-20s %-12s %-12s %-12s\n" "${configType}" "${activeConfig:-<none>}"  "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunTime}"
+	printf "%-20s %-20s %-10s %-12s %-12s %-20s %s\n" "ConfigType" "ActiveConfig" "ActiveMode"   "RunSchedule"  "LastResult"  "When" "CandidateConfigs"
+	local configType; for configType in "${!configTypes[@]}"; do
+		local typeKey="ConfigType:$configType"
+		local activeConfig;   PluginConfigGet -R activeConfig   "$typeKey"  "activeConfig"
+		local runSchedule;    PluginConfigGet -R runSchedule    "$typeKey"  "runSchedule"
+		local lastRunTime;    PluginConfigGet -R lastRunTime    "$typeKey"  "lastRunTime"
+		local lastResult;     PluginConfigGet -R lastResult     "$typeKey"  "lastResult"
+		local activationMode; PluginConfigGet -R activationMode "$typeKey"  "activationMode"
+		local lastRunExpr="$lastRunTime"
+		[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "$lastRunTime" lastRunExpr
+		printf "%-20s %-20s %-10s %-12s %-12s %-20s %s\n" "${configType}" "${activeConfig:-<none>}" "${activationMode:-monitor}" "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunExpr:---}" "${configTypes[$configType]}"
 	done
 }
 
-# usage: $Config::activate <pluginID> [<runSchedule>]
-# This static member function provides an easy way to call the activate method of a particular <pluginID>
-# See man(3) Config::activate
+# usage: $Config::activate <pluginID> [monitor|enforce [<runSchedule>]]
+# This static member function activates the specified <pluginID> to run on a schedule to either 'monitor' or 'enforce' its
+# configuration. The compliance engine daemon only runs plugins that have been activated on a host.  Installing a package may
+# introduce new Config plugins onto the host but that only provides new options for what can be activated. The host's actual
+# configuration state is determined by which Config plugins have been activated.
+#
+# The group of Config plugins that share the same ConfigType is similar to a set of radio buttons. Activating one will implicitly
+# deactive the one previously active. If the active ConfigType is deactivated, then no Config plugin of that ConfigType will be
+# active.
+#
+# When a Config plugin is active, it does not necessarily mean that host configuration reflects that configuration but it does mean
+# that there is an intention by the sysadmin that the host should comply with that configuration. For example, the sysadmin of a
+# server might activate a ConfigPlugin in the 'monitor' mode.  That would result in the compliance engine indicating a gap in the
+# configuration between how the server is 'supposed' to be configured and how it is actually configured. That gap could be closed
+# by applying the Config plugin or by changing the relavent configurations in any other way.
+#
+# A Config plugin can be ran directly by the host's sysadmin regardless of whether that plugin is activated. The state of the host
+# can be crafted by running Config plugins without activating them but the resultant configuration state would neither be monitored,
+# nor enforced. Activating a Config plugin is a declaration that the host should maintain that configuration and it would be
+# considered and error if a contrary configuration is implemented.
+#
+# Monitor vs Enforce:
+# A Config plugin activated in monitor mode is very similar to a Standards plugin. It will cause the compliance engine to report
+# on whether the actual host configuration complies with the declations made in the plugin, but not take any action if the host is
+# not configured correctly to comply.
+#
+# When activated in enforce mode, not only will the compliance engine report on it, but when ever a declaration is found to be false
+# an attempt will be made to change the host configuration so that it will then comply.
+#
+# Activation State Implementation:
+# The activation state is stored as dynamic attributes of the ConfigType:<ConfigType> plugin and the Config:<pluginID> of the active
+# config. Dynamic plugin attributes are stored in the host configuration scope of the system wide scoped configuration file system
+# implemented by the bg_config.sh library. The fully qualified pluginKey (type+name) is used as a ini section name and each ini
+# parameter in that section is a logical dynamic attribute.
 #
 # Params:
-#    <pluginID>   : the unique ID/name for the collect plugin
+#    <pluginID>     : the unique ID/name for the collect plugin
+#    <runSchedule>  : determines how often the Config plugin will run
+#    monitor|enforce: determines whether the Config plugin will run only 'monitor' compliance by running in check
+#                     mode or enforce compliance by running in 'apply' mode when its run by the system on the schedule.
+# See Also:
+#    man(7) Config.PluginType
 function static::Config::activate()
 {
 	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
 	local pluginKey="Config:$pluginID"
-	local configType configName; stringSplit "$pluginID" configType configName
-	local runSchedule="$*"
+	local activationMode="${1:-monitor}"; shift
+	local runSchedule="$1"; shift
+
+	local configType configName; stringSplit -d: "$pluginID" configType configName
+	local typeKey="ConfigType:$configType"
 	local testCronSched; cronNormSchedule -R testCronSched "$runSchedule"
 
 	if [ ! "$configName" ]; then
 		: lookup the default activation config name
 	fi
 
-	PluginConfigSet "ConfigType:$configName" "activeConfig" "$configName"
+	PluginConfigSet "$typeKey" "activeConfig" "$configName"
 	if [ ! "$runSchedule" ]; then
 		local -n cp; $Plugin::get "$pluginKey" cp
 		runSchedule="${cp[runSchedule]}"
 	fi
-	PluginConfigSet "$pluginKey" "runSchedule" "$runSchedule"
+	PluginConfigSet "$typeKey" "runSchedule" "$runSchedule"
+	PluginConfigSet "$typeKey" "activationMode" "$activationMode"
+	PluginConfigSet "$typeKey" "lastResult" ""
+	PluginConfigSet "$typeKey" "lastRunTime" ""
 }
 
+# usage: $Config::deactivate <ConfigType>
 # usage: $Config::deactivate <pluginID>
+# Deactivate the specified <ConfigType> by setting the [ConfigType:<ConfigType>]activeConfig attribute in the system-wide config
+# to empty "". Deactivating does not change the current host configuration, rather it just informs the compliance engine not to
+# monitor it at all.
+#
+# Its often more appropriate to activate the 'off' or 'default' <ConfigName> that is of the type <ConfigType> rather than
+# deactivating the current active <ConfigName>.
+#
 # Params:
-#    <pluginID>   : the unique ID/name for the collect plugin
+#    <ConfigType> : the ConfigType whose activeConfig will be set to empty string.
+#    <pluginID>   : the current activeConfig of the ConfigType that will be deactivated. The ConfigType is part of the <pluginID>
+#                   if the ConfigName in the <pluginID> is not the one that is currently active for ConfigType, an error will ocur
+#                   and no action will be taken. If it is the current activeConfig, the effect will be the same as if the <ConfigType>
+#                   was specified directly.
+#
+# See Also:
+#    man(7) Config.PluginType
+#    man(3) static::Config::activate
 function static::Config::deactivate()
 {
 	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
 	local pluginKey="Config:$pluginID"
+	local configType configName; stringSplit -d: "$pluginID" configType configName
+	local typeKey="ConfigType:$configType"
 
-	PluginConfigSet "$pluginKey" "activationState" ""
+	if [ "$configName" ]; then
+		local currentActive; PluginConfigSet -R currentActive "$typeKey" "activeConfig"
+		[ "$currentActive" ] && [ "$currentActive" != "$configName" ] && assertError -v pluginKey -v configType "the specified Config plugin is not active."
+	fi
+
+	PluginConfigSet "$typeKey" "activeConfig" ""
 }
 
 
 # usage: $Config::check [-q] [-v] <pluginID>
-# run the Config plugin by executing its entryPoint
+# This static method is a convenience to restore the specified <pluginID> and then call its .check method.
+# A script can use $Plugin.get <pluginID> <varName> to restore the plugin and then call methods on it.
 # Params:
-#    <pluginID>   : the unique ID/name for the collect plugin
-# Options:
-#    -q : quiet. less output
-#    -v : verbose. more output
-#         <verbosity>    : 0-4. 0 is most terse. 4 is all debug information. effects stdout
+#    <pluginID>   : the unique ID/name for the collect plugin to load and then call the method on
+# See Also:
+#    man(7) Config.PluginType
+#    man(3) Config::check
+#    man(3) static::Plugin::get
 function static::Config::check()
 {
 	local verbosity=${verbosity:-1}
@@ -140,6 +317,7 @@ function static::Config::check()
 	done
 	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
 	local pluginKey="Config:$pluginID"
+	local configType configName; stringSplit -d: "$pluginID" configType configName
 
 	local cp; $Plugin::get "$pluginKey" cp
 
@@ -147,13 +325,14 @@ function static::Config::check()
 }
 
 # usage: $Config::apply [-q] [-v] <pluginID>
-# run the Config plugin by executing its entryPoint
+# This static method is a convenience to restore the specified <pluginID> and then call its .apply method.
+# A script can use $Plugin.get <pluginID> <varName> to restore the plugin and then call methods on it.
 # Params:
-#    <pluginID>   : the unique ID/name for the collect plugin
-# Options:
-#    -q : quiet. less output
-#    -v : verbose. more output
-#         <verbosity>    : 0-4. 0 is most terse. 4 is all debug information. effects stdout
+#    <pluginID>   : the unique ID/name for the collect plugin to load and then call the method on
+# See Also:
+#    man(7) Config.PluginType
+#    man(3) Config::apply
+#    man(3) static::Plugin::get
 function static::Config::apply()
 {
 	local verbosity=${verbosity:-1}
@@ -162,6 +341,7 @@ function static::Config::apply()
 	done
 	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
 	local pluginKey="Config:$pluginID"
+	local configType configName; stringSplit -d: "$pluginID" configType configName
 
 	local cp; $Plugin::get "$pluginKey" cp
 
@@ -169,11 +349,13 @@ function static::Config::apply()
 }
 
 # usage: $Config::runAll
-# run any active collect plugins that are scheduled to run now
+# run any active Config plugins that are scheduled to run now.
 # Options:
 #    -f : force flag. force all active plugins to run instead of only the ones that are past their last scheduled runtime
 #    -q : quiet. less output
 #    -v : verbose. more output
+# See Also:
+#    man(7) Config.PluginType
 function static::Config::runAll()
 {
 	local forceFlag verbosity=1
@@ -183,17 +365,34 @@ function static::Config::runAll()
 		-v) ((verbosity++)) ;;
 	esac; shift; done
 
-	local standardsPlugins; static::Config::list -A standardsPlugins
-	local pluginKey; for pluginKey in "${standardsPlugins[@]}"; do
-		local activationState="$(PluginConfigGet "$pluginKey" "activationState")"
-		local runSchedule="$(PluginConfigGet "$pluginKey" "runSchedule")"
-		local lastRunTime="$(PluginConfigGet "$pluginKey" "lastRunTime")"
+	local configTypes; static::Config::list -A configTypes --types
 
-		if [ "$activationState" == "activated" ] && cronShouldRun "$runSchedule" "$lastRunTime"; then
+	local configType; for configType in "${configTypes[@]}"; do
+		local typeKey="ConfigType:$configType"
+		local activeConfig=$(PluginConfigGet "$typeKey" "activeConfig")
+		local runSchedule="$(PluginConfigGet "$typeKey" "runSchedule")"
+		local lastRunTime="$(PluginConfigGet "$typeKey" "lastRunTime")"
+		local lastResult=$(PluginConfigGet "$typeKey" "lastResult")
+
+		if [ "$activeConfig" ] && { [ "$forceFlag" ] || cronShouldRun "$runSchedule" "$lastRunTime"; }; then
+			local pluginKey="Config:$configType:$activeConfig"
 			echo "running '$pluginKey'"
-			PluginConfigSet "$pluginKey" "lastRunTime" "$(date +"%s")"
+			# check should also set the lastRunTime, but we do it here also to make sure that if there is a problem with the plugin
+			# that prevents it updating lastRunTime, it wont keep running.
+			configSet "$typeKey" "lastRunTime" "$EPOCHSECONDS"
 			local -n cp; $Plugin::get "$pluginKey" cp
-			$cp.check
+			local activationMode; PluginConfigGet -R activationMode "$typeKey" "activationMode"
+			Try:
+			(
+				if [ "$activationMode" == "enforce" ]; then
+					$cp.apply
+				else
+					$cp.check
+				fi
+			); local result=$?
+			Catch: && {
+				echo "    error: running '$pluginKey' ended abnormally"
+			}
 		fi
 	done
 	true
@@ -205,33 +404,83 @@ function static::Config::runAll()
 #################################################################################################################################
 ### Non-static members
 
+# usage: DeclarePlugin Config <ConfigType>:<ConfigName>
+# Config is a pluginType and plugins are objects using the bg_objects.sh style of object oriented scripts writing. Plugin objects
+# are not explicily instanciated using ConstructObject however. Instead, a new Config plugin is created by creating a script library
+# with the name <ConfigType>:<ConfigName>.Config that defines the details of the Config plugin and installing that script library
+# onto a host. To work with the Config object instance, use `$Plugin::get <pluginKey> <varName>` to restore the instance of the
+# plugin as <varName>.
+# See Also:
+#    man(7) Config.PluginType
 function Config::__construct()
 {
 	this[runSchedule]="SLAm"
+	[[ ! "${this[pluginID]}" =~ : ]] && assertError -v this[pluginID] -v this "
+		A config plugin must use the naming convention Config:<ConfigType>:<ConfigName> where 'Config' is the type of plugin,
+		<ConfigType> is the type of configuration that the plugin satisfies and <ConfigName> is the particular way in which it
+		satisfies the <ConfigType>.
+	"
+	stringSplit -d: "${this[pluginID]}" this[configType] this[configName]
 }
 
+# usage: $configObj.check [-q] [-v]
+# Manually run the Config plugin by executing its entryPoint function in the creqs 'check' mode.
+# A Config plugin can be ran manually at any time from the command line regardless of whether it is activated or not. If it is the
+# activeConfig for its ConfigType, running it manually will update the saved state the same as if it were run by the compliance
+# engine daemon and may affect when the compliance engline next runs. For example, running it manually soon before it was scheduled
+# to run may statisfy the scheduling window so that it would not run again until the next window. The security policy may dictate
+# that the compliance engine must not consider the results of manual runs so you can not rely on preventing the scheduled run.
+# Params:
+#    <pluginID>   : the unique ID/name of the plugin to run
+# Options:
+#    -q : quiet. less output
+#    -v : verbose. more output
+#    --verbosity=<verbosity> : 0-4. 0 is most terse. 4 is all the information available. effects stdout but not logging.
+# See Also:
+#    man(7) Config.PluginType
 function Config::check()
 {
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
+	configSet "ConfigType:${this[configType]}" lastRunTime "$EPOCHSECONDS"
 	Try:
 		creqStartSession --profileID="${this[pluginKey]}" check
 		$_this.invoke "cmd_run" "$@"
-		creqEndSession
-		$_this.setAttribute lastResult "success"
+		local -A results; creqEndSession -R results
+		$_this.setAttribute lastResult "${results[completeness]:-0}%"
+		configSet "ConfigType:${this[configType]}" lastResult "${results[completeness]:-0}%"
 	Catch: && {
 		$_this.setAttribute lastResult "fail"
+		configSet "ConfigType:${this[configType]}" lastResult "fail"
 	}
 }
 
+# usage: $configObj.apply [-q] [-v]
+# Manually run the Config plugin by executing its entryPoint function in the creqs 'apply' mode.
+# A Config plugin can be ran manually at any time from the command line regardless of whether it is activated or not. If it is the
+# activeConfig for its ConfigType, running it manually will update the saved state the same as if it were run by the compliance
+# engine daemon and may affect when the compliance engline next runs. For example, running it manually soon before it was scheduled
+# to run may statisfy the scheduling window so that it would not run again until the next window. The security policy may dictate
+# that the compliance engine must not consider the results of manual runs so you can not rely on preventing the scheduled run.
+# Params:
+#    <pluginID>   : the unique ID/name of the plugin to run
+# Options:
+#    -q : quiet. less output
+#    -v : verbose. more output
+#    --verbosity=<verbosity> : 0-4. 0 is most terse. 4 is all the information available. effects stdout but not logging.
+# See Also:
+#    man(7) Config.PluginType
 function Config::apply()
 {
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
+	configSet "ConfigType:${this[configType]}" lastRunTime "$EPOCHSECONDS"
 	Try:
 		creqStartSession --profileID="${this[pluginKey]}" apply
 		$_this.invoke "cmd_run" "$@"
-		creqEndSession
-		$_this.setAttribute lastResult "success"
+		local -A results; creqEndSession -R results
+		$_this.setAttribute lastResult "${results[completeness]:-0}%"
+		configSet "ConfigType:${this[configType]}" lastResult "${results[completeness]:-0}%"
 	Catch: && {
 		$_this.setAttribute lastResult "fail"
+		configSet "ConfigType:${this[configType]}" lastResult "fail"
 	}
 }
