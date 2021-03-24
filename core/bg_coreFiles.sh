@@ -157,7 +157,7 @@ function fsMakeTemp()
 			#       but maybe they should be refactored to create a temp directory to put multiple files
 			[ ! "$keepFlag" ] && rm -rf "$fileNameValue"
 
-			if [ ! "$assertError_EndingScript" ] && [ "$mode" == "releaseInternal" ] && [ ! "$willNotReleaseFlag" ] && { [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; }; then
+			if [ ! "$assertError_EndingScript" ] && [ "$mode" == "releaseInternal" ] && [ ! "$willNotReleaseFlag" ] && { [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; } && [ "$bgBASH_tryStackAction" != "exitOneShell" ]; then
 				(assertError --continue -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script." &>>$_bgtraceFile)
 			fi
 		fi
@@ -235,7 +235,7 @@ function fsIsDifferent()
 	[ -f "$file1" ] && [ -f "$file2" ] || return 0
 
 	# both exist so use diff to tell
-	! diff -q "${diffOpts[@]}" "$file1" "$file2" >/dev/null
+	! bgsudo -r "$file1" -r "$file2" diff -q "${diffOpts[@]}" "$file1" "$file2" >/dev/null
 }
 
 
@@ -638,7 +638,7 @@ function fsPipeToFile()
 			local destFolder="${destFile%/*}"
 			[ ! -d "$destFolder" ] && bgsudo -O sudoOpts mkdir -p "${destFolder}"
 		fi
-		cat "$tmpFile" | bgsudo -O sudoOpts tee "$destFile" >/dev/null
+		cat "$tmpFile" | bgsudo -O sudoOpts tee "$destFile" >/dev/null #|| assertError
 		[ "$channelID" ] && touch "$assertOut.$channelID"
 	fi
 	rm "$tmpFile"

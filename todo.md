@@ -1,11 +1,10 @@
 
-* add an activationState to Config plugins. activeConfig is the selected plugin, activationState is enforcing,checking, or paused
 * add a system user assetType to make a package add a system user account to the target host
 * add a configUser, collectUser, standardsUser system accounts and make the *Cntr commands execute as them   
 * add support to turn on/off the automatic running of collect, standards, and configs
 * make funcman scan for iniParamGet/Set and document the config settings referenced by the function or script
 * add # FUNCMAN_ALIAS <name> support for man pages
-* test putting a bgtraceBreak in a sourced function to debug it. will it end the terminal in some cases? Try in conjuction with the feature to hotpatch sourced function code with breakpoints
+* test putting a bgtraceBreak in a sourced function to debug it. why are line numbers so off in the stack trace? will it end the terminal in some cases? Try in conjuction with the feature to hotpatch sourced function code with breakpoints
 * bug: funcman: Catch.3 and Catch:.3 are different
 * make _bgbc_... refuse to send bgtrace to stderr or stdout so that BC does not get messed up
 * make funcman collect Environment: sections and BGENV: tags and create an agregate documentation
@@ -15,6 +14,7 @@
 * add try/catch unit tests
 * assertError: add "Throw: assertError" and "Rethrow:" syntax function
 * assertError: support catching specific exceptions
+(done) * add an activationState to Config plugins. activeConfig is the selected plugin, activationState is enforcing,checking, or paused
 (done) * bring over bg_plugins.sh
 (done) * unitTests: consider #!bashTests shebangs instead of calling untiTestCntr at the end of the file
 (done) * bug to fix: BC bg-debugCntr trace of<tab> -> off: gets a trailing : even those its suggestion does not have one -- tweak the $(nextBreakChar :) directive

@@ -817,10 +817,12 @@ function bgsudo()
 		-nn) suppressSudoErrorsFlag="-n"
 			 options+=("-n")
 			 ;;
-		-d)  debug="-d" ;;
+		-d)  debug="echo " ;;
 		-r*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
 		-w*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
 		-c*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
+		-o*|--chown*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-o$testFile") ;;
+
 		-[paghpuUrtCc]*|--role*|--prompt*|--close-from*|--group*|--user*|--host*|--type*|--other-user*)
 			bgOptionGetOpt opt: options "$@" && shift
 			;;
@@ -845,13 +847,14 @@ function bgsudo()
 	bgtrap -n bgsudo 'bgsudoCanceled="1"' SIGINT
 
 	# run with sudo ...
+	local envOpt; [ "$bgProductionMode" == "development" ] && envOpt="-E"
 	case ${defaultAction:-escalate} in
 		deescalate)
 			local realUser; bgGetLoginuid realUser
-			sudo -u "$realUser" "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
+			$debug sudo $envOpt -u "$realUser" "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
 			;;
 		escalate)
-			sudo                "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
+			$debug sudo $envOpt                "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
 			;;
 		*) assertLogicError ;;
 	esac
@@ -955,6 +958,7 @@ function _bgsudoAdjustPriv()
 		-r*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
 		-w*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
 		-c*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
+		-o*|--chown*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-o$testFile") ;;
 		-[paghpuUrtCcO]*|--role*|--prompt*|--close-from*|--group*|--user*|--host*|--type*|--other-user*)
 			bgOptionGetOpt opt: "$sudoOptsVar" "$@" && shift
 			;;
@@ -993,7 +997,29 @@ function _bgsudoAdjustPriv()
 		local term; for term in "${testFiles[@]}"; do
 			local testMode="${term:0:2}"
 			local fileToAccess="${term:2}"
-			{ [[ ! "$testMode" =~ ^-[rwc]$ ]] || [ ! "$fileToAccess" ]; } && assertLogicError -v testMode -v fileToAccess
+			{ [[ ! "$testMode" =~ ^-[rwco]$ ]] || [ ! "$fileToAccess" ]; } && assertLogicError -v testMode -v fileToAccess
+
+			# see if we need to escalate to change the user or group ownership of this file
+			if [ "$testMode" == "-o" ]; then
+				if [[ "$_sapAction" =~ ^(deescalate|skipSudo)$ ]]; then
+					local uOwn gOwn; IFS=: read -r fileToAccess uOwn gOwn <<<$"$fileToAccess"
+					local curU curG; IFS=: read -r curU curG <<<$"$(stat -c"%U:%G" "$fileToAccess")"
+					# if we are not the owner, we need to escalate to make any change
+					if [ "$curU" != "$USER" ]; then
+						_sapAction="escalate"
+					# if we are changing the user owner to someone else we need to escalate
+					elif [ "$uOwn" ] && [ "$uOwn" != "$curU" ]; then
+						_sapAction="escalate"
+					# if we are changing the group to one that we are not a member of
+					elif [ "$gOwn" ] && [ "$gOwn" != "$curG" ]; then
+						local memG="$(id -Gn)"
+						if [[ ! " $memG " =~ [\ ]$gOwn[\ ] ]]; then
+							_sapAction="escalate"
+						fi
+					fi
+				fi
+				continue
+			fi
 
 			# handle the case where we need to check the parent's permissions because fileToAccess does not exist or -c was specified
 			local path="${fileToAccess%/}"
@@ -3062,6 +3088,109 @@ function assertError()
 	esac
 }
 
+# usage: Rethrow
+# This is used to re-throw the exception caught in a Catch: block. It should only ever be called from inside a Catch block.
+# It is similar to calling assertError except that it takes no arguments because it takes the arguments from the assertError call
+# that was caught.
+function Rethrow()
+{
+	# get the action from the Try/Catch stack. We should be within a Catch: block, but that means Catch: already finished running
+	# so that Try/Catch has already been removed from the stack so that this one will be the next higher Try/Catch if there is one.
+	local tryStateAction="${bgBASH_tryStackAction[@]:0:1}"; tryStateAction="${tryStateAction:-abort}"
+
+	echo "$catch_errorDescription" >&2
+
+	# if this exception is not being caught, check to see if we should invoke the debugger
+	if [ "$tryStateAction" != "catch" ] && { { debuggerIsActive && ! debuggerIsInBreak; } || [ "$bgDebuggerStopOnAssert" ]; }; then
+		bgtraceBreak
+	fi
+
+	case ${tryStateAction:-default} in
+		continue)
+			return ${_ae_exitCode:-36}
+			;;
+
+		exitOneShell)
+			bgExit ${_ae_exitCode:-36}
+			;;
+
+		abort|default)
+			declare -g assertError_EndingScript="1"
+			bgExit --complete ${_ae_exitCode:-36}
+			#bgkillTree --endScript --exitCode=${_ae_exitCode:-36} $$
+			echo "error: logic error. bgExit did not stop this line from executing"
+			;;
+
+		catch)
+			local tryStatePID="${bgBASH_tryStackPID[@]:0:1}"
+			local throwingStatePID="$BASHPID"
+
+			if [ "$_ae_traceCatchFlag" ]; then
+				bgtrace "!!!Re-throwing exception "
+				bgtrace "   PID of throw ='$throwingStatePID'"
+				bgtrace "   PID of catch ='$tryStatePID'"
+				bgtracePSTree
+				declare -g traceCatchFlag="1"
+			fi
+
+			## fill in pidsToKill with each pid between where the assert is being thrown (throwingStatePID) and where it will be
+			# caught (tryStatePID)
+			local pidsToKill=()
+			if [ "$throwingStatePID" != "$tryStatePID" ]; then
+				local pid="$(ps -o ppid= --pid "$throwingStatePID")"
+				while (( pid != 0 )) && (( pid != tryStatePID )) && (( pid != $$ )); do
+					pidsToKill+=("$pid")
+					pid="$(ps -o ppid= --pid $pid)"
+				done
+				(( pid != tryStatePID )) && assertError --critical  -v pstreeOfTry:"-l$(bgGetPSTree "$tryStatePID")" -v pstreeOfThrow:"-l$(bgGetPSTree "$throwingStatePID")" "
+					Try/Catch Logic Failed. PID of Try block($tryStatePID) is not a parent of PID of asserting exception($BASHPID)"
+			fi
+
+			## Record the state at this point that the exception is being raised
+
+			# declare -g catch_psTree; bgGetPSTree "$$" catch_psTree
+			# declare -gx	catch_errorCode="$_ae_exitCode"
+			# declare -gx	catch_errorClass="$_ae_assertFunctionName"
+			# declare -gx	catch_errorFn="$_ae_failingFunctionName"
+			# declare -gx	catch_errorDescription="$(cat $assertOut.catchDescription)"
+
+			## record the state in $assertOut.* files if catch that is receiving this exception is in a different subshell
+			if [ "$BASHPID" != "$tryStatePID"  ]; then
+				bgStackMarshal "$assertOut.stkArrayRaw"
+				echo "$catch_psTree" >"$assertOut.psTree"
+				echo "$catch_errorCode $catch_errorClass $catch_errorFn" >>$assertOut.errorInfo
+			else
+				[ -f "$assertOut.stkArrayRaw" ] && rm "$assertOut.stkArrayRaw"
+				[ -f "$assertOut.psTree" ]      && rm "$assertOut.psTree"
+				[ -f "$assertOut.errorInfo" ]   && rm "$assertOut.errorInfo"
+			fi
+
+			## now throw the exception up to the nearest catch
+
+			# for unitTest framework, disable the ERR trap when we assert
+			builtin trap '' ERR
+
+			# the goal is that we want the tryStatePID process to wake up an receive the SIGUSR2 signal.
+			# If we are a synchronous child subshell of the tryStatePID, then we, and any subshells inbetween us that tryStatePID
+			# must end before it will wake up. We can simply exit but we need to send the intermediate processes a SIGINT.
+			# Since bash processes signals inbetween the simple commands that it runs, when we send the signals to our parents
+			# they will be queued until we exit which should cause a chain reaction of each parent waking and ending up to the tryStatePID
+			# whose SIGUSR2 trap handler will install a DEBUG handler that will skip simple commands until it finds a "Catch".
+			# Some bash commands are interuptable by SIGINT but if we are running a bash script, all the parents between us and
+			# tryStatePID must be bash subshells stopped on bash functions.
+			[ "$_ae_traceCatchFlag" ] && bgtrace "!!! kill -SIGUSR2 $tryStatePID  "
+			kill -SIGUSR2 "$tryStatePID"     # this wont return if we are tryStatePID
+			(( ${#pidsToKill[@]} > 0 )) && kill -SIGINT "${pidsToKill[@]}"
+			[ "$tryStatePID" != "$BASHPID" ] && bgExit  ${_ae_exitCode:-36}
+			[ "$_ae_traceCatchFlag" ] && bgtrace "!!! returning normally. this is an error"
+			;;
+
+		*)	echo "error: logic error. In assertError the action was computed to be '$tryStateAction' but should be one of catch,abort,continue,exitOneShell"
+			bgExit --complete ${_ae_exitCode:-36}
+			;;
+	esac
+}
+
 
 
 # usage: assertNotEmpty <varToTest> [options] [params]
@@ -3214,6 +3343,25 @@ function Try()
 	return 0
 }
 
+# usage: TryInSubshell [<assertErrorExitCode>]
+# This implements a particular type of Try / Catch block where the caller wants to invoke code in a subshell using the subshell to
+# catch any errors indicated by the exit code of the subshell. This would actually be the typical expected behavior in a script
+# except the default behavior of the assertError function is to abort the entire script by sending $$ the kill signal. By calling
+# this function inside the subshell at its start, anything that calls assertError will only exit the subshell instead of aborting
+# the entire script.
+# Note that there is no corresponding Catch call to this TryInSubshell call because the the actions it takes is automatically undone
+# when the subshell exits.
+# Note that an alternative to this technique would be to wrap the subshell call (either inside or outside of the subshell) in a Try:
+# Catch: block because Try / Catch works accross subshell boundaries by using the USR2 interrupt to pass the exception up.
+# Params:
+#    <assertErrorExitCode> : default is 163. if assertError is called inside the subshell, it will exit the subshell with this exit
+#         code. Specifying it allows the caller to select a code that is not used by other things that might exit the subshell so
+#         that they can tell that the shell exited because assert was thrown
+function TryInSubshell()
+{
+	bgBASH_tryStackAction=("exitOneShell"  "${bgBASH_tryStackAction[@]}"   )
+	assertErrorContext="-e${1:-163}"
+}
 
 # usage: Catch: [<assertFunctionSpec>] && { <errorPathCode...>; }
 # Catch: is part of a Try/Catch exception mechanism for bash scripts.
@@ -3424,7 +3572,6 @@ function extractVariableRefsFromSrc()
 	local srcCode="$1"
 
 	if [ ! "$srcCode" ] && [ "$(type -t "$functionName")" == "function" ]; then
-		bgtrace "!!!in it"
 		local srcFile srcLine; bgStackGetFunctionLocation "$functionName" srcFile srcLine
 		srcCode="$(awk -v srcLine="$srcLine" 'NR>srcLine {print $@} NR>srcLine && /^}\s*$/ {exit} ' "$srcFile")"
 	fi
@@ -3513,63 +3660,189 @@ function fsExists()
 
 
 # usage: fsTouch [-d] [-p]  <fileOrFolder>
-# This improves the pattern of use for 'touch' that you want to make sure that a file exists before going on to use it.
-# The gnu 'touch' works that way for a file but only if the parent folder already exists. This function adds two features to support
-# this pattern better. First, it will create the parent folder if needed. It will create one folder normally but with the -p option
-# it will create multiple folders in a hierarchy. Second, you can use it to make sure that a folder exits without making a file in
-# that folder.
+# This improves the pattern of using 'touch' to make sure a file exists before accessing it. If fsTouch ends without asserting an error,
+# it guarantees that <fileOrFolder> exists with all of the attributes that are specified in the options.
+#
+# Parent Folder Creation:
+# If the folder that <fileOrFolder> resides in does not exist, it will be created by default as long as the grandparent folder does
+# exist. If the -p option is specified, the entire folder chain will be created if needed. Use -p with caution because if the path
+# is specified incorrectly, for example leaving the leading / off of a long absolute path, it will silently create the entire
+# incorrect path.
+#
+# File Object Type:
+# fsTouch can work with the following file system objects denoted by a single letter.
+#       f  : regular file
+#       d  : directory (aka folder)
+#       p  : named pipe
+# The default type is 'f'. If <fileOrFolder> ends in a '/', the type is set to 'd'. It is an error to specify a different type for
+# a name that ends with '/' The --typeMode=f|d|p, -d|--directory and --perm=<accessRightStr> can be used to specify the type.
+#
+# Ownership and Access Rights:
+# The -u|--user=<user>, -g|--group=<group>, and --perm=<rwxBits> can be used to specify the access control for <fileOrFolder>
+# In the <rwxBits> string all 9 positions are required (rwx for each of user,group,other permissions). Put a '.' in any position
+# that you do not wish to specify.
+#
+# Timestamp:
+# Unlike gnu touch, fsTouch does not update the modified timestamp by default. The --updateTime option will make it set the modified
+# timestamp to the current time if <fileOrFolder> already exists. If it creates <fileOrFolder> the modification time will naturally
+# be set to the current time.
+#
+# When Sudo is Required:
+# If the user executing fsTouch does not have sufficient permission to access <fileOrFolder> in order for it to complete without
+# error, sudo will be used on the underlying operations that it performs. This means that the user may be prompted to enter their
+# password.
+#
 # Params:
-#    <fileOrFolder>  : the path to a filesystem object that should exist. If it ends in a '/' it will be a folder and otherwise a file
+#    <fileOrFolder>  : the path to a filesystem object that should exist. If it ends in a '/' it implies that typeMode must be 'd'
+#
 # Options:
-#    --existOnly     : just make sure that <fileOrFolder> exist but dont update its timestamp if it does
-#    -d|--directory  : specify that <fileOrFolder> is a directory (aka folder). Another way to accomplish this is to append a
-#                      trailing '/' to <fileOrFolder>
-#    -p              : normaly it will create at most one parent folder but -p makes it create the entire parent chain as needed.
-#                      Its safer to use without -p because you know that the base part of the path should exist. If you make a mistake
-#                      in the base path, without -p you will get an error but with it it will create the wrong path. Be particularely
-#                      wary of using -p when sudo is in effect.
+#    --checkOnlyFlag : instead of changing the file attributes, just return true(0) if the file already has the specified attributes
+#       or false(>0) if there are changes that would be made if called without this option. The return code reflects the first change
+#       that would be required. There may be other changes that would be required after the first change.
+#          1 : needs to make the parent folder
+#          2 : needs to remove an object of the wrong type at <fileOrFolder>
+#          3 : needs to update the timestamp
+#          4 : needs to create the file object
+#          5 : needs to change the user or group ownship
+#          6 : needs to change the access rights
+#    --updateTime    : if <fileOrFolder> already exists, update its modification time to the current time (like gnu touch would)
+#    -d|--directory  : alias for --typeMode=d. <fileOrFolder> will be a folder.
+#    --typeMode=f|d|p : specify the file system object type that <fileOrFolder> should be.
+#       f : regular file
+#       d : directory (aka folder)
+#       p : named pipe
+#    --perm=<rwxBits> : specify UGO permissions that <filename> should or should not have. <rwxBits> is a 10 character string similar
+#       to that displayed by `stat -c"%A" <filename>`. A 9 character string is also accepted and is interpretted
+#       as the <type> bit being unspecified. Spaces can be added between the clusters of bits to aid in readability. If a position
+#       has a '.', it means that that position is unspecified and any value is acceptable. If a position has a '-', it means that
+#       that right is not granted or in the case of the type character, it specifies that the type is a regular file.
+#          [.fdp-] [.r-][.w-][.x-] [.r-][.w-][.x-] [.r-][.w-][.x-]
+#          <type-> <----user-----> <----group----> <----other---->
+#    -p|--makePaths : normaly it will create at most one parent folder but -p makes it create the entire parent chain as needed.
+#       Its safer to use without -p because it wont blinding create a whole folder hierarchy if you make a mistake in the
+#       <fileOrFolder>. For example if you forget the leading / in a well know path, it would recreate that path under the current
+#       working directory. Without -p, it would fail and tell you that it cant create that path.
+#    -f|--force : without this option, if a different type of file system object exists at <fileOrFolder>, it will result in an error.
+#       specifiying this option makes it remove the other object so that it can create the specified type of object. This option is
+#       required to make it less likely that an entire folder of data could be accidentally lost.
 #    --prompt=<msg>  : if sudo is required to perform the operation and the user is prompted to enter their password, <msg> provides
 #                      context to what operation they are entering a password to complete.
 function fsTouch()
 {
-	local recurseMkdirFlag typeMode="-f" existOnlyFlag sudoPrompt
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		--existOnly) existOnlyFlag="--existOnly" ;;
-		-p) recurseMkdirFlag="-p" ;;
-		-d|--directory) typeMode="-d" ;;
-		--prompt*)  bgOptionGetOpt val: sudoPrompt "$@" && shift; sudoPrompt=(-p "$sudoPrompt") ;;
-	esac; shift; done
+	local checkOnlyFlag recurseMkdirFlag typeMode permMode forceFlag updateTimeFlag sudoPrompt userOwner groupOwner
+	while [ $# -gt 0 ]; do case $1 in
+		--checkOnly)  checkOnlyFlag="--checkOnly" ;;
+		--updateTime) updateTimeFlag="--updateTime" ;;
+		-d|--directory) typeMode="d" ;;
+		--typeMode*)  bgOptionGetOpt val: typeMode   "$@" && shift ;;
+		-u|--user*)   bgOptionGetOpt val: userOwner  "$@" && shift ;;
+		-g|--group*)  bgOptionGetOpt val: groupOwner "$@" && shift ;;
+		--perm*)      bgOptionGetOpt val: permMode   "$@" && shift
+			permMode="${permMode// }"
+			[ ${#permMode} -eq 9 ] && permMode=".$permMode" # the caller can leav out the file type bit
+			[ "$permMode" ] && [[ ! "$permMode" =~ ^[-fdp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.][-w.][-x.]$ ]] && assertError "The --perm=<rwxBits> must be a 9 or 10 character string matching [.fdp-]?[.r-][.w-][.x-][.r-][.w-][.x-][.r-][.w-][.x-]"
+		;;
+		-p|--makePaths) recurseMkdirFlag="-p" ;;
+		-f|--force) forceFlag="-f" ;;
+		--prompt*)    bgOptionGetOpt val: sudoPrompt "$@" && shift; sudoPrompt=(-p "$sudoPrompt") ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local fileOrFolder="$1"; assertNotEmpty fileOrFolder
 
-	# if <fileOrFolder> ends in a '/', force fileMode to be -d
-	[ "${fileOrFolder: -1}" == "/" ] && typeMode="-d"
+	# if <fileOrFolder> ends in a '/', it indicates that fileMode should be -d
+	if [ "${fileOrFolder: -1}" == "/" ]; then
+		[ "${typeMode:-d}" != "d" ] && assertError "conflicting types specified. The file object type specified in the --typeMode options conflicts with the fact that <fileOrFolder> ends with a '/' which indicates it is a folder"
+		typeMode="d"
+	fi
 	fileOrFolder="${fileOrFolder%/}"
+
+	# get the fileType from the permMode if specified
+	if [ "$permMode" ] && [ "${permMode:0:1}" != "." ]; then
+		local typeFromPerm="${permMode:0:1}"; [ "$typeFromPerm" == "-" ] && typeFromPerm="f"
+		[ "$typeMode" ] && [ "$typeMode" != "$typeFromPerm" ] && assertError "conflicting types specified. first character of the --perm=<mode> option conflicts with the file object type specified via either the -d, or --typeMode options or <fileOrFolder> ending with a '/' which indicates that it should be a folder"
+		typeMode="$typeFromPerm"
+		[ "${permMode:0:1}" == "f" ] && permMode="-${permMode:1}"
+	fi
 
 	# create the parent folder if needed
 	if [ ! -e "$fileOrFolder" ]; then
 		local parentFolder="${fileOrFolder%/*}"
 		[ ! -d "$parentFolder" ] && {
+			[ "$checkOnlyFlag" ] && return 1
 			bgsudo "${sudoPrompt[@]}" -w "$parentFolder" mkdir $recurseMkdirFlag "$parentFolder" || assertError
 		}
 	fi
 
 	# if it aready exists,  check to make sure its the right type
 	if [ -e "$fileOrFolder" ]; then
-		if [ "$typeMode" == "-f" ]; then
-			[[ "$(stat -c"%F" "$fileOrFolder")" =~ file ]] || assertError -v fileOrFolder "fsTouch trying to make <fileOrFolder> a file but it is already a '$(stat -c"%F" "$fileOrFolder")'"
-		elif [ "$typeMode" == "-d" ]; then
-			# if <fileOrFolder> is a symlink to a directory, we must test it with a trailing /
-			[[ "$(stat -c"%F" "$fileOrFolder/")" =~ ^directory ]] || assertError -v fileOrFolder "fsTouch trying to make <fileOrFolder> a directory but it is already a '$(stat -c"%F" "$fileOrFolder/")'"
-		fi
-		# update the timestamp
-		[ ! "$existOnlyFlag" ] && bgsudo "${sudoPrompt[@]}" -w "$fileOrFolder" touch "$fileOrFolder"
+		local curMode="$(stat -L -c"%A" "$fileOrFolder")"
+		local curType="${curMode:0:1}"; [ "$curType" == "-" ] && curType=f
 
-	elif [ ! -e "$fileOrFolder" ]; then
+		if [ "$typeMode" ] && [ "$curType" != "$typeMode" ]; then
+			[ ! "$forceFlag" ] && assertError -v fileOrFolder -v specifiedType:typeMode -v actualType:curType "fsTouch is trying to make a file object of a specified type but a different type of object already exists by that filename. Use the -f|--force option to allow fsTouch to remove the existing object."
+			local rmOptions="-f"
+			if [ "$curType" == "d" ]; then
+				{ [ ! "$fileOrFolder" ] || [[ "$fileOrFolder" =~ ^/[^/]*$ ]]; } && assertError "can not use fsTouch to remove a first level folder"
+				rmOptions="-rf"
+			fi
+			[ "$checkOnlyFlag" ] && return 2
+			bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" rm $rmOptions "${fileOrFolder:-nonExistentName}"  || assertError
+		else
+			# update the timestamp
+			[ "$updateTimeFlag" ] && [ "$checkOnlyFlag" ] && return 3
+			[ "$updateTimeFlag" ] && { bgsudo "${sudoPrompt[@]}" -w "$fileOrFolder" touch "$fileOrFolder" || assertError; }
+		fi
+	fi
+
+	if [ ! -e "$fileOrFolder" ]; then
 		# at this point, we know the parent exists but fileOrFolder does not so create it
-		if [ "$typeMode" == "-f" ]; then
-			bgsudo "${sudoPrompt[@]}" -w "$fileOrFolder" touch "$fileOrFolder"
-		elif [ "$typeMode" == "-d" ]; then
-			bgsudo "${sudoPrompt[@]}" -w "$fileOrFolder" mkdir "$fileOrFolder"
+		[ "$checkOnlyFlag" ] && return 4
+		case ${typeMode:-f} in
+			f) bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" touch   "$fileOrFolder"   || assertError ;;
+			d) bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" mkdir   "$fileOrFolder"   || assertError ;;
+			p) bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" mkfifo  "$fileOrFolder"   || assertError ;;
+			*) assertError -v typeMode "unknown file object type"
+		esac
+	fi
+
+	if [ "$permMode$userOwner$groupOwner" ]; then
+		local curMode="$(stat -L -c"%U:%G:%A" "$fileOrFolder")"
+	fi
+
+	if [ "$userOwner$groupOwner" ]; then
+		if [[ ! "$curMode" =~ ^${userOwner:-[^:]*}:${groupOwner:-[^:]*}:.*$ ]]; then
+			[ "$checkOnlyFlag" ] && return 5
+			bgsudo "${sudoPrompt[@]}" --chown "$fileOrFolder:$userOwner:$groupOwner" chown $userOwner:$groupOwner "$fileOrFolder"  || assertError
+		fi
+	fi
+
+	if [ "$permMode" ]; then
+		if [[ ! "$curMode" =~ ^[^:]*:[^:]*:$permMode ]]; then
+			local modeStr=""
+			case $permMode in
+				[-dp.]r*) modeStr+=",u+r" ;;&
+				[-dp.]-*) modeStr+=",u-r" ;;&
+				[-dp.][-r.]w*) modeStr+=",u+w" ;;&
+				[-dp.][-r.]-*) modeStr+=",u-w" ;;&
+				[-dp.][-r.][-w.]x*) modeStr+=",u+x" ;;&
+				[-dp.][-r.][-w.]-*) modeStr+=",u-x" ;;&
+				[-dp.][-r.][-w.][-x.]r*) modeStr+=",g+r" ;;&
+				[-dp.][-r.][-w.][-x.]-*) modeStr+=",g-r" ;;&
+				[-dp.][-r.][-w.][-x.][-r.]w*) modeStr+=",g+w" ;;&
+				[-dp.][-r.][-w.][-x.][-r.]-*) modeStr+=",g-w" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.]x*) modeStr+=",g+x" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.]-*) modeStr+=",g-x" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.]r*) modeStr+=",o+r" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.]-*) modeStr+=",o-r" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.]w*) modeStr+=",o+w" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.]-*) modeStr+=",o-w" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.][-w.]x) modeStr+=",o+x" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.][-w.]-) modeStr+=",o-x" ;;&
+			esac
+			modeStr="${modeStr#,}"
+
+			[ "$checkOnlyFlag" ] && return 6
+			bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" chmod $modeStr "$fileOrFolder" || assertError
 		fi
 	fi
 }
@@ -3593,7 +3866,7 @@ function fsTouch()
 #    * Note that * could be replaced with any wildcard expression but remember that hidden and non-hidden specs depend on the leading .
 #    bgfind -S mySet ... # (or -A) returning the found list in a Set or Array eliminates all the problems with special characters
 #                        # in filenames. Many other patterns are ok most of the time, but have edge cases that can bite you.
-#    fsExpandFiles * -type f -perm /a+x # glob exansion with find's test expression filtering
+#    fsExpandFiles ./* -type f -perm /a+x # glob exansion with find's test expression filtering
 # Use to run a cmd on a set of files that match a pattern...
 #    awk '...' $(fsExpandFiles -f <somePath>*.myExt) # run a cmd on some files without getting an error if there are no files
 #    * Note that this will fail for filenames that conatin whitespace. If you need to support those, get the list in an array and loop
@@ -3640,7 +3913,7 @@ function fsTouch()
 # so that this implementation will be the default for any use of find in a script that sources this library.
 #
 # Example -- Invoke awk on any file matching a glob:
-#    awk '<script>...' $(fsExpandFiles -f *.myext)
+#    awk '<script>...' $(fsExpandFiles -f ./*.myext)
 #    awk '<script>...' *.myext # if there are no matching files you get "*.myext" not found error. If you suppress it, awk reads from stdin
 # Example Compare Two Folders:
 #    local newPages=() removedPages=() updatedPages=() unchangedPages=()
@@ -3676,6 +3949,9 @@ function fsTouch()
 # Params:
 #    <fileSpecN> : a file spec that bash will expand to 0 or more filesystem object names before the function is invoked. These can
 #            be absolute (starting at the filsystem root) or relative to the current working directory.
+#            NOTE: files can exist whose names look like options or expressions to find so './*' should be used instead of '*' to
+#                  refer to all files in the current directory. That will cause the expanded names to start with './' so that they
+#                  can not be mistaken for an option.
 # Options:
 # These options affect which file obects are in the outputted list
 #    -f : force. return at least one fs object which will be "/dev/null" if none other match
@@ -3735,6 +4011,7 @@ function fsExpandFiles()
 		# native find (GNU utility) 'real' options
 		-H|-L|-P) bgOptionGetOpt  opt  findOpts  "$@" && shift ;;
 		-D*|-O*)  bgOptionGetOpt  opt: findOpts  "$@" && shift ;;
+		--) shift; break ;;
 		 *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
@@ -3986,5 +4263,8 @@ function DeclareCreqClass()
 	[[ "$creqClass" =~ ^[a-zA-Z_][a-zA-Z_0-9]*$ ]] || assertError "invalid creqClass name"
 	declare -gA $creqClass='()'
 	[ $# -gt 0 ] && parseDebControlFile $creqClass "$@"
-	eval 'function '$creqClass'() { creqClass="'"$creqClass"'" creqShellFnImplStub "$@" ; }'
+	eval '
+		function '$creqClass'() {
+			creqClass="'"$creqClass"'" creqShellFnImplStub "$@" ;
+		}'
 }

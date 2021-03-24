@@ -56,7 +56,7 @@
 #
 # The extension of the filename is the <PluginType> or "PluginType" to indicate the type of thing that the file contains.
 #
-# 
+#
 
 import bg_objects.sh  ;$L1;$L2
 import bg_ini.sh  ;$L1;$L2
@@ -111,7 +111,7 @@ function static::Plugin::register()
 	loadedPlugins[$1]="$2"
 }
 
-# usage: $Plugins::list [<outputOptions>] [--short] [<pluginNameSpec>]
+# usage: $Plugin::list [<outputOptions>] [--short] [<pluginNameSpec>]
 # list the names of the plugins installed on the host. This queryies the host manifest file and "bg-awkData manifest assetType:plugin"
 # can be used to access similar data.
 #
@@ -285,7 +285,8 @@ function static::Plugin::buildAwkDataTable()
 			echo  "$pluginKey" "loadable" "loadSuccess"
 		Catch: && {
 			echo  "$pluginKey" "loadable" "loadFail"
-			echo "the plugin '$pluginKey' failed to load" >&2
+			echo "the plugin '$pluginKey' failed to load '$catch_errorDescription'" >&2
+			assertError "the plugin '$pluginKey' failed to load"
 		}
 	done >  >(gawk '
 		@include "bg_core.awk"

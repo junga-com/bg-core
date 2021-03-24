@@ -700,6 +700,7 @@ function iniParamSet()
 			}
 
 			printf("%s\n", settingFoundOrDone) >"/dev/fd/3"
+			exit(0)
 		}
 	' "$iniFile" 3>&1)"
 

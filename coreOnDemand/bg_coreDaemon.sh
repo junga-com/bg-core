@@ -13,7 +13,7 @@
 #############################################################################################################################################
 ### API for use in Daemon Scripts
 
-# moved function daemonDeclare() to bg_coreLibsMisc.sh
+# stub loader for function daemonDeclare() exists in bg_coreLibsMisc.sh
 
 # usage: daemonDeclare "$@"
 # putting this at the top of a script will identify the script as a daemon to the invokeOutOfBandSystem
@@ -69,46 +69,59 @@ function daemonOut()
 	echo "" > "/var/run/$daemonName.pid"
 }
 
-# usage: daemonLogSetup [-q] [-v<verbosityLevel>]
+# usage: daemonLogSetup [-q] [-v] [--verbosity=<level>]
 # this sets or modifies the daemonVerbosity and (eventually) other things that effect what happens when daemonLog is called.
 function daemonLogSetup()
 {
-	local format reqVerbosity=1
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-q) ((daemonVerbosity--)) ;;
 		-v) ((daemonVerbosity++)) ;;
-		-v*) daemonVerbosity="$(bgetopt "$@")" && shift ;;
+		--verbosity*) daemonVerbosity="$(bgetopt "$@")" && shift ;;
+		-H*|--headerFormat*)  bgOptionGetOpt val: daemonLogHeaderFormat "$@" && shift ;;
 	esac; shift; done
 }
 
-# usage: daemonLog [-f<format>] [-v <logLevel>] ...
+# usage: daemonLog [-f<format>] [--pipe] [-v <logLevel>] ...
 # similar to echo/printf but it adds some formating that makes the output appropriate for a daemon's log file
 # It outputs to stdout because daemon scripts created with this library write to stdout which
 # will be redirected to the daemons log file when its ran as a daemon
 # Options:
-#     -f <formatStr> : If specified, it will be used as the format string to printf and the positional parameters
-#                      need to match the %s terms in the format.
-#     -v <reqVerbosity> : the log message will only be sent if the current daemonVerbosity is set to <reqVerbosity> or higher.
+#     -f <formatStr> : If specified, it will be used as the format string to printf and the positional parameters in the cmdline.
+#                      The argumets passed must match the %s terms in the format string.
+#     -v|--reqVerbosity=<reqVerbosity> : the log message will only be sent if the current daemonVerbosity is set to <reqVerbosity> or higher.
 #                         the default is 1 which is the typical starting point which means -q will suppress it
+#     --pipe          : If specified, the data to be printed to the log will be read from stdin instead of the cmdline. --pipe and
+#                       --format can not be used together
 function daemonLog()
 {
-	local format reqVerbosity=1
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-f) format="$(bgetopt "$@")" && shift ;;
-		-v*) reqVerbosity="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
+	local format reqVerbosity=1 pipeFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-f*|--format*)       bgOptionGetOpt val: format       "$@" && shift ;;
+		-v*|--reqVerbosity*) bgOptionGetOpt val: reqVerbosity "$@" && shift ;;
+		--pipe)              pipeFlag="--pipe" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	[ ${reqVerbosity} -le ${daemonVerbosity:-1} ] || return
 
-	# note that even if a user is running the daemon attached to a terminal for debugging, we can use
-	# the log file as a mutex name
+	# we write to stdout because the daemon that calls this will have stdout redirected to the log file if its running as a daemon
+
 	(
+		# note that even if a user is running the daemon attached to a terminal for debugging, we can use the log file as a mutex name
 		local lockID; startLock -w5 -u lockID "/var/log/${daemonName:-$(basename $0)}" || bgtrace "daemonLog: timeout (5s) waiting for logFile lock '/var/log/${daemonName:-$(basename $0)}'"
-		if [ ! "$format" ]; then
-			echo -e "$(date +"%Y-%m-%d:%H:%M:%S") $*"
+
+		local header="${daemonLogHeaderFormat:-%Y-%m-%d:%H:%M:%S }"
+
+		if [ "$pipeFlag" ]; then
+			gawk -v header="$header"'
+				NR==1 {printf(header"%s\n", $0)}
+				NR>1 {printf("  | %s\n", $0)}
+			'
+		elif [ "$format" ]; then
+			printf "$header$format" "$@" | awk 'NR==1 {print} NR>1 {print "  | "$0}'
 		else
-			printf "$format" "$@"
-		fi | awk 'NR==1 {print} NR>1 {print "    |"$0}'
+			printf "$header%s" "$*" | awk 'NR==1 {print} NR>1 {print "  | "$0}'
+		fi
 	)
 }
 
@@ -280,7 +293,7 @@ function daemonCntrGetType()
 }
 
 # usage: daemonCntrIsEnabled [-q] <daemonName>
-# returns whether the daemon is currently confiured to start automatically
+# returns whether the daemon is currently configured to start automatically
 # Params:
 #     <daemonName> : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
 # Options:
@@ -350,6 +363,49 @@ function daemonCntrDisable()
 	fi
 }
 
+# usage: daemonCntrGetDefaultAutoStartType [<retVar>]
+# return the prefered type of daemon control mechanism on this host
+function daemonCntrGetDefaultAutoStartType()
+{
+	local autoStartType
+	if which start >/dev/null; then
+		autoStartType=upstart
+	elif which systemctl >/dev/null; then
+		autoStartType=systemd
+	else
+		autoStartType=sysv
+	fi
+	returnValue "$autoStartType" "$1"
+}
+
+# usage: daemonCntrIsAutoStartInstalled <daemonName> [<autoStartType>]
+# return true(0) or false(1) to indicate whether this <daemonName> is installed in the specified autoStart mechanism.
+# Params:
+#     <daemonName>    : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
+#     <autoStartType> : one of sysv,upstart,systemd,any "any" will pick the best default for how the host is configured
+function daemonCntrIsAutoStartInstalled()
+{
+	local daemonName="$1"; [ $# -gt 0 ] && shift
+	local autoStartType="$1"; [ $# -gt 0 ] && shift
+
+	case ${autoStartType,,} in
+		sysv|any)
+			[ -f /etc/init.d/$daemonName ] && return 0
+			;;&
+
+		upstart|any)
+			if which start >/dev/null; then
+				[ -f /etc/init/$daemonName.conf ] && return 0
+			fi
+			;;
+
+		systemd|any)
+			[ -f /lib/systemd/system/$daemonName.service ] && return 0
+			;;
+	esac
+	return 1
+}
+
 
 # usage: daemonCntrInstallAutoStart <daemonName> [<autoStartType>]
 # install an auto start mechanism for this daemon (sysv,upstart,systemd)
@@ -365,13 +421,7 @@ function daemonCntrInstallAutoStart()
 
 	# choose the default based on whats installed on this host
 	if [ "${autoStartType:-any}" == "any" ]; then
-		if which start >/dev/null; then
-			autoStartType=upstart
-		elif which systemctl >/dev/null; then
-			autoStartType=systemd
-		else
-			autoStartType=sysv
-		fi
+		daemonCntrGetDefaultAutoStartType autoStartType
 	fi
 
 	case ${autoStartType,,} in
@@ -463,19 +513,25 @@ function daemonCntrUninstallAutoStart()
 
 	case ${autoStartType,,} in
 		sysv|any)
- 			update-rc.d -f "$daemonName" remove &>/dev/null
-			rm -f /etc/init.d/$daemonName &>/dev/null
-			;;&
+			if daemonCntrIsAutoStartInstalled sysv; then
+				update-rc.d -f "$daemonName" remove &>/dev/null
+				rm -f /etc/init.d/$daemonName &>/dev/null
+			fi
+		;;&
 
 		upstart|any)
-			rm -f /etc/init/$daemonName.conf  &>/dev/null
-			rm -f /etc/init/$daemonName.override  &>/dev/null
-			;;&
+			if daemonCntrIsAutoStartInstalled upstart; then
+				rm -f /etc/init/$daemonName.conf  &>/dev/null
+				rm -f /etc/init/$daemonName.override  &>/dev/null
+			fi
+		;;&
 
 		systemd|any)
-			systemctl disable $daemonName &>/dev/null
-			rm -f /lib/systemd/system/$daemonName.service  &>/dev/null
-			;;&
+			if daemonCntrIsAutoStartInstalled systemd; then
+				systemctl disable $daemonName &>/dev/null
+				rm -f /lib/systemd/system/$daemonName.service  &>/dev/null
+			fi
+		;;&
 	esac
 }
 
@@ -484,7 +540,7 @@ function daemonCntrUninstallAutoStart()
 
 # usage: daemonCntrIsRunning [-P<pidVarName>] <daemonName>
 # A daemon is a singleton process ran as its own session leader (SID) and writes its output to a log file
-# A daemon is identified by its pidFile in /var/run/<daemonName> not its executable name.
+# A daemon process is identified by its pidFile in /var/run/<daemonName> not its executable name.
 # returns true if running, false if not
 # Params:
 #     <daemonName> : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
@@ -707,65 +763,76 @@ function daemonCntrWaitFor()
 	return 0
 }
 
+# usage: cr_daemonRunningStateIs <daemonName> on|off
+DeclareCreqClass cr_daemonRunningStateIs
+function cr_daemonRunningStateIs::check() {
+	daemonName="$1"; shift
+	targetState="${1,,}"
+	[[ "$targetState" =~ ^(on|off)$ ]] || assertError "the second argument should be 'on' or 'off' (case insensitive)"
+	if [ "$targetState" == "on" ]; then
+		daemonCntrIsRunning "$daemonName"
+	else
+		! daemonCntrIsRunning "$daemonName"
+	fi
+}
+function cr_daemonRunningStateIs::apply() {
+	if [ "$targetState" == "on" ]; then
+		daemonCntrStart "$daemonName"
+	else
+		daemonCntrStop "$daemonName"
+	fi
+}
 
 
-# usage: cr_daemonAutoStartIsSetTo <daemonName> sysv|upstart|systemd|none|any  enabled|disabled
+# usage: cr_daemonAutoStartIsSetTo <daemonName> sysv|upstart|systemd|none|any|default  enabled|disabled
 # declare that the daemon auto start is enabled or disabled
-# Apply will enable or disable the /etc/init.d/<daemonName> script
-function cr_daemonAutoStartIsSetTo()
-{
-	case $objectMethod in
-		objectVars) echo "daemonName targetType targetState" ;;
-		construct)
-			daemonName="$1"
-			targetType="${2:-any}"
-			targetState="${3:-enabled}"
-			assertNotEmpty daemonName
-			[[ "$targetType" =~ ^(sysv|upstart|systemd|none|any)$ ]] || assertError "targetType should be one of sysv|upstart|systemd|none|any"
-			[[ "$targetState" =~ ^(enabled|disabled)$ ]] || assertError "targetState should be one of enabled|disabled"
-			;;
+# Apply will install the specified type of control file and set it to the specified enabled/disabled state
+DeclareCreqClass cr_daemonAutoStartIsSetTo
+function cr_daemonAutoStartIsSetTo::check() {
+	daemonName="$1"
+	targetType="${2:-any}"
+	targetState="${3:-disabled}"
+	assertNotEmpty daemonName
+	[ "$targetType" == "default" ] && daemonCntrGetDefaultAutoStartType targetType
+	[[ "$targetType" =~ ^(sysv|upstart|systemd|none|any)$ ]] || assertError "targetType should be one of sysv|upstart|systemd|none|any"
+	{ [ "$targetType" != "none" ] && [[ ! "$targetState" =~ ^(enabled|disabled)$ ]]; } && assertError "targetState should be one of enabled|disabled"
 
-		check)
-			local curType="$(daemonCntrGetType $daemonName)"
-			local curAutoState="$(daemonCntrIsEnabled $daemonName)"
+	local curType="$(daemonCntrGetType $daemonName)"
+	local curAutoState="$(daemonCntrIsEnabled $daemonName)"
 
-			if [ "$targetType" == "any" ]; then
-				[ "$curType" != "none" ] || return
-			else
-				[ "$targetType" == "$curType" ] || return
-			fi
-
-			[ "$targetState" == "$curAutoState" ] || return
-			;;
-
-		apply)
-			case $targetType in
-				sysv)
-					$daemonName auto installSysV
-					$daemonName auto uninstallSystemd
-					$daemonName auto uninstallUpstart
-					;;
-				upstart)
-					$daemonName auto installUpstart
-					$daemonName auto uninstallSystemd
-					$daemonName auto uninstallSysV
-					;;
-				systemd)
-					$daemonName auto installSystemd
-					$daemonName auto uninstallUpstart
-					$daemonName auto uninstallSysV
-					;;
-				none)
-					$daemonName auto uninstall
-					;;
-				any)
-					$daemonName auto install
-					;;
-			esac
+	if [ "$targetType" == "any" ]; then
+		[ "$curType" != "none" ] && [ "$targetState" == "$curAutoState" ]
+	else
+		[ "${targetType,,}" == "${curType,,}" ] && [ "$targetState" == "$curAutoState" ]
+	fi
+}
+function cr_daemonAutoStartIsSetTo::apply() {
+	case $targetType in
+		sysv)
+			$daemonName auto installSysV
+			$daemonName auto uninstallSystemd
+			$daemonName auto uninstallUpstart
 			$daemonName auto "${targetState:0:-1}"
 			;;
-
-		*) cr_baseClass "$@" ;;
+		upstart)
+			$daemonName auto installUpstart
+			$daemonName auto uninstallSystemd
+			$daemonName auto uninstallSysV
+			$daemonName auto "${targetState:0:-1}"
+			;;
+		systemd)
+			$daemonName auto installSystemd
+			$daemonName auto uninstallUpstart
+			$daemonName auto uninstallSysV
+			$daemonName auto "${targetState:0:-1}"
+			;;
+		none)
+			$daemonName auto uninstall
+			;;
+		any)
+			$daemonName auto install
+			$daemonName auto "${targetState:0:-1}"
+			;;
 	esac
 }
 

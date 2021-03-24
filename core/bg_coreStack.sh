@@ -465,11 +465,16 @@ function bgStackRenderFormat()
 		((maxFuncname= (maxFuncname>${#bgSTK_caller[i]})  ? maxFuncname : ${#bgSTK_caller[i]} ))
 	done
 
-	local i; for ((i=0; i<${#bgSTK_cmdFile[@]}; i++)); do
+	local i caller
+	for ((i=0; i<${#bgSTK_cmdFile[@]}; i++)); do
 		if [ "$callerColOpt" == "--callerColumn" ]; then
+			caller="${bgSTK_caller[i]}"
+			if [ ! "$bgStackShowPlumbing" ] && [ "$caller" == "_bgclassCall()" ]; then
+				caller="${bgSTK_caller[i+1]}"
+			fi
 			printf -v bgSTK_frmSummary[i] "%-*s : %-*s: %s" \
 				"$maxSrcLoc"    "${bgSTK_cmdLoc[i]}" \
-				"$((maxFuncname))"  "${bgSTK_caller[i]}" \
+				"$((maxFuncname))"  "$caller" \
 				"${bgSTK_cmdLine[i]}"
 		else
 			printf -v bgSTK_frmSummary[i] "%-*s : %s" \
@@ -546,6 +551,10 @@ function bgStackPrint()
 	echo "===============  BASH call stack trace P:$$/$BASHPID TTY:$(tty 2>/dev/null) ====================="
 	local i
 	for ((i=${#bgSTK_cmdFile[@]}-1; i>=${ignoreFramesCount:-0}; i--)); do
+		if [ ! "$bgStackShowPlumbing" ] && [[ "${bgSTK_cmdName[i]}" =~ ^(_bgclassCall)$ ]]; then
+			continue
+		fi
+
 		if [[ "${bgSTK_cmdFile[i]}" =~ \<handler\>$ ]]; then
 			echo "----- ${bgSTK_cmdFile[i]%<handler>} INTERUPT RECEIVED -------------------"
 		fi

@@ -193,15 +193,44 @@ function bgawk()
 			return 1
 		fi
 
+		# determine if we need sudo to read or write an input/output file
+		local sudoOpts
+		[ ${#file[@]} -gt 0 ] && if [ "$inplace" ]; then
+			bgsudo --makeOpts sudoOpts "${file[@]/#/-w}"
+		else
+			bgsudo --makeOpts sudoOpts "${file[@]/#/-r}"
+		fi
+
+		# if we need sudo and the script writes to /dev/fd/3 to return a status while stdout is being used to write to an in-place
+		# file, fix it up b/c sudo will close all fd above 2
+		local resultsFile
+		if [[ ! "${sudoOpts[*]}" =~ skip ]] && [[ "$script" =~ /dev/fd/3 ]]; then
+			resultsFile="$(mktemp -u)"
+			bgsudo -O sudoOpts touch "$resultsFile"
+			script="${script//\/dev\/fd\/3/$resultsFile}"
+		fi
+
 		# this case enumerates the 4 possible combinations of
 		#    1) where the input comes from (stdin vs input file)
 		#    2) where the output goes to (inplace vs stdout).
+		# TODO: if the user does not have permission to read an input file, sudo is used to invoke awk, but the default sudo behavior
+		#       is to close all file descriptors above 2 so if the script writes feedback on /dev/fd/3, (as iniParamSet does), it fails
+		#       The 'sudo -C 4 ...' option would fix this but it requires that sudo be configured with the closefrom_override and I do
+		#       not know what exploit that is meant to protect against.
+		#       Another solution could be to replace "/dev/fd/3" in the script with "/tmp/<tempfile>" and then cat "/tmp/<tempfile>" >&3
+		#       after awk runs.
 		case ${file:+fileExists}:${inplace:+inplace} in
-			fileExists:inplace) awk "${passThruOpts[@]}" "$script" "${file[@]}" 3>&1 > "$tmpFile" ;;
-			fileExists:)        awk "${passThruOpts[@]}" "$script" "${file[@]}"                   ;;
-			          :inplace) awk "${passThruOpts[@]}" "$script"              3>&1 > "$tmpFile" ;;
-			          :)        awk "${passThruOpts[@]}" "$script"                                ;;
+			fileExists:inplace) bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}" 3>&1 > "$tmpFile" ;;
+			fileExists:)        bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}"                   ;;
+			          :inplace) gawk "${passThruOpts[@]}" "$script"              3>&1 > "$tmpFile" ;;
+			          :)        gawk "${passThruOpts[@]}" "$script"                                ;;
 		esac; local exitCode=$?
+
+		# if a temp resultsFile was created, process it now
+		if [ "$resultsFile" ]; then
+			cat "$resultsFile"
+			bgsudo -O sudoOpts rm -f "$resultsFile"
+		fi
 
 		# if the awk command returns non-zero, we will not proceed with the inplace processing below
 		# and we might assert an error depending on the -q option
@@ -220,7 +249,7 @@ function bgawk()
 
 			# compare the original and and new files (debug mode)
 			if [ "$debugFlag" ]; then
-				$(getUserCmpApp) "$file"  "$tmpFile"
+				bgsudo -O sudoOpts $(getUserCmpApp) "$file"  "$tmpFile"
 				echo "tmpFile= '$tmpFile'  (modified version of '$file')"
 				return 0
 

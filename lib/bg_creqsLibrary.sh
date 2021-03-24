@@ -1,5 +1,161 @@
 #!/bin/bash
 
+# usage: creq cr_fileObjHasAttributes [<fsTouch_options>] <filename>
+# declare that <filename> exists with the specified attributes. See fsTouch for the supported attributes which include specifying
+# the type of file system object (file,folder,named pipe), user and group owners, and access rights (rwx bits for user, group and other)
+# Options:
+#    See man(3) fsTouch
+# See Also:
+#    man(3) fsTouch
+DeclareCreqClass cr_fileObjHasAttributes
+function cr_fileObjHasAttributes::check() { fsTouch --checkOnly "$@"; }
+function cr_fileObjHasAttributes::apply() { fsTouch "$@"; }
+
+
+# usage: creq cr_systemUserExists [-c|--comment=<comment>] <username>
+# declare that the host should have the specified system user configured
+# Options:
+#    -c|--comment=<comment>  : Any text string associating with the user. Generally the Full name of human users.
+DeclareCreqClass cr_systemUserExists
+function cr_systemUserExists::check() {
+	while [ $# -gt 0 ]; do case $1 in
+		-g*|--gid*)  bgOptionGetOpt val: groupName "$@" && shift ;;
+		-c|--comment*)  bgOptionGetOpt val: comment "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	sysUsername="$1"
+	getent passwd "$sysUsername" >/dev/null || return 1
+	[ ! "$groupName" ] || [[ "$(groups "$sysUsername")" =~ :.*$groupName([[:space:]]|$) ]]
+}
+function cr_systemUserExists::apply() {
+	[ "$groupName" ] && groupNameTerm="-g $groupName"
+ 	bgsudo -p "creating user '$sysUsername' [sudo] " useradd --system $groupNameTerm --comment "${comment:-added by cr_systemUserExists}" "$sysUsername"
+}
+
+# usage: creq cr_systemUserNotExists [-c|--comment=<comment>] <username>
+# declare that the host should NOT have the specified system user configured
+# Options:
+#    -c|--comment=<comment>  : Any text string associating with the user. Generally the Full name of human users.
+DeclareCreqClass cr_systemUserNotExists
+function cr_systemUserNotExists::check() {
+	while [ $# -gt 0 ]; do case $1 in
+		-c|--comment*)  bgOptionGetOpt val: comment "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	sysUsername="$1"
+	! getent passwd "$sysUsername" >/dev/null
+}
+function cr_systemUserNotExists::apply() {
+ 	bgsudo -p "removing user '$sysUsername' [sudo] " userdel "$sysUsername"
+}
+
+
+# usage: creq cr_systemGroupExists [-c|--comment=<comment>] <groupname>
+# declare that the host should have the specified system user group configured
+# Options:
+#    -c|--comment=<comment>  : Any text string associating with the group. Generally a short decription.
+DeclareCreqClass cr_systemGroupExists
+function cr_systemGroupExists::check() {
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	sysGroupname="$1"
+	getent group "$sysGroupname" >/dev/null
+}
+function cr_systemGroupExists::apply() {
+ 	bgsudo -p "creating group '$sysGroupname' [sudo] " groupadd --system  "$sysGroupname"
+}
+
+# usage: creq cr_systemGroupNotExists <groupname>
+# declare that the host should NOT have the specified system user group configured
+DeclareCreqClass cr_systemGroupNotExists
+function cr_systemGroupNotExists::check() {
+	sysGroupname="$1"
+	! getent group "$sysGroupname" >/dev/null
+}
+function cr_systemGroupNotExists::apply() {
+ 	bgsudo -p "removing group '$sysGroupname' [sudo] " groupdel "$sysGroupname"
+}
+
+
+
+# usage: cr_fileExistsWithContent <filename> <contents>
+# declare that a file should exist and should contain exactly the specied content.
+# Apply will write the specified content to the file, overwriting anything that it may have contained before
+# The only difference between this and cr_fileExists is that cr_fileExists uses the content only to create the file if it does not
+# exist and after that, the content can change to something else. cr_fileExistsWithContent on the other hand uses the content in
+# the check function so it will fail if the content gets changed from <contents>
+DeclareCreqClass cr_sudoConfigExists "
+	passMsg: sudo config (%configname%) exists with content %contentClip%
+	failMsg: sudo config (%configname%) does not contain %contentClip%
+	appliedMsg: created sudo config %configname% from %contentClip%
+	maxContentSize: 40
+"
+function cr_sudoConfigExists::construct() {
+	filename="/etc/sudoers.d/${1#/etc/sudoers.d/}"
+	configname="${filename#/etc/sudoers.d/}"
+	contentTerm="$2"
+	if [[ "$contentTerm" =~ ^file: ]]; then
+		contentType="from file ${contentTerm#file:}"
+		content="$(cat "${contentTerm#file:}")"
+	elif [[ "$contentTerm" =~ ^template: ]]; then
+		contentType="from template file '${contentTerm#template:}'"
+		import bg_template.sh ;$L1;$L2
+		content="$(templateExpand "${contentTerm#template:}")"
+	elif [ ! "$contentTerm" ]; then
+		content=""
+		contentType="with empty contents"
+	else
+		# its a string content that might be a template. If not a template, it may or may not start with 'string:'
+		content="$(strRemoveLeadingIndents "${contentTerm#string:}")"
+		contentType="from string '%contentClip%'"
+		if [[ "$content" =~ ^templateStr: ]]; then
+			templateStr="${content#templateStr:}"
+			contentType="from template string '%contentClip%'"
+			import bg_template.sh ;$L1;$L2
+			templateExpandStr -R content "$templateStr"
+		fi
+		contentClip="${content:0:${cr_fileExists[maxContentSize]}}"; contentClip="${contentClip//$'\n'/\\n}";
+		[ ${#content} -gt ${cr_fileExists[maxContentSize]:-0} ] && contentClip="${contentClip:0:$((${cr_fileExists[maxContentSize]}-3))}..."
+		contentType+=" '$contentClip'"
+	fi
+}
+function cr_sudoConfigExists::check() {
+	[ -f "$filename" ] && [ "$(bgsudo -p "sudo config [sudo] " -r "$filename" cat "$filename")" == "$content" ]
+}
+function cr_sudoConfigExists::apply() {
+	tmpFile; bgmktemp tmpFile
+	echo "$content" > "$tmpFile"
+	if ! visudo -c -f "$tmpFile" >/dev/null 2>"${tmpFile}.errOut"; then
+		assertError -f "$tmpFile" -f "${tmpFile}.errOut" "The sudo file did not pass visudo -c"
+	fi
+
+	echo "$content" | bgsudo -p "sudo config [sudo] " -w "$filename" tee "$filename" >/dev/null
+
+	bgmktemp --release tmpFile
+	true
+}
+
+DeclareCreqClass cr_sudoConfigNotExists "
+	passMsg: sudo config (%configname%) does not exist
+	failMsg: sudo config (%configname%) exists
+	appliedMsg: removed sudo config %configname%
+"
+function cr_sudoConfigNotExists::check() {
+	filename="/etc/sudoers.d/${1#/etc/sudoers.d/}"
+	configname="${filename#/etc/sudoers.d/}"
+	[ ! -e "$filename" ]
+}
+function cr_sudoConfigNotExists::apply() {
+	bgsudo -c "$filename" rm "$filename"
+	true
+}
+
+
+
+
+
+
 # usage: cr_symlinkExists <targetPath> <symlinkPath>
 # declare that the symlink should exist with the specified target
 DeclareCreqClass cr_symlinkExists

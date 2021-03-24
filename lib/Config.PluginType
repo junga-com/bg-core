@@ -443,6 +443,9 @@ function Config::check()
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
 	configSet "ConfigType:${this[configType]}" lastRunTime "$EPOCHSECONDS"
 	Try:
+		import bg_creqs.sh  ;$L1;$L2
+		import bg_creqsLibrary.sh  ;$L1;$L2
+
 		creqStartSession --profileID="${this[pluginKey]}" check
 		$_this.invoke "cmd_run" "$@"
 		local -A results; creqEndSession -R results
@@ -474,6 +477,9 @@ function Config::apply()
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
 	configSet "ConfigType:${this[configType]}" lastRunTime "$EPOCHSECONDS"
 	Try:
+		import bg_creqs.sh  ;$L1;$L2
+		import bg_creqsLibrary.sh  ;$L1;$L2
+
 		creqStartSession --profileID="${this[pluginKey]}" apply
 		$_this.invoke "cmd_run" "$@"
 		local -A results; creqEndSession -R results
@@ -482,5 +488,6 @@ function Config::apply()
 	Catch: && {
 		$_this.setAttribute lastResult "fail"
 		configSet "ConfigType:${this[configType]}" lastResult "fail"
+		Rethrow
 	}
 }

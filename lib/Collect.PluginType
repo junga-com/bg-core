@@ -141,10 +141,8 @@ function static::Collect::activate()
 	local testCronSched; cronNormSchedule -R testCronSched "$runSchedule"
 
 	PluginConfigSet "$pluginKey" "activationState" "activated"
-	if [ ! "$runSchedule" ]; then
-		local -n cp; $Plugin::get "$pluginKey" cp
-		runSchedule="${cp[runSchedule]}"
-	fi
+	local -n cp; $Plugin::get "$pluginKey" cp
+	runSchedule="${runSchedule:-${cp[runSchedule]}}"
 	PluginConfigSet "$pluginKey" "runSchedule" "$runSchedule"
 }
 
@@ -206,7 +204,7 @@ function static::Collect::runAll()
 		local lastRunTime="$(PluginConfigGet "$pluginKey" "lastRunTime")"
 
 		if [ "$activationState" == "activated" ] && cronShouldRun "$runSchedule" "$lastRunTime"; then
-			echo "running '$pluginKey'"
+			((verbosity>=1)) && echo "running '$pluginKey'"
 			PluginConfigSet "$pluginKey" "lastRunTime" "$(date +"%s")"
 			local -n cp; $Plugin::get "$pluginKey" cp
 			$cp.collect

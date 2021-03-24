@@ -161,6 +161,8 @@ creqApplyLog="/var/log/creqs.log"
 #    man(3) DeclareCreqClass
 function creqShellFnImplStub()
 {
+	[ "$objectMethod" != "newStyle" ] && assertError "cr_* functions can not be called directly. Use 'creq [<options>] cr_...'"
+
 	builtin trap 'echo ErrorInCheck  >&3' EXIT
 
 	declare -A this=()
@@ -449,7 +451,7 @@ function creq()
 
 
 	# run the statement with the cmd we just determined
-	local resultMsg="$( (objectMethod="newStyle" $creqClass "$@") 3>&1 >$stdoutFile 2>$stderrFile)"
+	local resultMsg="$((TryInSubshell; objectMethod="newStyle" $creqClass "$@") 3>&1 >$stdoutFile 2>$stderrFile)"
 
 	# parse the stdout msg:  <resultState> <msg text...>
 	local resultState="${resultMsg%%[ $'\n\t']*}"
@@ -504,6 +506,8 @@ function creqCheck()
 	local defaultMsg="$*"; defaultMsg="${defaultMsg#cr_}"; defaultMsg="${defaultMsg/$'\n'*/ ...}"; defaultMsg="${defaultMsg:0:100}"
 	local creqClass="$1"; shift
 
+	import bg_creqs.sh  ;$L1;$L2
+	import bg_creqsLibrary.sh  ;$L1;$L2
 
 	# run the statement with the cmd we just determined
 	exec {outFD}>&1
@@ -547,6 +551,8 @@ function creqApply()
 	local defaultMsg="$*"; defaultMsg="${defaultMsg#cr_}"; defaultMsg="${defaultMsg/$'\n'*/ ...}"; defaultMsg="${defaultMsg:0:100}"
 	local creqClass="$1"; shift
 
+	import bg_creqs.sh  ;$L1;$L2
+	import bg_creqsLibrary.sh  ;$L1;$L2
 
 	# run the statement with the cmd we just determined
 	exec {outFD}>&1

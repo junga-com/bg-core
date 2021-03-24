@@ -1065,8 +1065,16 @@ function winWrite() {
 			((_wcWin[curY]++))
 		fi
 		firstLine=""
-		_wcWin[lines${_wcWin[curY]}]+="$line"
-		csiStrlen -R _wcWin[curX] -- "${_wcWin[lines${_wcWin[curY]}]}"
+
+		local lineLen tmpStr=""
+		csiStrlen -R lineLen "$line"
+		if (( (_wcWin[curX]-1+lineLen >= 0) && (_wcWin[curX]-1 <= _wcWin[width]) && (_wcWin[curY] >= 1) || (_wcWin[curY] <= _wcWin[height]) )); then
+			csiSubstr -d "" --chopCSI    -R tmpStr -- "${_wcWin[lines${_wcWin[curY]}]}" "0"                                               "$((_wcWin[curX]-1))"
+			csiSubstr -d "" --chopCSI -a -R tmpStr -- "$line"                           "$((((_wcWin[curX]-1)<0)?(-(_wcWin[curX]-1)):0))"
+			csiSubstr -d "" --chopCSI -a -R tmpStr -- "${_wcWin[lines${_wcWin[curY]}]}" "$((_wcWin[curX]-1+lineLen))"
+			_wcWin[lines${_wcWin[curY]}]="${tmpStr}"
+			((_wcWin[curX]+=lineLen))
+		fi
 	done
 	if [ "$linefeedFlag" ]; then
 		_wcWin[curX]=1
@@ -1097,15 +1105,15 @@ function winWriteAt() {
 		#   #### len=4
 		#   abcd
 		#   ---dello World = out
-		local lineLen tmpStr
+		local lineLen tmpStr=""
 		csiStrlen -R lineLen "$line"
-		(( (cx-1+lineLen < 0) || (cx-1 > _wcWin[width]) || (cy < 1) || (cy > _wcWin[height]) )) && return
-		csiSubstr -d "" --chopCSI    -R tmpStr -- "${_wcWin[lines${cy}]}" "0"                          "$((cx-1))"
-		csiSubstr -d "" --chopCSI -a -R tmpStr -- "$line"                 "$((((cx-1)<0)?(-(cx-1)):0))"
-		csiSubstr -d "" --chopCSI -a -R tmpStr -- "${_wcWin[lines${cy}]}" "$((cx-1+lineLen))"
-		_wcWin[lines${cy}]="${tmpStr}"
-
-		csiStrlen -R _wcWin[curX] -- "${_wcWin[lines${_wcWin[curY]}]}"
+		if (( (cx-1+lineLen >= 0) && (cx-1 <= _wcWin[width]) && (cy >= 1) || (cy <= _wcWin[height]) )); then
+			csiSubstr -d "" --chopCSI    -R tmpStr -- "${_wcWin[lines${cy}]}" "0"                          "$((cx-1))"
+			csiSubstr -d "" --chopCSI -a -R tmpStr -- "$line"                 "$((((cx-1)<0)?(-(cx-1)):0))"
+			csiSubstr -d "" --chopCSI -a -R tmpStr -- "${_wcWin[lines${cy}]}" "$((cx-1+lineLen))"
+			_wcWin[lines${cy}]="${tmpStr}"
+			((_wcWin[curX]+=lineLen))
+		fi
 	done
 	if [ "$linefeedFlag" ]; then
 		_wcWin[curX]=cx
@@ -1116,10 +1124,11 @@ function winWriteAt() {
 # usage: winPaint <bufVar>
 function winPaint() {
 	local -n _wcWin="$1"
-	local paintScript="${CSI}${cSave}"
+	local paintScript; printf -v paintScript "${CSI}${cSave}"
+	local renderedCsiNorm; printf -v renderedCsiNorm "%s" "${csiNorm}"
 	local i tmpStr
 	for ((i=1; i<=_wcWin[height]; i++)); do
-		local line; csiSubstr -R line -- "${_wcWin[lines${i}]}"
+		local line="${_wcWin[lines${i}]}"
 		local additionalFontAttributes="${_wcWin[defaultFont]}"
 		if [ "${_wcWin[bordersFlag]}" ]; then
 			if (( i == 1 && i == _wcWin[height] )); then
@@ -1132,13 +1141,14 @@ function winPaint() {
 				additionalFontAttributes+="${csiNoOverline}${csiNoUnderline}"
 			fi
 		fi
-		[ "$additionalFontAttributes" ] && line="${additionalFontAttributes}${line//"${csiNorm}"/${csiNorm}${additionalFontAttributes}}"
-		paintScript+="${CSI}$((_wcWin[y1]+i-1));${_wcWin[x1]}${cMoveAbs}"
-		csiSubstr -d "" -a -R paintScript --pad -- "$line" "0" "${_wcWin[width]}"
+		printf -v additionalFontAttributes "%s" "$additionalFontAttributes"
+		[ "$additionalFontAttributes" ] && line="${additionalFontAttributes}${line//"${renderedCsiNorm}"/${renderedCsiNorm}${additionalFontAttributes}}"
+
+		local tmpStr; csiSubstr -R tmpStr --pad -- "$line" "0" "${_wcWin[width]}"
+		printf -v paintScript "%s${CSI}$((_wcWin[y1]+i-1));${_wcWin[x1]}${cMoveAbs}%s" "$paintScript" "$tmpStr"
 	done
-	paintScript+="${csiNoOverline}${csiNoUnderline}"
-	paintScript+="${CSI}${cRestore}"
-	printf "$paintScript"
+	printf -v paintScript "%s${csiNoOverline}${csiNoUnderline}${CSI}${cRestore}" "$paintScript"
+	printf "%s" "$paintScript" || assertError
 }
 
 # usage: winClear <bufVar>
@@ -1165,13 +1175,13 @@ function winScrollOff() {
 
 # usage: csiSplitOnCSI <string> [<retArray>]
 # splits apart the input <string> into alternating text and CSI escape sequences. Even elements returned ([0], [2], ...) are
-# quarteed to be text and odd elements are quaranteed to be CSI escape sequences. Text elements can "" empty string whenever a CSI
+# guaranteed to be text and odd elements are guaranteed to be CSI escape sequences. Text elements can "" empty string whenever a CSI
 # sequences is not preceeded by text such as when a CSI sequence appears first in the <string> or when multiple CSI sequences appear
-# next to eac other.
+# next to each other.
 #
 # Ascii vs Binary Escape:
 # This function will recognize an ESC character either as the 4 characters "\033" or "\x1b" or "\x1B" or as the single binary,
-# unprintable character $'\033' but the CSI sequences returned are always strings using the 4 charcter "\033" representation.
+# unprintable character $'\033'. The CSI sequences returned are always strings using the 4 charcter "\033" representation.
 #
 # In bash, "\033" is a 4 character string that respresents (to things that understand it), that those 4 characters should be replaced
 # by a single character with the unprintable value of octal 033. $'\033' on the other hand is a single character string with that
@@ -1197,16 +1207,18 @@ function csiSplitOnCSI() {
 	local retOpts=(--echo -1); [ "$retArray" ] && retOpts=(-a --array "$retArray")
 	outputValue --array "$retArray" --
 	local rematch
+
 	# for the regex test, we convert all the string representations of ESC to the actual, binary character because regex can only
 	# stop the string of text on whether a single character matches or not. If we stopped on the '\' character, there would be false
 	# positives when '\' the 3 characters following it are not '033'. Also, since there are several different ways to represent ESC,
 	# this normalizes them so the algorithm does not have to deal with them all.
-	_string="${_string//\\033/$'\033'}"
-	_string="${_string//\\x1[bB]/$'\033'}"
+	#_string="${_string//\\033/$'\033'}"
+	#_string="${_string//\\x1[bB]/$'\033'}"
 
 	while [[ "${_string//\\033/$'\033'}" =~ ^([^$'\033']*)($'\033'\[([0-9;]*)?([\ !\"#$%&\'()*+,./-]*)?[]@A-Z\^_\`a-z{|}~[])(.*)$ ]]; do
 		rematch=("${BASH_REMATCH[@]}")
-		outputValue -a --array "$retArray" -- "${rematch[1]}" "${rematch[2]//$'\033'/\\033}"
+		#rematch[2]="${rematch[2]//$'\033'/\\033}"
+		outputValue -a --array "$retArray" -- "${rematch[1]}" "${rematch[2]}"
 		_string="${rematch[@]: -1}" #"
 	done
 	[ "$_string" ] && outputValue -a --array "$retArray" -- "$_string" #"
