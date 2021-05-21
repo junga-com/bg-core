@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DeclarePlugin Standards osHardening "
-	cmd_check: standard_osHardening
+	cmd_run: standard_osHardening
 	tags: hardening production
 	goal: Secure a linux server against common configuraton errors
 	description: Secure configuration settings that are common to all linux servers

@@ -59,6 +59,8 @@ function daemonDeclare()
 
 	declare -g daemonLogFile="/var/log/$daemonName"
 	declare -g daemonErrorFile="$daemonLogFile"
+
+	declare -g daemonVerbosity=1
 }
 
 # usage: daemonOut
@@ -71,14 +73,18 @@ function daemonOut()
 
 # usage: daemonLogSetup [-q] [-v] [--verbosity=<level>]
 # this sets or modifies the daemonVerbosity and (eventually) other things that effect what happens when daemonLog is called.
+# Environment:
+# This function can be used to set these environment variables
+#    daemonVerbosity  : determines the
 function daemonLogSetup()
 {
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-q) ((daemonVerbosity--)) ;;
 		-v) ((daemonVerbosity++)) ;;
-		--verbosity*) daemonVerbosity="$(bgetopt "$@")" && shift ;;
+		--verbosity*)         bgOptionGetOpt val: daemonVerbosity "$@" && shift ;;
 		-H*|--headerFormat*)  bgOptionGetOpt val: daemonLogHeaderFormat "$@" && shift ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 }
 
 # usage: daemonLog [-f<format>] [--pipe] [-v <logLevel>] ...
@@ -110,18 +116,19 @@ function daemonLog()
 		# note that even if a user is running the daemon attached to a terminal for debugging, we can use the log file as a mutex name
 		local lockID; startLock -w5 -u lockID "/var/log/${daemonName:-$(basename $0)}" || bgtrace "daemonLog: timeout (5s) waiting for logFile lock '/var/log/${daemonName:-$(basename $0)}'"
 
-		local header="${daemonLogHeaderFormat:-%Y-%m-%d:%H:%M:%S }"
+		local header="$(date +"${daemonLogHeaderFormat:-%Y-%m-%d:%H:%M:%S }")"
 
 		if [ "$pipeFlag" ]; then
-			gawk -v header="$header"'
-				NR==1 {printf(header"%s\n", $0)}
-				NR>1 {printf("  | %s\n", $0)}
-			'
+			cat
 		elif [ "$format" ]; then
-			printf "$header$format" "$@" | awk 'NR==1 {print} NR>1 {print "  | "$0}'
+			printf "$format" "$@"
 		else
-			printf "$header%s" "$*" | awk 'NR==1 {print} NR>1 {print "  | "$0}'
-		fi
+			printf "%s" "$*"
+		fi | gawk -v header="$header" '
+			! itson && /^[[:space:]]*$/ {leadingEmpty=leadingEmpty"\n  | "; next}
+			! itson {itson=1; printf(header""leadingEmpty"%s\n", $0); next}
+			itson {printf("  | %s\n", $0)}
+		'
 	)
 }
 
@@ -1110,7 +1117,7 @@ function daemonInvokeOutOfBandSystem()
 		# this code already running as the daemon
 		local daemonPIDFile="/var/run/$daemonName.pid"
 		procIsRunning -f "$daemonPIDFile" && assertError "$daemonName singleton daemon is already running"
-		echo $$ > "/var/run/$daemonName.pid"
+		echo $$ | fsPipeToFile "/var/run/$daemonName.pid"
 
 		# define HOME and USER
 		export HOME=~

@@ -1,0 +1,18 @@
+#!/bin/bash
+
+DeclarePlugin Collect ut "
+	cmd_collect: collect_ut
+	runSchedule: *
+	description: used in unit tests
+	    *
+	    *
+"
+
+function collect_ut()
+{
+	collectPreamble || return
+
+	echo "msg to stdout"
+	echo "msg to stderr" >&2
+	#assertError "failed it"
+}

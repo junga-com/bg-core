@@ -80,7 +80,7 @@ DeclarePluginType Config "
 ### Static members
 
 
-# usage: $Config::list [<outputValueOptions>] [--short|--full|--tree|--types|--grouped]
+# usage: $Config::list [<outputValueOptions>] [--short|--full|--tree|--types|--grouped|--activeConfigs]
 # lists information about the installed Config plugins on the host.
 # Option determine the nature of the list returned. By default the list is written to stdout but all of the options supported by
 # the outputValue function can be used to redirect the output to a variable passed in. This function overrides the outputValue
@@ -90,9 +90,11 @@ DeclarePluginType Config "
 #    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
 #    -S|--set=<varName> : Fills in the associative array <varName> such that each key is an installed ConfigType whose value is a
 #                space separated list of all ConfigNames of that ConfigType installed on the host. This implies the --group option.
-#    --short   : the words returned are names without the "Config:" prefix
+#    --short   : the words returned are names without the "Config:" prefix (only affects --list and --activeConfigs modes)
 #    --full    : (default) the words returned include the "Config:" prefix like "Config:<name>"
 #    --types   : return a list of configTypes
+#    --activeConfigs : return just the pluginKeys (--full) or pluginIDs (--short) that are currently active. Each type can have 0
+#                or 1 active configs.
 #    --tree    : print a tree view where Config Plugins are nested under their configType
 #                if -S|--set=<varName> is specified as the method to return the results, --tree is automatically selected and the
 #                set (aka associative array, aka map) is filled in such that the keys are ConfigTypes and the values are a space
@@ -102,13 +104,14 @@ DeclarePluginType Config "
 #    man(7) Config.PluginType
 function static::Config::list()
 {
-	local retOpts shortFlag modeFlag="--list" setVarName
+	local retOpts shortFlag="--full" modeFlag="--list" setVarName
 	while [ $# -gt 0 ]; do case $1 in
 		--grouped) modeFlag="--grouped" ;;
 		--tree)    modeFlag="--tree" ;;
 		--types)   modeFlag="--types" ;;
-		--short)   shortFlag="--short"; modeFlag="--list" ;;
-		--full)    shortFlag="--full";  modeFlag="--list" ;;
+		--activeConfigs) modeFlag="--activeConfigs" ;;
+		--short)   shortFlag="--short" ;;
+		--full)    shortFlag="--full" ;;
 		-S*|--set*) bgOptionGetOpt val: setVarName "$@" && shift; retOpts+=("-S$setVarName") ;;
 		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
@@ -119,9 +122,16 @@ function static::Config::list()
 	fi
 
 	local results
-	mapfile -t results < <($Plugin::list $shortFlag  Config: | gawk -F: -v modeFlag="$modeFlag" '
+	mapfile -t results < <($Plugin::list  Config: | gawk -F: -v modeFlag="$modeFlag" -v shortFlag="$shortFlag" '
 		@include "bg_core.awk"
-		modeFlag=="--list" {print $0; next}
+		modeFlag=="--list" {
+			if (shortFlag=="--short")
+				print $2":"$3
+			else
+				print $0
+			next
+		}
+
 		{
 			type=$2; name=$3
 			if (!(type in data))
@@ -149,7 +159,18 @@ function static::Config::list()
 		}
 	')
 
-	if [ "$setVarName" ] && [ "$modeFlag" == "--grouped"  ]; then
+	if [ "$modeFlag" == "--activeConfigs" ]; then
+		local -a activeConfigs=()
+		local type; for type in "${results[@]}"; do
+			local activeConfig; configGet -R activeConfig "ConfigType:$type" activeConfig
+			[ "$activeConfig" ] && if [ "$shortFlag" == "--short" ]; then
+				activeConfigs+=("$type:$activeConfig")
+			else
+				activeConfigs+=("Config:$type:$activeConfig")
+			fi
+		done
+		outputValue -1 "${retOpts[@]}" "${activeConfigs[@]}"
+	elif [ "$setVarName" ] && [ "$modeFlag" == "--grouped"  ]; then
 		mapClear "$setVarName"
 		local line; for line in "${results[@]}"; do
 			local type="${line%%:*}"
@@ -181,20 +202,35 @@ function static::Config::list()
 #    man(7) Config.PluginType
 function static::Config::report()
 {
-	local -A configTypes; static::Config::list -S configTypes --tree
-
-	printf "%-20s %-20s %-10s %-12s %-12s %-20s %s\n" "ConfigType" "ActiveConfig" "ActiveMode"   "RunSchedule"  "LastResult"  "When" "CandidateConfigs"
-	local configType; for configType in "${!configTypes[@]}"; do
-		local typeKey="ConfigType:$configType"
-		local activeConfig;   PluginConfigGet -R activeConfig   "$typeKey"  "activeConfig"
-		local runSchedule;    PluginConfigGet -R runSchedule    "$typeKey"  "runSchedule"
-		local lastRunTime;    PluginConfigGet -R lastRunTime    "$typeKey"  "lastRunTime"
-		local lastResult;     PluginConfigGet -R lastResult     "$typeKey"  "lastResult"
-		local activationMode; PluginConfigGet -R activationMode "$typeKey"  "activationMode"
-		local lastRunExpr="$lastRunTime"
-		[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "$lastRunTime" lastRunExpr
-		printf "%-20s %-20s %-10s %-12s %-12s %-20s %s\n" "${configType}" "${activeConfig:-<none>}" "${activationMode:-monitor}" "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunExpr:---}" "${configTypes[$configType]}"
+	local verbosity="$verbosity"
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+	local configType="$1"
+
+	if [ "$configType" ]; then
+		creqReport "$configType"
+	else
+		local -A configTypes; static::Config::list -S configTypes --tree
+
+		{
+			printf "%-20s %-20s %-10s %-12s %-12s %-20s %s\n" "ConfigType" "ActiveConfig" "ActiveMode"   "RunSchedule"  "LastResult"  "LastRuntime" "CandidateConfigs"
+			local configType; for configType in "${!configTypes[@]}"; do
+				local typeKey="ConfigType:$configType"
+				local activeConfig;   configGet -R activeConfig   "$typeKey"  "activeConfig"
+				local runSchedule;    configGet -R runSchedule    "$typeKey"  "runSchedule"
+				local lastRunTime;    configGet -R lastRunTime    "$typeKey"  "lastRunTime"
+				local lastResult;     configGet -R lastResult     "$typeKey"  "lastResult"
+				local lastConfig;     configGet -R lastConfig     "$typeKey"  "lastConfig"
+				local activationMode; configGet -R activationMode "$typeKey"  "activationMode"
+				local lastRunExpr="$lastRunTime"
+				[ "$lastConfig" != "$activeConfig" ] && lastResult="($lastConfig)$lastResult"
+				[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "$lastRunTime" lastRunExpr
+				lastRunExpr="${lastRunExpr// /$'\a_'}"
+				printf "%-20s %-20s %-10s %-12s %-12s %-20s %s\n" "${configType}" "${activeConfig:-<none>}" "${activationMode:---}" "${runSchedule:---}" "${lastResult:-<notYetRan>}" "'${lastRunExpr:---}'" "[${configTypes[$configType]// /|}]"
+			done
+		} | column -t -e | sed 's/\a_/ /g'
+	fi
 }
 
 # usage: $Config::activate <pluginID> [monitor|enforce [<runSchedule>]]
@@ -254,15 +290,16 @@ function static::Config::activate()
 		: lookup the default activation config name
 	fi
 
-	PluginConfigSet "$typeKey" "activeConfig" "$configName"
+	configSet "$typeKey" "activeConfig" "$configName"
 	if [ ! "$runSchedule" ]; then
 		local -n cp; $Plugin::get "$pluginKey" cp
 		runSchedule="${cp[runSchedule]}"
 	fi
-	PluginConfigSet "$typeKey" "runSchedule" "$runSchedule"
-	PluginConfigSet "$typeKey" "activationMode" "$activationMode"
-	PluginConfigSet "$typeKey" "lastResult" ""
-	PluginConfigSet "$typeKey" "lastRunTime" ""
+	configSet "$typeKey" "runSchedule" "$runSchedule"
+	configSet "$typeKey" "activationMode" "$activationMode"
+	configSet "$typeKey" "lastResult" ""
+	configSet "$typeKey" "lastRunTime" ""
+	configSet "$typeKey" "lastConfig" ""
 }
 
 # usage: $Config::deactivate <ConfigType>
@@ -292,11 +329,12 @@ function static::Config::deactivate()
 	local typeKey="ConfigType:$configType"
 
 	if [ "$configName" ]; then
-		local currentActive; PluginConfigSet -R currentActive "$typeKey" "activeConfig"
+		local currentActive; configSet -R currentActive "$typeKey" "activeConfig"
 		[ "$currentActive" ] && [ "$currentActive" != "$configName" ] && assertError -v pluginKey -v configType "the specified Config plugin is not active."
 	fi
 
-	PluginConfigSet "$typeKey" "activeConfig" ""
+	configSet "$typeKey" "activeConfig" ""
+	configSet "$typeKey" "activationMode" ""
 }
 
 
@@ -316,9 +354,13 @@ function static::Config::check()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
-	local pluginKey="Config:$pluginID"
 	local configType configName; stringSplit -d: "$pluginID" configType configName
 
+	[ ! "$configName" ] && configGet -R configName ConfigType:$configType activeConfig
+	[ ! "$configName" ] && configGet -R configName ConfigType:$configType lastConfig
+	[ ! "$configName" ] && assertError "Unspecified config. When no config of type '$configType' is activated nor has one been applied, you must explicily specify the config to run"
+
+	local pluginKey="Config:$configType:$configName"
 	local cp; $Plugin::get "$pluginKey" cp
 
 	$cp.check
@@ -340,9 +382,12 @@ function static::Config::apply()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local pluginID="${1#Config:}"; shift; assertNotEmpty pluginID
-	local pluginKey="Config:$pluginID"
 	local configType configName; stringSplit -d: "$pluginID" configType configName
+	[ ! "$configName" ] && configGet -R configName ConfigType:$configType activeConfig
+	[ ! "$configName" ] && configGet -R configName ConfigType:$configType lastConfig
+	[ ! "$configName" ] && assertError "Unspecified config. When no config of type '$configType' is activated nor has one been applied, you must explicily specify the config to run"
 
+	local pluginKey="Config:$configType:$configName"
 	local cp; $Plugin::get "$pluginKey" cp
 
 	$cp.apply
@@ -359,39 +404,51 @@ function static::Config::apply()
 function static::Config::runAll()
 {
 	local forceFlag verbosity=1
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-f) forceFlag="-f" ;;
-		-q) ((verbosity--)) ;;
-		-v) ((verbosity++)) ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	local configTypes; static::Config::list -A configTypes --types
 
 	local configType; for configType in "${configTypes[@]}"; do
 		local typeKey="ConfigType:$configType"
-		local activeConfig=$(PluginConfigGet "$typeKey" "activeConfig")
-		local runSchedule="$(PluginConfigGet "$typeKey" "runSchedule")"
-		local lastRunTime="$(PluginConfigGet "$typeKey" "lastRunTime")"
-		local lastResult=$(PluginConfigGet "$typeKey" "lastResult")
+		local activeConfig; configGet -R activeConfig "$typeKey" "activeConfig"
+		local runSchedule;  configGet -R runSchedule  "$typeKey" "runSchedule"
+		local lastRunTime;  configGet -R lastRunTime  "$typeKey" "lastRunTime"
+		local lastResult;   configGet -R lastResult   "$typeKey" "lastResult"
 
 		if [ "$activeConfig" ] && { [ "$forceFlag" ] || cronShouldRun "$runSchedule" "$lastRunTime"; }; then
 			local pluginKey="Config:$configType:$activeConfig"
-			echo "running '$pluginKey'"
-			# check should also set the lastRunTime, but we do it here also to make sure that if there is a problem with the plugin
-			# that prevents it updating lastRunTime, it wont keep running.
+			((verbosity==1)) && echo "running '$pluginKey'"
+			configSet "$pluginKey" "lastRunTime" "$EPOCHSECONDS"
 			configSet "$typeKey" "lastRunTime" "$EPOCHSECONDS"
 			local -n cp; $Plugin::get "$pluginKey" cp
-			local activationMode; PluginConfigGet -R activationMode "$typeKey" "activationMode"
+			local activationMode; configGet -R activationMode "$typeKey" "activationMode"
 			Try:
 			(
+				import bg_creqs.sh         ;$L1;$L2
+				import bg_creqsLibrary.sh  ;$L1;$L2
+
+				local -A results
 				if [ "$activationMode" == "enforce" ]; then
-					$cp.apply
+					verbosity=$((verbosity-1)) creqStartSession --profileID="$pluginKey" apply
 				else
-					$cp.check
+					verbosity=$((verbosity-1)) creqStartSession --profileID="$pluginKey" check
 				fi
+				verbosity=$((verbosity-2)) $cp.invoke "cmd_run" "$@"
+				verbosity=$((verbosity-1)) creqEndSession -R results
+
+				configSet "$pluginKey" "lastResult" "${results[completeness]:-0}%"
+				configSet "$typeKey"   "lastResult" "${results[completeness]:-0}%"
+				configSet "$typeKey"   "lastConfig" "${pluginKey##*:}"
+
 			); local result=$?
 			Catch: && {
-				echo "    error: running '$pluginKey' ended abnormally"
+				configSet "$pluginKey" "lastResult" "fail"
+				configSet "$typeKey"   "lastResult" "fail"
+				((verbosity>=1)) && echo "  | error: running '$pluginKey' ended abnormally"
+				((verbosity>=2)) && echo "$catch_errorDescription" >&2
 			}
 		fi
 	done
@@ -451,9 +508,12 @@ function Config::check()
 		local -A results; creqEndSession -R results
 		$_this.setAttribute lastResult "${results[completeness]:-0}%"
 		configSet "ConfigType:${this[configType]}" lastResult "${results[completeness]:-0}%"
+		configSet "ConfigType:${this[configType]}" lastConfig "${this[configName]}"
 	Catch: && {
 		$_this.setAttribute lastResult "fail"
 		configSet "ConfigType:${this[configType]}" lastResult "fail"
+		configSet "ConfigType:${this[configType]}" lastConfig "${this[configName]}"
+		Rethrow
 	}
 }
 
@@ -485,9 +545,12 @@ function Config::apply()
 		local -A results; creqEndSession -R results
 		$_this.setAttribute lastResult "${results[completeness]:-0}%"
 		configSet "ConfigType:${this[configType]}" lastResult "${results[completeness]:-0}%"
+		configSet "ConfigType:${this[configType]}" lastConfig "${this[configName]}"
+		return 0
 	Catch: && {
 		$_this.setAttribute lastResult "fail"
 		configSet "ConfigType:${this[configType]}" lastResult "fail"
+		configSet "ConfigType:${this[configType]}" lastConfig "${this[configName]}"
 		Rethrow
 	}
 }

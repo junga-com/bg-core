@@ -1,4 +1,6 @@
 
+* configGet: support a syntax (maybe +=) that combines values from scopes instead of just taking the value of the most specific scope. Something like the awkData column algorithm
+* create a custom text diff that supports a language of sections that can match regex. The language may be a superset of the bash template language. Use it in 1) fsTouch and 2) unit test plato comparisons.
 * add a system user assetType to make a package add a system user account to the target host
 * add a configUser, collectUser, standardsUser system accounts and make the *Cntr commands execute as them   
 * add support to turn on/off the automatic running of collect, standards, and configs

@@ -10,7 +10,7 @@ import bg_template.sh ;$L1;$L2
 import bg_plugins.sh ;$L1;$L2
 
 
-supportedCmds="templates plugin cuiWin config manifest"
+supportedCmds="templates plugin cuiWin config manifest compliance"
 
 ###############################################################################
 # Command manpage
@@ -142,6 +142,31 @@ function pluginCntr()
 	esac
 }
 
+function complianceCntr()
+{
+	import Config.PluginType  ;$L1;$L2
+	import Standards.PluginType  ;$L1;$L2
+
+	while [ $# -gt 0 ]; do case $1 in
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local cmd="$1"; shift
+
+	case ${cmd:-list} in
+		listIDs)
+			local -a activeProfiles=()
+			static::Config::list       -A activeProfiles --activeConfigs   --full
+			static::Standards::list -a -A activeProfiles --activeStandards --full
+			local profileID; for profileID in "${activeProfiles[@]}"; do
+				local cp; $Plugin::get "$profileID" cp
+				creqStartSession  --profileID="$profileID" reportIDs
+				$cp.invoke "cmd_run"
+				creqEndSession
+			done
+		;;
+		*) assertError "unknown sub command '$cmd'" ;;
+	esac
+}
 
 ###############################################################################
 # Main script
@@ -164,6 +189,7 @@ case ${command:-show} in
 	plugin)        pluginCntr     "${passThruOpts[@]}" "$@" ;;
 	config)        configCntr     "${passThruOpts[@]}" "$@" ;;
 	manifest)      echo "use 'bg-awkData manifest ...' to query the host manifest" ;;
+	compliance)    complianceCntr "${passThruOpts[@]}" "$@" ;;
 	show)          echo "coming soon..."  ;;
 	*)  echo "error: unknown command '$command'. "
 		echo "   See man $(basename $0)"

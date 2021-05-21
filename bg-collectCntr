@@ -23,8 +23,8 @@ function oob_getRequiredUserAndGroup()
 
 	local cmd="$1"
 	case $cmd in
-		activate)   echo "root" ;;
-		deactivate) echo "root" ;;
+		# activate)   echo "root" ;;
+		# deactivate) echo "root" ;;
 		*) echo "" ;;
 	esac
 }

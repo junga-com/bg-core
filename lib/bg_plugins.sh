@@ -321,7 +321,6 @@ function static::Plugin::buildAwkDataTable()
 			addCol("requiredCols")
 			addCol("cmd_run")
 			addCol("cmd_collect")
-			addCol("cmd_check")
 			addCol("auth")
 			addCol("runAsUser")
 			addCol("tags")
@@ -393,7 +392,7 @@ function Plugin::postConstruct()
 
 	local -n mutableCols="$(GetOID "${newTarget[mutableCols]}")"
 	for attribName in "${!mutableCols[@]}"; do
-		this[$attribName]="$(PluginConfigGet "${this[pluginKey]}" "$attribName" "${this[$attribName]}")"
+		configGet -R this[$attribName] "${this[pluginKey]}" "$attribName" "${this[$attribName]}"
 	done
 
 	local requiredCol; for requiredCol in ${static[requiredCols]}; do
@@ -407,7 +406,7 @@ function Plugin::setAttribute()
 	local value="$1"; shift
 	if $static[mutableCols][$name].exists; then
 		this[$name]="$value"
-		PluginConfigSet "${this[pluginKey]}" "$name" "${this[$name]}"
+		configSet "${this[pluginKey]}" "$name" "${this[$name]}"
 	else
 		bgtrace "not setting attribute '$name' in plugin '${this[pluginID]}' because its plugin type '${this[pluginType]}' does not declare it as mutable"
 	fi
@@ -424,17 +423,4 @@ function Plugin::invoke()
 	# support a nicer format.
 	# TODO: split up the following line and do better error reporting
 	${this[$entryPointName]:-${this[pluginID]}::$entryPointName} "$@"
-}
-
-
-function PluginConfigGet()
-{
-	configGet "$@"
-	#iniParamGet /etc/bgPlugins.conf "$1" "$2" "$3"
-}
-
-function PluginConfigSet()
-{
-	configSet "$@"
-	#iniParamSet /etc/bgPlugins.conf "$1" "$2" "$3"
 }

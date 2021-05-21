@@ -11,9 +11,9 @@ import bg_plugins.sh ;$L1;$L2
 #
 
 DeclarePluginType Standards "
-	columns: name(-18) cmd_check(-18) activationState(-10) runSchedule(13) lastResult lastRunTime goal tags description
+	columns: name(-18) cmd_run(-18) activationState(-10) runSchedule(13) lastResult lastRunTime goal tags description
 	keyCol: name
-	requiredCols: cmd_check
+	requiredCols: cmd_run
 	mutableCols: activationState runSchedule lastResult lastRunTime
 	description: A Standards plugin checks the host's configuration and reports what parts pass and what parts fail to meet the
 	 standard that it represents.
@@ -33,14 +33,31 @@ DeclarePluginType Standards "
 #    --full  : (default) the words returned include the "Standards:" prefix like "Standards:<name>"
 function static::Standards::list()
 {
-	local retOpts shortFlag
+	local retOpts shortFlag modeFlag="--list"
 	while [ $# -gt 0 ]; do case $1 in
-		--short) retOpts+=(--short) ;;
-		--full)  retOpts+=(--full) ;;
+		--activeStandards) modeFlag="--activeStandards" ;;
+		--short)   shortFlag="--short" ;;
+		--full)    shortFlag="--full" ;;
 		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	$Plugin::list "${retOpts[@]}" Standards:
+	local -a results=()
+	$Plugin::list -A results $shortFlag Standards:
+
+	if [ "$modeFlag" == "--activeStandards" ]; then
+		local -a activeStandards=()
+		local pluginID; for pluginID in "${results[@]}"; do
+			local activationState; configGet -R activationState "Standards:${pluginID#Standards:}"  "activationState"
+			[ "$activationState" ] && if [ "$shortFlag" == "--short" ]; then
+				activeStandards+=("${pluginID#Standards:}")
+			else
+				activeStandards+=("Standards:${pluginID#Standards:}")
+			fi
+		done
+		outputValue -1 "${retOpts[@]}" "${activeStandards[@]}"
+	else
+		outputValue -1 "${retOpts[@]}" "${results[@]}"
+	fi
 }
 
 
@@ -53,22 +70,19 @@ function static::Standards::list()
 function static::Standards::report()
 {
 	local pkg scrap pluginKey filename
-	printf "%-20s %-11s %-12s %-12s %-12s\n" "Name" "Enabled"   "RunSchedule"  "LastResult"  "When"
-	while read -r pkg scrap pluginKey filename; do
-		Try:
-			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp
-		Catch: && {
-			local activationState=$(PluginConfigGet "$pluginKey" "activationState")
-			local runSchedule=$(PluginConfigGet "$pluginKey" "runSchedule")
-			local lastRunTime=$(PluginConfigGet "$pluginKey" "lastRunTime")
-			local lastResult=$(PluginConfigGet "$pluginKey" "lastResult")
-			printf "%-20s %-11s %-12s %-12s %-12s %s\n" "${pluginKey#*:}" "${activationState:-off}"  "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunTime}" "<error: plugin will not load>"
-			continue
-		}
-		local lastRunExpr="${cp[lastRunTime]}"
-		[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "${cp[lastRunTime]}" lastRunExpr
-		printf "%-20s %-11s %-12s %-12s %-12s\n" "${cp[pluginID]}" "${cp[activationState]:-off}"   "${cp[runSchedule]:-<unset>}"  "${cp[lastResult]:-<notYetRan>}"  "'${lastRunExpr}'"
-	done < <(manifestGet plugin "Standards:.*")
+	{
+		printf "%-20s %-11s %-12s %-12s %-12s\n" "Name" "Activated"   "RunSchedule"  "LastResult"  "LastRuntime"
+		while read -r pkg scrap pluginKey filename; do
+			local activationState; configGet -R activationState "$pluginKey"  "activationState"
+			local runSchedule;     configGet -R runSchedule     "$pluginKey"  "runSchedule"
+			local lastRunTime;     configGet -R lastRunTime     "$pluginKey"  "lastRunTime"
+			local lastResult;      configGet -R lastResult      "$pluginKey"  "lastResult"
+			local lastRunExpr="$lastRunTime"
+			[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "$lastRunTime" lastRunExpr
+			lastRunExpr="${lastRunExpr// /$'\a_'}"
+			printf "%-20s %-11s %-12s %-12s %-12s\n" "${pluginKey#*:}" "${activationState:---}"  "${runSchedule:---}" "${lastResult:-<notYetRan>}" "'${lastRunExpr:---}'"
+		done
+	} < <(manifestGet plugin "Standards:.*") | column -t -e | sed 's/\a_/ /g'
 }
 
 # usage: $Standards::activate <pluginID> [<runSchedule>]
@@ -84,12 +98,12 @@ function static::Standards::activate()
 	local runSchedule="$*"
 	local testCronSched; cronNormSchedule -R testCronSched "$runSchedule"
 
-	PluginConfigSet "$pluginKey" "activationState" "activated"
+	configSet "$pluginKey" "activationState" "activated"
 	if [ ! "$runSchedule" ]; then
 		local -n cp; $Plugin::get "$pluginKey" cp
 		runSchedule="${cp[runSchedule]}"
 	fi
-	PluginConfigSet "$pluginKey" "runSchedule" "$runSchedule"
+	configSet "$pluginKey" "runSchedule" "$runSchedule"
 }
 
 # usage: $Standards::deactivate <pluginID>
@@ -100,7 +114,7 @@ function static::Standards::deactivate()
 	local pluginID="${1#Standards:}"; shift; assertNotEmpty pluginID
 	local pluginKey="Standards:$pluginID"
 
-	PluginConfigSet "$pluginKey" "activationState" ""
+	configSet "$pluginKey" "activationState" ""
 }
 
 
@@ -121,10 +135,8 @@ function static::Standards::run()
 	local pluginID="${1#Standards:}"; shift; assertNotEmpty pluginID
 	local pluginKey="Standards:$pluginID"
 
+bgtraceVars verbosity
 	local cp; $Plugin::get "$pluginKey" cp
-
-	import bg_creqs.sh  ;$L1;$L2
-	import bg_creqsLibrary.sh  ;$L1;$L2
 
 	$cp.check
 }
@@ -137,27 +149,41 @@ function static::Standards::run()
 #    -v : verbose. more output
 function static::Standards::runAll()
 {
-	local forceFlag verbosity=1
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	local forceFlag verbosity=${verbosity:-1}
+	while [ $# -gt 0 ]; do case $1 in
 		-f) forceFlag="-f" ;;
-		-q) ((verbosity--)) ;;
-		-v) ((verbosity++)) ;;
-	esac; shift; done
-
-	import bg_creqs.sh  ;$L1;$L2
-	import bg_creqsLibrary.sh  ;$L1;$L2
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	local standardsPlugins; static::Standards::list -A standardsPlugins
-	local pluginKey; for pluginKey in "${standardsPlugins[@]}"; do
-		local activationState="$(PluginConfigGet "$pluginKey" "activationState")"
-		local runSchedule="$(PluginConfigGet "$pluginKey" "runSchedule")"
-		local lastRunTime="$(PluginConfigGet "$pluginKey" "lastRunTime")"
 
-		if [ "$activationState" == "activated" ] && cronShouldRun "$runSchedule" "$lastRunTime"; then
-			echo "running '$pluginKey'"
-			PluginConfigSet "$pluginKey" "lastRunTime" "$(date +"%s")"
+	local pluginKey; for pluginKey in "${standardsPlugins[@]}"; do
+		local activationState; configGet -R activationState "$pluginKey" "activationState"
+		local runSchedule;     configGet -R runSchedule     "$pluginKey" "runSchedule"
+		local lastRunTime;     configGet -R lastRunTime     "$pluginKey" "lastRunTime"
+
+		if [ "$activationState" == "activated" ] && { [ "$forceFlag" ] || cronShouldRun "$runSchedule" "$lastRunTime"; }; then
+			((verbosity==1)) && echo "running '$pluginKey'"
+			configSet "$pluginKey" "lastRunTime" "$EPOCHSECONDS"
 			local -n cp; $Plugin::get "$pluginKey" cp
-			$cp.check
+			Try:
+			(
+				import bg_creqs.sh         ;$L1;$L2
+				import bg_creqsLibrary.sh  ;$L1;$L2
+
+				local -A results
+				verbosity=$((verbosity-1)) creqStartSession --profileID="$pluginKey" check
+				verbosity=$((verbosity-2)) $cp.invoke "cmd_run" "$@"
+				verbosity=$((verbosity-1)) creqEndSession -R results
+
+				configSet "$pluginKey" "lastResult" "${results[completeness]:-0}%"
+
+			); local result=$?
+			Catch: && {
+				configSet "$pluginKey" "lastResult" "fail"
+				((verbosity>=1)) && echo "  | error: running '$pluginKey' ended abnormally"
+				((verbosity>=2)) && echo "$catch_errorDescription" >&2
+			}
 		fi
 	done
 	true
@@ -178,11 +204,17 @@ function Standards::check()
 {
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
 	Try:
+		import bg_creqs.sh         ;$L1;$L2
+		import bg_creqsLibrary.sh  ;$L1;$L2
+
 		creqStartSession --profileID="${this[pluginKey]}" check
-		$_this.invoke "cmd_check" "$@"
-		creqEndSession
-		$_this.setAttribute lastResult "success"
+		$_this.invoke "cmd_run" "$@"
+		local -A results; creqEndSession -R results
+		$_this.setAttribute lastResult "${results[completeness]:-0}%"
+		return 0
 	Catch: && {
 		$_this.setAttribute lastResult "fail"
+		local -A results; creqEndSession -R results
+		Rethrow
 	}
 }

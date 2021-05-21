@@ -1,0 +1,10 @@
+#!/bin/bash
+
+DeclarePlugin RBACPermission queryHardware "
+	auth: NOPASSWD
+	runAsUser: root
+	cmd:
+	 lshw
+	 dmidecode
+	goal: query the host for hardware information
+"

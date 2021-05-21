@@ -109,22 +109,19 @@ function static::Collect::list()
 function static::Collect::report()
 {
 	local pkg scrap pluginKey filename
-	printf "%-20s %-11s %-12s %-12s %-12s\n" "Name" "Enabled"   "RunSchedule"  "LastResult"  "When"
-	while read -r pkg scrap pluginKey filename; do
-		Try:
-			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp
-		Catch: && {
-			local activationState=$(PluginConfigGet "$pluginKey" "activationState")
-			local runSchedule=$(PluginConfigGet "$pluginKey" "runSchedule")
-			local lastRunTime=$(PluginConfigGet "$pluginKey" "lastRunTime")
-			local lastResult=$(PluginConfigGet "$pluginKey" "lastResult")
-			printf "%-20s %-11s %-12s %-12s %-12s %s\n" "${pluginKey#*:}" "${activationState:-off}"  "${runSchedule:-SLAm}" "${lastResult:-<notYetRan>}" "${lastRunTime}" "<error: plugin will not load>"
-			continue
-		}
-		local lastRunExpr="${cp[lastRunTime]}"
-		[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "${cp[lastRunTime]}" lastRunExpr
-		printf "%-20s %-11s %-12s %-12s %-12s\n" "${cp[pluginID]}" "${cp[activationState]:-off}"   "${cp[runSchedule]:-<unset>}"  "${cp[lastResult]:-<notYetRan>}"  "'${lastRunExpr}'"
-	done < <(manifestGet plugin "Collect:.*")
+	{
+		printf "%-20s %-11s %-12s %-12s %-12s\n" "Name" "Activated"   "RunSchedule"  "LastResult"  "LastRuntime"
+		while read -r pkg scrap pluginKey filename; do
+			local activationState; configGet -R activationState "$pluginKey"  "activationState"
+			local runSchedule;     configGet -R runSchedule     "$pluginKey"  "runSchedule"
+			local lastRunTime;     configGet -R lastRunTime     "$pluginKey"  "lastRunTime"
+			local lastResult;      configGet -R lastResult      "$pluginKey"  "lastResult"
+			local lastRunExpr="$lastRunTime"
+			[[ "$lastRunExpr" =~ ^[0-9][0-9]*$ ]] && timeGetAproximateRelativeExpr "$lastRunTime" lastRunExpr
+			lastRunExpr="${lastRunExpr// /$'\a_'}"
+			printf "%-20s %-11s %-12s %-12s %-12s\n" "${pluginKey#*:}" "${activationState:---}"  "${runSchedule:---}" "${lastResult:-<notYetRan>}" "'${lastRunExpr:---}'"
+		done
+	} < <(manifestGet plugin "Collect:.*") | column -t -e | sed 's/\a_/ /g'
 }
 
 # usage: $Collect::activate <pluginID> [<runSchedule>]
@@ -140,10 +137,10 @@ function static::Collect::activate()
 	local runSchedule="$*"
 	local testCronSched; cronNormSchedule -R testCronSched "$runSchedule"
 
-	PluginConfigSet "$pluginKey" "activationState" "activated"
+	configSet "$pluginKey" "activationState" "activated"
 	local -n cp; $Plugin::get "$pluginKey" cp
 	runSchedule="${runSchedule:-${cp[runSchedule]}}"
-	PluginConfigSet "$pluginKey" "runSchedule" "$runSchedule"
+	configSet "$pluginKey" "runSchedule" "$runSchedule"
 }
 
 # usage: $Collect::deactivate <pluginID>
@@ -155,7 +152,7 @@ function static::Collect::deactivate()
 	local pluginID="${1#Collect:}"; shift; assertNotEmpty pluginID
 	local pluginKey="Collect:$pluginID"
 
-	PluginConfigSet "$pluginKey" "activationState" ""
+	configSet "$pluginKey" "activationState" ""
 }
 
 # usage: $Collect::run [-q] [-v] <pluginID>
@@ -191,25 +188,44 @@ function static::Collect::run()
 function static::Collect::runAll()
 {
 	local forceFlag verbosity=1
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-f) forceFlag="-f" ;;
-		-q) ((verbosity--)) ;;
-		-v) ((verbosity++)) ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	local collectPlugins; static::Collect::list -A collectPlugins
-	local pluginKey; for pluginKey in "${collectPlugins[@]}"; do
-		local activationState="$(PluginConfigGet "$pluginKey" "activationState")"
-		local runSchedule="$(PluginConfigGet "$pluginKey" "runSchedule")"
-		local lastRunTime="$(PluginConfigGet "$pluginKey" "lastRunTime")"
 
-		if [ "$activationState" == "activated" ] && cronShouldRun "$runSchedule" "$lastRunTime"; then
+	local outFile; bgmktemp outFile
+	local errFile; bgmktemp errFile
+
+	local pluginKey; for pluginKey in "${collectPlugins[@]}"; do
+		local activationState; configGet -R activationState "$pluginKey" "activationState"
+		local runSchedule;     configGet -R runSchedule     "$pluginKey" "runSchedule"
+		local lastRunTime;     configGet -R lastRunTime     "$pluginKey" "lastRunTime"
+
+		if [ "$activationState" == "activated" ] && { [ "$forceFlag" ] || cronShouldRun "$runSchedule" "$lastRunTime"; }; then
 			((verbosity>=1)) && echo "running '$pluginKey'"
-			PluginConfigSet "$pluginKey" "lastRunTime" "$(date +"%s")"
+			configSet "$pluginKey" "lastRunTime" "$(date +"%s")"
 			local -n cp; $Plugin::get "$pluginKey" cp
-			$cp.collect
+			Try:
+			(
+				$cp.collect >$outFile 2>$errFile
+
+				((verbosity>=2)) && cat $errFile | gawk '{print "  (err)| "$0}' >&2
+				((verbosity>=3)) && cat $outFile | gawk '{print "  | "$0}'
+
+			); local result=$?
+			Catch: && {
+				((verbosity>=1)) && echo "  | error: running '$pluginKey' ended abnormally"
+				((verbosity>=2)) && cat $errFile | gawk '{print "  (err)| "$0}' >&2
+				((verbosity>=3)) && cat $outFile | gawk '{print "  | "$0}'
+			}
 		fi
 	done
+
+	bgmktemp --release outFile
+	bgmktemp --release errFile
+
 	true
 }
 
@@ -231,8 +247,10 @@ function Collect::collect()
 	Try:
 		$_this.invoke "cmd_collect" "$@"
 		$_this.setAttribute lastResult "success"
+		return 0
 	Catch: && {
 		$_this.setAttribute lastResult "fail"
+		Rethrow
 	}
 }
 

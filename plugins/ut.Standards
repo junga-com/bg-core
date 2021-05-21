@@ -1,0 +1,23 @@
+#!/bin/bash
+
+DeclarePlugin Standards ut "
+	cmd_run: standard_ut
+	description: used in unit tests
+"
+
+DeclareCreqClass cr_true
+function cr_true::check() { true; }
+function cr_true::apply() { true; }
+
+DeclareCreqClass cr_false
+function cr_false::check() { false; }
+function cr_false::apply() { false; }
+
+function standard_ut()
+{
+	creq cr_true
+	creq cr_false
+	# echo "msg to stdout"
+	# echo "msg to stderr" >&2
+	#assertError "failed it"
+}

@@ -23,8 +23,8 @@ function oob_getRequiredUserAndGroup()
 
 	local cmd="$1"
 	case $cmd in
-		activate)   echo "root" ;;
-		deactivate) echo "root" ;;
+		# activate)   echo "root" ;;
+		# deactivate) echo "root" ;;
 		*) echo "" ;;
 	esac
 }
@@ -41,6 +41,8 @@ function printBashCompletion()
 
 	case $cmd:$posCwords in
 		*:1) echo "$cmds" ;;
+
+		list:*) echo "--activeStandards --short --full" ;;
 
 		run:2) echo "<StandardsPluginName>"; $Standards::list --short ;;
 

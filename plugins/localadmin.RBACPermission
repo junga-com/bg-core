@@ -1,0 +1,8 @@
+#!/bin/bash
+
+DeclarePlugin RBACPermission localadmin "
+	auth: NOPASSWD
+	runAsUser: root
+	cmd: ALL
+	goal: localadmin is the exergency access super user
+"

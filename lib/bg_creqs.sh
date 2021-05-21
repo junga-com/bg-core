@@ -161,7 +161,7 @@ creqApplyLog="/var/log/creqs.log"
 #    man(3) DeclareCreqClass
 function creqShellFnImplStub()
 {
-	[ "$objectMethod" != "newStyle" ] && assertError "cr_* functions can not be called directly. Use 'creq [<options>] cr_...'"
+	[ "$objectMethod" != "newStyle" ] && assertError --frameOffset=2 "cr_* functions can not be called directly. Use 'creq [<options>] cr_...'"
 
 	builtin trap 'echo ErrorInCheck  >&3' EXIT
 
@@ -375,26 +375,21 @@ function creqStartSession()
 {
 	varExists creqAction && assertError "nesting creq profile sessions is not (yet?) allowed"
 
-	declare -gx verbosity="${verbosity:-1}" creqProfileID="<anon>" statementLog
+	declare -gx verbosity="${verbosity:-1}" creqProfileID="<anon>" statementIDLogFlag
 	while [ $# -gt 0 ]; do case $1 in
 		--profileID*) bgOptionGetOpt val: creqProfileID "$@" && shift ;;
-		--statementLog*) bgOptionGetOpt val: statementLog "$@" && shift ;;
+		--statementIDLog) statementIDLogFlag="--statementIDLog" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	declare -gx creqAction="${1:-check}"
-	[[ "$creqAction" =~ ^(check|apply)$ ]] || assertError -v creqAction "The first positional argument must be 'check' or 'apply'"
-
-
-	if [ "$statementLog" ]; then
-		fsTouch "$statementLog"
-		echo > "$statementLog"
-	fi
+	[[ "$creqAction" =~ ^(check|apply|reportIDs)$ ]] || assertError -v creqAction "The first positional argument must be 'check' or 'apply'"
 
 	declare -gA creqRun=(
 		[profileID]="$creqProfileID"
 		[profileType]="${creqProfileID%%:*}"
 		[profileName]="${creqProfileID#*:}"
 		[action]="$creqAction"
+		[creqCountTotal]=0
 	)
 
 	declare -g stderrFile; bgmktemp stderrFile
@@ -408,19 +403,29 @@ function creqStartSession()
 #    -R|--retVar=<mapVar> : <mapVar> is an associative array that will be filled in with the results
 function creqEndSession()
 {
-	local mapVar
+	local mapVar verbosity="${verbosity:-1}"
 	while [ $# -gt 0 ]; do case $1 in
 		-R*|--retVar*)  bgOptionGetOpt val: mapVar "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+
+
 	creqRun[countCompliant]="$(( ${creqRun[countPass]:-0}+${creqRun[countApplied]:-0} ))"
 	creqRun[completeness]="$(( ${creqRun[countCompliant]:-0} * 100 / ${creqRun[countTotal]:-1} ))"
 
-	printf "%-18s : %s/%s %3s%% compliant\n" "${creqRun[profileID]}" "${creqRun[countCompliant]}" "${creqRun[countTotal]}" "${creqRun[completeness]}"
+	if [ "$creqAction" != "reportIDs" ]; then
+		((verbosity>=1)) && printf "%-18s : %s/%s %3s%% compliant\n" "${creqRun[profileID]}" "${creqRun[countCompliant]}" "${creqRun[countTotal]}" "${creqRun[completeness]}"
 
-	for countVar in Pass Fail Applied ErrorInCheck ErrorInApply ErrorInProtocol; do
-		[ ${creqRun[count${countVar}]:-0} -gt 0 ] && printf "   %4s: %s\n"  "${creqRun[count${countVar}]}" "$countVar"
-	done
+		if ((verbosity>=2)); then
+			local countVar numNonZero=0
+			for countVar in Pass Fail Applied ErrorInCheck ErrorInApply ErrorInProtocol; do
+				[ ${creqRun[count${countVar}]:-0} -gt 0 ] && ((numNonZero++))
+			done
+			((numNonZero>1)) && for countVar in Pass Fail Applied ErrorInCheck ErrorInApply ErrorInProtocol; do
+				[ ${creqRun[count${countVar}]:-0} -gt 0 ] && printf "   %4s: %s\n"  "${creqRun[count${countVar}]}" "$countVar"
+			done
+		fi
+	fi
 
 	arrayCopy creqRun "$mapVar"
 
@@ -429,6 +434,62 @@ function creqEndSession()
 	unset creqRun creqAction
 }
 
+# usage: creqPrintResult <resultState> <policyID> <stmText> [<stdoutFile> <stderrFile>]
+# Environment:
+#    <logFileFD> : if this env var exists, and <resultState> starts with 'Error' <stdoutFile> and <stderrFile>
+function creqPrintResult()
+{
+	local resultState="$1"; shift
+	local policyID="$1";    shift
+	local stmText="$1";     shift
+	local stdoutFile="$1";  shift
+	local stderrFile="$1";  shift
+
+	case $resultState in
+		Pass)
+			[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s %s\n" "${resultState^^}" "$policyID" "$stmText"
+		;;
+		Applied)
+			[ ${verbosity:-1} -ge 1 ] && printf "${csiBlue}%-7s${csiNorm} : %s %s\n" "${resultState^^}" "$policyID"  "$stmText"
+		;;
+		Fail)
+			[ ${verbosity:-1} -ge 1 ] && printf "${csiHiYellow}%-7s${csiNorm} : %s %s\n" "${resultState^^}" "$policyID"  "$stmText"
+		;;
+		# ErrorInProtocol)
+		# 	[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : \ntext returned by creqClass='%s'\n" "$resultState"  "$resultMsg"
+		# 	if [ "$logFileFD" ]; then
+		# 		printf "ErrorInProtocol : \ntext returned by creqClass='%s'" "$resultMsg" >&$logFileFD
+		# 		[ "$stdoutFile" ] && awk '{print "   stdout: " $0}' "$stdoutFile" >&$logFileFD
+		# 		[ "$stderrFile" ] && awk '{print "   stderr: " $0}' "$stderrFile" >&$logFileFD
+		# 	fi
+		# ;;
+		Error*)
+			[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s %s\n" "$resultState" "$policyID"   "$stmText"
+			if [ "$logFileFD" ]; then
+				echo "$resultState: $stmText" >&$logFileFD
+				[ "$stdoutFile" ] && awk '{print "   stdout: " $0}' "$stdoutFile" >&$logFileFD
+				[ "$stderrFile" ] && awk '{print "   stderr: " $0}' "$stderrFile" >&$logFileFD
+			fi
+		;;
+		*) assertLogicError
+	esac
+}
+
+# usage: creqMakeID [-R <retVar>] <creqStatement...>
+function creqMakeID()
+{
+	local retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	creqID="$*"
+	creqID="$(echo "${creqID// }" | sha256sum)"
+	creqID="${creqID:6:8}"
+
+	returnValue "$creqID" "$retVar"
+}
 
 # usage: creq <creqClass> [<arg1>..<argN>]
 # creq is the creqStatement runner used inside creqStartSession and creqEndSession calls used to run Standards and Config plugin
@@ -443,11 +504,15 @@ function creq()
 	done
 	local creqClass="$1"; shift
 
-	# typically Config profiles do not provide a GUID for the policyID so we create a transient one that will be unique within a
-	# profile and consistent only for each particular version of the profile. Standards profiles typically do provide them so that
-	# each statement can match up to a policy ID in an organization's policy and standards documentation
-	[ ! "$policyID" ] && printf -v policyID "%s-%04d" "$creqClass" "$creqCountTotal"
-	[ "$statementLog" ] && echo "${creqRun[profileID]}:$policyID" >> "$statementLog"
+	((creqRun[creqCountTotal]++))
+
+	# A creqID is a hash of the <creqStatment>. The options of the
+	[ ! "$policyID" ] && creqMakeID -R policyID "$creqClass" "$@"
+
+	if [ "$creqAction" == "reportIDs" ]; then
+		printf "%-50s %s\n" "${creqRun[profileID]}:$creqClass-$policyID" "$creqClass $*"
+		return
+	fi
 
 
 	# run the statement with the cmd we just determined
@@ -463,34 +528,7 @@ function creq()
 	((creqRun[count${resultState^}]++))
 	[[ "$resultState" =~ ^ErrorIn ]] && ((creqRun[countError]++))
 
-	case $resultState in
-		Pass)
-			[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
-			;;
-		Applied)
-			[ ${verbosity:-1} -ge 1 ] && printf "${csiBlue}%-7s${csiNorm} : %s\n" "APPLIED"  "$stmText"
-			;;
-		Fail)
-			[ ${verbosity:-1} -ge 1 ] && printf "${csiHiYellow}%-7s${csiNorm} : %s\n" "FAILED"  "$stmText"
-			;;
-		ErrorInCheck|ErrorInApply)
-			[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
-			if [ "$logFileFD" ]; then
-				echo "$resultState: $stmText" >&$logFileFD
-				[ "$stdoutFile" ] && awk '{print "   stdout: " $0}' "$stdoutFile" >&$logFileFD
-				[ "$stderrFile" ] && awk '{print "   stderr: " $0}' "$stderrFile" >&$logFileFD
-			fi
-			;;
-		ErrorInProtocol)
-			[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : \ntext returned by creqClass='%s'\n" "$resultState"  "$resultMsg"
-			if [ "$logFileFD" ]; then
-				printf "ErrorInProtocol : \ntext returned by creqClass='%s'" "$resultMsg" >&$logFileFD
-				[ "$stdoutFile" ] && awk '{print "   stdout: " $0}' "$stdoutFile" >&$logFileFD
-				[ "$stderrFile" ] && awk '{print "   stderr: " $0}' "$stderrFile" >&$logFileFD
-			fi
-			;;
-		*) assertLogicError
-	esac
+	creqPrintResult "$resultState" "$policyID" "$stmText" "$stdoutFile" "$stderrFile"
 }
 
 # usage: creqCheck <creqClass> [<arg1>..<argN>]
@@ -499,7 +537,7 @@ function creqCheck()
 {
 	varExists creqRun && assertError "Creq statements can not be executed with creqCheck nor creqApply inside a creq Statndards or Config profile "
 
-	local verbosity="1"
+	local verbosity="${verbosity:-1}"
 	while [ $# -gt 0 ]; do case $1 in
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -520,21 +558,22 @@ function creqCheck()
 	local stmText="${resultMsg#$resultState}"; stringTrim -R stmText
 	stmText="${stmText:-$defaultMsg}"
 
-	case $resultState in
-		Pass)
-			[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
-			return 0
-			;;
-		Fail)
-			[ ${verbosity:-1} -ge 1 ] && printf "${csiHiYellow}%-7s${csiNorm} : %s\n" "FAILED"  "$stmText"
-			return 1
-			;;
-		ErrorInCheck|ErrorInApply|ErrorInProtocol)
-			[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
-			return 202
-			;;
-		*) assertLogicError
-	esac
+	creqPrintResult "$resultState" "$policyID" "$stmText"
+	# case $resultState in
+	# 	Pass)
+	# 		[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
+	# 		return 0
+	# 		;;
+	# 	Fail)
+	# 		[ ${verbosity:-1} -ge 1 ] && printf "${csiHiYellow}%-7s${csiNorm} : %s\n" "FAILED"  "$stmText"
+	# 		return 1
+	# 		;;
+	# 	ErrorInCheck|ErrorInApply|ErrorInProtocol)
+	# 		[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
+	# 		return 202
+	# 		;;
+	# 	*) assertLogicError
+	# esac
 }
 
 
@@ -544,7 +583,7 @@ function creqApply()
 {
 	varExists creqRun && assertError "Creq statements can not be executed with creqCheck nor creqApply inside a creq Statndards or Config profile "
 
-	local verbosity="1"
+	local verbosity="${verbosity:-1}"
 	while [ $# -gt 0 ]; do case $1 in
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -565,21 +604,22 @@ function creqApply()
 	local stmText="${resultMsg#$resultState}"; stringTrim -R stmText
 	stmText="${stmText:-$defaultMsg}"
 
-	case $resultState in
-		Pass)
-			[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
-			return 0
-			;;
-		Applied)
-			[ ${verbosity:-1} -ge 1 ] && printf "${csiBlue}%-7s${csiNorm} : %s\n" "APPLIED"  "$stmText"
-			return 0
-			;;
-		ErrorInCheck|ErrorInApply|ErrorInProtocol)
-			[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
-			return 202
-			;;
-		*) assertLogicError
-	esac
+	creqPrintResult "$resultState" "$policyID" "$stmText" "$stdoutFile" "$stderrFile"
+	# case $resultState in
+	# 	Pass)
+	# 		[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
+	# 		return 0
+	# 		;;
+	# 	Applied)
+	# 		[ ${verbosity:-1} -ge 1 ] && printf "${csiBlue}%-7s${csiNorm} : %s\n" "APPLIED"  "$stmText"
+	# 		return 0
+	# 		;;
+	# 	ErrorInCheck|ErrorInApply|ErrorInProtocol)
+	# 		[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
+	# 		return 202
+	# 		;;
+	# 	*) assertLogicError
+	# esac
 }
 
 
@@ -673,7 +713,7 @@ function creqsTrackChangesCheck()
 
 # usage: creqServiceAction <serviceName> <action> [<varName>]
 # Perform an action (ie. restart,reload, etc..) on a service daemon only if varName has been set and the mode is 'apply'
-# This is typically only called by creqReport at the end of a creq run on any service/actions that have been registered
+# This is typically only called by creqEndSession at the end of a creq run on any service/actions that have been registered
 # during the creq run with creqsTrackChangesStart/Stop or creqsDelayedServiceAction.
 # It only does the action in apply mode so check mode can be sure not to change anything on the host.
 # Typically, varName is the service name and if any creq changes are applied between creqsTrackChangesStart/Stop statements
@@ -699,7 +739,7 @@ function creqServiceAction()
 
 # usage: creqWasChanged file1 [ file2 [ .. fileN] ]
 # test the files to see if any have a modification time stamp newer than the start of the
-# creqInit run. This can be called any time before the creqReport call
+# creqInit run. This can be called any time before the creqEndSession call
 # returns 0 (true) if any of the files have been changed
 # returns 1 (false) if none have been changed
 function creqWasChanged()

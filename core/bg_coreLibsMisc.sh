@@ -3658,8 +3658,58 @@ function fsExists()
 }
 
 
+# usage: fsParseContent <contentVar> <contentTypeVar> <contentClip> <content...>
+# processes the <content> argument into the three return variables. <content> can either be the content or a term that leads to the
+# content.
+# Params:
+#    <contentVar>     : var that receives the processed content string
+#    <contentTypeVar> : var that receives a word that describes the type of the content -- file,template,templateStr,...
+#    <contentClip>    : var that receives a short section that represents the content
+#    <content...>     : the content passed in. Several types of content are supported
+#       file:<filename>   : read contents from <filename>
+#       template:<templateName> : <templateName> will be looked up using templateFind and then expanded to produce the content
+#       templateStr:...   : the remainder of the <contents> will be expanded as a template to produce the content
+#       string:...        : (default) the remainder of the <contents> will be the content
+function fsParseContent()
+{
+	local _fspcMaxContentSize=40
+	local contentVar="$1"; shift
+	local contentTypeVar="$1"; shift
+	local contentClipVar="$1"; shift
+	local contentTerm="$*"
+	local _fspcContentType _fspcContent _fspcContentClip
+	if [[ "$contentTerm" =~ ^file: ]]; then
+		_fspcContentType="file"
+		_fspcContent="$(cat "${contentTerm#file:}")"
+	elif [[ "$contentTerm" =~ ^template: ]]; then
+		_fspcContentType="template"
+		import bg_template.sh ;$L1;$L2
+		_fspcContent="$(templateExpand "${contentTerm#template:}")"
+	elif [ ! "$contentTerm" ]; then
+		_fspcContent=""
+		_fspcContentType="emptyStr"
+	else
+		# its a string _fspcContent that might be a template. If not a template, it may or may not start with 'string:'
+		_fspcContent="$(strRemoveLeadingIndents "${contentTerm#string:}")"
+		_fspcContentType="string"
+		if [[ "$_fspcContent" =~ ^templateStr: ]]; then
+			templateStr="${_fspcContent#templateStr:}"
+			_fspcContentType="templateStr"
+			import bg_template.sh ;$L1;$L2
+			templateExpandStr -R _fspcContent "$templateStr"
+		fi
+	fi
 
-# usage: fsTouch [-d] [-p]  <fileOrFolder>
+	_fspcContentClip="${_fspcContent:0:$_fspcMaxContentSize}"; _fspcContentClip="${_fspcContentClip//$'\n'/\\n}";
+	[ ${#_fspcContent} -gt ${_fspcMaxContentSize:-0} ] && _fspcContentClip="${_fspcContentClip:0:$(($_fspcMaxContentSize-3))}..."
+
+	setReturnValue "contentTypeVar" "$_fspcContentType"
+	setReturnValue "contentClipVar" "$_fspcContentClip"
+	returnValue "$_fspcContent" "$contentVar"
+}
+
+
+# usage: fsTouch [-d] [-p]  <fileOrFolder> [<content>]
 # This improves the pattern of using 'touch' to make sure a file exists before accessing it. If fsTouch ends without asserting an error,
 # it guarantees that <fileOrFolder> exists with all of the attributes that are specified in the options.
 #
@@ -3694,17 +3744,26 @@ function fsExists()
 #
 # Params:
 #    <fileOrFolder>  : the path to a filesystem object that should exist. If it ends in a '/' it implies that typeMode must be 'd'
-#
+#    <content>       : if specified, and the file is created, it will be filled with this content. If the (?) option is specified
+#       in addition, when the file already exists, if its content does not match <content>, it will be overwritten with <content>
+#       Several formats of specifying the content are supportted. If the leading characters of <content> match one of the following
+#       it will determine the format. If not <content> will be treated as the literal contents texts.
+#            file:<filename>   : read contents from <filename>
+#            template:<templateName> : <templateName> will be looked up using templateFind and then expanded to produce the content
+#            templateStr:...   : the remainder of the <contents> will be expanded as a template to produce the content
+#            string:...        : (default) the remainder of the <contents> will be the content
 # Options:
 #    --checkOnlyFlag : instead of changing the file attributes, just return true(0) if the file already has the specified attributes
 #       or false(>0) if there are changes that would be made if called without this option. The return code reflects the first change
-#       that would be required. There may be other changes that would be required after the first change.
+#       that would be required. There may be other changes that would be required after the first change. Note that if --updateTime
+#       is specified along with --checkOnlyFlag, it will never return true
 #          1 : needs to make the parent folder
 #          2 : needs to remove an object of the wrong type at <fileOrFolder>
-#          3 : needs to update the timestamp
-#          4 : needs to create the file object
-#          5 : needs to change the user or group ownship
-#          6 : needs to change the access rights
+#          3 : needs to change content to match <content>
+#          4 : needs to update the timestamp
+#          5 : needs to create the file object
+#          6 : needs to change the user or group ownship
+#          7 : needs to change the access rights
 #    --updateTime    : if <fileOrFolder> already exists, update its modification time to the current time (like gnu touch would)
 #    -d|--directory  : alias for --typeMode=d. <fileOrFolder> will be a folder.
 #    --typeMode=f|d|p : specify the file system object type that <fileOrFolder> should be.
@@ -3725,11 +3784,13 @@ function fsExists()
 #    -f|--force : without this option, if a different type of file system object exists at <fileOrFolder>, it will result in an error.
 #       specifiying this option makes it remove the other object so that it can create the specified type of object. This option is
 #       required to make it less likely that an entire folder of data could be accidentally lost.
+#    --enforceContent : If the file already exists this option causes its content to be compared with <content> and overwritten
+#       with <content> if they are not equal.
 #    --prompt=<msg>  : if sudo is required to perform the operation and the user is prompted to enter their password, <msg> provides
 #                      context to what operation they are entering a password to complete.
 function fsTouch()
 {
-	local checkOnlyFlag recurseMkdirFlag typeMode permMode forceFlag updateTimeFlag sudoPrompt userOwner groupOwner
+	local checkOnlyFlag recurseMkdirFlag typeMode permMode forceFlag updateTimeFlag sudoPrompt userOwner groupOwner enforceContentFlag
 	while [ $# -gt 0 ]; do case $1 in
 		--checkOnly)  checkOnlyFlag="--checkOnly" ;;
 		--updateTime) updateTimeFlag="--updateTime" ;;
@@ -3744,10 +3805,11 @@ function fsTouch()
 		;;
 		-p|--makePaths) recurseMkdirFlag="-p" ;;
 		-f|--force) forceFlag="-f" ;;
+		--enforceContent) enforceContentFlag="--enforceContent" ;;
 		--prompt*)    bgOptionGetOpt val: sudoPrompt "$@" && shift; sudoPrompt=(-p "$sudoPrompt") ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local fileOrFolder="$1"; assertNotEmpty fileOrFolder
+	local fileOrFolder="$1"; shift; assertNotEmpty fileOrFolder
 
 	# if <fileOrFolder> ends in a '/', it indicates that fileMode should be -d
 	if [ "${fileOrFolder: -1}" == "/" ]; then
@@ -3788,19 +3850,33 @@ function fsTouch()
 			[ "$checkOnlyFlag" ] && return 2
 			bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" rm $rmOptions "${fileOrFolder:-nonExistentName}"  || assertError
 		else
+			if [ "${typeMode:-f}" == "f" ] && [ "$enforceContentFlag" ]; then
+				local content contentType contentClip
+				fsParseContent content contentType contentClip "$*"
+				if [ "$content" != "$(cat "$fileOrFolder")" ]; then
+					[ "$checkOnlyFlag" ] && return 3
+					echo "$content" | bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" tee "$fileOrFolder" >/dev/null || assertError
+				fi
+			fi
+
 			# update the timestamp
-			[ "$updateTimeFlag" ] && [ "$checkOnlyFlag" ] && return 3
+			[ "$updateTimeFlag" ] && [ "$checkOnlyFlag" ] && return 4
 			[ "$updateTimeFlag" ] && { bgsudo "${sudoPrompt[@]}" -w "$fileOrFolder" touch "$fileOrFolder" || assertError; }
 		fi
 	fi
 
+	# this is not an else block b/c if the existing object was the wrong type, it might have been removed so that now it does not exist
 	if [ ! -e "$fileOrFolder" ]; then
+		local content contentType contentClip
+		fsParseContent content contentType contentClip "$*"
+
 		# at this point, we know the parent exists but fileOrFolder does not so create it
-		[ "$checkOnlyFlag" ] && return 4
-		case ${typeMode:-f} in
-			f) bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" touch   "$fileOrFolder"   || assertError ;;
-			d) bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" mkdir   "$fileOrFolder"   || assertError ;;
-			p) bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" mkfifo  "$fileOrFolder"   || assertError ;;
+		[ "$checkOnlyFlag" ] && return 5
+		case ${typeMode:-f}:${content:+c} in
+			f:c) echo "$content" | bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" tee "$fileOrFolder" >/dev/null || assertError ;;
+			f*)  bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" touch   "$fileOrFolder"   || assertError ;;
+			d*)  bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" mkdir   "$fileOrFolder"   || assertError ;;
+			p*)  bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" mkfifo  "$fileOrFolder"   || assertError ;;
 			*) assertError -v typeMode "unknown file object type"
 		esac
 	fi
@@ -3811,7 +3887,7 @@ function fsTouch()
 
 	if [ "$userOwner$groupOwner" ]; then
 		if [[ ! "$curMode" =~ ^${userOwner:-[^:]*}:${groupOwner:-[^:]*}:.*$ ]]; then
-			[ "$checkOnlyFlag" ] && return 5
+			[ "$checkOnlyFlag" ] && return 6
 			bgsudo "${sudoPrompt[@]}" --chown "$fileOrFolder:$userOwner:$groupOwner" chown $userOwner:$groupOwner "$fileOrFolder"  || assertError
 		fi
 	fi
@@ -3841,7 +3917,7 @@ function fsTouch()
 			esac
 			modeStr="${modeStr#,}"
 
-			[ "$checkOnlyFlag" ] && return 6
+			[ "$checkOnlyFlag" ] && return 7
 			bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" chmod $modeStr "$fileOrFolder" || assertError
 		fi
 	fi
@@ -4116,7 +4192,7 @@ function timeGetAproximateRelativeExpr() {
 	local nowInEpech="$EPOCHSECONDS"
 	local type
 	if (( timeInEpoch == nowInEpech )); then
-		returnValue "now"; return
+		returnValue "now" "$retVar"; return
 	elif (( timeInEpoch < nowInEpech )); then
 		local secondsDiff=$((nowInEpech - timeInEpoch))
 		type="ago"

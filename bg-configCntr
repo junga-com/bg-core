@@ -42,10 +42,10 @@ function printBashCompletion()
 	case $cmd:$posCwords in
 		*:1) echo "$cmds" ;;
 
-		list:*) echo "--types --short --full --tree --list --grouped" ;;
+		list:*) echo "--types --short --full --tree --list --grouped --activeConfigs" ;;
 
-		check:2) echo "<ConfigPluginName>"; $Config::list --short ;;
-		apply:2) echo "<ConfigPluginName>"; $Config::list --short ;;
+		check:*) echo "<ConfigPluginName>"; $Config::list --short ;;
+		apply:*) echo "<ConfigPluginName>"; $Config::list --short ;;
 
 		activate:2)   echo "<ConfigPluginName>"; $Config::list --short ;;
 		activate:3)   echo "<activationMode> monitor enforce" ;;

@@ -141,7 +141,7 @@ function static::RBACPermission::report()
 		Try:
 			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp
 		Catch: && {
-			local activationState=$(PluginConfigGet "$pluginKey" "activationState")
+			local activationState; configGet -R activationState "$pluginKey" "activationState"
 			printf "%-20s %-11s %s\n" "${pluginKey#*:}" "${activationState:-off}"   "<error: plugin will not load>"
 			continue
 		}
@@ -257,7 +257,7 @@ function RBACPermission::activate()
 	fi
 	bgmktemp --release tmpFile
 
-	PluginConfigSet "${this[pluginKey]}" "activationState" "activated"
+	configSet "${this[pluginKey]}" "activationState" "activated"
 }
 
 # usage: $RBACPermission::deactivate
@@ -269,7 +269,7 @@ function RBACPermission::deactivate()
 
 	sudo rm -f "$sudoerFile" || assertError -v this "failed to deactive RBACPermission plugin"
 
-	PluginConfigSet "${this[pluginKey]}" "activationState" ""
+	configSet "${this[pluginKey]}" "activationState" ""
 }
 
 
