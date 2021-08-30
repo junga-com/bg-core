@@ -23,6 +23,8 @@ supportedCmds="templates plugin cuiWin config manifest compliance"
 #  * cuiWin    : query and manipulate terminal windows participating in various script UI
 #  * dropin    : see status of and enable/disable various dropin configurations
 #  * config    : query and set host and domain configuration settings
+#  * manifest  : query resources installed by various packages
+#  * compliance : manage the plugins that determine the host behavior
 #
 # See Also:
 
@@ -152,7 +154,7 @@ function complianceCntr()
 	done
 	local cmd="$1"; shift
 
-	case ${cmd:-list} in
+	case ${cmd:-listIDs} in
 		listIDs)
 			local -a activeProfiles=()
 			static::Config::list       -A activeProfiles --activeConfigs   --full

@@ -14,7 +14,6 @@ function loadDaemonConfig()
 	daemonLog "loading configuration"
 	local logVerbosity; iniParamGet -R logVerbosity "/etc/${daemonName}.conf"  "." "logVerbosity"
 	daemonLogSetup --verbosity=${logVerbosity:-1}
-bgtraceVars logVerbosity daemonVerbosity
 }
 
 daemonDeclare "$@"
@@ -25,6 +24,7 @@ oob_invokeOutOfBandSystem "$@"
 daemonLog "Starting up..."
 
 loadDaemonConfig
+
 
 while ! daemonCheckForSignal INT TERM; do
 

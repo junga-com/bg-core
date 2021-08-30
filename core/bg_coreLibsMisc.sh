@@ -627,7 +627,7 @@ function oob_invokeOutOfBandSystem()
 			local sudoOpts=()
 			# -E allows sudo to not reset the environment. For development its OK to do that. Note that on a production machine
 			# the sudo policy should prohibit it so if we did add the -E option here, the sudo $0 execution below would fail.
-			[ "$bgDevModeUnsecureAllowed" ] && [ "$bgVinstalledPaths$bgTracingOn" ] && sudoOpts+=("-E")
+			[ "$bgDevModeUnsecureAllowed" ] && [ "$bgVinstalledPaths$bgTracingOn" ] && sudoOpts+=("-E"  "PATH=$PATH")
 
 			sudoOpts+=(-u "$reqUser")
 

@@ -5,8 +5,6 @@
 
 set +e
 
-
-
 # Library bg_core.sh
 # bg_core.sh is the entry point into the bg_* script system. Scripts should source this script in the typical way using its absolute
 # path like...

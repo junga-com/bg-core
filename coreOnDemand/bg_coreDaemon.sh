@@ -97,7 +97,14 @@ function daemonLogSetup()
 #     -v|--reqVerbosity=<reqVerbosity> : the log message will only be sent if the current daemonVerbosity is set to <reqVerbosity> or higher.
 #                         the default is 1 which is the typical starting point which means -q will suppress it
 #     --pipe          : If specified, the data to be printed to the log will be read from stdin instead of the cmdline. --pipe and
-#                       --format can not be used together
+#                       --format can not be used together. The output will be different based on the the number of lines received...
+#                      0 lines (no characters sent) : no log entry. header is supressed.
+#                      1 line (no trailing \n)      : produces a one line log entry with header and data on the same line
+#                                                     2021-05-26:10:52:59 Starting up...
+#                      2 or more lines              : produces a separate header line followed by indented data lines
+#                                                     2021-05-26:10:52:59
+#                                                       | running 'Collect:ut'
+#                                                       | running 'Config:Test:on'
 function daemonLog()
 {
 	local format reqVerbosity=1 pipeFlag
@@ -125,9 +132,22 @@ function daemonLog()
 		else
 			printf "%s" "$*"
 		fi | gawk -v header="$header" '
-			! itson && /^[[:space:]]*$/ {leadingEmpty=leadingEmpty"\n  | "; next}
-			! itson {itson=1; printf(header""leadingEmpty"%s\n", $0); next}
-			itson {printf("  | %s\n", $0)}
+			function flush() {
+				switch (NR) {
+					case 0: break;
+					case 1: printf(header""l1"\n"); break;
+					case 2:
+						printf(header"\n");
+						printf("  | %s\n", l1);
+						printf("  | %s\n", l2);
+				}
+			}
+			NR==1 {l1=$0; next}
+			NR==2 {l2=$0; flush(); next}
+			{printf("  | %s\n", $0)}
+			END {
+				if (NR<2) flush();
+			}
 		'
 	)
 }
@@ -869,13 +889,17 @@ function cr_daemonAutoStartIsSetTo::apply() {
 # If the script's oob_getRequiredUserAndGroup returns a value it will override the one this function returns
 function daemon_oob_getRequiredUserAndGroup()
 {
+	shift # the cmd line position is not used.
+	shift # the $0 cmdname is not used.
 	bgCmdlineParse "hN:FvDqO" "$@"; shift "${options["shiftCount"]}"
-	# this sets the required user for the real daemon proc invocation
-	if [ "${options[-F]}" ]; then
-		if [ "$(type -t oob_getRequiredUserAndGroup)" ]; then
-			oob_getRequiredUserAndGroup "$@"
+
+	# if the user supplied callback returned an answer, use it, which overrides the default behavior of this callback
+	if [ "$(type -t oob_getRequiredUserAndGroup)" ]; then
+		local results="$(oob_getRequiredUserAndGroup "$@")"
+		if [ "$results" ]; then
+			echo "$results"
+			return 0
 		fi
-		return
 	fi
 
 	local daemonName="${options["-N"]:-${0##*/}}"
@@ -905,6 +929,13 @@ function daemon_oob_getRequiredUserAndGroup()
 			esac
 			;;
 	esac
+
+	# if the daemon is being launched, this sets its required user. Typically it is root because it needs to set the privileged PID file
+	# and then it might drop privileges to a different user
+	if [ "${options[-F]}" ]; then
+		echo "root"
+	fi
+
 }
 
 
