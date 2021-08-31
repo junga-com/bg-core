@@ -1,6 +1,12 @@
 # bg-core
 
-This is a library for writing secure bash scripts. It supports many features that make it easier to write and maintain good scripts that participates in the operating system's host environment.
+| :warning: WARNING          |
+|:---------------------------|
+| This library is in a pre-release state. The readme file is full of mini tutorials that demonstrate most of the features. If you try any out, I would love to here about your experience.
+I have only tested on Ubuntu 20.04 but it should work in other distributions and versions without major change.
+
+
+This is a library for writing secure bash scripts. It provides many features that make it easier to write and maintain good scripts that participates in the operating system's host environment.
 
 The motivation of this package is a philosophy that developing software at all levels should be linearly independent. Instead of developing platforms that can be hosted on an OS, the OS is the platform and components coexist and compliment each other.
 
@@ -10,18 +16,30 @@ This package is part of a larger ecosystem that I have developed consisting of f
 
 
 ## Key features include...
+Click on each item to scroll down to its mini-tutorial.
 
- * import: system for importing (aka sourcing) bash libraries.
+ * [Script Modularity](#Script-Modularity): An Import System for importing (aka sourcing) bash libraries.
    See man(3) import  (you need to specify the section like man -s3 import)
- * options processing: easy, idiomatic options processing syntax that supports short and long options both with and without arguments and short option concatenation. Works for functions and commands.
- * in-place cmdline argument completion: your script provides the completion data to bash so that the syntax is maintained in one place
-   See man(3) _bgbc-complete-viaCmdDelegation, man(3) oob_printBashCompletion, and man(3) oob_invokeOutOfBandSystem
- * simple text template expansion against the linux environment variables
- * full featured bash debugger (the debugger UI's are in the bg-dev package)
- * easy to use error handling patterns with some exception throw / catch semantics and stack traces for script exits
-   See man(3) assertError
- * tracing: system for putting trace statements in scripts that can be turned on/off and redirected to various destinations
-   See man(1) bg-debugCntr
+ * [Testing](#Testing): A system for maintaining unit tests alongside scripts and other resources.
+ * [Debugging](#Debugging): Features to debug BASH scripts using a debugger or tracing.
+ * [Error Handling](#Error-Handling): Make robust scripts that print relevant diagnostics when they do not succeed.
+ * [Documentation](#Documentation): Produce man pages and web sites automatically from scripts content.
+ * [Command Structure](#Command-Structure): Supports a simple pattern for defining the options and positional parameters that a command script or script function accepts. Automatically supports short and long form options with and without arguments. Automatically supports command line completion to document the optional and required parameters.
+ * [Daemons](#Daemons): Create a script application that is controlled on the target host as a daemon.
+ * [Configuration Files](#Configuration-Files): Read and set configuration settings in various file formats.
+ * [Object Oriented Bash](#Object-Oriented-Bash): Use object oriented techniques to organize BASH script code.
+ * [Plugins](#Plugins): Plugins provide a way to build features that can be extended by third party scripts delivered in different packages.
+ * [RBACPermission Plugins](#RBACPermission-Plugins): Define permissions that can be granted to users that results in the user being able to perform only a specific function.
+ * [Collect Plugins](#Collect-Plugins): Activating a Collect plugin on a host causes it to record some information periodically. This is typically used to collect information on hosts into a central management system.
+ * [Declarative Configuration Part 1 -- Creqs](#declarative-configuration-part-1----creqs): A declarative configuration statement describes how something on a host should be and then can be used to either test to see if the host complies with the description or modify the host so that it does.
+ * [Declarative Configuration Part 2 -- Standards and Config Plugins](#Declarative-Configuration-Part 2----Standards-and-Config-Plugins): These plugin types provide a script written with creqs that represent a unit of configuration that can be applied or checked.
+
+
+This is a list of some noteable descrete features...
+ * templates: simple text template expansion against the linux environment variables
+ * debugger: full featured bash debugger (the debugger UI's are in the bg-dev package)
+ * assertError: easy to use error handling patterns with some exception throw / catch semantics and stack traces for script exits
+ * bgtrace: tracing: system for putting trace statements in scripts that can be turned on/off and redirected to various destinations
  * progress feedback: scripts can 'broadcast' their progress and the environment that the script runs and user preferences can determine if and how the progress is displayed
  * bash idioms: various idiomatic functions are provided to make passing parameters to functions and working with bash variables easier
  * cuiWin : when running on a desktop host, a script can open additional terminal windows to provide UI
@@ -29,6 +47,7 @@ This package is part of a larger ecosystem that I have developed consisting of f
  * RBAC permission system (using sudo)
  * Daemon scripts: easily write a script which can be deployed as a full featured, manageable daemon
  * configuration files: read and write configuration files in a variety of formats
+
 
 ## Script Modularity
 
@@ -64,9 +83,13 @@ $ chmod a+x /tmp/test3.sh
 $ /tmp/test3.sh
 p1 is 'hello. we are running on' and p2 is 'ubuntu'
 ```
-The import syntax is a wrapper over the bash `source bg_ini.sh` command that adds idempotency (you can call it more than once with no ill effect), secure location finding, and other features. This means a library script can import its dependencies without regard to whether the script its being used in has imported it or not. The script also does not need to know where the library script is located which may be different on different OS and between production and development environments.  
+This import syntax is a wrapper over the bash `source bg_ini.sh` command that makes it easier and convenient to use.
 
-The ` ;$L1` is an an idiomatic thing. Bash is not a modern language but its ubiquitous. Sometimes we need to adopt some idiom that might not be clear in itself but its simple and just works. To work efficiently, the import statement needs us to follow that syntax. IDE's can help make it easy to know what idioms are available and to follow them.
+It adds idempotency which means you can call it more than once with no ill effect so that you do not have to be concerned if something else in the script has already sourced the library.
+
+It adds a secure search path so that you can import the name of the library script without being concerned with where the library is. A library script can be included in a package that can be installed as needed.
+
+The ` ;$L1` part of the syntax is an an idiomatic thing. Bash is not a modern language but its ubiquitous. Sometimes we need to adopt some idiom that might not be clear in itself but its simple and just works. To work efficiently, the import statement needs us to follow that syntax. IDE's can help make it easy to know what idioms are available and to follow them.
 
 See:
 * man(3) import
@@ -709,15 +732,15 @@ Since they are plugins, you can provide Standards and Config scripts in packages
 
 Config plugins can be used just like Standards but can additionally be ran in apply mode to affect a change in the host configuration to make it comply.
 
-The Standards, Config, Standards and RBACPermission plugins are the heart of a system of distributed system administration that provides central command and control without requiring that any remote user have unrestricted privilege on a host. This is an important new firewall that limits risk in an organization by allowing compartmentalization to an extent not achieved by other means.
+Standards, Config, and RBACPermission plugins are the heart of a system of distributed system administration that provides central command and control without requiring that any remote user have unrestricted privilege on a host. This is an important new firewall that limits risk in an organization by allowing compartmentalization to an extent not achieved by other means.
 
 
 
 ## bg-core Project Folder Description
 
-The bg-core project is managed by the bg-dev project tools. The asset scanners and installers in bg-dev and development packages tools that extend it define how files in various folders in the project are treated. When you install an asset scanner and installed plugin, it will generally identify assets of its type by the containing folder as well as possibly the file extension and file type.   
+The bg-core project is managed by the bg-dev project tools. The asset scanners and installers built into the bg-dev package and other packages that extend bg-dev define how files in various folders in the project are treated. When you install an asset scanner and installer plugin, it will generally identify assets of its type in a project folder by the file path, extension and type.
 
-Note that typically, bg-dev projects place all bash library scripts in the <projectFolder>lib/ subfolder but this project places them in several subfolders to reflect the bootstrapping nature of bg-core.
+Note that typically, bg-dev projects place all bash library scripts in the <projectFolder>lib/ subfolder but the bg-core  project places them in several subfolders to reflect the bootstrapping nature of bg-core.
 
 ### Root level
 
