@@ -4,6 +4,12 @@
 |:---------------------------|
 | This library is in a pre-release state. The readme file is full of mini tutorials that demonstrate most of the features. If you try any out, I would love to here about your experience.
 I have only tested on Ubuntu 20.04 but it should work in other distributions and versions without major change.
+I am not building the packages for this library yet. To test it, clone bg-core and bg-dev into a new folder (for example ~/bg-sandbox/) and virtually install with the bg-debugCntr command like...
+ ~/$ `mkdir bg-sandbox; cd bg-sandbox`
+ ~/bg-sandbox$ `git clone git@github.com:junga-com/bg-dev.git`
+ ~/bg-sandbox$ `git clone git@github.com:junga-com/bg-core.git`
+ ~/bg-sandbox$ `source ~/bg-sandbox/bg-dev/bg-debugCntr; bg-debugCntr vinstall ~/bg-sandbox/; bg-debugCntr trace on:`
+
 
 
 This is a library for writing secure bash scripts. It provides many features that make it easier to write and maintain good scripts that participates in the operating system's host environment.
@@ -97,7 +103,7 @@ See:
 
 ## Testing
 
-To build good scripts and especially good script libraries, you need to define the expected behavior and automate the testing of each new change to see if the expected behavior is still achieved.
+To build good scripts and especially good script libraries, you need to define the expected behavior and automate the testing of that behavior each time a change is made.
 
 Unit tests scripts are simple bash scripts that follow a minimal pattern.
 ```bash
