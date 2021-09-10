@@ -10,6 +10,8 @@ function manifestGetFile(                      manFile) {
 
 function manifestGet(assetTypeMatch, assetNameMatch, array                    ,manFile,cmd,script,asset) {
 	manFile=manifestGetFile()
+	assetTypeMatch="^" gensub(/^\^/,"","g",assetTypeMatch)
+	assetNameMatch="^" gensub(/^\^/,"","g",assetNameMatch)
 	script="$2~/"assetTypeMatch"/ && $3~/"assetNameMatch"/ {print $4}"
 	cmd="awk '"script"' "manFile
 	arrayCreate(array)

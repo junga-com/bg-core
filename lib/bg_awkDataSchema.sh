@@ -243,13 +243,20 @@ function awkData_parseID()
 	local awkTableNameValue awkDataFileValue awkDataSchemaFileValue
 	stringSplit -d'|' "$awkDataID" awkTableNameValue awkDataFileValue awkDataSchemaFileValue
 
+	# For one-off tables, the user might specify either the awkFile alone and then we glean the table name from the filename
+	if [ ! "$awkTableNameValue" ]; then
+		local filename="$awkDataFileValue"
+		awkTableNameValue="${filename##*/}"
+		awkTableNameValue="${awkTableNameValue%.*}"
+	fi
+
 	# typical case: lookup the schema from the table name
 	if [ "$awkTableNameValue" ] && [ ! "$awkDataSchemaFileValue" ]; then
 		awkDataSchemaFileValue="$(manifestGet -o '$4' "data.awkDataSchema" "$awkTableNameValue")"
-		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID -v awkTableNameValue "No awk schema registered for table name"
+		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID -v awkTableNameValue "No data.awkDataSchema asset installed for table name"
 	fi
 
-	# If the shemaFile field contains a simple table name, look up the schema asset
+	# If the schemaFile field contains a simple table name, look up the schema asset
 	# This is a case where the caller is crafting a new data table from an existing schema definition. The caller can assign a new
 	# table name and awkFile location and an existing installed schema.
 	if [[ ! "$awkDataSchemaFileValue" =~ [/.] ]] && [ ! -f "$awkDataSchemaFileValue" ]; then
@@ -263,8 +270,7 @@ function awkData_parseID()
 		[ "$awkDataFileValue" ] || assertError -v awkdatID -v awkDataSchemaFileValue "Neither the awk schema file nor the awkDataID specify the awkFile path"
 	fi
 
-	# For one-off tables, the user might specify either the awkFile or the schemaFile alone and then we glean the table name from
-	# the filename of the data file.
+	# If only the awkDataSchemaFile was specified, the awkDataFile was not available when we first tried to glean the name so check it again
 	if [ ! "$awkTableNameValue" ]; then
 		local filename="${awkDataFileValue:-$awkDataSchemaFileValue}"
 		awkTableNameValue="${filename##*/}"

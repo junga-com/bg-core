@@ -332,62 +332,51 @@ function awkData_readHeader() {
 
 # usage: akwDataIDLongForm awkData_parseID(awkDataIDShortForm|akwDataIDLongForm)
 # Returns the long form of akwDataID regardless of whether the short or long form is passed in.
-# Note that this implementation is not as complete as the bash implementation. Typically a bash script should pass in the long form
-# always but this is useful when testing awk scripts from the command line with common awkDataID that this does support.
-function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchemaFile,schemas) {
-	# its in the long form but we still check to see if any pieces need filling in
-	if (awkDataID ~ /[|]/) {
-		#awkDataID|awkObjName|awkFile|awkSchemaFile
-		# 1        2          3       4
-		split(awkDataID, awkObjData, "|")
-		awkDataID=awkObjData[1];
-		awkObjName=awkObjData[2];
-		awkFile=awkObjData[3];
-		awkSchemaFile=awkObjData[4];
+function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchemaFile,schemas,script,cmd) {
+	#awkObjName|awkDataFile|awkSataSchemaFile
+	# 1          2       3
+	split(awkDataID, awkObjData, "|")
+	awkObjName=awkObjData[1];
+	awkFile=awkObjData[2];
+	awkSchemaFile=awkObjData[3];
 
-		if (!awkDataID) {
-			awkDataID=awkObjName;
-		}
+	if (!awkObjName && awkFile)
+		awkObjName=gensub(/(^.*\/)|([.].*$)/,"","g",awkFile)
 
-		if (!awkSchemaFile) {
-			arrayCreate(schemas)
-			manifestGet("awkDataSchema", awkObjName, schemas)
-			switch (length(schemas)) {
-				case 0: assert("no awkDataSchema was found in the host manifest for awkObjName ='"awkObjName"'")
-				case 1: awkSchemaFile=schemas[1]; break
-				default: assert("multiple manifest entries matched for type='awkDataSchema' and name ='"awkObjName"'")
-			}
-		} else if (!fsExists(awkSchemaFile)) {
-			arrayCreate(schemas)
-			manifestGet("awkDataSchema", awkSchemaFile, schemas)
-			switch (length(schemas)) {
-				case 0: assert("the awkSchemaFile does not exist and is not the name of a awkDataSchema in the host manifest. awkSchemaFile='"awkSchemaFile"'")
-				case 1: awkSchemaFile=schemas[1]; break
-				default: assert("multiple manifest entries matched for type='awkDataSchema' and name ='"awkSchemaFile"'")
-			}
-		}
-
-	# this block is for filename that are specified as awkObjNames. If it contains a / or .
-	# it can not be a valid domData awkObjName name, it must be a filename
-	} else if (awkDataID ~ /[/.]/) {
-		# note that the bash version of awkData_parseID will detect if the file path matches a domData awkData and handle that correctly
-		awkObjName=awkDataID; gsub(/(^.*\/)|(.cache$)(.schema$)/,"", awkObjName)
-		awkFile=awkDataID; gsub(/(.cache$)(.schema$)/,"", awkFile); awkFile=awkFile".cache"
-		awkSchemaFile=awkFile; sub(/.cache$/,".schema", awkSchemaFile)
-
-	# <awkObjName> syntax
-	} else {
-		awkObjName=awkDataID
+	if (!awkSchemaFile && awkObjName) {
 		arrayCreate(schemas)
-		manifestGet("awkDataSchema", awkObjName, schemas)
+		manifestGet("^data.awkDataSchema$", "^"awkObjName"$", schemas)
 		switch (length(schemas)) {
-			case 0: assert("no awkDataSchema was found in the host manifest for awkObjName ='"awkObjName"'")
+			case 0: assert("No data.awkDataSchema asset installed for table name '"awkObjName"'")
 			case 1: awkSchemaFile=schemas[1]; break
 			default: assert("multiple manifest entries matched for type='awkDataSchema' and name ='"awkObjName"'")
 		}
 	}
 
-	return awkDataID"|"awkObjName"|"awkFile"|"awkSchemaFile
+	if ( (awkSchemaFile !~ /[/.]/) && !fsExists(awkSchemaFile)) {
+		arrayCreate(schemas)
+		manifestGet("awkDataSchema", awkSchemaFile, schemas)
+		switch (length(schemas)) {
+			case 0: assert("Invalid awkDataSchemaFile specified in the awkDataID. It should be either the full path to a schema file or the asset name of a installed data.awkDataSchema asset on the host awkDataSchemaFile='"awkSchemaFile"'")
+			case 1: awkSchemaFile=schemas[1]; break
+			default: assert("multiple manifest entries matched for type='awkDataSchema' and name ='"awkSchemaFile"'")
+		}
+	}
+
+	if (awkSchemaFile && ! awkFile) {
+		script="$1==\"awkFile\" {print gensub(/[[:space:]]*#.*$/,\"\",\"g\",$2);exit(0)} /^[[:space:]]*[[]/ {exit(0)}"
+		cmd="gawk -F= '"script"' " awkSchemaFile
+		cmd | getline awkFile
+		close(cmd)
+		if ( !awkFile )
+			assert("Neither the awk schema file nor the awkDataID specify the awkFile path. awkDataID="awkDataID)
+
+	}
+
+	if (!awkObjName && awkFile)
+		awkObjName=gensub(/(^.*\/)|([.].*$)/,"","g",awkFile)
+
+	return awkObjName"|"awkFile"|"awkSchemaFile
 }
 
 # usage: awkData_initDataScan(schema, where)
@@ -444,17 +433,17 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 	if (!awkDataID)
 		assert("-v awkDataID (awk)schemaInfo_restore(): awkDataID is a required parameter")
 
-	#awkDataID|awkObjName|awkFile|awkSchemaFile
-	# 1        2          3       4
+	info["noSchemaDataFound"]=1 # initially assume that we wont find any data
+
+	#awkObjName|awkFile|awkSchemaFile
+	# 1          2       3
 	split(awkData_parseID(awkDataID), awkObjData, "|")
-	awkDataID=awkObjData[1]
 
 	# set the information from the parsed awkDataID
-	info["noSchemaDataFound"]=1 # initially assume that we wont find any data
 	info["awkDataID"]=awkDataID
-	info["awkObjName"]=awkObjData[2]
-	info["awkFile"]=awkObjData[3]
-	info["awkSchemaFile"]=awkObjData[4]
+	info["awkObjName"]=awkObjData[1]
+	info["awkFile"]=awkObjData[2]
+	info["awkSchemaFile"]=awkObjData[3]
 
 	schemaFileRead=""
 	schemaSection=""
@@ -660,17 +649,16 @@ function gleanColumnWidth(colStr, colName                      ,token,rematch) {
 #    bgawkSchemaClass : schema class documentation
 function schema_restore(awkDataID            ,awkDataIDLongForm,awkObjData) {
 	if (!awkDataID)
-		assert("-v schemas[awkDataID]["info"]=<value> is a required parameter to this library")
+		assert("-v awkDataID is a required parameter to this library")
 
-	#awkDataID|awkObjName|awkFile|awkSchemaFile
-	# 1        2          3       4
+	#awkObjName|awkFile|awkSchemaFile
+	# 1          2       3
 	awkDataIDLongForm=awkData_parseID(awkDataID)
 	split(awkDataIDLongForm, awkObjData, "|")
-	awkDataID=awkObjData[1]
 
-	arrayCreate2(schemas,awkDataID)
-	arrayCreate2(schemas[awkDataID], "info")
-	schemaInfo_restore(schemas[awkDataID]["info"], awkDataIDLongForm)
+	arrayCreate2(schemas,awkObjData[1])
+	arrayCreate2(schemas[awkObjData[1]], "info")
+	schemaInfo_restore(schemas[awkObjData[1]]["info"], awkDataIDLongForm)
 
 	if (! ("noSchemaDataFound" in schemas[awkDataID]["info"])) {
 		schema_construct(schemas[awkDataID], schemas[awkDataID]["info"])
