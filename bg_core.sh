@@ -37,7 +37,7 @@ set +e
 # -> fix -> repeat. This library supports a concept of production modes. A script run on a host in production mode have its mode set
 # based on whether the script itself is a secure system script or a user script. Script libraries installed into system folders
 # should each start with an entry statement that fails out if they are not sourced below this file so that they can not be used by
-# user scripts directly. Library functions that implement develoment features use the production mode to determine if those functions
+# user scripts directly. Library functions that implement development features use the production mode to determine if those functions
 # are available.
 #
 # The structure of this library supports efficient remote integrity checks so that a remote, unprivileged supervisor can
@@ -231,7 +231,7 @@ if [ "$1" != "--queryMode" ]; then
 	function _coreFindInclude()
 	{
 		# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
-		# searched in non-develoment mode
+		# searched in non-development mode
 		if [ "$bgSourceOnlyUnchangable" ]; then
 			local includePaths="$scriptFolder:/usr/lib"
 		else

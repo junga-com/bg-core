@@ -39,9 +39,11 @@ Click on each item to scroll down to its mini-tutorial.
  * [Collect Plugins](#Collect-Plugins): Activating a Collect plugin on a host causes it to record some information periodically. This is typically used to collect information on hosts into a central management system.
  * [Declarative Configuration Part 1 -- Creqs](#declarative-configuration-part-1----creqs): A declarative configuration statement describes how something on a host should be and then can be used to either test to see if the host complies with the description or modify the host so that it does.
  * [Declarative Configuration Part 2 -- Standards and Config Plugins](#Declarative-Configuration-Part 2----Standards-and-Config-Plugins): These plugin types provide a script written with creqs that represent a unit of configuration that can be applied or checked.
+ * [Simple Text Database](#Simple-Text-Database): awkData is a lightly coupled, low barrier to entry database system.
 
 
-This is a list of some noteable descrete features...
+This is a list of some noteable discrete features...
+ * printfVars: powerful and compact way to format shell variables of various types for output
  * templates: simple text template expansion against the linux environment variables
  * debugger: full featured bash debugger (the debugger UI's are in the bg-dev package)
  * assertError: easy to use error handling patterns with some exception throw / catch semantics and stack traces for script exits
@@ -53,6 +55,7 @@ This is a list of some noteable descrete features...
  * RBAC permission system (using sudo)
  * Daemon scripts: easily write a script which can be deployed as a full featured, manageable daemon
  * configuration files: read and write configuration files in a variety of formats
+ * awkData: a lightly coupled text file database system.
 
 
 ## Script Modularity
@@ -234,6 +237,7 @@ $ chmod a+x /tmp/test5.sh
 ```
 
 ```bash
+$ bg-debugCntr trace off
 $ /tmp/test5.sh hey
 
 error: bar: ls "$p1" --FOO 2>$assertOut || assertError
@@ -242,10 +246,11 @@ error: bar: ls "$p1" --FOO 2>$assertOut || assertError
     : ls: unrecognized option '--FOO'
     : Try 'ls --help' for more information.
 ```
-Notice how the default error report shows us the source line of the command that failed and even the values of the variables used in that line. assertError can be passed many options to affect how the error is displayed and with what context.
+Because bgtrace is off, this is the message a normal user would see when encountering an exception in a script. Notice how the default error report shows us the source line of the command that failed and even the values of the variables used in that line. This gives the user some information that might help them work around the problem. assertError can be passed many options to affect how the error is displayed and with what context.
 
-Lets run it again with bgtrace enabled to get a full stack trace.
+Lets run it again with bgtrace enabled to get a full stack trace. This is what the developer typically sees when an exception is encountered while testing the script.
 ```bash
+$ bg-debugCntr trace on:
 $ /tmp/test5.sh blue
 ls: unrecognized option '--FOO'
 Try 'ls --help' for more information.
@@ -264,11 +269,13 @@ error: bar: ls "$p1" --FOO || assertError
 =================  bottom of call stack trace  ==========================
 $
 ```
+The stack trace lets the developer understand the context that the exceptions happened in.
+
 We can also use `bg-debugCntr debugger stopOnAssert` to invoke the debugger if an uncaught assert happens.
 
-When writing reusable library code, you don't really know how the script that uses your code will want to deal with the errors it might produce. The assert* family of functions allows you to declare that the function can not complete its task but not necessarily that the script needs to exits.
+Calling an assert is similar to throwing an exception in other languages. When writing reusable library code, you don't really know how the script that uses your code will want to deal with the errors it might produce. The assert* family of functions allows you to declare that the function can not complete its task but not necessarily that the script needs to exit because the calling script can catch and handle the exception.
 
-Calling an assert is similar to throwing an exception in other languages. Modify the test5.sh script to put Try: / Catch: statements around the call to myFunc
+Modify the test5.sh script to put Try: / Catch: statements around the call to myFunc
 ```bash
 Try:
     myFunc "$@"
@@ -299,7 +306,7 @@ catch_stkArray[]
               [4]=' test5.sh:(7):              : ls "$p1" --FOO 2>$assertOut || assertError'
 
 ```
-Now the script continues to completion instead of ending prematurely. We printed out all the catch_* variables so that you can see the context the Catch block has at its disposal to determine what happened and decide how to proceed.
+Now the script continues to completion instead of ending prematurely. We printed out all the catch_* variables so that you can see the context the Catch block has at its disposal to determine what happened and decide how to proceed. In a real script it might use that information to quietly handle the exception or it might use it to display a better error message and then exit.
 
 See
 * man(1) bg-debugCntr
@@ -321,11 +328,9 @@ See
 * man(1) bg-dev-funcman
 * man(7) bg_funcman.sh
 
-The second mechanism is the "out of band" script mechanism. When a script includes a call to  `oob_invokeOutOfBandSystem`, the command will inherit certain functionality. The -h option will open the command's man page and bash completion will be supported.
+The second mechanism for documentation is Command line completion support. When a script includes a call to  `oob_invokeOutOfBandSystem`, the command will inherit certain functionality. It will recognize when the script is invoked with an option that starts with "-h". The -h option will open the command's man page and other out of band options allow a generic bash completion stub to query the script for information about that command line syntax it requires.
 
-Command line completion is an important form of documentation. The BC (bash completion) support adds a convention that comment strings
-can be added to the suggested words to give the user context about what they are entering. Comments are surrounded by '<>' which makes
-then unselectable.
+Command line completion is an important form of documentation. Thi ssupport adds a notion to bash completion that in addition to suggested words, the command can also display non-selectable words that gives the user context about the command line paramter being entered.
 
 ```bash
 $ cat - >/tmp/test6.sh
@@ -359,7 +364,7 @@ $ /tmp/test6.sh --file=tags bobg cat
 ***** bg-debugCntr: Tracing='/tmp/bgtrace.out'. Vinstall='ON:bg-core:'
 ```
 
-By having the bash completion algorithm inside the script, it encourages its development and maintenance along with the script. I find that I build the command line syntax first for each new feature I write so that I can select files and other parameters from lists instead of finding the values and typing them in. BC becomes a sort of UI for the command line that gives the user lists of choices and with this system the tools of the script are available to the BC routine so it can be very dynamic, filtering the list to exactly the values that are possible given the arguments already completed. Check out the bg-awkData command for a great example of that.
+By having the bash completion algorithm inside the script, it encourages its development and maintenance along with the script. I find that I build the command line syntax first for each new feature I write so that I can select files and other parameters from lists instead of finding the values and typing them in. BC becomes a sort of UI for the command line that gives the user lists of choices. Also, by providing the BC code inside the script, the functions that the script uses are available so that it can be very dynamic, filtering the list to exactly the values that are possible given the arguments already completed. Check out the bg-awkData command for a great example of that.
 
 There are many ways to write an oob_printBashCompletion function. This example passes a syntax string to bgBCParse that allow it to do most of the work. Then it adds to the results by providing suggestions for <name> and <foo> type arguments.
 
@@ -370,10 +375,13 @@ See
 
 ## Command Structure
 
-Every language has a function call protocol that defines the mechanism that passes arguments provided by the caller to the parameters expected by the function. This is the principle thing that makes any shell language like BASH different from other languages. Its a blessing and a curse. The blessing is that it makes the language mimic typing commands at a terminal and bash functions are called just like any external command installed on the host.  The curse is that compared to modern languages, the syntax can be quirky and cryptic.
+Every language has a function call protocol that defines the mechanism that passes arguments provided by the caller to the parameters expected by the function. The call mechanism used by shell language like BASH is the principle thing that makes them different from other languages. The call mechanism they use is both a blessing and a curse. The blessing is that it makes the language mimic commands typed at a terminal and bash functions are called just like any external command installed on the host.  The curse is that compared to modern languages, the syntax can be quirky and cryptic.
 
-Supporting the traditional command line syntax with long and short options with and without arguments, entered with and without separating spaces and optionally combining multiple short options has been very hard until now. The bgOpt* family of functions allow a syntax that is easy to reproduce in scripts and functions to support all conventions with a minimum of overhead.
+A convention has formed around the syntax of passing arguments to commands. Arguments can be optional or positional. Optional arguments can be specified on the command line in different ways -- short and long options, with and without an argument, options and their arguments can sometimes be combined into one token or can be specified in multiple tokens.
 
+Supporting this syntax convention completely has been so hard that it is common that simple or quickly written scripts do not making commands less uniform. The bgOpt* family of functions makes it so that the easiest way to add support for an option will fully support the conventions.
+
+Check out this example script.
 ```
 $ cat - >/tmp/test8.sh
 #!/usr/bin/env bash
@@ -382,29 +390,30 @@ oob_invokeOutOfBandSystem "$@"
 while [ $# -gt 0 ]; do case $1 in
 	-a|--all)  allFlag="-a" ;;
 	-b|--my-bFlag) myBFlag="-b" ;;
-	-c*|--catBread*) bgOptionGetOpt val: catBread "$@" && shift ;;
+	-c*|--catBreed*) bgOptionGetOpt val: catBreed "$@" && shift ;;
 	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 done
 p1="$1"; shift
 p2="${1:-"defaultP2Value"}"; shift
-printfVars allFlag myBFlag catBread p1 p2
+printfVars allFlag myBFlag catBreed p1 p2
 <cntr-d>
 $ chmod a+x /tmp/test8.sh
 ```
-Ok, at first glance this is not simple. But its another idiomatic thing. The first and last two lines of the while loop are constant. You dont need to think about them. Copy and paste them or rely on an editor snipit to add them to your script or function. What you do care about are the lines starting with -a, -b, and -c. Each of those lines introduce a supported option. Option -c requires an argument.
+Ok, at first glance this is not simple. But its an idiomatic thing. The first and last two lines of the while loop are constant. You dont need to think about them. Copy and paste them or rely on an editor snipit to add them to your script or function. What you do care about are the lines starting with -a, -b, and -c. Each of those lines introduce a supported option. Can you tell that option -c requires an argument and options -a and -b do not?
+
 After a while, you get conditioned to recognizing the options loop at the start of a function or script body and it becomes simple to understand.
 
-The glean feature in the bgBCParse function understands this idiom so it automatically provides completion help for the user to know that options are available, what they are, and which require arguments. This script does not implement a oob_printBashCompletion callback so it will use the default BC algorithm using only the glean feature.
+This script uses the default BC behavior which will glean the option syntax from the standard options block to let the user know that optional arguments are available, what they are, and if any require an argument.  You could define the oob_printBashCompletion callback function in your script to add bespoke option processing if needed. Note that the words surrounded in &lt&gt are comments that give the user context and can not be selected.
 
 ```
 $ /tmp/test8.sh<tab><tab>
 <optionsAvailable>  >                   
 $ /tmp/test8.sh -<tab><tab>
-<options>    -a           --all        -b           --my-bFlag   -c           --catBread=  
-$ /tmp/test8.sh --catBread=calico one
+<options>    -a           --all        -b           --my-bFlag   -c           --catBreed=  
+$ /tmp/test8.sh --catBreed=calico one
 allFlag=''
 myBFlag=''
-catBread='calico'
+catBreed='calico'
 p1='one'
 p2='defaultP2Value'
 ```
@@ -414,10 +423,11 @@ p2='defaultP2Value'
 
 ## Daemons
 
-Some commands are meant to be invoked by a user and others are meant to run in the background to provide some long running feature. Still others are meant to be invoked in response to some system event. Commands that are run by the host init system  are daemons.
+Some commands are meant to be invoked by a user and others are meant to run in the background to provide some long running feature. Still others are meant to be invoked in response to some system event. Commands that are run by the host system as opposed to a user are daemons.
 
-Writing a good linux daemon has traditionally been difficult. Scripts that source /usr/lib/bg_core.sh can declare that they are a daemon and the oob_printBashCompletion system will provide many common features that a good daemon should support. For testing, the daemon can be started and stopped manually without installing it into the host and then when packaged and installed on a host, it
-will controlled by systemd, sysV, or what ever init system the host supports.
+Writing a good linux daemon has traditionally been difficult, especially as a script.  bg-core provides a way to easily create a script file that runs as a well behaved daemon.
+
+For testing, the daemon can be started and stopped manually without installing it into the host and then when packaged and installed on a host, it will controlled by the host's init system whether its systemd, sysV, or upstart.
 
 ```bash
 $ cat - >/tmp/test7.sh
@@ -457,19 +467,17 @@ last 3 log lines:
 $ /tmp/test7.sh stop
 test7.sh is stopped
 ```
-Note that sudo is required to run the daemon so that it can write to the pid and log files in the system folders. You can configure
-The daemon to drop privilege to a different user and it will manage the ownership and permissions on those files accordingly.
+Note that sudo is required to run the daemon so that it can write to the pid and log files in the system folders. You can configure the daemon to drop privilege to a different user and it will manage the ownership and permissions on those files accordingly.
 
-The loop of this daemon wakes up every 5 seconds to do something. It could alternatively block on reading a pipe to receive messages.
-The daemonCheckForSignal API allows the daemon to respond to signals synchronously with respect to the task that it performs. For
-example, when it receives SIGTERM, it will finish the current loop and then drop out to the exit code so that it shuts down gracefully.
+The loop of this daemon wakes up every 5 seconds to do something. It could alternatively block on reading a pipe to receive messages. The daemonCheckForSignal API allows the daemon to respond to signals synchronously with respect to the task that it performs. For example, when it receives SIGTERM, it will finish the current loop and then drop out to the code after the loop so that it shuts down gracefully.
 
 
 ## Configuration Files
 
-Devops and sysops coding involves a lot of configuration file manipulation. The bg_ini.sh library provides commands to read and write
-to different kinds of configuration files (not just just ini formatted files) while the bg_template library provides a way to manage
+Devops and sysops coding involves a lot of configuration file manipulation. The bg_ini.sh library provides commands to read and write to different kinds of configuration files (not just just ini formatted files) while the bg_template library provides a way to manage
 and expand a library of template files.
+
+**Reading and writing config file settings**
 
 ```bash
 $ bg-debugCntr vinstall sourceCore  
@@ -498,9 +506,14 @@ $ iniParamSet /tmp/data9 webserver template yourTemplate
 $ iniParamGet /tmp/data9 webserver template mytemplate
 yourTemplate
 ```
-There are many features of the ini* and config* functions from bg_ini.sh so this example only illustrates a few. When these functions change files, they preserve the existing order and comments where ever possible. They try to make making a change as close as possible to how a human would make the change, preserving work done by other humans to organize and comment the file.
+There are many features of the ini* and config* functions from bg_ini.sh so this example only illustrates a few. When these functions make a change to files, they preserve the existing order and comments where ever possible. They try to make the change as close as possible to how a human would make the change, preserving work done by other humans to organize and comment the file.
 
-Note that the /tmp/data9[webserver]template setting did not initially exist. A common idiom is that when making a script we decide that it needs some information like a file path. We dont want to hard code it but we also want the script to work in a reasonable way with zero configuration. So we can retrieve the value from a config file and provide a reasonable default value. If the file does not exist or the setting is missing, the default value is returned but the host admin or end user can configure the file to change the script's behavior. The script author can mention the setting in the comments of the script that will become the man page. The `domDataConfig ...` function from bg_domData.sh library is similar but uses a concept of a virtual config file for the operating domain so that not only can the script author provide the default value but also the domain admin, location admin or host admin can manage their default values and the most specific value will be used.
+Note that the [webserver]template setting inside /tmp/data9 did not initially exist. A common idiom is that when making a script we decide that it needs some information like a file path. We dont want to hard code it but we also want the script to work in a reasonable way with zero configuration. So we can retrieve the value from a config file and provide a reasonable default value. If the file does not exist or the setting is missing, the default value is returned but the host admin or end user can configure the file to change the script's behavior. The script author can mention the setting in the comments of the script that will become the man page.
+
+**Domain Configuration**
+
+The `domDataConfig ...` function from bg_domData.sh library is similar to the iniParam function but uses a concept of a virtual config file for the operating domain. We do not pass the configuration filename to the function call since it uses the well known global file.  That file is 'virtual' because it is actually the combination of multiple files that produce the end result.  This makes it so that a domain admin can change the default value for a set of hosts and a local host admin could override that default.  The most specific value will be used. When changing a value, the default is to change it only on the host but if the user has sufficient privilege, they can specify that it be changed at a different scope level.
+
 
 **Templates**
 
@@ -723,6 +736,22 @@ Notice that because we did not use the verbose switch to the creqApply command, 
 You can also access the check operation of a creq statement directly with the bg-creqCheck command. Its exit code will reflect whether the host complies with the configuration described by the statement.
 
 The reason that this simple idea is so powerful is that often, performing the earlier steps in a configuration algorithm would mess up the target state if it is already in a later, possibly customized state of configuration. This allows writing the algorithm with the quality of idempotency which means you can call it multiple times without adverse affect.
+
+
+## State Database
+A host computer's state is made up of base state from the operating system and additional state from all the applications installed on the host.  We can think of the host as an object instance of a computer class. The provisioning and configuration data can be thought of as state variables of the computer.
+
+The problem is that the provisioning and configuration data is spread out over non-uniform commands and files.
+
+Awkdata is a text database system that can help access the disparate configuration and provisioning information in a uniform way. Think of it as a compatibility layer on top of the native configuration files on a server. Awkdata builder plugins are responsible for translating the data.
+
+The native configuration files and commands remain the system of record for the data but there is a uniform cache layer that allows the data to be inspected and queried.
+
+(Tutorial to come.... write a plugin for the ip data and then query it. show other data in the schema)
+
+
+
+
 
 
 

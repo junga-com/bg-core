@@ -208,15 +208,20 @@ fi
 
 
 # usage: templateFind [options] <templateNameSpec>
-# finds the template file in the system template paths. This is similar to how linux finds a
-# command in the system $PATH and has similar security concerns because a template can be used
+# finds a template file among those installed on the host.
+#
+# This is similar to how linux finds a command in the system $PATH and has similar security concerns because a template can be used
 # as the basis for system configuration.
 #
-# This is a wrapper over the findInPaths function which hardcodes the serach path to the proper set of system folders.
-# <templateNameSpec> can contain wildcards to return all matching templates in the system path. See findInPaths.
+# The general idea is that packages can provide templates and privileged admins can override and add to the set of installed templates.
+# Domain admins can override or add to templates on a set of hosts. A local sysadmin can override or add to the templates installed
+# on that particular host.
 #
-# The general idea is that packages can provide templates, domain admins can override and add to those templates, the local sysadmin
-# can override or add to those templates and the unprivileged user can not override or provide any template.
+# Templates have types. Code that uses a template will only look for templates of a particular type. When more than one template of
+# the requested type exists, the code may allow the unprivileged user to select among the available installed templates of that type.
+#
+# This function is implemented as a wrapper over the findInPaths function, hardcoding the serach path to the proper set of system folders.
+# <templateNameSpec> can contain wildcards to return all matching templates in the system path. See findInPaths.
 #
 # Naming Convention:
 # The naming convention is <baseType>[.<typePart1>.[.<typePart2>...]]

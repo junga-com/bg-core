@@ -123,7 +123,7 @@ function bgawk()
 		[ "$file" == "<>#" ] && file=("$@")
 
 		if [ "$useCols" == "1" ]; then
-			assertNotEmpty file "an input file must be specified when the -c use awkData colunms option it specified"
+			assertNotEmpty file "an input file must be specified when the -c (use awkData colunms) option it specified"
 			assertFileExists "$file"
 			local cols="$(awkData_getColumns "$file")"
 			assertNotEmpty cols "the input file '$file' does not have a awkData header with column names"

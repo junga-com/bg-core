@@ -23,7 +23,7 @@
 #######################################################################################################################################
 ### From bg_manifest.sh
 
-# usage: manifestGet <assetTypeMatch> <assetNameMatch>
+# usage: manifestGet [-p|--pkg=<pkgMatch>] [-o|--output='$n'] <assetTypeMatch> <assetNameMatch>
 # query the host manifest file for assets installed on the host from any pkg that participates in the bg-core asset management
 # system.
 #
@@ -84,14 +84,22 @@ declare -gx pluginManifestInstalledPath="/var/lib/bg-core/pluginManifest"
 # returns the file path to the prevailing host manifest file. In production this would be "$manifestInstalledPath"
 # but vinstalling a sandbox overrides it
 function manifestGetHostManifest() {
-	returnValue "${bgVinstalledManifest:-$manifestInstalledPath}" $1
+	if [ "$bgHostProductionMode" == "development" ]; then
+		returnValue "${bgVinstalledManifest:-$manifestInstalledPath}" $1
+	else
+		returnValue "$manifestInstalledPath" $1
+	fi
 }
 
 # usage: manifestGetHostPluginManifest
 # returns the file path to the prevailing host plugin manifest file. In production this would be "$pluginManifestInstalledPath"
 # but vinstalling a sandbox overrides it
 function manifestGetHostPluginManifest() {
-	returnValue "${bgVinstalledPluginManifest:-$pluginManifestInstalledPath}" $1
+	if [ "$bgHostProductionMode" == "development" ]; then
+		returnValue "${bgVinstalledPluginManifest:-$pluginManifestInstalledPath}" $1
+	else
+		returnValue "$pluginManifestInstalledPath" $1
+	fi
 }
 
 

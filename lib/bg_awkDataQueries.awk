@@ -1,10 +1,12 @@
 @include "bg_awkDataSchema.awk"
 @include "bg_cui.awk"
 
-# Library 
-# This awk library is part of the awkData subsystem. It brings in a BEGIN section that processes the inout variables and ultimately
-# launches an awkData table scan that returns the restult set format descibed by the inputs 
+# Library
+# This awk library is part of the awkData subsystem. It brings in a BEGIN section that processes the input variables and ultimately
+# launches an awkData table scan that returns the restult set format descibed by the inputs
 #
+# Input:
+#    -v awkDataID=<awkDataID>  : the awkDataID to query.
 # Return Codes:
 #     0 (success) : normal operation
 #     3 (dirty)   : the awkDataID is dirty so it failed before doing any query work. Set noDirtyCheckFlag to non-empty to suppress
@@ -14,6 +16,10 @@
 BEGIN {
 	if (!noDirtyCheckFlag && schema_isDirty(schema))
 		hardExit(3)
+
+	if (!awkDataID) {
+		assert("awkDataID is a required input to the bg_awkDataQueries.awk script")
+	}
 
 	### prepare the filterExpr struct that will be used to test for matching lines for inclusion in the result set
 	if (plainFilterFlag)

@@ -99,9 +99,10 @@ cmd=""
 passThruOpts=()
 oob_invokeOutOfBandSystem "$@"
 while [ $# -gt 0 ]; do case $1 in
-	-q|--query)    cmd="query"  ;;
-	-s|--summary)  cmd="summary"  ;;
-	-g|--get)      cmd="get"  ;;
+	-q|--query)     cmd="query"  ;;
+	-s|--summary)   cmd="summary"  ;;
+	-g|--get)       cmd="get"  ;;
+	-i|--tableInfo) cmd="tableInfo" ;;
 
 	-c*|--columns*)      bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
 	-n|--noDirtyCheck)   bgOptionGetOpt opt passThruOpts "$@" && shift ;;
@@ -123,5 +124,6 @@ case ${cmd:-query} in
 	query)      awkData_query        "${passThruOpts[@]}" "$awkDataID" "$@" ;;
 	summary)    awkData_countValues  "${passThruOpts[@]}" "$awkDataID" "$@" ;;
 	get)        awkData_getValue     "${passThruOpts[@]}" "$awkDataID" "$@" ;;
+	tableInfo)  awkData_showSchema   "${passThruOpts[@]}" "$awkDataID" "$@" ;;
 	*) assertError -v cmd "unknown cmd" ;;
 esac

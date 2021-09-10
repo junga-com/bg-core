@@ -8,7 +8,103 @@ import bg_ini.sh ;$L1;$L2
 ### Schema data operations  -- objectTypes (tables), columns, and ranges of values
 #
 
+# MAN(7) bgawkDataSystem
+# The awkData system defines a simple text format for tabular data which can be easily queried and operated on by awk scripts.
+#
+# The bg-awkData command provides a way to query and perform other operations on the data from the command line. The data to be
+# operated on is identified by passing bg-awkData a awkDataID which is similar to a table name.  The awkDataID is not simply a
+# table name because it can identify the data in several different ways.
+#
+# An awkData 'table' consists of a text file containing the data (refered to as the awkDataFile) and optionally an ini style file
+# that describes the structure and attributes of the table (refered to as the awkDataSchemaFile). By default, the first couple lines
+# of the awkDataFile is a header that describes the column and optionally a few other attributes.  There is typically a one to one
+# correspondence between an awkDataFile and an awkDataSchemaFile but there are some exceptions.
+#
+# Caching Host Configuration and Provisioning Information:
+# Often an awkData table is used to cache some system configuration information that is stored on the host in various formats. This
+# makes the information accessible in a standard way. To facilitate building and keeping the data up-to-date, a schema can specify
+# a builder cmd and dependent files.  If the awkDataFile does not exist or if any of the dependent files has a more recent timestamp
+# than the awkDataFile, it is considered dirty and will be rebuilt on demand.
+#
+# AwkData Schema Registry:
+# AwkData tools can be used to access one-off files that are not registered on the host but by registering an awkDataSchemaFile
+# asset on the host, the table becomes discoverable and logically becomes part of the configuration and providioning data on the
+# host.
+#
+# This is powerful because it allows disparate systems, written by different teams with different tools, standards and practices,
+# to become part of a standard object oriented state of the host. We can start thinking about the host as a uniform object oriented
+# system with identity, state, and behavior which makes the host easier to automate and control.
+#
+# awkDataID Format:
+# A fully qualified awkDataID consists of 3 parts separated by the pipe character.
+#    <awkTableName>|<awkDataFile>|<awkDataSchemaFile>
+# It is often valid to exclude one or two parts by leaving them empty. Trailing pipe characters can be ommitted.
+#
+# If the awkData table is registered on the host, then the <awkTableName> alone is sufficient to identify the table. For a registered
+# awkData table the <awkDataSchemaFile> is an asset in the host manifest with an assetType="data.awkDataSchema" and
+# assetName=<awkTableName>. This allows looking up the <awkDataSchemaFile> from the <awkTableName> and the <awkDataSchemaFile>'s
+# awkDataFile attrubute points to the <awkDataFile>.
+#
+# It is also sufficient to only specify the <awkDataFile> if it includes at least the column header. This is tyically used when
+# creating and using a one-off data file that will not be registered.
+#
+# It is also sufficient to only specify the <awkDataSchemaFile>. This is typically used when creating and using a one-off data file
+# that will not be registered but needs to specify additional table attributes or needs to persist even when the data file is deleted.
+#
+# The <awkDataSchemaFile> typically specifies the <awkDataFile> so there is a one-to-one correspondence between them, but it is
+# possible to create a second data table that uses the same schema by specifying both <awkDataFile> and <awkDataSchemaFile>. When
+# <awkDataFile> is specified in the awkDataID, it will override the one speicied in the awkfile attribute of the <awkDataSchemaFile>.
+#
+#
+# Example AwkDataFile:
+#     $ cat -n manifestExample
+#       1 package     assetType      assetName          path
+#       2
+#       3 bg-core     cmd            bg-collectCntr     /usr/bin/bg-collectCntr
+#       4 bg-dev      cmd            bg-debugCntr       /usr/bin/bg-debugCntr
+#     $
+# The first line is a header line that contains the name of each column. The second line is also a header line but in this simple
+# case it is empty. The data starts on the third line and continues to the end of the file. Each data line is a separate record.
+# All tokens in the column header and each data line are separated by spaces and/or tabs. Whitespace in the data is escaped with
+# tokens of the form %NN where NN is the hex number of the character. (a space is %20).
+#
+# The complete syntax of the awkDataFile is documented in man(5) bgawkDataFile
+#
+# Example AwkDataSchemaFile:
+# $ cat -n ./lib/manifest.awkDataSchema
+#    1 columns=pkg(-20) assetType(-20) assetName(-20) path
+#    2 awkFile=/var/lib/bg-core/manifest
+# This file uses the INI file style. Lines contains attribute definitions n the form <name>=<value>
+#
+# The complete syntax of the awkDataSchemaFile is documented in man(5) bgawkDataSchemaFile
+#
+#
+# For example, an isolated txt file that
+# follows the simple format can be queried with bg-awkData by using the path to the file as the awkDataID. More typically, the
+# awkDataID is a single word that refers to the awkObjName (aka table name) which is registered on the host as an ini style file
+# that describes the structure and attributes of the data table and the absolute path to a data file that contains the data.
+#
+# The standard allows one off data files that are self describing but it also allows defining the structure and attributes of the
+# data file in a separate awkDataSchemaFile.
+#
+# The schema file can be used on its own or an admin with sufficient privilege can be register (aka install) it on the host so that
+# it becomes a part of the host's configuration and provisioning system.
+#
+# There is normally a one to one correspondence between a awkDataFile and a awkDataSchemaFile. The awkDataSchemaFile will define
+# the absolute path to the awkDataFile in its 'awkFile' attribute and the names of the the files connect them as well. The awkDataID
+# is used to name both files and serves like a table name. The awkDataFile contains the table data and the awkDataSchemaFile contains
+# a description of the table structure and other attributes.
+#
+# awkDataSchemaFile. However, it is possible to reuse the schema description of a awkDataSchemaFile by crafting a long form awkDataID
+
+
 # MAN(5) bgawkDataSchemaFileFormat
+# This man page describes the file format of a awkData Schema file.
+#
+#The data file is often considered a
+# cache of some other information and may be deleted. If it has a fully functioning awkDataSchemaFile, it will be recreated automatically
+# as needed.
+#
 # The awkData schema file is a way to define a awkData cache file that is persistent past the deletion
 # of its actual cache file. Say the cache file is deleted because its dirty. In order for it to be rebuilt
 # the metadata to know the columns and buildCmd need to be known. Sometimes it is convenient to hardcode
@@ -112,418 +208,124 @@ import bg_ini.sh ;$L1;$L2
 
 
 
-# usage: awkData_parseID <awkDataID> <awkObjNameVar> <awkFileVar> <awkSchemaFileVar>
-# (old usage): awkData_parseID [-C <domID>] [--awkObjDataVar=<awkObjDataVar>] <awkDataID> <scopeTypeVar> <scopeNameVar> <awkObjNameVar> <awkFileVar> <awkSchemaFileVar> <awkDomFolderVar> <awkDepsRootVar>
-# Given the <awkDataID>, return the <awkObjNameVar> <awkFileVar> and <awkSchemaFileVar>
+# usage: awkData_parseID <awkDataID> <awkTableNameVar> <awkDataFileVar> <awkDataSchemaFileVar>
+# Given the <awkDataID>, return the <awkTableName> <awkDataFile> and <awkDataSchemaFile> values in the given vars passed in.
 #
-# Supported Syntax:
-# An <awkDataID> is one of these
-#    Long Form:
-#       <shorForm>|scopeType|scopeName|awkObjName|awkFile|awkSchemaFile|awkDomFolder|depsRoot
-#    Short Form:
-#       <awkObjName>
-#       <path/to/cachefile>
-#       <path/to/schemafile>
-#       (disabled) <scopeType>:<scopeName>:<awkObjName>
-#       (disabled) <scopeName>:<awkObjName>
-#       (disabled) index
-#       (disabled) me:<awkObjName>
-#       (disabled) local:<awkObjName>
-# Where
-#     <awkObjName> : is the simple name of the data table without path or extension or scope modifiers
-#     path/to/file :
-#          if the awkDataID contains one or more '/', then it is considered to be a path to an awkData file
-#          if the path refers to a <scope>./cache/ file, inside a domFolder it will treat it as such.
-#     (disabled) <scopeType>:<scopeName> : is the fully qualified scope folder relative to a domData
-#     (disabled) <scopeName> : (alone) is the partially qualified scope folder relative to a domData. If <scopeName>
-#          is unique in the referenced domData, <scopeType> will be filled in automatically.
-#     (disabled) me: : is a special scope modifier in the domData that refers to scope path returned by $(domWhoami -p)
-#          note that 'me' can also be a <scopeName> so servers:me is equivalent. locations:me is the location
-#          scope that represents the location where the host is located
-#     (disabled) local: : is a special scope modifier that refers to a local folder that is specifically not tracked in the domData but
-#          is associated with the domData.
-#     (disabled) index :
-#          an awkData cache file named "index" is maintained that contains all the values used in any other global awkData
-#          this can be used to query by a data value and see where in the domain that value is used. This is particularely
-#          helpful for serial numbers, mac address and other unique identifiers. This replaces the domIndex
-#          $domFolder/cache/index
-#     (disabled) <scopeType>:[:]<awkObjName> :
-#          refers to all partial <awkObjName> in that scope type. The first part of an awkDataID with one : can
-#          be a scopeType or a scopeName. If the word matches the short list of known scopeTypes, it is a type.
-#          $domFolder/<scopeType>/*/cache/<awkObjName>.cache
-#     (disabled) [:]<scopeName>:<awkObjName> :
-#          refers to the specific partial scope <awkObjName>. The scopeType can be omitted if scopeName is unambiguous.
-#          $domFolder/*/<scopeName>/cache/<awkObjName>.cache
-# Options:
-#    (disabled) -C <domID> : override the default domData to operate on. Can be domain name or folder path
-#    --awkObjDataVar=<awkObjDataVar> : this is a return string that contains all the others joined with the '|' character.
-#          this is often used to pass the parsed results to an awk script
-# Exit Codes:
-#    0(success)  : the <awkDataID> was parsed. It might not exist, but its a recognized format that can be parsed
-#    1(failure)  : the <awkDataID> is not a valid form. Initially, the only invalid form is the empty string
+# An <awkDataID> is a token (without whitespace) that has up to 3 fields separated by the pipe character. Not all fields must be
+# specified so this function can be used to parse the token into its 3 parts and also fill in the missing parts.
+#
+# Syntax:
+# The full syntax is ...
+#     <awkTableName>|<awkDataFile>|<awkDataSchemaFile>
+# Any of the fields may be empty. Trailing pipe characters that result from one or more empty fields can be omitted.
+#
+# Examples:
+#     manifest                # only the <awkTableName> is specified. The other two fields will be looked up from an installed
+#                               asset with assetName="manifest" and assetType="data.awkDataSchema"
+#    |/tmp/myTempData.cache   # only the data file path is specified. The table name will be considered the base name of the data file.
+#                               The <awkDataSchemaFile> will remain empty as it is not alway needed.
+#    ||/tmp/myTempSchema      # only the <awkDataSchemaFile> is specified. The <awkDataFile> will be retrieved from the 'awkFile'
+#                               attribute inside the schema file. The <awkTableName> will be the base name of the <awkDataFile>
+#    tmpManifest|/tmp/m|manifest # all 3 fields are specified to explicitly use a new data file that uses the same schema definition
+#                                  as the manifest table. Because the <awkDataSchemaFile> specified is not the full path to a file,
+#                                  it will be looked up the same way as when only the <awkTableName> is specified. However, since the
+#                                  <awkDataFile> was also specified, the awkFile attribute in the <awkDataSchemaFile> will not be used.
 # See Also:
 #    awkData_getSchema      : super set of this function that goes on to read the schema attributes too
 #    awkData_listAwkDataIDs : list <awkDataID> that exist on the host
 function awkData_parseID()
 {
-	local ldFolder="$ldFolder" domIDOverride forceFlag awkObjDataVar quietFlag
-	while [ $# -gt 0 ]; do case $1 in
-		# (disabled) -C*)              bgOptionGetOpt val: domIDOverride "$@" && shift ;;
-		--awkObjDataVar*) bgOptionGetOpt val: awkObjDataVar "$@" && shift ;;
-		-q) quietFlag="-q" ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
-	done
 	local awkDataID="$1";    [ ! "$awkDataID" ] && return 1
-	local awkObjNameVar="$2"
-	local awkFileVar="$3"
-	local awkSchemaFileVar="$4"
+	local awkTableNameVar="$2"
+	local awkDataFileVar="$3"
+	local awkDataSchemaFileVar="$4"
 
-	local scopeTypeValue scopeNameValue awkObjNameValue awkFileValue awkSchemaFileValue awkDomFolderValue awkDepsRootValue
+	local awkTableNameValue awkDataFileValue awkDataSchemaFileValue
+	stringSplit -d'|' "$awkDataID" awkTableNameValue awkDataFileValue awkDataSchemaFileValue
 
-	# we already parsed this awkDataID into its long form so just use those values
-	if [[ "$awkDataID" =~ [|] ]]; then
-		IFS="|" read -r awkDataID awkObjNameValue awkFileValue awkSchemaFileValue <<<"$awkDataID"
-
-	# # me: syntax allows us to specify the awkObjName that is specific to the local host and will be in
-	# # the domData if the domData exists but it is quaranteed to exist regardless of whether a domData
-	# # exists and whether this host has a persistent scope in the domFolder
-	# # domWhoami -p is responsible for determining this path and making sure it exists
-	# elif [[ "$awkDataID" =~ ^me: ]]; then
-	# 	_domMethodPreamble "$domIDOverride"
-	# 	scopeTypeValue="servers"
-	# 	scopeNameValue="me"
-	# 	awkObjNameValue="${awkDataID#me:}"
-	# 	local scopeFolder; domWhoami -p -r scopeFolder
-	# 	[ ! -d "$scopeFolder" ] && assertError -v awkDataID -v scopeFolder "parsing me: scope but domWhoami -p did not return a folder that exists"
-	# 	awkFileValue="${scopeFolder%/}/cache/${awkObjNameValue}.cache"
-	# 	awkSchemaFileValue="${ldFolder:+${ldFolder}/schema/${awkObjNameValue}.schema}"
-	# 	awkSchemaFileValue="${awkSchemaFileValue:-${awkFileValue%.cache}.schema}"
-	# 	# if the domWhoami -p returned a folder outside any domData because there was none selected
-	# 	# should we return "" or the domFolder root of the scope folder?
-	# 	awkDomFolderValue="${ldFolder}" # will be empty if there is no domData. that is correct
-	# 	awkDepsRootValue="${awkDomFolderValue:-${awkFileValue%/*}}"
-	#
-	# # local: syntax allows us to specify the awkObjName that is specific to the local host
-	# # and never stored in the domdata. It can be a host wide shared folder or a transient folder in the
-	# # user's home
-	# elif [[ "$awkDataID" =~ ^local: ]]; then
-	# 	_domMethodPreamble "$domIDOverride"; domAssertLdFolder; awkDomFolderValue="$ldFolder"
-	# 	awkObjNameValue="${awkDataID#local:}"
-	# 	local scopeFolder="$awkDomFolderValue/.bglocal/localScope"
-	# 	mkdir -p "$scopeFolder"
-	# 	awkFileValue="${scopeFolder%/}/cache/${awkObjNameValue}.cache"
-	# 	awkSchemaFileValue="${scopeFolder%/}/schema/${awkObjNameValue}.schema"
-	# 	awkDepsRootValue="${awkDomFolderValue:-${awkFileValue%/*}}"
-	#
-	# # host: syntax allows us to specify the awkObjName that is specific to the host and not associated with a domData
-	# elif [[ "$awkDataID" =~ ^host: ]]; then
-	# 	awkObjNameValue="${awkDataID#host:}"
-	# 	local scopeFolder="$domFolderRootPath/host"
-	# 	[ ! -d "$scopeFolder" ] && fsGetUserCacheFile "userDomFolder/" scopeFolder
-	# 	[ ! -d "$scopeFolder" ] && assertError "parsing host: scope but 'fsGetUserCacheFile userDomFolder/' failed to return a folder that exists"
-	# 	awkFileValue="${scopeFolder%/}/cache/${awkObjNameValue}.cache"
-	# 	awkSchemaFileValue="${scopeFolder%/}/schema/${awkObjNameValue}.schema"
-	# 	awkDomFolderValue="${scopeFolder%/}"
-	# 	awkDepsRootValue="${awkDomFolderValue:-${awkFileValue%/*}}"
-
-	# this block is for filename that are specified as awkObjNames. If it contains a / or .
-	# it can not be a valid domData awkObjName name, it must be a filename
-	elif [[ "$awkDataID" =~ [/.] ]]; then
-		awkObjNameValue="${awkDataID%/}"; awkObjNameValue="${awkObjNameValue##*/}"
-		awkFileValue="${awkDataID}"
-		awkSchemaFileValue="${awkFileValue%.cache}.schema"
-		awkDepsRootValue="${awkDomFolderValue:-${awkFileValue%/*}}"
-
-	# # <scopeType>:<scopeName>:<awkObjName> syntax
-	# elif [[ "$awkDataID" =~ ^([^:]*):([^:]*):(.*)$ ]]; then
-	# 	scopeTypeValue="${BASH_REMATCH[1]}"
-	# 	scopeNameValue="${BASH_REMATCH[2]}"
-	# 	awkObjNameValue="${BASH_REMATCH[3]}"
-	# 	_domMethodPreamble "$domIDOverride"; domAssertLdFolder; awkDomFolderValue="$ldFolder"
-	# 	awkFileValue="$ldFolder/$scopeTypeValue/$scopeNameValue/cache/${awkObjNameValue}.cache"
-	# 	awkSchemaFileValue="$ldFolder/schema/${awkObjNameValue}.schema"
-	# 	awkDepsRootValue="${awkDomFolderValue:-${awkFileValue%/*}}"
-	#
-	# # <scopeName>:<awkObjName> syntax
-	# elif [[ "$awkDataID" =~ ^([^:]*):(.*)$ ]]; then
-	# 	scopeNameValue="${BASH_REMATCH[1]}"
-	# 	awkObjNameValue="${BASH_REMATCH[2]}"
-	# 	domScopeGetType "$scopeNameValue" scopeTypeValue
-	# 	[ ! "$quietFlag" ] && [ ! "$scopeTypeValue" ] && assertError -v awkDataID -v ldFolder -v scopeNameValue "could not resolve the <scopeName> in the specified <domFolder>"
-	# 	_domMethodPreamble "$domIDOverride"; domAssertLdFolder; awkDomFolderValue="$ldFolder"
-	# 	awkFileValue="$ldFolder/$scopeTypeValue/$scopeNameValue/cache/${awkObjNameValue}.cache"
-	# 	awkSchemaFileValue="$ldFolder/schema/${awkObjNameValue}.schema"
-	# 	awkDepsRootValue="${awkDomFolderValue:-${awkFileValue%/*}}"
-
-	# <awkObjName> syntax
-	else
-		awkObjNameValue="$awkDataID"
-		local pkg assetType assetName assetPath
-		read -r pkg assetType assetName assetPath <<<"$(manifestGet "data.awkDataSchema" "$awkDataID")"
-		awkSchemaFileValue="$assetPath"
-		if [ ! "$awkSchemaFileValue" ] || [ ! -f "$awkSchemaFileValue" ]; then
-			assertError -v awkDataID "awk data schema not found for this awkDataID"
-		fi
-		awkFileValue="$(awk -F= '$1=="awkFile" {print $2}' "$awkSchemaFileValue")"
+	# typical case: lookup the schema from the table name
+	if [ "$awkTableNameValue" ] && [ ! "$awkDataSchemaFileValue" ]; then
+		awkDataSchemaFileValue="$(manifestGet -o '$4' "data.awkDataSchema" "$awkTableNameValue")"
+		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID -v awkTableNameValue "No awk schema registered for table name"
 	fi
 
-
-	setReturnValue "$awkObjNameVar"    "$awkObjNameValue"
-	setReturnValue "$awkFileVar"       "$awkFileValue"
-	setReturnValue "$awkSchemaFileVar" "$awkSchemaFileValue"
-
-	# This awkObjData value is used to pass all the parsed attributes to an awk script in a way that the script script can easily parse it
-	# See schema_restore
-	#                                     awkDataID ,awkObjName       ,awkFile      ,awkSchemaFile
-	#                                     1          2                 3             4
-	setReturnValue "$awkObjDataVar"     "$awkDataID|$awkObjNameValue|$awkFileValue|$awkSchemaFileValue"
-}
-
-
-#    schemas[<awkObjName>][<attributes>]
-#    schemas[<awkObjName>]["dataCols"][<colName>]["width"]
-#    schemas[<awkObjName>]["dataCols"][<colName>]["fieldNum"]
-#    schemas[<awkObjName>]["dataCols"][<colName>]["name"]
-
-
-
-
-# usage: awkData_getSchema [-C <domID>] <awkDataID> <attribsArrayVar> [<scopeTypeVar> <scopeNameVar> <awkObjNameVar> <awkFileVar> <awkSchemaFileVar> <awkDomFolderVar> <awkDepsRootVar>]
-# usage: local awkDataID="${1:-$awkDataID}"; shift; [ "$awkSchema" != "$awkDataID" ] && { local -A awkSchema=(); awkData_getSchema $domIDOverrideOpt "$awkDataID" awkSchema; }
-# this is the common preamble for functions that operate on an awkDataID. (aka method functions of awkData)
-# This wraps a call to awkData_parseID and in addition, loads the schema file into an array var
-# read all the schema attributes into an associative array.
-#    1) If a schema file exists it will be prefered.
-#    2) If no schema file exists or if it does not cantain the column attribute, the header of the cache file will be read
-#    3) if neither exists, the exist code is 1(false)
-# if <awkDataID> contains a scope modifier, the attributes will be realized for that scope. This means
-# that any attributes that are specified in a matching scope section will be promoted to overwrite
-# the same attribute at the top level. Also, the <awkFile> path (data cache file) will be in the
-# $domFolder/$scopeType/$scopeName/cache/ folder instead of the global $domFolder/cache/ folder
-# Attributes Returned:
-#    * the input to this function
-#         [awkDataID]      : the identifier of the awkData being operated on.
-#    * the attributes returned by awkData_parseID. These are all derived from the awkDataID alone.
-#         [scopeType]     : servers|locations|etc...
-#         [scopeName]     : name of folder under the scopeType/ folder
-#         [awkObjName]    : the simple name of the <awkDataID>. For domData it is <awkDataID> but for a path
-#                           based <awkDataID>, it is the simple base filename with path and .cache extension removed
-#         [awkFile]       : the path to the cache data file which may or may not exist
-#         [awkSchemaFile] : the path to the schema file which may or may not exist
-#         [depsRoot]      : the folder where the dependent paths are relative to.
-#    * data read from the schema file if it exists, Every attribute in the schema file will be represented in the returned array.
-#      Typically a schema will include...
-#         [columns]          : column names, each with optional width
-#         [buildCmd]         : the command used to build the awkFile from the <dependents>
-#         [dependents]       : input files to the builder. can contain wildcards. paths relative to
-#         [defDisplayCols]   : default columns that query functions should include in output.
-#         [keyCol]           : the column whose value uniquely identifies each data row
-#         [secondaryKeyCols] : other columns that are also unque across all data rows
-#         [defFilter]        : filter that query functions should use by default to exclude some rows from the output
-#    * Generated, synthesized Attributes
-#         [schemaType]     : domData|independent
-#         [schemaFileRead] : non-empty if data was read from the schema file
-#         [cacheFileRead]  : non-empty if data was read from the cache file
-#         [noSchemaDataFound]: non-empty if neither the schema file nor cache file were found
-#         [columnsWithWidths]: normalized version of the columns attribute where every colName has a width
-#                       specifiers. The default width is the length of the colName
-#         [colNames]  : normalized version of the columns attribute where each token is just the colName
-#         [colWidths] : normalized version of the columns attribute where each token is just the column width
-#         [anyKeyCols]: combined keyCol and secondaryKeyCols attribute. (but composite keyCol are ignored, currently)
-#                       The spirit of this attribute is any column whose value is unique. Eventually it
-#                       should add a composite keyCol but that is not supported now becuse there is no
-#                       universal syntax to combine the keyCol columns into one token that would later
-#                       be recognized as multiple, related columns
-#         [fmtStr]    : a printf format string suitable for printing column header and data lines in an awkData file
-#    * --processDeps: (the following are created if --processDeps option is specified)
-#         [depsStatic]  : a sub list of just the dependents that do not have glob character (*?[)
-#         [depsGlobs]   : a sub list of just the dependents that have glob characters (*?[)
-#         [depsCurrent] : a list of the actual dependents that exist now expanding the globs
-# Params:
-#    <awkDataID>       : aka <awkObjName>. Identifies the thing being operated on. Any syntaxt supported by awkData_parseID
-#    <attribsArrayVar> : the name of the assiciative array declared in the callers scope that will be filled in.
-# Options:
-#    -C <domID>    : override the default domData to operate on. Can be domain name or folder path
-#    --processDeps : process the [dependents] attrubute to create [depsStatic] [depsGlobs] and [depsCurrent]
-# Exit Codes:
-#   0(true)  : some schema data was found, either from a schema file or the cache file header
-#   1(false) : no schema data was found. the parsed awkDataID information is still returned
-# See Also:
-#    awkData_parseID
-function awkData_getSchema()
-{
-	#bgtimerStartTrace -T awkData_getSchema
-	local domIDOverrideOpt processDeps awkObjDataVar
-	local -A _localSchemaVar
-	while [ $# -gt 0 ]; do case $1 in
-		-C*) bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
-		--awkObjDataVar*) bgOptionGetOpt val: awkObjDataVar "$@" && shift ;;
-		--processDeps) processDeps="$1" ;;
-		*)   bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
-	done
-	local awkDataIDParam="$1"
-	local attribsArrayVar="${2:-_localSchemaVar}"
-	local scopeTypeVar="${3:-scopeType}"        ;  [ "$3" ] || local scopeType
-	local scopeNameVar="${4:-scopeName}"        ;  [ "$4" ] || local scopeName
-	local awkObjNameVar="${5:-awkObjName}"      ;  [ "$5" ] || local awkObjName
-	local awkFileVar="${6:-awkFile}"            ;  [ "$6" ] || local awkFile
-	local awkSchemaFileVar="${7:-awkSchemaFile}";  [ "$7" ] || local awkSchemaFile
-	local awkDomFolderVar="${8:-awkDomFolder}"  ;  [ "$8" ] || local awkDomFolder
-	local awkDepsRootVar="${9:-awkDepsRoot}"    ;  [ "$9" ] || local awkDepsRoot
-	[ ! "$awkObjDataVar" ] && { local awkObjDataValue; awkObjDataVar="awkObjDataValue"; }
-
-	awkData_parseID $domIDOverrideOpt --awkObjDataVar="$awkObjDataVar" "$awkDataIDParam" "$scopeTypeVar" "$scopeNameVar" "$awkObjNameVar" "$awkFileVar" "$awkSchemaFileVar" "$awkDomFolderVar" "$awkDepsRootVar" || assertError
-
-	local schemaVarsScript; IFS="" read -r -d "\0" schemaVarsScript < <(awk  \
-		-v awkDataIDList="${!awkObjDataVar}" '
-		@include "bg_awkDataSchema.awk"
-		END {
-			for (name in schemas["'"$awkDataIDParam"'"]["info"])
-				print "'"$attribsArrayVar"'["name"]='\''"schemas["'"$awkDataIDParam"'"]["info"][name]"'\''"
-		}
-	' /dev/null)
-	eval "$schemaVarsScript"
-
-	if [ "$processDeps" ]; then
-		local depsRaw schemaDeps="$attribsArrayVar[dependents]" schemaDepsGlobs="$attribsArrayVar[depsGlobs]" schemaDepsStatic="$attribsArrayVar[debsStatic]" schemaDepsCur="$attribsArrayVar[depsCurrent]"
-		read -r -a depsRaw <<<"${!schemaDeps}"
-		local dep; for dep in "${depsRaw[@]}"; do
-			[[ "$dep" =~ [*?[] ]] && stringJoin -R "$schemaDepsGlobs" -a -e -d " " "$dep" || stringJoin -R "$schemaDepsStatic" -a -e -d " " "$dep"
-		done
-		stringJoin -R "$schemaDepsCur" -a -e -d " " "$(cd "${!awkDepsRootVar}"; fsExpandFiles -E ${attribsArrayValue[dependents]})" #"
+	# If the shemaFile field contains a simple table name, look up the schema asset
+	# This is a case where the caller is crafting a new data table from an existing schema definition. The caller can assign a new
+	# table name and awkFile location and an existing installed schema.
+	if [[ ! "$awkDataSchemaFileValue" =~ [/.] ]] && [ ! -f "$awkDataSchemaFileValue" ]; then
+		awkDataSchemaFileValue="$(manifestGet -o '$4' "data.awkDataSchema" "$awkDataSchemaFileValue")"
+		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID "Invalid awkDataSchemaFile specified in the awkDataID. It should be either the full path to a schema file or the asset name of a installed data.awkDataSchema asset on the host"
 	fi
 
-	# if the user did not pass in an array var name to fill in, write the results to standard out
-	if [ "$attribsArrayVar" == "_localSchemaVar" ]; then
-		printfVars schema:$attribsArrayVar
+	# typical case: lookup the data file from the schema file
+	if [ "$awkDataSchemaFileValue" ] && [ ! "$awkDataFileValue" ]; then
+		awkDataFileValue="$(gawk -F= '$1=="awkFile" {print gensub(/[[:space:]]*#.*$/,"","g",$2)}' "$awkDataSchemaFileValue")"
+		[ "$awkDataFileValue" ] || assertError -v awkdatID -v awkDataSchemaFileValue "Neither the awk schema file nor the awkDataID specify the awkFile path"
 	fi
 
-	# set the exit code to indicate if schema data was found 0(true), or the array only contains parsed awkDataID attributes 1(false)
-	local noSchemaDataFoundCheck="$attribsArrayVar[noSchemaDataFound]"
-	[ ! "${!noSchemaDataFoundCheck}" ]
+	# For one-off tables, the user might specify either the awkFile or the schemaFile alone and then we glean the table name from
+	# the filename of the data file.
+	if [ ! "$awkTableNameValue" ]; then
+		local filename="${awkDataFileValue:-$awkDataSchemaFileValue}"
+		awkTableNameValue="${filename##*/}"
+		awkTableNameValue="${awkTableNameValue%.*}"
+	fi
+
+	setReturnValue "$awkTableNameVar"      "$awkTableNameValue"
+	setReturnValue "$awkDataFileVar"       "$awkDataFileValue"
+	setReturnValue "$awkDataSchemaFileVar" "$awkDataSchemaFileValue"
 }
 
 
 
-# usage: awkData_listAwkDataIDs [<scopeType>:][<scopeName>:][<awkDataIDSpec>]
-# CRITICALTODO: there seems to be ambiguity about the intent of different callers of this function. Some want to list ids of existing
-#               data files and others seem to list all the schemas that could exists at a scope requardless of whether they exist yet.
-#               The typical use cases are:
-#                      ""   -- just list all the known schema types (or does the caller want a list of existing ids that can be queried?)
-#                      "<fullyQualified>" -- a function supports wildcards but the caller specified a specific id and we should just return that id
-#                      "<wildcards>" (including specs ending with a : like <scopeType>:<scopeName>:)
-# awkDataIDs are the names that identify a particular awk data schema definition at a particular scope.
-#    awk data schema definition: The awkObjName is the part of the awkDataID that identifies the scheama. This schema definition
-#        is the column list and other attributes that affect how the table is built and queried. The definition is typically
-#        stored in the .schema file
-#    scope: the data in a schema can exist at multiple domData scopes. The global scope is the default and always exists.
-#        some schemas can support component scopes that combine to form the data in the global scope and an awkDataID can
-#        specify one of those sub-scopes
+
+
+
+
+
+# usage: awkData_listAwkDataIDs [<filterRegex>]
+# prints a list of awkDataID names installed on this host to stdout.
+# awkDataIDs are the table names of data in the bg-core configuration and provisioning system. They are installed on a host via
+# assets in packages that follow the bg-ore conventions. An assetType of 'data.awkDataSchema' will introduce a new awkDataID using
+# the assetName as the awkDataID name.
+#
+# A local or domain admin with sufficient privilege can also install awkDataIDs directly.
+# TODO: add a reference to the command used to add awkDataIDs
+#
 # Params:
-#    <awkDataIDSpec> : this can be any syntax accepted by awkData_parseID as an awkDataID but can also include wildcards
-#         or a partial awkDataID syntax so that it matches multiple awkDataIDs
-#         The special values supported:
-#            'this': refers to the awkDataID that is represented in the standard variable names
-#                    used in awkData_parseID and awkData_getSchema. (awkSchema[] et.all) This is used in awkData_* methods
-#                    to efficiently use the exiting context being operated on.
-#            'all':  (default) list all known global awkDataIDs on the host
-# Options:
-#    -C <domID> : override the default domData to operate on. Can be domain name or folder path
+#    <filterRegex> : a regex that matches awkDataID names from the start (^ is automatically prepended)
 # See Also:
 #    awkData_parseID
 function awkData_listAwkDataIDs()
 {
-	local ldFolder="$ldFolder" domIDOverride forceFlag
-	while [ $# -gt 0 ]; do case $1 in
-		-C*) bgOptionGetOpt val: domIDOverride "$@" && shift ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
-	done
-	local awkDataID="$1"
-
-	# if it does not comply with any syntax for enumerating multiple ids, then just return it as is.
-	if [[ ! "$awkDataID" =~ (^$)|(^all$)|[*?]|:$ ]]; then
-		echo "$awkDataID"
-		return
-	fi
-
-	_domMethodPreamble "$domIDOverride"
-
-	case $awkDataID in
-		# The 'this' value for awkDataID means that the awkObjName specified is the one that is already reflected in the
-		# awkSchema[] inheritted from the caller
-		this) echo "this"; return ;;
-		all)  awkDataID="" ;;
-		me:*)
-			awkDataID="${awkDataID#me:}"
-			local scopeFolder; domWhoami -p -r scopeFolder
-			if [[ "$awkDataID" =~ [*?] ]]; then
-				for i in $(fsExpandFiles --baseNames $scopeFolder/cache/$awkDataID.cache); do
-					echo ${i%.cache}
-				done
-			else
-				echo "$awkDataID"
-			fi
-			return
-			;;
-		local:*)
-			assertError "check this code path -- it might be ok to comment out this assert"
-			awkDataID="${awkDataID#local:}"
-			local scopeFolder="$domFolderRootPath/local"
-			for i in $(fsExpandFiles -b $scopeFolder/cache/*.cache); do
-				echo local:$i
-			done
-			return
-			;;
-	esac
-
-	local scopeType scopeName awkObjName prefix schemaScopeMatch="."
-	awkData_parseID "$awkDataID" scopeType scopeName awkObjName
-
-	local objTypeRegEx="^\\(.*:\\)*${awkObjName:-.*}$"
-	[[ "$objTypeRegEx" =~ [*?] ]] && awkObjName=""
-
-	# indexMatch will be 'index' or '' depending on whether we are listing objects in the global scope
-	local indexMatch="index"
-
-	local cacheFolder="${ldFolder}"
-
-	if [ "$scopeType" ]; then
-		cacheFolder="$cacheFolder/$scopeType/${scopeName:-*}"
-		prefix="$scopeType:${scopeName:-%scopeName%}:"
-		schemaScopeMatch="\bscope:$scopeType\b"
-		indexMatch=""
-	fi
-
-	# schemaMatches are awkObjNames referenced in a schema file. Since .cache files are transient, it Could
-	# be that the .cache file has not yet been built but we know from the schema file that it could be built.
-	local schemaMatches="$(grep -l "$schemaScopeMatch" ${ldFolder}/schema/*.schema 2>/dev/null)"
-
-
-	for i in $(echo $awkObjName $schemaMatches $indexMatch; bash -c "ls -d $cacheFolder/cache/*.cache" 2>/dev/null); do
-		if [[ "$prefix" =~ %scopeName% ]] && scopeName="" && [[ "$i" =~ \.cache$ ]]; then
-			scopeName=${i%cache/*}
-			scopeName=${scopeName%/}
-			scopeName=${scopeName##*/}
-		fi
-		i="$(basename "$i")"
-		i="${i%.cache}"
-		i="${i%.schema}"
-		echo "${prefix//%scopeName%/${scopeName:-*}}$i"
-	done | sort -u | grep "$objTypeRegEx"
+	local filterSpec="$1"
+	manifestGet -o '$3' data.awkDataSchema '.*'
+	return
 }
 
 
 # usage: awkData_showSchema [<awkDataID>]
 # write out all the known <awkDataID> (in the domData) and each column they support in a tree
-function awkDataCache_showSchema() { awkData_showSchema "$@"; }
 function awkData_showSchema()
 {
-	local awkObjName; for awkObjName in $(awkData_listAwkDataIDs "$@"); do
-		echo "$awkObjName"
-		local column; for column in $(awkData_getColumns "$awkObjName"); do
-			echo "   $column"
+	local awkDataID="$1"
+
+	if [ "$awkDataID" ]; then
+		awk  \
+			-v awkDataID="$awkDataID" '
+			@include "bg_awkDataSchema.awk"
+			END {
+				printfVars2(0,awkDataID"_schema", schemas[awkDataID])
+			}
+		' /dev/null
+	else
+		local awkObjName; for awkObjName in $(awkData_listAwkDataIDs "$@"); do
+			echo "$awkObjName"
+			local column; for column in $(awkData_getColumns "$awkObjName"); do
+				echo "   $column"
+			done
 		done
-	done
+	fi
 }
 
 # usage: awkData_getColumns <awkDataID>
@@ -532,18 +334,18 @@ function awkData_showSchema()
 # which is about the same amount of work as this function but returns all the schema attributes in an array.
 function awkData_getColumns()
 {
-	local domIDOverrideOpt
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-C*) bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
-	esac; shift; done
 	local awkDataID="$1"
 
-	if ! varIsA mapArray awkSchema || [ "${awkSchema["awkDataID"]}" != "$awkDataID" ]; then
-		local -A awkSchema
-		awkData_getSchema $domIDOverrideOpt "$awkDataID" awkSchema
-	fi
-
-	echo "${awkSchema["colNames"]}"
+	awk  \
+		-v awkDataID="$awkDataID" '
+		@include "bg_awkDataSchema.awk"
+		END {
+			#printfVars("schemas awkDataID")
+			for (i in schemas[awkDataID]["colNames"])
+				printf("%s ", schemas[awkDataID]["colNames"][i])
+			printf("\n")
+		}
+	' /dev/null
 }
 
 # usage: awkData_createSchema <templateFile> <schemaName>

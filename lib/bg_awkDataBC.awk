@@ -37,7 +37,7 @@
 #   bcColumnValueBegin    : complete value that is valide for this column (uses unique values already in the data)
 #   bcColumnListBegin     : complete a list of column names
 BEGIN {
-	if (bcType && !isarray(schemas[awkDataID])) assert("awkDataID is a required parameter to this awk script")
+	if (bcType && !isarray(schemas[awkDataID])) assert("awkDataID is a required parameter to bg_awkDataBC.awk")
 	#bgtraceVars("schemas")
 	switch (bcType) {
 		case "attributeTerm"  :  bcAttributeTermBegin(schemas[awkDataID], validOperators, planMode, filters, !dontDoDefaultCol) ; break

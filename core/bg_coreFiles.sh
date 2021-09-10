@@ -359,17 +359,17 @@ function fsMakeSymLink()
 	local linkContents="$(pathGetRelativeLinkContents "${symLinkPath%/}" "$targetPath")"
 
 	# if its not a symlink or if its content is not what we are setting, then create/update the symlink
-	local preCmd; isSudoNeededRef -r "${symLinkPath}" preCmd
-	if [ ! -h "${symLinkPath%/}" ] || [ "$linkContents" != $($preCmd readlink "${symLinkPath%/}") ]; then
+	local sudoOpts; bgsudo --makeOpts sudoOpts -r "${symLinkPath}"
+	if [ ! -h "${symLinkPath%/}" ] || [ "$linkContents" != $(bgsudo -O sudoOpts readlink "${symLinkPath%/}") ]; then
 		# its ok if the symLinkPath does not exist or is already a symlink but it its another type of FS object
 		# its an error instaead of overwriting what ever object is there. But if forceFlag is specified, go ahead
 		# and replace what ever is there with the new symlink (ln -sfn will do that automatically)
 		[ ! "$forceFlag" ] && [ -e "$symLinkPath" ] && [ ! -h "${symLinkPath%/}" ] && assertError -v targetPath -v symLinkPath -v linkContents "could not make symlink. A file or folder is in the way"
 
-		[ ! "$preCmd" ] && isSudoNeededRef "${symLinkPath}" preCmd
+		bgsudo --makeOpts sudoOpts -w "${symLinkPath}"
 		local linkParent="${symLinkPath%/*}"
-		[ ! -d "$linkParent" ] && { $preCmd /bin/mkdir -p "$linkParent" || assertError -v targetPath -v symLinkPath -v linkContents "could not make the parent folder for symlink"; }
-		$preCmd ln -sfn "$linkContents" "${symLinkPath%/}" || assertError -v targetPath -v symLinkPath -v linkContents "could not make symlink"
+		[ ! -d "$linkParent" ] && { bgsudo -O sudoOpts /bin/mkdir -p "$linkParent" || assertError -v targetPath -v symLinkPath -v linkContents "could not make the parent folder for symlink"; }
+		bgsudo -O sudoOpts ln -sfn "$linkContents" "${symLinkPath%/}" || assertError -v targetPath -v symLinkPath -v linkContents "could not make symlink"
 	fi
 }
 

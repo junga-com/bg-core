@@ -9,6 +9,7 @@ import bg_awkDataSchema.sh  ;$L1;$L2
 # Params:
 #   <awkDataID> :
 #       The object type being queried (like a table name). Can optionally include prefixes that limit the the data set to a particular scope.
+#       if the --awkDataID option is specified, then this parameter must not be provided
 #   <outputColumns> :
 #       an ordered list of columns to include in the output. Supports several special features
 #       the column name "all" expands to all columns in the order defined in the data file
@@ -45,6 +46,7 @@ import bg_awkDataSchema.sh  ;$L1;$L2
 function awkData_query()
 {
 	local columns domIDOverrideOpt escapOutput forceFlag refreshFlag noDirtyCheckFlag plainFilterFlag headerFlag outFmtType="txt"
+	local awkDataID="$awkDataID" awkDataSet
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-C*|--domID*)      bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
 		-c*|--columns*)    bgOptionGetOpt val: columns "$@" && shift ;;
@@ -56,17 +58,20 @@ function awkData_query()
 		-F*|--tblFormat*)  bgOptionGetOpt val: outFmtType "$@" && shift ;;
 		-w|--wiki)         outFmtType="wiki" ;;
 		-p|--plainFilter)  plainFilterFlag="-p" ;;
+		--awkDataID)   awkDataSet="1" ;;
+		--awkDataID*)  bgOptionGetOpt val: awkDataID "$@" && shift; awkDataSet="1" ;;
 		*)   bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
 	done
-	local awkDataID="${1:-$awkDataID}"; shift
-	local filters="$*"
+	[ ! "$awkDataSet" ] && { awkDataID="${1:-$awkDataID}"; shift; }
 
 	local verticalOutputFlag; [[ "${@: -1}" =~ [\\]?G$ ]] && { verticalOutputFlag=".vert"; set -- "${@:1:$#-1}"; }
+
+	local filters="$*"
 
 	assertNotEmpty awkDataID
 
 	# columns can be specified as a part of the awkDataID term like <awkDataID>.<coluList>
-	if [[ "$awkDataID" =~ [.] ]]; then
+	if ! [[ "$awkDataID" =~ [|] ]] && [[ "${awkDataID##/}" =~ [.] ]]; then
 		columns="${awkDataID#*.}"
 		awkDataID="${awkDataID%%.*}"
 	fi
@@ -91,8 +96,7 @@ function awkData_query()
 	# also indicates that the awkDataID needs building, then we fail.
 	local result i
 	for ((i=0; i<2; i++)); do
-		awk -v awkDataIDList="$awkDataID" \
-			-v awkDataID="$awkDataID" \
+		awk -v awkDataID="$awkDataID" \
 			-v columns="$columns" \
 			-v filters="$filters" \
 			-v noDirtyCheckFlag="$noDirtyCheckFlag" \
@@ -189,12 +193,6 @@ function awkData_getValue()
 	[[ ! "$attribute" =~ \. ]] && attribute="${attribute/:/.}"
 	local awkDataID="${attribute%.*}"
 	local columns="${attribute##*.}"
-
-	# this block is a pattern to get the data about the awkDataID first from the parent scope but then to look it up if needed
-	local awkObjName; awkObjData="$awkObjData"
-	{ [ ! "$awkObjData" ] || [[ ! "$awkObjData" =~ ^"$awkDataID[|]" ]]; } && awkData_parseID $domIDOverrideOpt --awkObjDataVar=awkObjData "$awkDataID" "" "" awkObjName "" ""
-	[ ! "$awkDataID" ] && awkDataID="${awkDataID%%[|]*}"
-	assertNotEmpty awkDataID
 
 	# force means rebuild the cache unconditionally and then go on to run the query
 	# refresh means rebuild the cache only if its dirty and then return without doing a query

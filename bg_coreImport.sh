@@ -214,7 +214,7 @@ function import()
 	### look up the library in the system paths
 
 	# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
-	# searched in non-develoment mode
+	# searched in non-development mode
 	if [ "$bgSourceOnlyUnchangable" ]; then
 		local includePaths="$scriptFolder:/usr/lib"
 	else

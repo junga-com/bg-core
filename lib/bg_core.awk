@@ -199,7 +199,9 @@ function printfVars2(level, varName, varValue, optionsStr,      i,optToken,optio
 
 		maxWidth=0; for (i in varValue) maxWidth=max(maxWidth,length(i))
 
-		for (i in varValue)
+		for (i in varValue) if (!isarray(varValue[i]))
+			printfVars2(level+1, i, varValue[i], "-w"maxWidth" --brackets "optionsStr)
+		for (i in varValue) if (isarray(varValue[i]))
 			printfVars2(level+1, i, varValue[i], "-w"maxWidth" --brackets "optionsStr)
 	}
 }

@@ -799,23 +799,19 @@ function templateExpandFolder()
 		-o*|--objCtx) bgOptionGetOpt val: _objectContextES "$@" && shift ;;
 	esac; shift; done
 
-	local intemplatename=$1
-	local outfoldername=$2
+	local intemplatename="$1"; assertNotEmpty intemplatename
+	local outfoldername="$2";  assertNotEmpty outfoldername
 
 	intemplatename=${intemplatename%/}
 
-	if [ ! -d $intemplatename/ ]; then
-		echo "error: templateExpandFolder: the template folder '$intemplatename/' does not exist" >&2
-		return 1
-	fi
-
-	local preCmd=$(isSudoNeeded "$outfoldername")
+	[ ! -d $intemplatename/ ] && assertError "the template folder '$intemplatename/' does not exist"
 
 	# make the folder structure from the template in the new outfoldername folder
 	local folderlist=$(find $intemplatename/ -mindepth 1 -type d -exec echo {} \;)
 	for folder in $folderlist; do
-		local relFolder=$(expandString "${folder#$intemplatename}") || assertError -v folder -v intemplatename -v outfoldername "expanding folder name"
-		$preCmd mkdir -p $outfoldername$relFolder
+		local relFolder=""
+		relFolder=$(expandString "${folder#$intemplatename}") || assertError -v folder -v intemplatename -v outfoldername "expanding folder name"
+		bgsudo -w $outfoldername$relFolder mkdir -p $outfoldername$relFolder
 	done
 
 	local textFileList=$(find $intemplatename/  -type f -exec echo {} \;)
