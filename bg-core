@@ -108,7 +108,7 @@ function templateCntr()
 	case ${cmd} in
 		types)      templateListTypes     "$@" ;;
 		list)       templateListTemplates "$@" ;;
-		find)       templateFind          "$@" || assertError "no template found" ;;
+		find)       templateFind          "$@" || assertError "no template found for '$@'" ;;
 		expand)     templateExpand        "$@" ;;
 		paths)
 			echo "These folders will be searched in order to resolve template names. The first folders will reflect the package where "

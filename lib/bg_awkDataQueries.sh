@@ -45,10 +45,9 @@ import bg_awkDataSchema.sh  ;$L1;$L2
 #    Library bg_awkDataQueries.awk
 function awkData_query()
 {
-	local columns domIDOverrideOpt escapOutput forceFlag refreshFlag noDirtyCheckFlag plainFilterFlag headerFlag outFmtType="txt"
+	local columns escapOutput forceFlag refreshFlag noDirtyCheckFlag plainFilterFlag headerFlag outFmtType="txt"
 	local awkDataID="$awkDataID" awkDataSet
 	while [[ "$1" =~ ^- ]]; do case $1 in
-		-C*|--domID*)      bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
 		-c*|--columns*)    bgOptionGetOpt val: columns "$@" && shift ;;
 		-n|--noDirtyCheck) noDirtyCheckFlag="-n" ;;
 		-f|--forceRebuild) forceFlag="-f" ;;
@@ -174,9 +173,8 @@ function awkData_query()
 #    awkData_query        : the most qeneral query function which returns all matching rows without combining duplicates
 function awkData_getValue()
 {
-	local domIDOverrideOpt escapOutput forceFlag refreshFlag noDirtyCheckFlag plainFilterFlag assertOneFlag retVar countFlag
+	local escapOutput forceFlag refreshFlag noDirtyCheckFlag plainFilterFlag assertOneFlag retVar countFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
-		-C*|--domID*)         bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
 		-n|--noDirtyCheck)    noDirtyCheckFlag="-n" ;;
 		-f|--forceRebuild)    forceFlag="-f" ;;
 		-r|--refresh)         refreshFlag="-r" ;;

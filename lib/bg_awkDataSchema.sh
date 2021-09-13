@@ -353,11 +353,3 @@ function awkData_getColumns()
 		}
 	' /dev/null
 }
-
-# usage: awkData_createSchema <templateFile> <schemaName>
-function awkData_createSchema()
-{
-	local templateFile="$1"
-	local schemaName="${2:-${templateFile##*/}}"
-	templateExpand --interactive "$templateFile" /dom/schema/${schemaName%.schema}.schema
-}

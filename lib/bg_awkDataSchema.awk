@@ -340,9 +340,11 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 	awkFile=awkObjData[2];
 	awkSchemaFile=awkObjData[3];
 
+	# For one-off tables, the user might specify either the awkFile alone and then we glean the table name from the filename
 	if (!awkObjName && awkFile)
 		awkObjName=gensub(/(^.*\/)|([.].*$)/,"","g",awkFile)
 
+	# typical case: lookup the schema from the table name
 	if (!awkSchemaFile && awkObjName) {
 		arrayCreate(schemas)
 		manifestGet("^data.awkDataSchema$", "^"awkObjName"$", schemas)
@@ -353,6 +355,9 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 		}
 	}
 
+	# If the schemaFile field contains a simple table name, look up the schema asset
+	# This is a case where the caller is crafting a new data table from an existing schema definition. The caller can assign a new
+	# table name and awkFile location and an existing installed schema.
 	if ( (awkSchemaFile !~ /[/.]/) && !fsExists(awkSchemaFile)) {
 		arrayCreate(schemas)
 		manifestGet("awkDataSchema", awkSchemaFile, schemas)
@@ -363,6 +368,7 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 		}
 	}
 
+	# typical case: lookup the data file from the schema file
 	if (awkSchemaFile && ! awkFile) {
 		script="$1==\"awkFile\" {print gensub(/[[:space:]]*#.*$/,\"\",\"g\",$2);exit(0)} /^[[:space:]]*[[]/ {exit(0)}"
 		cmd="gawk -F= '"script"' " awkSchemaFile
@@ -373,6 +379,7 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 
 	}
 
+	# If only the awkDataSchemaFile was specified, the awkDataFile was not available when we first tried to glean the name so check it again
 	if (!awkObjName && awkFile)
 		awkObjName=gensub(/(^.*\/)|([.].*$)/,"","g",awkFile)
 
@@ -957,6 +964,10 @@ function tblFmt_writeBeginning(tblFmt, schema, outFields, headerFlag) {
 
 	if (length(outFields)>1)
 		arrayCopy2(schema["colWidths"], tblFmt,"widths")
+
+	# set the last one to 0 b/c we dont need to pad the end of the line (which might make a line wrap)
+	for (i in outFields) {field=outFields[i]}
+	tblFmt["widths"][field]=0
 
 	if (headerFlag) {
 		switch (tblFmt["colLabelType"]) {
