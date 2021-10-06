@@ -182,6 +182,9 @@ function static::Plugin::types()
 	local pkg scrap pluginID pluginPath
 	while read -r pkg scrap pluginID pluginPath; do
 		types["${pluginID%%:*}"]="1"
+		if [[ "$pluginID" =~ ^PluginType: ]]; then
+			types["${pluginID#PluginType:}"]="1"
+		fi
 	done < <(manifestGet --pkg="${packageOverride:-.*}" "plugin" "$pluginTypeSpec")
 
 	outputValue -1 "${retOpts[@]}" "${!types[@]}"
@@ -191,12 +194,11 @@ function static::Plugin::types()
 # usage: $Plugin::get [-R <retVar>] <pluginType> <pluginID>
 #        $Plugin::get [-R <retVar>] <pluginType>:<pluginID>
 # static Plugin method to get a plugin given its type and name (which is its unique key)
-# This returns quickly without doing anything if the plugin is already loaded.
-# This function assumes that the plugin is implemented in a library with the assetType:plugin and assetName <pluginType>.>pluginName>
-# in the host manifest. If that is not the case, you can source the library that implements it another way and this function wont
-# do anything if called because it will already be loaded.
-# There is a static member variable of type Map in the Plugin class called loadedPlugins where plugins (and pluginTypes) are registered
-# when they are loaded. Code should use the DeclarePlugin and DeclarePluginType functions to create and register plugins or PluginTypes.
+# This returns quickly without doing anything if the plugin is already loaded. If it is not already loaded, it will attempt to load
+# it by using the host manifest to find a library asset with the assetType "plugin" and assetName "<pluginType>.>pluginName>".
+# It should be noted that you can load a plugin that is not registered in the host manifest by sourcing the library that contains
+# it explicitly and then calling $Plugin::get but that would not be secure on a production machine and such code should not be
+# accepted into a trusted repository.
 function static::Plugin::get()
 {
 	local retVar quietFlag
@@ -227,20 +229,7 @@ function static::Plugin::get()
 		read -r _pg_pkg _pg_scrap _pg_scrap _pg_filename < <(manifestGet  plugin "$pluginType:$pluginID")
 		assertNotEmpty _pg_filename "could not find assetType:plugin assetName:'$pluginType:$pluginID' in host manifest"
 
-		local _pg_fileTypeInfo="$(file "$_pg_filename")"
-		if [[ "$_pg_fileTypeInfo" =~ Bourne-Again ]]; then
-			# this is the initially typical case where the plugin is implemented as a bash script
-			import "$_pg_filename" ;$L1;$L2
-
-		elif [ -x "$_pg_filename" ]; then
-			# this is the case where the plugin is implemented in a different language. It could be a php or python script or a binary
-			# The executable should respond to the 'getAttributes' command by returning its attributes in the deb control file syntax
-			DeclarePlugin "$pluginType" "$pluginID" "$($_pg_filename getAttributes)"
-		else
-			assertError "could not load plugin file '$_pg_filename' because it is not a bash script and not an executable"
-		fi
-
-		[ "${loadedPlugins[$pluginKey]+exists}" ] || assertError "failed to load plugin '$pluginKey'"
+		_pluginLoadContainingLibrary "$pluginKey" "$_pg_filename"
 
 		local -n _pg_plugin; GetOID "${loadedPlugins[$pluginKey]}" _pg_plugin
 		_pg_plugin[package]="$_pg_pkg"
@@ -251,6 +240,44 @@ function static::Plugin::get()
 	else
 		returnObject "${loadedPlugins[$pluginKey]}" "$retVar"
 	fi
+}
+
+
+# usage: _pluginLoadContainingLibrary <pluginKey> <libraryFilename>
+function _pluginLoadContainingLibrary()
+{
+	local _pl_pluginKey="$1";       shift; assertNotEmpty _pl_pluginKey
+	local _pl_libraryFilename="$1"; shift; assertNotEmpty _pl_libraryFilename
+
+	local _pl_fileTypeInfo="$(file "$_pl_libraryFilename")"
+	if [[ "$_pl_fileTypeInfo" =~ Bourne-Again ]]; then
+		# this is the typical (at least initially) case where the plugin is implemented as a bash script
+		import "$_pl_libraryFilename" ;$L1;$L2
+	elif [ -x "$_pl_libraryFilename" ]; then
+		# this is the case where the plugin is implemented in a different language. It could be a php or python script or a binary
+		# The executable should respond to the 'getAttributes' command by returning its attributes in the deb control file syntax
+		DeclarePlugin "$pluginType" "$pluginID" "$($_pl_libraryFilename getAttributes)"
+	else
+		assertError -v libraryFilename:_pl_libraryFilename "could not load plugin library file '$_pl_libraryFilename' because it is not a bash script and not an executable"
+	fi
+
+	[ "${loadedPlugins[$_pl_pluginKey]+exists}" ] || assertError "failed to load plugin '$_pl_pluginKey' contained in file '$_pl_libraryFilename'"
+}
+
+
+# usage: $Plugin::loadAllOfType [-R <retVar>] <pluginType>
+# static Plugin method to load all the installed plugins of the given type.
+function static::Plugin::loadAllOfType()
+{
+	local pluginType="$1"; shift; assertNotEmpty pluginType
+
+	# ensure that this  pluginType is loaded first
+	[ "$pluginType" != "PluginType" ] && static::Plugin::get -q "PluginType:$pluginType"
+
+	local  _pg_pkg _pg_type _pg_name _pg_filename;
+	while read -r _pg_pkg _pg_type _pg_name _pg_filename; do
+		_pluginLoadContainingLibrary "$_pg_name" "$_pg_filename"
+	done < <(manifestGet  plugin "$pluginType:.*")
 }
 
 # usage: $Plugin::buildAwkDataTable

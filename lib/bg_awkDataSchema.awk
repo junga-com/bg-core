@@ -662,10 +662,11 @@ function schema_restore(awkDataID            ,awkDataIDLongForm,awkObjData) {
 	# 1          2       3
 	awkDataIDLongForm=awkData_parseID(awkDataID)
 	split(awkDataIDLongForm, awkObjData, "|")
+	awkDataID=awkObjData[1]
 
-	arrayCreate2(schemas,awkObjData[1])
-	arrayCreate2(schemas[awkObjData[1]], "info")
-	schemaInfo_restore(schemas[awkObjData[1]]["info"], awkDataIDLongForm)
+	arrayCreate2(schemas,awkDataID)
+	arrayCreate2(schemas[awkDataID], "info")
+	schemaInfo_restore(schemas[awkDataID]["info"], awkDataIDLongForm)
 
 	if (! ("noSchemaDataFound" in schemas[awkDataID]["info"])) {
 		schema_construct(schemas[awkDataID], schemas[awkDataID]["info"])

@@ -38,7 +38,7 @@
 #   bcColumnListBegin     : complete a list of column names
 BEGIN {
 	if (bcType && !isarray(schemas[awkDataID])) assert("awkDataID is a required parameter to bg_awkDataBC.awk")
-	#bgtraceVars("schemas")
+	# bgtraceVars("schemas awkDataID")
 	switch (bcType) {
 		case "attributeTerm"  :  bcAttributeTermBegin(schemas[awkDataID], validOperators, planMode, filters, !dontDoDefaultCol) ; break
 		case "columnNames"    :  bcColumnNameBegin(   schemas[awkDataID], planMode, filters, !dontDoDefaultCol)    ; break

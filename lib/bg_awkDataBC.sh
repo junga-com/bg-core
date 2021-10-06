@@ -114,8 +114,7 @@ function awkData_bcColumnList()
 	local awkDataID="${1:-$awkDataID}"; shift;
 	local cur="$1"; shift
 
-	awk -v awkDataIDList="$awkDataID" \
-		-v awkDataID="$awkDataID" \
+	awk -v awkDataID="$awkDataID" \
 		-v cur="$cur" \
 		-v bcType="columnList" \
 		-f "bg_awkDataBC.awk"
@@ -172,8 +171,7 @@ function awkData_bcAttributeTerm()
 		[ "$1" != "$cur" ] && [[ ! "$1" =~ ^- ]] && [[ "$1" =~ : ]] && completedTerms+=("$1")
 	shift; done
 
-	awk -v awkDataIDList="$awkDataID" \
-		-v awkDataID="$awkDataID" \
+	awk -v awkDataID="$awkDataID" \
 		-v cur="$cur" \
 		-v bcType="attributeTerm" \
 			-v planMode="${planMode:--p0}" \
@@ -215,8 +213,7 @@ function awkData_bcColumnNames()
 		[ "$1" != "$cur" ] && [[ ! "$1" =~ ^- ]] && [[ "$1" =~ : ]] && completedTerms+=("$1")
 	shift; done
 
-	awk -v awkDataIDList="$awkDataID" \
-		-v awkDataID="$awkDataID" \
+	awk -v awkDataID="$awkDataID" \
 		-v cur="$cur" \
 		-v bcType="columnNames" \
 			-v planMode="${planMode:--p1}" \
@@ -250,8 +247,7 @@ function awkData_bcColumnValues()
 		[ "$1" != "$cur" ] && [[ ! "$1" =~ ^- ]] && [[ "$1" =~ : ]] && completedTerms+=("$1")
 	shift; done
 
-	awk -v awkDataIDList="$awkDataID" \
-		-v awkDataID="$awkDataID" \
+	awk -v awkDataID="$awkDataID" \
 		-v cur="$cur" \
 		-v bcType="columnValues" \
 			-v colName="$colName" \
