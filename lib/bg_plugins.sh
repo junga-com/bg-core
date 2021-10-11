@@ -75,6 +75,9 @@ function DeclarePlugin()
 }
 
 # usage: DeclarePluginType <pluginType> <attributes>
+# This is used to introduce a new type of plugin into the system. <name>.PluginType plugins use this instead of DeclarePlugin.
+# Typically a package that includes a <MyNewType>.PluginType will also include commands that use plugins of <MyNewType> to allow
+# other packages to extend the functionality of the command.
 function DeclarePluginType()
 {
 	local pluginType="$1"; shift
@@ -265,11 +268,11 @@ function _pluginLoadContainingLibrary()
 }
 
 
-# usage: $Plugin::loadAllOfType [-R <retVar>] <pluginType>
+# usage: $Plugin::loadAllOfType <pluginType>
 # static Plugin method to load all the installed plugins of the given type.
 function static::Plugin::loadAllOfType()
 {
-	local pluginType="$1"; shift; assertNotEmpty pluginType
+	local pluginType="${1:-${static[name]}}"; shift; assertNotEmpty pluginType
 
 	# ensure that this  pluginType is loaded first
 	[ "$pluginType" != "PluginType" ] && static::Plugin::get -q "PluginType:$pluginType"
@@ -278,6 +281,26 @@ function static::Plugin::loadAllOfType()
 	while read -r _pg_pkg _pg_type _pg_name _pg_filename; do
 		_pluginLoadContainingLibrary "$_pg_name" "$_pg_filename"
 	done < <(manifestGet  plugin "$pluginType:.*")
+}
+
+# usage: $Plugin::addNewAsset <newAssetName>
+# This is invoked by the "bg-dev asset plugin.<pluginType> <newAssetName>" command to add a new asset to the current project folder
+# of this plugin type.  This default implementation assumes that there is a system template named newAsset.<pluginType> which it
+# expands to make a new asset file at <projectRoot>/plugins/<newAssetName>.<pluginType>.  A particular <pluginType> may override
+# this static function to perform different actions if needed.
+function static::Plugin::addNewAsset()
+{
+	local newAssetName="$1"; shift; assertNotEmpty newAssetName
+
+	local destFile="./plugins/$newAssetName.${static[name]}"
+	[ -e "$destFile" ] && assertError "An asset already exists at '$destFile'"
+
+	import bg_template.sh  ;$L1;$L2
+	local templateFile; templateFind -R templateFile "newAsset.${static[name]}"
+	[ ! "$templateFile" ] && assertError -v templateName:"-lnewAsset.${static[name]}" -v "plugintype:-l${static[name]}" "The template to create a new plugin asset of this type was not found on this host."
+
+	templateExpand "$templateFile" "$destFile"
+	echo "A new asset has been added at '$destFile' with default values. Edit that file to customize it."
 }
 
 # usage: $Plugin::buildAwkDataTable
