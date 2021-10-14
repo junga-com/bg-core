@@ -665,18 +665,18 @@ function ConstructObject()
 	[[ "${BASH_VERSION:0:3}" < "4.3" ]] && assertError "classes need the declare -n option which is available in bash 4.3 and above"
 	local _CLASS="$1"; assertNotEmpty _CLASS "className is a required parameter"
 
-	DeclareClassEnd "$_CLASS"
-	varExists "$_CLASS[name]" || assertError -v "$_CLASS" "Class '$_CLASS' does not exist"
+	DeclareClassEnd "${_CLASS%%::*}"
+	varExists "${_CLASS%%::*}[name]" || assertError -v "${_CLASS%%::*}" "Class '${_CLASS%%::*}' does not exist"
 
 	### support dynamic base class implemented construction
-	if [[ "$_CLASS" =~ :: ]] && type -t ${_CLASS//::*/::ConstructObject} &>/dev/null; then
+	if type -t ${_CLASS%%::*}::ConstructObject &>/dev/null; then
 		_CLASS="${1%%::*}"
-		local data="${1#*::}"
-		shift
-		local objName="$1"; shift
-		$_CLASS::ConstructObject "$data" "$objName" "$@"
-		bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-		return 0
+		local data; [[ "$1" =~ :: ]] && data="${1#*::}"
+		if $_CLASS::ConstructObject "$data" "${@:2}"; then
+			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
+			return 0
+		fi
+		unset data
 	fi
 
 	local -n class="$_CLASS"

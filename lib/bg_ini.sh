@@ -519,10 +519,12 @@ function iniParamGetAll()
 				scopeDelim="."
 		}
 		inTarget && iniLineType=="setting" {
-			switch (fullyQualifiedFlag":"scopeDelim) {
-				case /^:/:        name=iniParamName; break
-				case /full:[][]/: name="["iniSectionNorm"]"iniParamName; break
-				default:          name=iniSectionNorm""scopeDelim""iniParamName; break
+			if (fullyQualifiedFlag || iniSection=="") {
+				name=iniParamName
+			} else if (scopeDelim~"[][]") {
+				name="["iniSection"]"iniParamName
+			} else {
+				name=iniSection""scopeDelim""iniParamName
 			}
 			maxNameLen=max(maxNameLen, length(name))
 			settings[name]=iniValue
@@ -530,7 +532,7 @@ function iniParamGetAll()
 		END {
 			print maxNameLen
 			for (name in settings)
-				printf("%*s = %s\n", -maxNameLen, norm(name), settings[name])
+				printf("%*s %s\n", -maxNameLen, norm(name), settings[name])
 		}
 	' "$iniFile")
 }
