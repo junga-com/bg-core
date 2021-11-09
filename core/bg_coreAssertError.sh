@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library bg_coreAssertError.sh
 # This library provides the core assertError functionality and a set of assert* functions that relate to core library features.

@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library bg_coreImport.sh bg_core.sh
 # this is the core library script in the bg-core system. It implements the import function and uses it

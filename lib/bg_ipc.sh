@@ -1,4 +1,4 @@
-#!/bin/bash
+
 
 import bg_bgawk.sh ;$L1;$L2
 

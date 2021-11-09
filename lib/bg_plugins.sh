@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library
 # Bash script plugins provide a mechanism for multiple packages to collaborate to achieve features.
@@ -69,9 +68,10 @@ function DeclarePlugin()
 {
 	local pluginType="$1"; shift
 	local pluginID="$1"; shift
-	local pluginInst
+	local -n pluginInst
 	ConstructObject "$pluginType" pluginInst "$pluginType" "$pluginID" "$@"
 	$Plugin::register "$pluginType:$pluginID" "$pluginInst"
+	pluginInst[package]="$packageName"
 }
 
 # usage: DeclarePluginType <pluginType> <attributes>
@@ -97,6 +97,7 @@ function DeclarePluginType()
 	done
 
 	$Plugin::register "PluginType:$pluginType" "$static"
+	static[package]="$packageName"
 	true
 }
 
@@ -133,15 +134,18 @@ function static::Plugin::register()
 #    <outputOptions>   : See man outputValue for supported options which control how the output is returned.
 #    --short           : return just the pluginID for each plugin
 #    --full            : (default) return pluginType:pluginID for each plugin
-#
+#    --pkgName=<pkg> : list plugins that are provided by this package only.
+#    --manifest=<file> : list the plugins from this manifest file.  By default, the host's global manifest file or
+#                  the virtually installed sandbox's manifest file is used based on the environment.
 # See Also:
 #   "bg-awkData manifest assetType:plugin" # assetName is of the form <pluginType>:<pluginName>
 function static::Plugin::list()
 {
-	local retOpts shortFlag manifestOpt
+	local retOpts shortFlag manifestOpt pkgNameOpt
 	while [ $# -gt 0 ]; do case $1 in
 		--short) shortFlag="--short" ;;
 		--full)  shortFlag="" ;;
+		-p*|--pkg*|--pkgName*)   bgOptionGetOpt opt: pkgNameOpt "$@" && shift ;;
 		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
 		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
@@ -155,7 +159,7 @@ function static::Plugin::list()
 	while read -r pkg scrap pluginID pluginPath; do
 		[ "$shortFlag" ] && pluginID="${pluginID#*:}"
 		plugins+=($pluginID)
-	done < <(manifestGet $manifestOpt --pkg="${packageOverride:-.*}" "plugin" "$pluginNameSpec")
+	done < <(manifestGet $manifestOpt $pkgNameOpt "plugin" "$pluginNameSpec")
 
 	outputValue -1 "${retOpts[@]}" "${plugins[@]}"
 }
@@ -167,12 +171,17 @@ function static::Plugin::list()
 #    <pluginTypeSpec> : only list the names plugin types that match this spec
 # Options:
 #    <outputOptions>   : See man outputValue for supported options which control how the output is returned.
+#    --pkgName=<pkg> : list types that are provided by this package only.
+#    --manifest=<file> : list the types from this manifest file.  By default, the host's global manifest file or
+#                  the virtually installed sandbox's manifest file is used based on the environment.
 # See Also:
 #   "bg-awkData manifest assetType:plugin" # assetName is of the form <pluginType>:<pluginName>
 function static::Plugin::types()
 {
-	local retOpts
+	local retOpts manifestOpt pkgNameOpt
 	while [ $# -gt 0 ]; do case $1 in
+		-p*|--pkg*|--pkgName*)   bgOptionGetOpt opt: pkgNameOpt "$@" && shift ;;
+		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
 		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -188,26 +197,49 @@ function static::Plugin::types()
 		if [[ "$pluginID" =~ ^PluginType: ]]; then
 			types["${pluginID#PluginType:}"]="1"
 		fi
-	done < <(manifestGet --pkg="${packageOverride:-.*}" "plugin" "$pluginTypeSpec")
+	done < <(manifestGet $manifestOpt $pkgNameOpt "plugin" "$pluginTypeSpec")
 
 	outputValue -1 "${retOpts[@]}" "${!types[@]}"
 }
 
 
-# usage: $Plugin::get [-R <retVar>] <pluginType> <pluginID>
-#        $Plugin::get [-R <retVar>] <pluginType>:<pluginID>
-# static Plugin method to get a plugin given its type and name (which is its unique key)
+# usage: $Plugin::get [-R <retVar>] <pluginKey>
+#        $Plugin::get [-R <retVar>] <pluginType> <pluginID>
+# static Plugin method to get a plugin given its type and name (which is its unique key). The parameter passed in the second form
+# is also known as the <pluginKey>. The <pluginKey> uniquely identifies the plugin on the host but if two packages containing the
+# same <pluginKey> are somehow installed on the same host, the --pkgName= option can be used to resolve the conflict.
+#
 # This returns quickly without doing anything if the plugin is already loaded. If it is not already loaded, it will attempt to load
 # it by using the host manifest to find a library asset with the assetType "plugin" and assetName "<pluginType>.>pluginName>".
+# If the --pkgName= option is specified, only plugins provided by that package will be considered.
 # It should be noted that you can load a plugin that is not registered in the host manifest by sourcing the library that contains
 # it explicitly and then calling $Plugin::get but that would not be secure on a production machine and such code should not be
 # accepted into a trusted repository.
+# Options:
+#    -q|--quiet) : load the plugin without returning a reference to it. Sometimes you just want to make sure the plugin is loaded.
+#    --pkgName=<pkg> : normally <pluginKey>s (<pluginType> + <pluginID>) are unique on a host. If that is not the case, this option
+#                  can be used to choose which package provided the desired plugin.
+#    --manifest=<file> : load the plugin referenced in the specified manifest file. By default, the host's global manifest file or
+#                  the virtually installed sandbox's manifest file is used based on the environment.
+#    -R <retVar> : <retVar> is the variable that will receive the loaded plugin. If it is an uninitialized -n (reference) variable,
+#                  it will be set to point to the plugin's Object OID associaive array. Otherwise, it will be set with the Object's
+#                  <objRef> string representation which acts like a pointer to the associative arrary. If this option is not specified
+#                  the string <objRef> is printed to stdout. See man(3) returnObject
+# Params:
+#    <pluginKey>   : the unique identifier for a plugin installed on a host. It consists of the <pluginType> and <pluginID> separated
+#                    by a ':' (<pluginType>:<pluginID>)
+#    <pluginType>  : the type of the plugin to be returned.
+#    <pluginID>    : the name of the plugin to be returned.
+# See Also:
+#    man(3) returnObject
 function static::Plugin::get()
 {
-	local retVar quietFlag
+	local retVar quietFlag pkgNameOpt manifestOpt
 	while [ $# -gt 0 ]; do case $1 in
-		-q|--quiet) quietFlag="-q" ;;
-		-R*) bgOptionGetOpt val: retVar "$@" && shift ;;
+		-q|--quiet)   quietFlag="-q" ;;
+		-p*|--pkg*|--pkgName*)   bgOptionGetOpt opt: pkgNameOpt "$@" && shift ;;
+		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
+		-R*)          bgOptionGetOpt val: retVar "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	if [[ "$1" =~ : ]]; then
@@ -229,13 +261,17 @@ function static::Plugin::get()
 
 		# get the filename that implements this plugin from the manifest
 		local _pg_pkg _pg_scrap _pg_filename
-		read -r _pg_pkg _pg_scrap _pg_scrap _pg_filename < <(manifestGet  plugin "$pluginType:$pluginID")
+		read -r _pg_pkg _pg_scrap _pg_scrap _pg_filename < <(manifestGet $manifestOpt $pkgNameOpt plugin "$pluginType:$pluginID")
 		assertNotEmpty _pg_filename "could not find assetType:plugin assetName:'$pluginType:$pluginID' in host manifest"
+
+		# override the 'context global' packageName var for and DeclarePlugin calls made when sourcing the plugin library. There
+		# may be multiple plugins Declared in the library, not just the one we are explicitly 'getting'
+		local packageName="$_pg_pkg"
 
 		_pluginLoadContainingLibrary "$pluginKey" "$_pg_filename"
 
 		local -n _pg_plugin; GetOID "${loadedPlugins[$pluginKey]}" _pg_plugin
-		_pg_plugin[package]="$_pg_pkg"
+		[ "${_pg_plugin[package]}" == "$_pg_pkg" ] || assertLogicError
 	fi
 
 	if [ "$quietFlag" ]; then
@@ -247,6 +283,8 @@ function static::Plugin::get()
 
 
 # usage: _pluginLoadContainingLibrary <pluginKey> <libraryFilename>
+# This is an internal helper function to load a plugin library file with the purpose of loading the specified <pluginKey>
+# The <libraryFilename> can be a bash script or some opaque executable that implements the plugin libary protocol.
 function _pluginLoadContainingLibrary()
 {
 	local _pl_pluginKey="$1";       shift; assertNotEmpty _pl_pluginKey
@@ -270,8 +308,17 @@ function _pluginLoadContainingLibrary()
 
 # usage: $Plugin::loadAllOfType <pluginType>
 # static Plugin method to load all the installed plugins of the given type.
+# Options:
+#    --manifest=<file> : load the plugins listed in this alternate manifest file.  By default, the host's global manifest file or
+#                  the virtually installed sandbox's manifest file is used based on the environment.
 function static::Plugin::loadAllOfType()
 {
+	local manifestOpt
+	while [ $# -gt 0 ]; do case $1 in
+		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
 	local pluginType="${1:-${static[name]}}"; shift; assertNotEmpty pluginType
 
 	# ensure that this  pluginType is loaded first
@@ -280,7 +327,7 @@ function static::Plugin::loadAllOfType()
 	local  _pg_pkg _pg_type _pg_name _pg_filename;
 	while read -r _pg_pkg _pg_type _pg_name _pg_filename; do
 		_pluginLoadContainingLibrary "$_pg_name" "$_pg_filename"
-	done < <(manifestGet  plugin "$pluginType:.*")
+	done < <(manifestGet $manifestOpt  plugin "$pluginType:.*")
 }
 
 # usage: $Plugin::addNewAsset <newAssetName>
@@ -303,42 +350,57 @@ function static::Plugin::addNewAsset()
 	echo "A new asset has been added at '$destFile' with default values. Edit that file to customize it."
 }
 
-# usage: $Plugin::buildAwkDataTable
-# This builds an awkData style table of all installed plugins and the union of attribute names that they contain as columns
-# Mutable attributes (aka columns) and attributes that start with '_' are not included.
-# The output is sent to stdout.
-function static::Plugin::buildAwkDataTable()
+# usage: $Plugin::_dumpAttributes [--pkgName=<pkgName>] [--manifest=<file>] [<pluginKeySpec>]
+# This is a helper function used to build and maintain the plugin awkData table. You specify a set of plugins and it will print to
+# stdout all the attributes, one per line of each plugin in the set.
+# Each line has the format...
+#      <pkgName> <pluginKey> <attributeName> <attributeValue>
+# Each token is escaped using the awkData standard.
+function static::Plugin::_dumpAttributes()
 {
-	local manifestOpt
+	local pkgNameOpt manifestOpt
 	while [ $# -gt 0 ]; do case $1 in
+		-p*|--pkg*|--pkgName*) bgOptionGetOpt opt: pkgNameOpt "$@" && shift ;;
 		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+	local pluginKeySpec="$1"
 
-	local allPlugins; $Plugin::list -A allPlugins $manifestOpt --full '.*'
-
-	local pluginKey
+	local pkg scrap pluginKey pluginPath
 	local -n plugin
-	for pluginKey in "${allPlugins[@]}"; do
+	while read -r pkg scrap pluginKey pluginPath; do
 		Try:
-			unset -n plugin; local -n plugin; $Plugin::get -R plugin "$pluginKey"
-			echo "$pluginKey" "pluginKey" "$pluginKey"
+			unset -n plugin; local -n plugin; $Plugin::get --pkgName=$pkg -R plugin "$pluginKey"
+			echo "$pkg" "$pluginKey" "pluginKey" "$pluginKey"
 			local attribNames=(); $plugin.getAttributes -A attribNames
 			local -n mutableCols; $plugin.static.mutableCols.getOID mutableCols
 			local attrib; for attrib in "${attribNames[@]}"; do
 				if [ ! "${mutableCols[$attrib]+exists}" ]; then
 					local value="${plugin[$attrib]}"
 					varEscapeContents attrib value
-					echo "$pluginKey" "$attrib" "$value"
+					echo "$pkg"  "$pluginKey" "$attrib" "$value"
 				fi
 			done
-			echo  "$pluginKey" "loadable" "loadSuccess"
+			echo "$pkg" "$pluginKey" "loadable" "loadSuccess"
 		Catch: && {
-			echo  "$pluginKey" "loadable" "loadFail"
+			echo "$pkg" "$pluginKey" "loadable" "loadFail"
 			echo "the plugin '$pluginKey' failed to load '$catch_errorDescription'" >&2
 			assertError "the plugin '$pluginKey' failed to load"
 		}
-	done >  >(gawk '
+
+	done < <(manifestGet $manifestOpt $pkgNameOpt "plugin" "${pluginKeySpec:-.*}")
+}
+
+# usage: $Plugin::_assembleAttributesForAwktable [--pkgName=<pkgName>] [<pluginKeySpec>]
+# This is a pipe function which reads a stream of one attribute per line, as produced by _dumpAttributes, and outputs to stdout
+# an awkdata table with one plugin per line and columns which is a union of all columns used by any of the present plugins.
+# Note that there are a handful of hard coded columns that will always be present and appear first (left most). The rest of the
+# columns depend on which ones are present in the set of plugin attributes read on stdin.
+#
+# Some (most) plugins will not have values for every attribute column and those fields will be empty ('--').
+function static::Plugin::_assembleAttributesForAwktable()
+{
+	gawk '
 		@include "bg_core.awk"
 		function addCol(col) {
 			if (!(col in attribs)) {
@@ -380,11 +442,12 @@ function static::Plugin::buildAwkDataTable()
 			addCol("defDisplayCols")
 			addCol("columns")
 		}
-		NF!=3 {assert("logic error. The pipe should feed in only lines with three columns : <pluginKey> <attribName> <value>")}
+		NF!=4 {assert("logic error. The pipe should feed in only lines with three columns : <pluginKey> <attribName> <value>")}
 		{
-			pluginKey=$1; attrib=$2; value=$3
+			pkgName=$1; pluginKey=$2; attrib=$3; value=$4
 			#bgtrace("   |pluginKey=|"pluginKey"|  attrib=|"attrib"|")
 			if (attrib ~ /^[a-zA-Z]/  && attrib !~ /^(staticMethods|methods|vmtCacheNum|classHierarchy|baseClass|mutableCols)$/) {
+				if (attrib=="package" && pkgName != value) assert("logic error: the [package] attribute ("value") in plugin "pluginKey" does not match the pkgName from the manifest entry for the plugin ("pkgName") ")
 				addRow(pluginKey)
 				addCol(attrib)
 				values[pluginKey,attrib]=value
@@ -403,7 +466,28 @@ function static::Plugin::buildAwkDataTable()
 				printf("\n")
 			}
 		}
-	' | column -t -e)
+	'
+}
+
+
+# usage: $Plugin::buildAwkDataTable [--manifest=<file>]
+# This builds an awkData style table of all installed plugins and the union of attribute names that they contain as columns
+# Mutable attributes (aka columns) and attributes that start with '_' are not included.
+# The output is sent to stdout.  The set of plugins is the entire set contained in a manifest file.  By default it uses the global
+# host manifest of the host computer. In a production environment that will be the one in the /var/lib/bg-core/hostmanifest and
+# in a vinstalled development environment it will be the one in the vinstalled sandbox's ./.bglocal/hostmanifest.  The --manifest
+# option can be used to specify a particular manifest file to use.
+# Options:
+#    --manifest=<file> : override the prevailing default host manifest (either production or vinstalled) with a specific file.
+function static::Plugin::buildAwkDataTable()
+{
+	local manifestOpt
+	while [ $# -gt 0 ]; do case $1 in
+		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	static::Plugin::_dumpAttributes $manifestOpt | static::Plugin::_assembleAttributesForAwktable | column -t -e
 }
 
 

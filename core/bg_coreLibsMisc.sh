@@ -1,5 +1,3 @@
-#!/bin/bash
-
 
 # Library bg_coreLibsMisc.sh
 # All the libraries that start with bg_core* are mandatory and are sourced by 'source /usr/lib/bg_core.sh'. Other libraries can be
@@ -55,7 +53,7 @@
 #                       be specified to get any results. use '.*' to match all assetNames
 #
 # Options:
-#    -p|--pkg=<pkgMatch>   : specify a regex(gawk) to match the pkg field. '.*' is the default
+#    -p|--pkg|--pkgName=<pkgMatch>   : specify a regex(gawk) to match the pkg field. '.*' is the default
 #    -o|--output=<outStr>  : specify what is returned for each matching asset record. default is '$0'. This can use the the terms
 #                            $1,$2,$3,$4 to refer to the columns of the manifest file respectively. $0 is all colums.
 #    --manifest=<file>     : override the path of the manifest file to use.
@@ -63,8 +61,8 @@ function manifestGet() {
 	local manifestFile
 	local pkgMatch=".*" outputStr='$0'
 	while [ $# -gt 0 ]; do case $1 in
-		-p|--pkg*)    bgOptionGetOpt val: pkgMatch "$@" && shift ;;
-		-o|--output*) bgOptionGetOpt val: outputStr "$@" && shift ;;
+		-p*|--pkg*|--pkgName*) bgOptionGetOpt val: pkgMatch "$@" && shift ;;
+		-o*|--output*) bgOptionGetOpt val: outputStr "$@" && shift ;;
 		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -4025,7 +4023,7 @@ function fsTouch()
 # Most find 'Action' expressions (e.g. -print, -exec, etc...) are not allowed. The action of this command is hard coded to return a list
 # of found filesystem objects.
 #
-# -prune and -exit can be used to limit the results eficciently
+# -prune and -exit can be used to limit the results efficiently
 #
 # In non-resursive mode (+R, default when invoked as fsExpandFiles) find is invoked with -maxdepth 0 so that the test expressions
 # will only serve to limit the list of files that <fileSpecN> expanded to after glob expansion. This means that
@@ -4035,14 +4033,22 @@ function fsTouch()
 #            be absolute (starting at the filsystem root) or relative to the current working directory.
 #            NOTE: files can exist whose names look like options or expressions to find so './*' should be used instead of '*' to
 #                  refer to all files in the current directory. That will cause the expanded names to start with './' so that they
-#                  can not be mistaken for an option.
+#                  can not be mistaken for an option. The option '-B./' could be used to remove the ./ from the results if needed.
 # Options:
 # These options affect which file obects are in the outputted list
 #    -f : force. return at least one fs object which will be "/dev/null" if none other match
 #    -F : files only. match only file objects. Note: upper case F b/c -f is force.
 #    -D : directories only. match only folder(aka directory) objects. Note upper case for consistency with -F
 #    -R : recursive     (default for bgfind alias)        treat each matching <fileSpec> as a startig point to potentially descend
-#    +R : not recursive (default for fsExpandFiles alias) only consider the file objects matching <fileSpec>, not there descendants
+#    +R : not recursive (default for fsExpandFiles alias) only consider the file objects matching <fileSpec>, not their descendants
+#    --exclude=<pattern>  : exclude directories and files that match <pattern>. Excluded directories are pruned so they are not
+#         entered and its entire sub-tree is skipped. <pattern> is a little bit like that used in gitignore files. A trailing /
+#         makes it only match directories and not files. A / in the beginning or middle makes it match against the whole path instead
+#         of only the base name (with leading path removed). * and ? are interpreted as glob characters.
+#    --gitignore[=<gitignoreFilePath>] : This mostly causes the files that git would skip to be skipped but it wont be perfect because
+#         gitignore <patterns> have several extentions that can not be implemented exactly in gnu find. If <gitignoreFilePath> is
+#         not specified, it attempts to find a .gitignore file in the common root of the search paths. Regardless of whether a
+#         .gitignore file is found, .git/ and .bglocal/ folders are excluded at all levels.
 # These options determine how the list of files is returned. Default is standard out, one per line
 #    -A <arrayName> : return in Array. instead of writing the matching file system objects to stdout,
 #             one per line, add them to the caller's array. This avoids the sub process and also works
@@ -4065,7 +4071,8 @@ function fsExpandFiles()
 {
 	local outputOpts=()
 	local recursiveOpt=("-maxdepth" "0")
-	local forceFlag fsef_prefixToRemove fsef_outputVarName fTypeOpt=() findCmdLineCompat findOpts=()
+	local forceFlag fsef_prefixToRemove fsef_outputVarName fTypeOpt=() findCmdLineCompat findOpts=() findPruneExpr=() excludePaths=()
+	local _gitIgnorePath
 	local findStartingPoints=()
 	while [ $# -gt 0 ]; do case $1 in
 		# If any options conflict arise, findCmdLineCompat==true means use the find meaning and findCmdLineCompat==false means use our meaning
@@ -4092,6 +4099,10 @@ function fsExpandFiles()
 		-b|--baseNames) fsef_prefixToRemove="*/" ;;
 		-B*) bgOptionGetOpt  val: fsef_prefixToRemove "$@" && shift ;;
 
+		--gitignore)  _gitIgnorePath="<glean>" ;;
+		--gitignore*) bgOptionGetOpt  val: _gitIgnorePath "$@" && shift; _gitIgnorePath="${_gitIgnorePath:-<glean>}" ;;
+		--exclude*)   bgOptionGetOpt  valArray: excludePaths "$@" && shift ;;
+
 		# native find (GNU utility) 'real' options
 		-H|-L|-P) bgOptionGetOpt  opt  findOpts  "$@" && shift ;;
 		-D*|-O*)  bgOptionGetOpt  opt: findOpts  "$@" && shift ;;
@@ -4115,7 +4126,7 @@ function fsExpandFiles()
 
 	# if none of the starting points exist it will match nothing, but there is nothing we can set findStartingPoints to so that find
 	# would exit cleanly without displaying an error so we return here
-	if [ ${#findStartingPoints} -eq 0 ]; then
+	if [ ${#findStartingPoints[@]} -eq 0 ]; then
 		[ "$forceFlag" ] && varOutput "${outputOpts[@]}" "/dev/null"
 		return 1
 	fi
@@ -4151,10 +4162,48 @@ function fsExpandFiles()
 	# like one and'd filter criteria
 	[ "${#findExpressions[@]}" -gt 1 ] && findExpressions=('(' "${findExpressions[@]}" ')')
 
+	local commonPrefix
+	if [ "$_gitIgnorePath" ] || [ ${#excludePaths[@]} -gt 0 ]; then
+		pathGetCommon -R commonPrefix "${findStartingPoints[@]}"
+		[ "$commonPrefix" ] && commonPrefix+="/"
+	fi
+
+	# add the gitignore contents to the excludePaths if called for
+	if [ "$_gitIgnorePath" ]; then
+		excludePaths+=(.git .bglocal)
+		[ "$_gitIgnorePath" == "<glean>" ] && _gitIgnorePath="${commonPrefix}.gitignore"
+		if [ -r "$_gitIgnorePath" ]; then
+			local _line; while read _line; do
+				excludePaths+=( "$_line" )
+			done < "$_gitIgnorePath"
+		fi
+	fi
+
+	# build the findPruneExpr if there are any excludePaths
+	if [ ${#excludePaths[@]} -gt 0 ]; then
+		local _folderEntries=() _anyEntries=()
+		local _line; for _line in "${excludePaths[@]}"; do
+			local _type="both"
+			[[ "$_line" =~ /$ ]] && { _line="${_line%%/}"; _type="d"; }
+			local _expr="-name"; [[ "$_line" =~ / ]] && _expr="-path"
+			[[ "$_line" =~ ^/ ]] && _line="${commonPrefix}${_line##/}"
+			if [ "$_type" == "d" ]; then
+				_folderEntries+=( -o "$_expr" "$_line" )
+			else
+				_anyEntries+=( -o "$_expr" "$_line" )
+			fi
+		done
+
+		findPruneExpr=( "(" "(" -type d "(" -false "${_folderEntries[@]}" ")" ")" -o  "(" -false "${_anyEntries[@]}" ")"  ")" -prune -o )
+		#                (-  (--         (---------------------------------) --)       (------------------------------)   -)
+	fi
+
+
 	# the final findExpressions is composed.
 	#    recursiveOpt is a 'global option' that must come first. If the user specified -maxdepth or -mindepth recursiveOpt is cleared
 	#    fTypeOpt is ANDed with the rest of the expression.
-	findExpressions=("${recursiveOpt[@]}" "${findGlobalExpressions[@]}" "${fTypeOpt[@]}" "${findExpressions[@]}")
+	findExpressions=("${recursiveOpt[@]}" "${findGlobalExpressions[@]}"  "${findPruneExpr[@]}" "${fTypeOpt[@]}" "${findExpressions[@]}")
+
 
 	# now invoke the find command
 	[ "$fsef_prefixToRemove" ] && fsef_prefixToRemove="#${fsef_prefixToRemove#'#'}"

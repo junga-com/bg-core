@@ -1,4 +1,3 @@
-#!/bin/bash
 
 import bg_config.sh  ;$L1;$L2
 

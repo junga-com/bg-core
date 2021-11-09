@@ -3,7 +3,7 @@
 ###############################################################################
 # Includes and defines
 
-projectName=bg-core
+packageName=bg-core
 
 source /usr/lib/bg_core.sh
 import Standards.PluginType ;$L1;$L2

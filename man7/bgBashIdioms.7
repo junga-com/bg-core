@@ -170,7 +170,7 @@ I use an Atom snippet to add the bgOptions_DoOutputVarOpts line to an options bl
 The natural and more readable way to use a function to retrieve a value is ...
    local manifestFile="$(manifestGetHostManifest)"
 
-... but functions that support the "Functions with Output to Stdout Semantics" pattern support a more efficient alternative.
+ ... but functions that support the "Functions with Output to Stdout Semantics" pattern support a more efficient alternative.
    local manifestFile; manifestGetHostManifest manifestFile
 
 Unfortunately, this looks to the casual eye a lot like we are declaring 3 local variables but actually we are declaring only one and setting its value with a call to manifestGetHostManifest.
@@ -241,7 +241,7 @@ There are several naming conventions that you will see in bg-core library functi
 
 When a function is in a very low level library which is likely to be called from other library functions, the strongest convention (_<functionInitials>*) is used. When a function is higher level, only uses one return value then the weakest convention (_*) can be used.
 
-Its a bit unpalatable that this naming convention is subjective and not guaranteed to avoid conflicts but in practice I find it not that hard to avoid conflicts because the programming environment provided by bg-core and bg-dev supports an agile, iterative dev cycle where its apparent quickly it there is a naming conflict.   
+Its a bit unpalatable that this naming convention is subjective and not guaranteed to avoid conflicts but in practice I find it not that hard to avoid conflicts because the programming environment provided by bg-core and bg-dev supports an agile, iterative dev cycle where its apparent quickly it there is a naming conflict.
 
 The bg_coreBashVars.sh library has a number of functions starting with var* that help getting and setting values of bash variables by name.
 

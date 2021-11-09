@@ -1,7 +1,11 @@
 .TH oob_printOptBashCompletion 7 "October 2014" "Junga" "bg-core"
 
 .SH NAME
-function oob_printOptBashCompletion() { ...} - is a callback function that you can define in your script
+oob_printOptBashCompletion - is a callback function that you can define in your script
+
+.SH SYNOPSIS
+function oob_printOptBashCompletion() { ...}
+
 
 .SH OVERVIEW
 Authors of bash scripts that can provide BC processing by defining a function oob_printBashCompletion() that produces suggestions.
@@ -81,7 +85,7 @@ it will delegate to it.
                 subCmd="$2"
                 case $subCmd:$((posCwords-2)) in
                     subCmdA:1) [[ "$cur" =~ ^- ]] && echo "--compare --dry-run"  ;;
-                    subCmdB:*)  echo "\$(doFilesAndDirs)";;
+                    subCmdB:*)  echo "\\$(doFilesAndDirs)";;
                 esac
                 ;;
         esac

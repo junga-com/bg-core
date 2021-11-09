@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library bg_coreDebug.sh
 # sourcing /usr/lib/bg-core.sh provides several debugging facilities for scripts that will be optionally activated depending on

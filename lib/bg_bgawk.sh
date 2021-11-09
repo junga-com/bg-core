@@ -1,5 +1,3 @@
-#!/bin/bash
-
 
 # usage: bgawk [-i] [-n] [-d] [-c] [-C] [-S] [-v <varName>=<value>] [-F <delim>] <awkScript> <file> [ ... <fileN>]
 # this function combines some common behavior of sed and awk. The -i and -n options have the same
@@ -85,10 +83,11 @@
 #                                 whether the file was or would be changed
 function bgawk()
 {
-	local file awkScript inplace quietFlag debugFlag outOffFlag cols1Flag cols2Flag outputDefaultOff
+	local file awkScript inplace inplaceSort quietFlag debugFlag outOffFlag cols1Flag cols2Flag outputDefaultOff
 	local useCols checkOnlyFlag stripCommentsFlag passThruOpts=("--re-interval") returnTrueIfChanged="1" returnTrueIfSuccessful
 	while [ $# -gt 0 ]; do case $1 in
 		-i)  inplace="-i" ;;
+		--sort) inplaceSort="sort" ;;
 		-q)  quietFlag="-q" ;;
 		-d)  debugFlag="-d" ;;
 		-n)  outOffFlag="-n"; outputDefaultOff="{outputOff="1"}" ;;
@@ -159,7 +158,6 @@ function bgawk()
 			/^[[:space:]]*$/ {next}
 		'
 
-
 		script="$script"'
 			function deleteLine() {
 				outputOff="1"
@@ -220,7 +218,7 @@ function bgawk()
 		#       Another solution could be to replace "/dev/fd/3" in the script with "/tmp/<tempfile>" and then cat "/tmp/<tempfile>" >&3
 		#       after awk runs.
 		case ${file:+fileExists}:${inplace:+inplace} in
-			fileExists:inplace) bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}" 3>&1 > "$tmpFile" ;;
+			fileExists:inplace) bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}" 3>&1 | ${inplaceSort:-cat} > "$tmpFile" ;;
 			fileExists:)        bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}"                   ;;
 			          :inplace) gawk "${passThruOpts[@]}" "$script"              3>&1 > "$tmpFile" ;;
 			          :)        gawk "${passThruOpts[@]}" "$script"                                ;;

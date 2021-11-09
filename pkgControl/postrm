@@ -1,0 +1,7 @@
+#!/bin/bash -e
+
+[ ! -f /usr/lib/bg_coreImport.sh ] || source /usr/lib/bg_core.sh --postrm bg-core "$@"
+
+# special processing for bg-core because the bg-core files will not be present
+sed -i -e '/^bg-core\b/d' /var/lib/bg-core/manifest
+sed -i -e '/^bg-core\b/d' /var/lib/bg-core/pluginManifest

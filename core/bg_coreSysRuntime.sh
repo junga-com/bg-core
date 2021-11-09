@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library bg_coreSysRuntime.sh
 #######################################################################################################################################
@@ -8,12 +7,12 @@
 # information from multiple packages that may or may not be integrated with similar standards and mechanisms provided by the host's
 # OS
 #
-# If the $projectName vaiable is set before this script is sourced, it will declare a family of pkg*[File|Folder] variables that
+# If the $packageName vaiable is set before this script is sourced, it will declare a family of pkg*[File|Folder] variables that
 # contain the paths to various package/project specific files and folders.
 #
 # Sometimes a package wants to operate on data that may originate from itself (like default templates) but also may come from other
 # packages that override or extend the first package's functionality or from system specific changes made by the sysadmin or user.
-# When a domData is installed on a host this information may come from it. The findInPaths function is the core of this mechaism
+# When a domData is installed on a host this information may come from it. The findInPaths function is the core of this mechanism
 # that allows the information that a package's code has access to to come from any of these sources and provide an algorithm for
 # overriding or combining the information.
 
@@ -167,7 +166,7 @@ function findInPaths()
 }
 
 
-# usage: bgGetDataFolder [<projectName>]
+# usage: bgGetDataFolder [<packageName>]
 # get the runtime package data folder for the specified project
 # this recognizes virtually installed pacakge projects.
 # The path returned may be different for differnt distributions. On debian style systems it is /usr/share/<packagename>
@@ -176,7 +175,7 @@ function findInPaths()
 # where commands can reference its data.
 function bgGetDataFolder()
 {
-	local pName=${1:-$projectName}
+	local pName=${1:-$packageName}
 
 	# search in bgDataPath to honor virtually installed packages
 
@@ -195,15 +194,16 @@ function bgGetDataFolder()
 }
 
 
-# scripts that are a part of a package typically set the projectName var at the top.
+# scripts that are a part of a package typically set the packageName var at the top.
 # set the default dataFolder to the top level project the running script belongs to
-if [ "$projectName" ]; then
-	dataFolder="$(bgGetDataFolder $projectName)"
-	confFile="/etc/$projectName"
+if [ "$packageName" ]; then
+	dataFolder="$(bgGetDataFolder $packageName)"
+	confFile="/etc/$packageName"
 	# 2020-10 - created new naming standard to group the paths related to the package running the code
+	pkgName="${packageName}"
 	pkgDataFolder="$dataFolder"
 	pkgConfFile="$confFile"
-	pkgManifest="/var/lib/bg-core/$projectName"
+	pkgManifest="/var/lib/bg-core/$packageName"
 fi
 
 
@@ -264,6 +264,7 @@ fi
 #    routine, by calling this function with a wild coard for the type like templateFind vhostConf.*
 #
 # Default Search Path:
+#.nf
 #    This function now uses the manifest file first to find templates and then falls back to this search path if the template was
 #    not found in the manifest.  At some point the search paths algorithm may be removed.
 #
@@ -321,7 +322,7 @@ function templateFind()
 	done
 	local templateNameSpec="$1"; [ $# -gt 0 ] && shift
 
-	local localPkgName="${packageOverride:-${packageName:-$projectName}}"
+	local localPkgName="${packageOverride:-${packageName}}"
 
 	### first, try to find the template in the manifest file.
 

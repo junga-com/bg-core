@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library bg_outOfBandScriptFeatures.sh
 # Out of Band (OOB) Functions are functions that deal with scripts as generic maintainable entities.

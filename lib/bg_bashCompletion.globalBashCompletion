@@ -1,4 +1,3 @@
-#!/usr/bin/bash
 # this files contains completion functions that implement a style of completion that delegates to the cmd
 
 declare -gA _bgbcData

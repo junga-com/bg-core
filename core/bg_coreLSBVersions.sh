@@ -1,6 +1,4 @@
 
-
-
 # Library bg_coreLSBVersions.sh
 # This library wraps the lsb_release command and also provides functions to check the version of other common systems or programs
 # like bash.  I use lsb* as the prefix for all the functions in this library even if they are not implemented in terms of lsb_release

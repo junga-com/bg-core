@@ -1,6 +1,3 @@
-#!/bin/bash
-
-
 
 # man(5) bgTemplateFileFormat
 # The bg_template.sh library from the bg-lib pacakge works on simple template files that are useful for configuration and other

@@ -1,4 +1,3 @@
-#!/bin/bash
 
 #import bg_????.sh ;$L1;$L2
 

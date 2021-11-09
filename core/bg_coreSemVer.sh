@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library bg_coreSemVer.sh
 # This library provides functions to compare and manipulate semantic verion numbers.

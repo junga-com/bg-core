@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library bg_debugTrace.sh
 # This library provides a set of bgtrace* functions that can be used to trace the operation of a script.

@@ -1,5 +1,0 @@
-#!/bin/bash -e
-
-[ -f /usr/lib/bg_core.sh ] && source /usr/lib/bg_core.sh
-type -t pkgOnPreRemove &>/dev/null && pkgOnPreRemove bg-core "$@"
-true

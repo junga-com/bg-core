@@ -1,4 +1,3 @@
-#!/bin/bash
 
 import bg_bgawk.sh  ;$L1;$L2
 import bg_bgsed.sh  ;$L1;$L2
@@ -95,7 +94,7 @@ iniUserConfFile=~/.bg-lib.conf
 #    [ subnet:192.168.0/24 ]
 #    [ subnet:172.16.0.0/16 ]
 #    [ ip:192.168.22.3 ]
-# ... you could query all the subnet sections or ip sections and then access the parameter settings inside
+#   ... you could query all the subnet sections or ip sections and then access the parameter settings inside
 # each section to get the information on each.
 #
 # ParameterSetting Line Comments:

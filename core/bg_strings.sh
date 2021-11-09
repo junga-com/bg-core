@@ -1,5 +1,3 @@
-#!/bin/bash
-
 
 # Library bg_strings.sh
 ####################################################################################################################
@@ -1954,20 +1952,53 @@ function strSetIntersection()
 #   out = /var/lib/
 function pathGetCommon()
 {
-	local p1="$1"
-	local p2="$2"
-	local t1="" t2="" out="" finished=""
+	local retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local paths=( "$@" )
 
-	stringConsumeNext -t t1 p1 "/" || finished="1"
-	stringConsumeNext -t t2 p2 "/" || finished="1"
+	local prefix=""
 
-	while [ "$t1" == "$t2" ] && [ ! "$finished" ]; do
-		out="${out}${t1}"
-		stringConsumeNext -t t1 p1 "/" || finished="1"
-		stringConsumeNext -t t2 p2 "/" || finished="1"
+	local done="" fail=""
+	while [ ! "${done}${fail}" ]; do
+		local prefixTest="${paths[0]#$prefix}"
+		if [ "${prefixTest:0:1}" == "/" ]; then
+			prefixTest="/"
+		else
+			prefixTest="${prefixTest%%/*}/"
+		fi
+
+		local path; for path in "${paths[@]}"; do
+			[[ "${path}/" =~ ^${prefix}${prefixTest} ]] || { fail=1; break; }
+			[ "${path}" == "${prefix}${prefixTest}" ] && done="1"
+		done
+
+		if [ ! "$fail" ]; then
+			prefix="${prefix}${prefixTest}"
+		fi
 	done
 
-	[ "$out" ] && echo "$out"
+	[ "$prefix" != "/" ] && prefix="${prefix%/}"
+
+	returnValue "${prefix}" "$retVar"
+
+	# 2021-10-15 replaced this implementation with the one above which handles any number of inputs
+	# local p1="$1"
+	# local p2="$2"
+	# local t1="" t2="" out="" finished=""
+	#
+	# stringConsumeNext -t t1 p1 "/" || finished="1"
+	# stringConsumeNext -t t2 p2 "/" || finished="1"
+	#
+	# while [ "$t1" == "$t2" ] && [ ! "$finished" ]; do
+	# 	out="${out}${t1}"
+	# 	stringConsumeNext -t t1 p1 "/" || finished="1"
+	# 	stringConsumeNext -t t2 p2 "/" || finished="1"
+	# done
+	#
+	# [ "$out" ] && echo "$out"
 }
 
 

@@ -1,4 +1,3 @@
-#!/bin/bash
 
 import bg_strings.sh ;$L1;$L2
 import bg_ini.sh ;$L1;$L2
@@ -145,7 +144,7 @@ import bg_ini.sh ;$L1;$L2
 # a temporary absolute path will be created to do the comparison. Indendent awkData files can have a
 # schema file by placing a similarly named .schema file next to the cache file. If the cache file ends
 # in .cache, .cache is replaced with .schema. If that does not produce the path of an existing file,
-# .schema is appended to the whole filename and its check again for existence.
+#   .schema is appended to the whole filename and its check again for existence.
 #
 # AwkDataID that are a part of a domData have simple names without paths and without extensions.
 # Schema files are located in $domFolder/schema/<awkDataID>.schema

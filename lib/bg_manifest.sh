@@ -111,21 +111,93 @@ function manifestReadOneType()
 }
 
 
-# usage: manifestUpdateInstalledManifest
-# This function is called by postinst to update the manifest and pluginManifest to reflect the new state of installed packages.
-# There is another version in the bg-dev package in bg_manifestScanner.sh that is used in a vinstalled environment.
-# Initially, the vinstall version also called this version because the installer code was not yet done. In a vinstall environment,
-# this function can update the global manifest file fine and it does no harm but the pluginManifest can not be called from a vinstall
-# because it loads plugins to get there attributes and it could install a vinstall version of the plugin
+# usage: manifestUpdateInstalledManifest [all]
+# usage: manifestUpdateInstalledManifest remove <pkgName>
+# usage: manifestUpdateInstalledManifest add <pkgName>
+# This function is called when ever the set of installed packages changes on a host to update the manifest and pluginManifest to
+# reflect the new state of installed packages.
+#
+# Based on the arguments passed, it can either create the manifest from scratch or remove one pkg's data or update/add one pkg's
+# data. The add operation works as an update operation if an older version of the package is already installed.
+#
+# This function only handles the real, installed manifest files. There is another version of this function  in the bg_manifestScanner.sh
+# library from the bg-dev package that is used to create and maintain the vinstalled sandbox's manifest files.
 function manifestUpdateInstalledManifest() {
-	local rebuildInstalled dirtyDeps
-	if fsGetNewerDeps --array=dirtyDeps "$manifestInstalledPath" /var/lib/bg-core/*/hostmanifest; then
-		cat $(fsExpandFiles -f /var/lib/bg-core/*/hostmanifest) | sort | fsPipeToFile "$manifestInstalledPath"
-	fi
+	local action="$1"
+	local pkgName="$2"
 
-	# protect this from being called in vinstall environment
-	if [ ! "${bgVinstalledManifest}${bgVinstalledPluginManifest}" ]; then
-		import bg_plugins.sh  ;$L1;$L2
-		$Plugin::buildAwkDataTable | fsPipeToFile "$pluginManifestInstalledPath"
-	fi
+	# make backups of the current manifest files for debugging by diffing to see what changed
+	[ -f "$manifestInstalledPath" ]       && cat "$manifestInstalledPath"       | fsPipeToFile "${manifestInstalledPath}.prev"
+	[ -f "$pluginManifestInstalledPath" ] && cat "$pluginManifestInstalledPath" | fsPipeToFile "${pluginManifestInstalledPath}.prev"
+
+	case ${action:-all} in
+		all)
+			local rebuildInstalled dirtyDeps
+			if fsGetNewerDeps --array=dirtyDeps "$manifestInstalledPath" /var/lib/bg-core/*/hostmanifest; then
+				cat $(fsExpandFiles -f /var/lib/bg-core/*/hostmanifest) | sort | fsPipeToFile "$manifestInstalledPath"
+			fi
+
+			import bg_plugins.sh  ;$L1;$L2
+			$Plugin::buildAwkDataTable --manifest="$manifestInstalledPath" | fsPipeToFile "$pluginManifestInstalledPath"
+			;;
+
+		remove)
+			assertNotEmpty pkgName
+			[ ! -f "$manifestInstalledPath" ] && [ ! -f "$pluginManifestInstalledPath" ] && return 0
+			bgawk -i  \
+			   -v pkgName="$pkgName" \ '
+				$1==pkgName {deleteLine()}
+			' $(fsExpandFiles "$manifestInstalledPath" "$pluginManifestInstalledPath")
+			;;
+
+		add)
+			assertNotEmpty pkgName
+			bgawk -i \
+			   -v pkgName="$pkgName" \ '
+				function insertNewPkgData() {
+					if (!didIt) {
+						didIt="1"
+						while (getline < "/var/lib/bg-core/"pkgName"/hostmanifest" >0)
+							printf("%s\n", $0)
+					}
+				}
+
+				# suppress printing of any pkgName data already in the file
+				$1==pkgName {deleteLine()}
+
+				# if we have not yet written the new data and we see a pkgName that sorts after it, its time to write the data
+				!didIt && ($1 > pkgName) {
+					insertNewPkgData()
+				}
+
+				END {
+					# if we did not find an insertion point while scanning the file, we write it at the end
+					if (!didIt)
+						insertNewPkgData()
+				}
+			' "$manifestInstalledPath"
+
+			{
+				import bg_plugins.sh  ;$L1;$L2
+				[ -f "$pluginManifestInstalledPath" ] && bgawk -n  \
+				   -v pkgName="$pkgName" \ '
+					@include "bg_core.awk"
+					NR==1 {
+						for (i=1; i<=NF; i++)
+							cols[i]=$i
+					}
+					NR==2 {next;}
+					{
+						if ($1!=pkgName) {
+							for (i=1; i<=length(cols); i++)
+								printf("%s %s %s %s\n", pkgName, norm($2), cols[i], norm($i))
+						}
+					}
+				' "$pluginManifestInstalledPath"
+
+				static::Plugin::_dumpAttributes --manifest="$manifestInstalledPath" --pkgName="$pkgName"
+
+			} | static::Plugin::_assembleAttributesForAwktable | column -t -e | fsPipeToFile "$pluginManifestInstalledPath"
+			;;
+	esac
 }

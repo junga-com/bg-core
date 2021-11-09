@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # usage: creq cr_fileObjHasAttributes [<fsTouch_options>] <filename>
 # declare that <filename> exists with the specified attributes. See fsTouch for the supported attributes which include specifying

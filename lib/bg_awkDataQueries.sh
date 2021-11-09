@@ -1,4 +1,3 @@
-#!/bin/bash
 
 import bg_template.sh  ;$L1;$L2
 import bg_awkDataSchema.sh  ;$L1;$L2

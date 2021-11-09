@@ -1,5 +1,3 @@
-#!/bin/bash
-
 
 # Library
 # CSI refers to a standard for escape sequences for terminals. A terminal is something that can be on the other end of a file

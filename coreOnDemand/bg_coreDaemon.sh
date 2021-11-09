@@ -1,4 +1,3 @@
-#!/bin/bash
 
 # Library bg_coreDaemon.sh
 # This library provides support for bash scripts that can be controlled as daemons. It is a core library meaning that you do not
@@ -92,6 +91,7 @@ function daemonLogSetup()
 # It outputs to stdout because daemon scripts created with this library write to stdout which
 # will be redirected to the daemons log file when its ran as a daemon
 # Options:
+#.nf
 #     -f <formatStr> : If specified, it will be used as the format string to printf and the positional parameters in the cmdline.
 #                      The argumets passed must match the %s terms in the format string.
 #     -v|--reqVerbosity=<reqVerbosity> : the log message will only be sent if the current daemonVerbosity is set to <reqVerbosity> or higher.
@@ -493,7 +493,7 @@ function daemonCntrInstallAutoStart()
 				# daemonErrorFile="$daemonErrorFile"
 
 				description "$daemonShortDesc"
-				author "$projectName package"
+				author "$packageName package"
 				start on $daemonStartDepsUpstart
 				stop on $daemonStopDepsUpstart
 				respawn

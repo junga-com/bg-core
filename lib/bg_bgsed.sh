@@ -1,5 +1,4 @@
 
-
 # usage: bgsed [-p] [--prompt=<msg>] [<sedOptions>] [<file>]
 # This is a wrapper over the linux utility sed. It adds several features mostly around how -i works. It strives to be completely
 # backward compatible with sed. Initially, one incompatibility is that sed allows operating on multiple inplace files but bgsed does not.

@@ -237,6 +237,7 @@ function expr_evaluate(expr,data         ,i) {
 				case "==" :  if ((value ==  expr["value"] )) {return 1}; break
 				case "="  :  if ((value ==  expr["value"] )) {return 1}; break
 				case "!"  :  if ((value !=  expr["value"] )) {return 1}; break
+				case "!=" :  if ((value !=  expr["value"] )) {return 1}; break
 				case "<>" :  if ((value !=  expr["value"] )) {return 1}; break
 				case "~"  :  if ((value ~   expr["value"] )) {return 1}; break
 				case "!~" :  if ((value !~  expr["value"] )) {return 1}; break

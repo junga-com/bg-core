@@ -1,0 +1,32 @@
+January 19, 2020
+
+Author(s):
+
+Robert E. Griffith <bobg(apersand)junga(dot)com> 914(dot)413(dot)7070
+
+Copyright:
+
+	<Copyright (C) 2009 Robert E. Griffith>
+
+License:
+
+	I intend to release this package under an opensource license but have not yet chosen one. If you are interested in
+	using this package for commercial use please contact me.
+
+	This package is proprietary software. This license grants limited use of this particular software version.
+
+	Definition of 'use of this particular software version'. This phrase includes installing the project from debian or rpm
+	packages to invoke the components installed be the package. It also includes cloning the source project to invoke components
+	from the source folders. Modifications of the source may be made. The source, with or without modifications can not be published.
+	It is not allowed to remove parts of the software to be used outside the context of this project.
+
+	I grant use of this particular software version under the following conditions.
+		1) Personal use. Personal use is allowed. Examples of personal use include a personal website, a home network, or
+		   simulations of commercial activities which do not actually conduct commercial activities. A commercial activity is defined
+		   as any that is designed to sell products. Marketing oneself in order to obtain employment is considered personal use.
+		2) Commercial use. Commercial use is defined as any that does not qualify as personal use as defined above. Commercial use
+		   is allowed on any non-production equipment even if that equipement supports commercial activities. Non-production devices
+		   are any that would not impact commercial activities if they were to be turned off. The intent is to allow prototyping and
+		   proof of concept projects and also internal projects used within an organization by commercial entities. Furthermore, the
+		   software can be used on a production equipment for up to one year. The intent of this provision is to provide leeway
+		   for commercial use that is not deliberate and long lived.

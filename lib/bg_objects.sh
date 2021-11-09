@@ -1,5 +1,3 @@
-#!/bin/bash
-
 
 # Library
 # This library implements an object oriented syntax for bash scripts. In classic bash, its hard to write a function that works
@@ -1017,7 +1015,7 @@ function DeleteObject()
 #    '_bgclassCall heap_A_uXqNpmuWi Foo 0 |'
 # So when $myObj starts an expression like...
 #    $myObj.doSomething "argument one" "second argument"
-# ...it it turns into this...
+#    ...it it turns into this...
 #    _bgclassCall heap_A_uXqNpmuWi Foo 0 |.doSomething "argument one" "second argument"
 # The function _bgclassCall gets called with the rest of the line as its arguments. The first 3 arguments come from the <objRef>
 # syntax. The | character ensures that the space before it does not get removed and the  4th parameter will begin with the |

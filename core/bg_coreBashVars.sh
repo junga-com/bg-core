@@ -1,5 +1,3 @@
-#!/bin/bash
-
 
 # Library bg_coreBashVars.sh
 ####################################################################################################################
@@ -467,7 +465,7 @@ function varOutput()
 # function to change the default behavior and still allow the caller to have the final say. In the above example, the outputValue
 # line could be changed to ...
 #       outputValue -1 "${retOpts[@]}" one two three
-# ... which makes it print each returned value on a seaparate line by default, but the caller can still specify the +1 option to
+#       ... which makes it print each returned value on a seaparate line by default, but the caller can still specify the +1 option to
 # change it back to the non -1 behavior.
 #
 # Options:
@@ -1217,7 +1215,7 @@ function printfVars()
 			fi
 
 		# it its an object reference, invoke its .toString method
-		elif [ ! "$pv_noObjectsFlag" ]  && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
+		elif [ ! "$pv_noObjectsFlag" ]  && [[ ! "$pv_varname" =~ [[][@*][]] ]]  && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
 			Try:
 				${!pv_varname}.toString --title="${pv_varname}"
 			Catch: && {
