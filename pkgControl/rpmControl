@@ -1,0 +1,59 @@
+Name:       bg-core
+Version:    1.0.0
+Release:    1
+Summary:    Configuration management and sysadmin tools for linux hosts
+BuildArch:  noarch
+License:    Proprietary (for now)
+
+%description
+bg-core provides an environment maintaining the configuration of linux servers
+and workstations. It introduces a notion of plugins that can be delivered in
+packages to extend other packages in a controlled way. Config plugins provide
+units of configuration that can be delivered in packages and then turned on
+and off by the host admin. Standards plugins along with Config plugins provide
+ongoing configuration monitoring to report on compliance with policies set by
+the controlling domain.
+bg-core also provides a rich bash programming environment that handles many of
+rote tasks required to write robust system administration scripts.
+See man(7) bg-core after installing.
+
+#%prep
+# nothing
+
+#%build
+# nothing
+
+#%install
+# nothing
+
+%files
+/
+
+#%pretrans
+# nothing
+
+%pre
+[ ! -f /usr/lib/bg_coreImport.sh ] || source /usr/lib/bg_core.sh --preinst bg-core "$@"
+# special processing for bg-core follows because the bg-core files will not be present
+
+%post
+[ ! -f /usr/lib/bg_coreImport.sh ] || source /usr/lib/bg_core.sh --postinst bg-core "$@"
+
+%preun
+[ ! -f /usr/lib/bg_coreImport.sh ] || source /usr/lib/bg_core.sh --prerm bg-core "$@"
+
+%postun
+[ ! -f /usr/lib/bg_coreImport.sh ] || source /usr/lib/bg_core.sh --postrm bg-core "$@"
+# special processing for bg-core follows because the bg-core files will not be present
+sed -i -e '/^bg-core\b/d' /var/lib/bg-core/manifest
+sed -i -e '/^bg-core\b/d' /var/lib/bg-core/pluginManifest
+
+#%posttrans
+# nothing
+
+
+
+
+
+%changelog
+# let's skip this for now

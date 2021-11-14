@@ -8,13 +8,14 @@ Vcs-git: git@github.com/junga-com/bg-core
 Package: bg-core
 Architecture: all
 Depends: coreutils (>=1), grep (>=2),  bash (>=3), gawk, sed (>=4), git, ipcalc, host
-Description: bash script coding library
- bg-core provides an environment for writing secure scripts by sysadmins and
- devops and anyone interested in scripting their linux
- environment.
- To use this library in your script include this at the top
-   source /usr/lib/bg_core.sh
-   import <libname.sh> ;$L1;$L2
- To include additional script libraries, use import syntax
- instead of 'source' or '.'
- See man bg-core after installing.
+Description: Configuration management and sysadmin tools for linux hosts
+ bg-core provides an environment maintaining the configuration of linux servers
+ and workstations. It introduces a notion of plugins that can be delivered in
+ packages to extend other packages in a controlled way. Config plugins provide
+ units of configuration that can be delivered in packages and then turned on
+ and off by the host admin. Standards plugins along with Config plugins provide
+ ongoing configuration monitoring to report on compliance with policies set by
+ the controlling domain.
+ bg-core also provides a rich bash programming environment that handles many of
+ rote tasks required to write robust system administration scripts.
+ See man(7) bg-core after installing.

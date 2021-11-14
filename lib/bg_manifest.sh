@@ -36,7 +36,7 @@ function manifestSummary()
 {
 	local manifestFile; manifestGetHostManifest manifestFile
 	while [ $# -gt 0 ]; do case $1 in
-		-f*|--file*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
@@ -67,7 +67,7 @@ function manifestReadTypes()
 {
 	local manifestFile; manifestGetHostManifest manifestFile
 	while [ $# -gt 0 ]; do case $1 in
-		-f*|--file*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
@@ -96,7 +96,7 @@ function manifestReadOneType()
 {
 	local manifestFile; manifestGetHostManifest manifestFile
 	while [ $# -gt 0 ]; do case $1 in
-		-f*|--file*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local filesVar="$1"
@@ -154,11 +154,12 @@ function manifestUpdateInstalledManifest() {
 			assertNotEmpty pkgName
 			bgawk -i \
 			   -v pkgName="$pkgName" \ '
-				function insertNewPkgData() {
+				function insertNewPkgData(                     line) {
 					if (!didIt) {
 						didIt="1"
-						while (getline < "/var/lib/bg-core/"pkgName"/hostmanifest" >0)
-							printf("%s\n", $0)
+						while ((getline line < ("/var/lib/bg-core/"pkgName"/hostmanifest")) >0) {
+							printf("%s\n", line)
+						}
 					}
 				}
 
@@ -177,14 +178,15 @@ function manifestUpdateInstalledManifest() {
 				}
 			' "$manifestInstalledPath"
 
+			import bg_plugins.sh  ;$L1;$L2
 			{
-				import bg_plugins.sh  ;$L1;$L2
 				[ -f "$pluginManifestInstalledPath" ] && bgawk -n  \
 				   -v pkgName="$pkgName" \ '
 					@include "bg_core.awk"
 					NR==1 {
 						for (i=1; i<=NF; i++)
 							cols[i]=$i
+						next
 					}
 					NR==2 {next;}
 					{
@@ -200,4 +202,5 @@ function manifestUpdateInstalledManifest() {
 			} | static::Plugin::_assembleAttributesForAwktable | column -t -e | fsPipeToFile "$pluginManifestInstalledPath"
 			;;
 	esac
+	return 0
 }

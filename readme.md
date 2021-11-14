@@ -809,7 +809,7 @@ See man(1) bg-dev-tests
 
 ### data/
 
-The data/ folder contains file assets that will be copied to the target system when the package is installed. On debian systems these files will be in /usr/share/bg-core/. Scripts use the $dataPath variable to refer to this folder which may be in a different location on other OS.
+The data/ folder contains file assets that will be copied to the target system when the package is installed. On debian systems these files will be in /usr/share/bg-core/. Scripts use the $pkgDataFolder variable to refer to this folder which may be in a different location on other OS.
 
 ### templates/
 

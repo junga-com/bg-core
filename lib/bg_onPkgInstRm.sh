@@ -46,10 +46,10 @@ function onPostinst()
 	fi
 
 	import bg_manifest.sh  ;$L1;$L2
-	manifestUpdateInstalledManifest "${packageName:+add}" "%{packageName}"
+	manifestUpdateInstalledManifest "${packageName:+add}" "${packageName}"
 
 	local file
-	for file in $(fsExpandFiles "$dataPath/bash_completion.d/*"); do
+	for file in $(fsExpandFiles "$pkgDataFolder/bash_completion.d/"*); do
 		cp "$file" /etc/bash_completion.d/ || assertError
 	done
 	true
@@ -65,7 +65,7 @@ function onPrerm()
 	local action="$1"; shift   # remove|upgrade|deconfigure|failed-upgrade
 
 	local file
-	for file in $(fsExpandFiles "$dataPath/bash_completion.d/*"); do
+	for file in $(fsExpandFiles "$pkgDataFolder/bash_completion.d/"*); do
 		rm -f "/etc/bash_completion.d/$file"
 	done
 	true
@@ -98,14 +98,13 @@ function onPostrm()
 	esac
 
 	import bg_manifest.sh  ;$L1;$L2
-	manifestUpdateInstalledManifest  "${packageName:+remove}" "%{packageName}"
+	manifestUpdateInstalledManifest  "${packageName:+remove}" "${packageName}"
 }
 
 # process the command line and invoke the specified hook
-earlyTrace "BGINSTALL: install script: $*"
 hookFn="$1"; shift
 packageName="$1"; shift
-case $1 in
+case $hookFn in
 	--preinst)   onPreinst   "$@" ;;
 	--postinst)  onPostinst  "$@" ;;
 	--prerm)     onPrerm     "$@" ;;

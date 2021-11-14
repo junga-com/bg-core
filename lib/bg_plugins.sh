@@ -370,7 +370,7 @@ function static::Plugin::_dumpAttributes()
 	local -n plugin
 	while read -r pkg scrap pluginKey pluginPath; do
 		Try:
-			unset -n plugin; local -n plugin; $Plugin::get --pkgName=$pkg -R plugin "$pluginKey"
+			unset -n plugin; local -n plugin; $Plugin::get $manifestOpt --pkgName=$pkg -R plugin "$pluginKey"
 			echo "$pkg" "$pluginKey" "pluginKey" "$pluginKey"
 			local attribNames=(); $plugin.getAttributes -A attribNames
 			local -n mutableCols; $plugin.static.mutableCols.getOID mutableCols
@@ -442,12 +442,13 @@ function static::Plugin::_assembleAttributesForAwktable()
 			addCol("defDisplayCols")
 			addCol("columns")
 		}
-		NF!=4 {assert("logic error. The pipe should feed in only lines with three columns : <pluginKey> <attribName> <value>")}
+		NF!=4 {assert("logic error. The pipe should feed in only lines with four columns : <pkgName> <pluginKey> <attribName> <value>")}
 		{
 			pkgName=$1; pluginKey=$2; attrib=$3; value=$4
-			#bgtrace("   |pluginKey=|"pluginKey"|  attrib=|"attrib"|")
+			#bgtrace("   |pluginKey=|"pluginKey"|  attrib=|"attrib"|       |"$0"|")
 			if (attrib ~ /^[a-zA-Z]/  && attrib !~ /^(staticMethods|methods|vmtCacheNum|classHierarchy|baseClass|mutableCols)$/) {
-				if (attrib=="package" && pkgName != value) assert("logic error: the [package] attribute ("value") in plugin "pluginKey" does not match the pkgName from the manifest entry for the plugin ("pkgName") ")
+				if (attrib=="package" && pkgName != value)
+					assert("logic error: the [package] attribute ("value") in plugin "pluginKey" does not match the pkgName from the manifest entry for the plugin ("pkgName") ")
 				addRow(pluginKey)
 				addCol(attrib)
 				values[pluginKey,attrib]=value
