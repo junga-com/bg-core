@@ -10,12 +10,15 @@
 # https://wiki.debian.org/MaintainerScripts
 
 
+onPkgTrace=""
+
 # The package will not yet be unpacked, so the preinst script cannot rely on any files included in its package. Only essential
 # packages and pre-dependencies (Pre-Depends) may be assumed to be available. Pre-dependencies will have been configured at least
 # once, but at the time the preinst is called they may only be in an “Unpacked” or “Half-Configured” state if a previous version
 # of the pre-dependency was completely configured and has not been removed since then.
 function onPreinst()
 {
+	[ "$onPkgTrace" ] && echo "$packageName - $FUNCNAME $*" >> "/tmp/bgtrace.out"
 	local action="$1";  shift  # install|upgrade|abort-upgrade
 	if [ "$action" != "abort-upgrade" ]; then
 		local oldVersion="$1"; shift
@@ -27,12 +30,14 @@ function onPreinst()
 		# included in the package.
 		local newVersion="$1"; shift
 	fi
+	return 0
 }
 
 # The files contained in the package will be unpacked. All package dependencies will at least be “Unpacked”. If there are no
 # circular dependencies involved, all package dependencies will be configured.
 function onPostinst()
 {
+	[ "$onPkgTrace" ] && echo "$packageName - $FUNCNAME $*" >> "/tmp/bgtrace.out"
 	local action="$1"; shift    # configure|abort-upgrade|abort-remove|abort-deconfigure
 
 	if [ "$action" == "configure" ]; then
@@ -52,7 +57,7 @@ function onPostinst()
 	for file in $(fsExpandFiles "$pkgDataFolder/bash_completion.d/"*); do
 		cp "$file" /etc/bash_completion.d/ || assertError
 	done
-	true
+	return 0
 }
 
 
@@ -62,17 +67,19 @@ function onPostinst()
 # partial upgrade.
 function onPrerm()
 {
+	[ "$onPkgTrace" ] && echo "$packageName - $FUNCNAME $*" >> "/tmp/bgtrace.out"
 	local action="$1"; shift   # remove|upgrade|deconfigure|failed-upgrade
 
 	local file
 	for file in $(fsExpandFiles "$pkgDataFolder/bash_completion.d/"*); do
 		rm -f "/etc/bash_completion.d/$file"
 	done
-	true
+	return 0
 }
 
 function onPostrm()
 {
+	[ "$onPkgTrace" ] && echo "$packageName - $FUNCNAME $*" >> "/tmp/bgtrace.out"
 	local action="$1"; shift    # remove|purge|upgrade|disappear |failed-upgrade |abort-install|abort-upgrade
 	case $action in
 		# The postrm script is called after the package’s files have been removed or replaced. The package whose postrm is being
@@ -99,6 +106,8 @@ function onPostrm()
 
 	import bg_manifest.sh  ;$L1;$L2
 	manifestUpdateInstalledManifest  "${packageName:+remove}" "${packageName}"
+
+	return 0
 }
 
 # process the command line and invoke the specified hook

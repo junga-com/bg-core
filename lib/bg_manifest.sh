@@ -145,7 +145,7 @@ function manifestUpdateInstalledManifest() {
 			assertNotEmpty pkgName
 			[ ! -f "$manifestInstalledPath" ] && [ ! -f "$pluginManifestInstalledPath" ] && return 0
 			bgawk -i  \
-			   -v pkgName="$pkgName" \ '
+			   -v pkgName="$pkgName" '
 				$1==pkgName {deleteLine()}
 			' $(fsExpandFiles "$manifestInstalledPath" "$pluginManifestInstalledPath")
 			;;
@@ -181,18 +181,22 @@ function manifestUpdateInstalledManifest() {
 			import bg_plugins.sh  ;$L1;$L2
 			{
 				[ -f "$pluginManifestInstalledPath" ] && bgawk -n  \
-				   -v pkgName="$pkgName" \ '
+				   -v pkgName="$pkgName" \
+				   -v pluginManifestInstalledPath='$pluginManifestInstalledPath' '
 					@include "bg_core.awk"
 					NR==1 {
+						if ($1!="package")
+							assert("Bad format for plugin mnifest file at "pluginManifestInstalledPath". The first column needs to be package but it is '"$1"'")
 						for (i=1; i<=NF; i++)
 							cols[i]=$i
 						next
 					}
 					NR==2 {next;}
+
 					{
 						if ($1!=pkgName) {
 							for (i=1; i<=length(cols); i++)
-								printf("%s %s %s %s\n", pkgName, norm($2), cols[i], norm($i))
+								printf("%s %s %s %s\n", $1, norm($2), cols[i], norm($i))
 						}
 					}
 				' "$pluginManifestInstalledPath"

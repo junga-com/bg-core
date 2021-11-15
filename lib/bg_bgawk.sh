@@ -113,10 +113,12 @@ function bgawk()
 		awkScript="$1"; [ $# -gt 0 ] && shift
 	fi
 
+
 	# files may or may not contain the files list specified. if inplace is set it will because we have to process
 	# each file separately, creating a new temp file, etc...  Otherwise, its set to '-' to indicate that we can invoke
 	# awk once with what ever files were passed to us. This might be no files in which case awk will read from stdin.
 	local files="<>#"; [ "$inplace$cols1Flag" ] && files=("$@")
+	local inplaceExitCode=0
 	for file in "${files[@]}"; do
 		# this is the case where we want one pass using the 0, 1, or multiple files passed in on the command line
 		[ "$file" == "<>#" ] && file=("$@")
@@ -142,7 +144,7 @@ function bgawk()
 		fi
 
 		local script='@include "bg_core.awk"'$'\n'
-		[ "$useCols" == "2" ] && script='
+		[ "$useCols" == "2" ] && script="$script"'
 			NR==1 {for (i=1; i<=NF; i++) colNames[i]=$i}
 			NR>1 {for (i=1; i<=NF; i++) {if (colNames[i]) {row[colNames[i]]=$i; }}}
 		'
@@ -249,7 +251,6 @@ function bgawk()
 			if [ "$debugFlag" ]; then
 				bgsudo -O sudoOpts $(getUserCmpApp) "$file"  "$tmpFile"
 				echo "tmpFile= '$tmpFile'  (modified version of '$file')"
-				return 0
 
 			# if files are different, overwrite/create the original with the new
 			elif fsIsDifferent "$tmpFile" "$file"; then
@@ -257,18 +258,14 @@ function bgawk()
 					cat "$tmpFile" | pipeToFile "$file" || assertError
 				fi
 				rm "$tmpFile"
-				[ "$returnTrueIfSuccessful" ] && return 0
-				[ "$returnTrueIfChanged" ]
-				return
+				[ ! "$returnTrueIfSuccessful" ] && [ ! "$returnTrueIfChanged" ] && inplaceExitCode=1
 
 			# do nothing. original and new file are the same.
 			else
 				rm "$tmpFile"
-				[ "$returnTrueIfSuccessful" ] && return 0
-				[ ! "$returnTrueIfChanged" ]
-				return
+				[ ! "$returnTrueIfSuccessful" ] && [ "$returnTrueIfChanged" ] && inplaceExitCode=1
 			fi
 		fi
-		assertLogicError "this line should be be reached"
 	done
+	return $inplaceExitCode
 }

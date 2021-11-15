@@ -223,7 +223,7 @@
 #
 # See Also:
 #    man(1) bg-unitTest.ut
-#    man(1) bg-dev-tests.ut
+#    man(1) bg-dev-tests
 
 # bgUnitTestMode=utRuntime|direct
 declare -g bgUnitTestMode="utRuntime"; [[ "$bgLibExecCmd" =~ ([.]ut)|(bg-utRunner)$ ]] && bgUnitTestMode="direct"

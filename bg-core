@@ -97,11 +97,6 @@ function oob_helpMode()
 
 
 
-# Command manpage: bg-dev-tests
-# usage: bg-dev tests list   [-f|--fullyQualyfied] [all]
-#        bg-dev tests list   [-f|--fullyQualyfied] <utIDSpec> [...<utIDSpecN>]
-#
-# See Also:
 function templateCntr()
 {
 	local cmd="${1:-list}"; shift

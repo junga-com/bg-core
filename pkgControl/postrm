@@ -5,3 +5,8 @@
 # special processing for bg-core because the bg-core files will not be present
 sed -i -e '/^bg-core\b/d' /var/lib/bg-core/manifest
 sed -i -e '/^bg-core\b/d' /var/lib/bg-core/pluginManifest
+
+if [ "$1" == "purge" ]; then
+	rm -f /var/lib/bg-core/{manifest,pluginManifest}{,.prev}
+	rm -f /etc/{bgHostProductionMode,bg-complianceEngine.conf,bgsys.conf,bgsys.global.conf,bgsys.location.conf}
+fi
