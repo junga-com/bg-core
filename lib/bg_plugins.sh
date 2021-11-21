@@ -257,12 +257,12 @@ function static::Plugin::get()
 
 	if [ ! "${loadedPlugins[$pluginKey]+exists}" ]; then
 		# ensure that this plugin's pluginType is loaded first
-		[ "$pluginType" != "PluginType" ] && static::Plugin::get -q "PluginType:$pluginType"
+		[ "$pluginType" != "PluginType" ] && static::Plugin::get -q $manifestOpt "PluginType:$pluginType"
 
 		# get the filename that implements this plugin from the manifest
 		local _pg_pkg _pg_scrap _pg_filename
 		read -r _pg_pkg _pg_scrap _pg_scrap _pg_filename < <(manifestGet $manifestOpt $pkgNameOpt plugin "$pluginType:$pluginID")
-		assertNotEmpty _pg_filename "could not find assetType:plugin assetName:'$pluginType:$pluginID' in host manifest"
+		assertNotEmpty _pg_filename "could not find assetType:plugin, assetName:'$pluginType:$pluginID' in host manifest"
 
 		# override the 'context global' packageName var for and DeclarePlugin calls made when sourcing the plugin library. There
 		# may be multiple plugins Declared in the library, not just the one we are explicitly 'getting'
@@ -332,7 +332,7 @@ function static::Plugin::loadAllOfType()
 
 # usage: $Plugin::addNewAsset <newAssetName>
 # This is invoked by the "bg-dev asset plugin.<pluginType> <newAssetName>" command to add a new asset to the current project folder
-# of this plugin type.  This default implementation assumes that there is a system template named newAsset.<pluginType> which it
+# of this plugin type.  This default implementation assumes that there is a system template named newAsset.plugin.<pluginType> which it
 # expands to make a new asset file at <projectRoot>/plugins/<newAssetName>.<pluginType>.  A particular <pluginType> may override
 # this static function to perform different actions if needed.
 function static::Plugin::addNewAsset()
@@ -343,8 +343,8 @@ function static::Plugin::addNewAsset()
 	[ -e "$destFile" ] && assertError "An asset already exists at '$destFile'"
 
 	import bg_template.sh  ;$L1;$L2
-	local templateFile; templateFind -R templateFile "newAsset.${static[name]}"
-	[ ! "$templateFile" ] && assertError -v templateName:"-lnewAsset.${static[name]}" -v "plugintype:-l${static[name]}" "The template to create a new plugin asset of this type was not found on this host."
+	local templateFile; templateFind -R templateFile "newAsset.plugin.${static[name]}"
+	[ ! "$templateFile" ] && assertError -v templateName:"-lnewAsset.plugin.${static[name]}" -v "plugintype:-l${static[name]}" "The template to create a new plugin asset of this type was not found on this host."
 
 	templateExpand "$templateFile" "$destFile"
 	echo "A new asset has been added at '$destFile' with default values. Edit that file to customize it."

@@ -137,7 +137,7 @@ function templateListTypes()
 function completeTemplateName()
 {
 	local cur="$1"
-	templateFind --return-relative "${cur}*" | awk -v cur="$cur" '
+	templateFind --return-relative "${cur}.*" | awk -v cur="$cur" '
 		@include "bg_core.awk";
 		BEGIN {
 			curDonePart=""
@@ -145,6 +145,7 @@ function completeTemplateName()
 				curDonePart=gensub(/[.].*$/,".","g",cur)
 				printf("$(cur:%s)\n", substr(cur, length(curDonePart)+1))
 			}
+			arrayCreate(results)
 		}
 		NF>0 {
 			if ($0 ~ "^"cur) {

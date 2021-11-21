@@ -321,30 +321,35 @@ See
 When you spend time and effort to build script commands and libraries you want them to be understood and used so this system provides two important mechanisms to document your work as you write it.
 
 `bg-dev funcman` scans scripts and produces documentation from the the comments and other information that it gleans. This can produce man(1) pages for each script command, man(3) pages for public script functions in libraries and man(7) pages for each script library.
-The bg-core uses this to provide man pages for each command, library, protocol, and public function. While writing a script, the bash
-completion on man pages lets you lookup a bash function name and then see how to use it.
+While writing a script, the bash completion on man pages lets you lookup a bash function name and then see how to use it.
 
 See
 * man(1) bg-dev-funcman
 * man(7) bg_funcman.sh
 
-The second mechanism for documentation is Command line completion support. When a script includes a call to  `oob_invokeOutOfBandSystem`, the command will inherit certain functionality. It will recognize when the script is invoked with an option that starts with "-h". The -h option will open the command's man page and other out of band options allow a generic bash completion stub to query the script for information about that command line syntax it requires.
+The second mechanism for documentation is Command line completion support. When a script includes a call to  `oob_invokeOutOfBandSystem`, the command will inherit certain functionality. It will recognize when the script is invoked with an option that starts with "-h". The -h option will open the command's man page and other out of band options like -hb allow a generic bash completion stub to query the script for information about that command line syntax it requires.
 
-Command line completion is an important form of documentation. Thi ssupport adds a notion to bash completion that in addition to suggested words, the command can also display non-selectable words that gives the user context about the command line paramter being entered.
+This allows the script itself to provide the bash completion routine so that the bash completion can be developed as a first class feature of the script.
+
+Command line completion is an important form of documentation so that users can get information about the command as they attempt to use it. This mechanism adds a notion to bash completion that in addition to suggested words, the command can also display non-selectable comment words that gives the user context about the command line parameter being entered.
 
 ```bash
 $ cat - >/tmp/test6.sh
 #!/usr/bin/env bash
 source /usr/lib/bg_core.sh
+cmdSyntax="[-v] [-q] [-f|--file=<foo>] <name> <species>|dog|cat|human"
 function oob_printBashCompletion() {
-    bgBCParse "[-v] [-q] [-f|--file=<foo>] <name> <species>|dog|cat|human" "$@"; set -- "${posWords[@]:1}"
-    case $completingType in
+    bgBCParse -RclInput "$cmdSyntax" "$@"
+    case $completingArgName in
         '<name>') getent passwd | awk -F: '$3>=1000{print $1}' ;;
         '<foo>')  echo "\$(doFilesAndDirs)" ;;
     esac
 }
 oob_invokeOutOfBandSystem "$@"
 # ... the rest of the script would follow...
+bgCmdlineParse -RclInput "$cmdSyntax" "$@"
+echo "your name is '${clInput[name]}'"
+printfVars clInput
 <cntr-d>
 $ chmod a+x /tmp/test6.sh
 ```

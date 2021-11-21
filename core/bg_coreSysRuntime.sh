@@ -428,35 +428,3 @@ function bgListInstalledProjects()
 		fsExpandFiles -B /var/lib/bg-core/ /var/lib/bg-core/* -type d
 	fi
 }
-
-# usage: bgManifestOfInstalledAssets
-# return a list of all the installed bash libraries and bash script commands from any script package
-# project. If any virtually installed projects are detected, only virutally installed paths will be
-# returned. Otherwise any found in the system pathes /usr/bin/ and /usr/lib are returned.
-function bgManifestOfInstalledAssets()
-{
-	local awkScript outType='{printf("%s\n", $3)}'
-	while [ $# -gt 0 ]; do
-		awkScript+='$2=="'"$1"'" '"$outType"$'\n'
-		shift
-	done
-	awkScript="${awkScript:-$outType}"
-
-	local manifestFiles=()
-
-	if [ "$bgInstalledPkgNames" ]; then
-		findInPaths -R manifestFiles -d -r .bglocal/ manifest "$bgLibPath"
-	else
-		# TODO: the installer needs to produce an additional manifest with the filenames located in the host
-		fsExpandFiles -A manifestFiles /var/lib/bg-core/*/hostmanifest
-	fi
-
-	awk '
-		@include bg_core.awk
-		BEGINFILE {
-			prefix=gensub(/.bglocal.manifest/,"","g", FILENAME)
-		}
-		{if ($3!~/^\//)  $3 = prefix""$3}
-		'"$awkScript"'
-	' "${manifestFiles[@]:-/dev/null}"
-}

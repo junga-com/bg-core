@@ -1387,7 +1387,7 @@ function arrayCopy()
 	local -n cpFromArrayVar="$1"
 	local -n cpToArrayVar="$2"
 
-	[ ! "'$appendFlag'" ] && cpToArrayVar=()
+	[ ! "$appendFlag" ] && cpToArrayVar=()
 	local _acName; for _acName in "${!cpFromArrayVar[@]}"; do
 		cpToArrayVar["$_acName"]="${cpFromArrayVar["$_acName"]}"
 	done
@@ -3716,8 +3716,9 @@ function fsParseContent()
 
 
 # usage: fsTouch [-d] [-p]  <fileOrFolder> [<content>]
-# This improves the pattern of using 'touch' to make sure a file exists before accessing it. If fsTouch ends without asserting an error,
-# it guarantees that <fileOrFolder> exists with all of the attributes that are specified in the options.
+# This improves the pattern of using 'touch' to make sure a file exists before accessing it.
+# If fsTouch ends without asserting an error, it guarantees that <fileOrFolder> exists with all of the attributes that are specified
+# in the options.
 #
 # Parent Folder Creation:
 # If the folder that <fileOrFolder> resides in does not exist, it will be created by default as long as the grandparent folder does
@@ -3781,8 +3782,13 @@ function fsParseContent()
 #       as the <type> bit being unspecified. Spaces can be added between the clusters of bits to aid in readability. If a position
 #       has a '.', it means that that position is unspecified and any value is acceptable. If a position has a '-', it means that
 #       that right is not granted or in the case of the type character, it specifies that the type is a regular file.
-#          [.fdp-] [.r-][.w-][.x-] [.r-][.w-][.x-] [.r-][.w-][.x-]
-#          <type-> <----user-----> <----group----> <----other---->
+#          [.fdp-] [.r-][.w-][.xsS-] [.r-][.w-][.xsS-] [.r-][.w-][.x-]
+#          <type-> <-----user------> <-----group-----> <----other---->
+#          Where s and x share a spot...
+#               '-' means '--' niether is set
+#               'x' means 'x-' only x,
+#               'S' means '-s' only s
+#               's' means 'xs' both are set
 #    -p|--makePaths : normaly it will create at most one parent folder but -p makes it create the entire parent chain as needed.
 #       Its safer to use without -p because it wont blinding create a whole folder hierarchy if you make a mistake in the
 #       <fileOrFolder>. For example if you forget the leading / in a well know path, it would recreate that path under the current
@@ -3907,13 +3913,17 @@ function fsTouch()
 				[-dp.][-r.]w*) modeStr+=",u+w" ;;&
 				[-dp.][-r.]-*) modeStr+=",u-w" ;;&
 				[-dp.][-r.][-w.]x*) modeStr+=",u+x" ;;&
-				[-dp.][-r.][-w.]-*) modeStr+=",u-x" ;;&
+				[-dp.][-r.][-w.]s*) modeStr+=",u+xs" ;;&
+				[-dp.][-r.][-w.]S*) modeStr+=",u+s,u-x" ;;&
+				[-dp.][-r.][-w.]-*) modeStr+=",u-xs" ;;&
 				[-dp.][-r.][-w.][-x.]r*) modeStr+=",g+r" ;;&
 				[-dp.][-r.][-w.][-x.]-*) modeStr+=",g-r" ;;&
 				[-dp.][-r.][-w.][-x.][-r.]w*) modeStr+=",g+w" ;;&
 				[-dp.][-r.][-w.][-x.][-r.]-*) modeStr+=",g-w" ;;&
 				[-dp.][-r.][-w.][-x.][-r.][-w.]x*) modeStr+=",g+x" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.]-*) modeStr+=",g-x" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.]s*) modeStr+=",g+xs" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.]S*) modeStr+=",g+s,g-x" ;;&
+				[-dp.][-r.][-w.][-x.][-r.][-w.]-*) modeStr+=",g-xs" ;;&
 				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.]r*) modeStr+=",o+r" ;;&
 				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.]-*) modeStr+=",o-r" ;;&
 				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.]w*) modeStr+=",o+w" ;;&
