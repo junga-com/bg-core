@@ -19,7 +19,7 @@ cmds="list report activate deactivate"
 # see man bg-overviewOutOfBandScriptFunctions for details
 function oob_getRequiredUserAndGroup()
 {
-	bgBCParse "<glean>" 0 "$@"; set -- "${posWords[@]}"
+	local -A clInput; bgCmdlineParse -RclInput "<glean>" "$@"; shift "${clInput[shiftCount]}"
 
 	local cmd="$1"
 	case $cmd in

@@ -43,9 +43,9 @@
 
 
 
-# usage: bgBCParse <cmdlineSyntaxStr> <cword> <cmdName> [<arg1> ... <argN>]
-#        bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
-#        bgBCParse "fvqC:"   "$@"; set -- "${posWords[@]:1}"
+# usage: bgCmdlineParseBC <cmdlineSyntaxStr> <cword> <cmdName> [<arg1> ... <argN>]
+#        bgCmdlineParseBC "<glean>" "$@"; set -- "${posWords[@]:1}"
+#        bgCmdlineParseBC "fvqC:"   "$@"; set -- "${posWords[@]:1}"
 # This function parses the cmdline arguments according to the syntax described in <cmdlineSyntaxStr>. It can produce three types of
 # output.
 #    1) it can write out bash completion information to stdout. See man(3) _bgbc-complete-viaCmdDelegation
@@ -130,16 +130,17 @@
 #    $prev : $prev is the token before the one being completed. This is provided because the bash_completion project makes it
 #         available but it is not typically used because other variables provide better information.
 # See Also:
-#    bgBCParse  : meant for use in oob_printBashCompletion() functions. deos basic completion based on the provided <cmdlineSyntaxStr>
+#    bgCmdlineParseBC  : meant for use in oob_printBashCompletion() functions. deos basic completion based on the provided <cmdlineSyntaxStr>
 #                 and fills in clInput[] with any completed arguments from the cmdline. Also sets variables used to provide additional
 #                 completion info.
 #    bgCmdlineParse : meant for use in a function or cmd as an alternative to the standard options loop and positional assignment
-#    bgMakeUsageSpec : used by bgBCParse and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
+#    bgMakeUsageSpec : used by bgCmdlineParseBC and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
 #                 about the syntax.
-#    parseForBashCompletion : (OBSOLETE: use bgBCParse)
+#    parseForBashCompletion : (OBSOLETE: use bgCmdlineParseBC)
 #    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (amoung other things)
 #    _bgbc-complete-viaCmdDelegation: documents the bash completion protocol written to stdout by inline BC routines
-function bgBCParse()
+function bgBCParse() { bgCmdlineParseBC "$@" ; }
+function bgCmdlineParseBC()
 {
 	local retVar
 	while [ $# -gt 0 ]; do case $1 in
@@ -340,13 +341,13 @@ function bgBCParse()
 #         The index "shiftCount" is set to the number of args that were determined to be options. The caller can pass this to shift
 #         to remove them and leave only the positional args in the "$@" vars
 # See Also:
-#    bgBCParse  : meant for use in oob_printBashCompletion() functions. deos basic completion based on the provided <cmdlineSyntaxStr>
+#    bgCmdlineParseBC  : meant for use in oob_printBashCompletion() functions. deos basic completion based on the provided <cmdlineSyntaxStr>
 #                 and fills in clInput[] with any completed arguments from the cmdline. Also sets variables used to provide additional
 #                 completion info.
 #    bgCmdlineParse : meant for use in a function or cmd as an alternative to the standard options loop and positional assignment
-#    bgMakeUsageSpec : used by bgBCParse and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
+#    bgMakeUsageSpec : used by bgCmdlineParseBC and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
 #                 about the syntax.
-#    parseForBashCompletion : (OBSOLETE: use bgBCParse)
+#    parseForBashCompletion : (OBSOLETE: use bgCmdlineParseBC)
 #    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (amoung other things)
 #    _bgbc-complete-viaCmdDelegation: documents the bash completion protocol written to stdout by inline BC routines
 function bgCmdlineParse()
@@ -468,13 +469,13 @@ function bgCmdlineParse()
 #    <syntaxSpecVar> : the name of an associative array (local -A) variable declared by the caller that will receive the output of
 #                  this function.
 # See Also:
-#    bgBCParse  : meant for use in oob_printBashCompletion() functions. deos basic completion based on the provided <cmdlineSyntaxStr>
+#    bgCmdlineParseBC  : meant for use in oob_printBashCompletion() functions. deos basic completion based on the provided <cmdlineSyntaxStr>
 #                 and fills in clInput[] with any completed arguments from the cmdline. Also sets variables used to provide additional
 #                 completion info.
 #    bgCmdlineParse : meant for use in a function or cmd as an alternative to the standard options loop and positional assignment
-#    bgMakeUsageSpec : used by bgBCParse and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
+#    bgMakeUsageSpec : used by bgCmdlineParseBC and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
 #                 about the syntax.
-#    parseForBashCompletion : (OBSOLETE: use bgBCParse)
+#    parseForBashCompletion : (OBSOLETE: use bgCmdlineParseBC)
 #    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (amoung other things)
 #    _bgbc-complete-viaCmdDelegation: documents the bash completion protocol written to stdout by inline BC routines
 function bgMakeUsageSpec() {
@@ -689,7 +690,7 @@ function bgetopt()
 }
 
 
-# OBSOLETE: use bgBCParse or bgCmdlineParse
+# OBSOLETE: use bgCmdlineParseBC or bgCmdlineParse
 # usage: parseForBashCompletion --compat2 wordsVarName cwordVarName curVarName prevVarName optWordsVarName posWordsVarName posCwordsVarName "$@"
 # usage: parseForBashCompletion [-o"hs:a:"] wordsVarName cwordVarName curVarName prevVarName optWordsVarName posWordsVarName  "$@"
 # usage: (cont)                 <cword> [<word1> .. <wordN>]
@@ -702,7 +703,7 @@ function bgetopt()
 #        This makes the index numbers of posWords the same as the $N vars that the script will know the positional params as when
 #        it is called.
 # See Also:
-#    bgBCParse  : newer version of parseForBashCompletion
+#    bgCmdlineParseBC  : newer version of parseForBashCompletion
 function parseForBashCompletion()
 {
 	local optSpecs=""

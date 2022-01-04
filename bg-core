@@ -11,6 +11,7 @@ import bg_plugins.sh ;$L1;$L2
 
 
 supportedCmds="templates plugin cuiWin config manifest compliance"
+cmdSyntax="[-v|--verbose] [-q|--quiet] [--verbosity] <cmd>"
 
 ###############################################################################
 # Command manpage
@@ -35,34 +36,27 @@ supportedCmds="templates plugin cuiWin config manifest compliance"
 # The bash completion script calls this get the list of possible words.
 function oob_printBashCompletion()
 {
-	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+	local -A clInput; bgBCParse -RclInput "$cmdSyntax" "$@"; shift "$((${clInput[shiftCount]}+2))"
 
-	cmd="$1"
+	cmd="$1"; shift; ((posCwords--))
 
 	case $cmd:$posCwords in
-		*:1) echo $supportedCmds ;;
-		templates:2) echo "types list find expand getVars paths" ;;
+		*:0) echo $supportedCmds ;;
+		templates:1) echo "types list find expand getVars paths" ;;
 		templates:*)
-			shift; ((posCwords--))
 			subCmd="$1"; shift; ((posCwords--))
 			case $subCmd:$((posCwords)) in
+				# all subcmds except 'paths' take a template name as their first parameter
 				paths:1) ;;
-				*:1)
-					completeTemplateName "$@"
-					;;
+				*:1) completeTemplateName "$@" ;;
 
 				expand:2) echo "<destination> - /" ;;
-
-
-				expand:*)
-					completeTemplateVariables --cword="$posCwords" --cur="$cur" "$@"
-					;;
+				expand:*) completeTemplateVariables --cword="$posCwords" --cur="$cur" "$@" ;;
 			esac
 			;;
 
-		plugin:2) echo "types list get" ;;
+		plugin:1) echo "types list get" ;;
 		plugin:*)
-			shift; ((posCwords--))
 			subCmd="$1"; shift; ((posCwords--))
 			case $subCmd:$((posCwords)) in
 				get:1)
@@ -72,6 +66,21 @@ function oob_printBashCompletion()
 			esac
 			;;
 
+		config:1) echo "set get remove view" ;;
+		config:*)
+			subCmd="$1"; shift; ((posCwords--))
+			case $subCmd in
+				get)    bgBCParse -RclInput "[-s|--scope=<scope>] <section> <setting> [<defaultValue>]" "$posCwords" "$0" "$@" ;;
+				set)    bgBCParse -RclInput "[-s|--scope=<scope>] <section> <setting> <value>"          "$posCwords" "$0" "$@" ;;
+				remove) bgBCParse -RclInput "[-s|--scope=<scope>] <section> <setting>"                  "$posCwords" "$0" "$@" ;;
+				view)   : ;;
+			esac
+			case $completingArgName in
+				'<scope>')   configScopeList ;;
+				'<section>') configSectionList ${clInput[-s]:+"-s${clInput[-s]}"}; [ "$subCmd" == "set" ] && echo "."; echo "\$(emptyIsAnOption)" ;;
+				'<setting>') configSettingList ${clInput[-s]:+"-s${clInput[-s]}"} "${clInput[section]}"; echo "\$(emptyIsAnOption)" ;;
+			esac
+			;;
 	esac
 	exit
 }
@@ -80,11 +89,8 @@ function oob_printBashCompletion()
 # see man bg-overviewOutOfBandScriptFunctions for details
 function oob_helpMode()
 {
-	local words cword cur prev optWords posWords posCwords
-	parseForBashCompletion --compat2 words cword cur prev optWords posWords posCwords "$@"
-
-	local cmd="${posWords[1]}"
-	case ${cmd:-main} in
+	local -A clInput; bgCmdlineParse -RclInput "<cmd>" "$@"
+	case ${clInput[cmd]:-main} in
 		main)  man "$(basename $0)" ;;
 		*)     man "$(basename $0)" ;;
 	esac
@@ -162,6 +168,20 @@ function complianceCntr()
 			done
 		;;
 		*) assertError "unknown sub command '$cmd'" ;;
+	esac
+}
+
+
+function configCntr()
+{
+	local cmd="$1"; shift
+
+	case ${cmd:-view} in
+		get)    configGet    "$@" ;;
+		set)    configSet    "$@" ;;
+		remove) configRemove "$@" ;;
+		view)   configView   "$@" ;;
+		*) assertError -v subCmd:cmd "Unknown sub command" ;;
 	esac
 }
 

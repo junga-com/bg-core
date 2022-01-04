@@ -10,6 +10,16 @@ import Config.PluginType ;$L1;$L2
 
 cmds="list report check apply runAll activate deactivate"
 
+# Command:
+# usage: bg-configCntr list|report|check|apply|runAll|activate|deactivate
+# A command to manage the Config plugins currently installed on a host.
+# Config plugins are units of configuration that can be distributed in deb or rpm packages and then turned on or off on the host.
+# The Config plugins installed on a host provide capabilities to the host that lay dormant until they are activated in some way.
+# Each Config plugin has a 'check' operation and an 'apply' operation which can be invoked manually with this command. Each Config
+# plugin also has an activation state which can be set by this command. When a Config plugin is activated, the bg-complianceEngine
+# will invoke it periodically and as needed to either 'monitor' (call 'check' only) or 'enforce' (call 'apply') the configuration.
+# Any time either operation is called, the state of the host's compliance with this configuration is recorded. A healthy host would
+# have all active Config plugins reporting 100% compliance.
 
 ###############################################################################
 # Functions
@@ -19,7 +29,7 @@ cmds="list report check apply runAll activate deactivate"
 # see man bg-overviewOutOfBandScriptFunctions for details
 function oob_getRequiredUserAndGroup()
 {
-	bgBCParse "<glean>" "$@"; set -- "${posWords[@]:1}"
+	local -A clInput; bgCmdlineParse -RclInput "<glean>" "$@"; shift "${clInput[shiftCount]}"
 
 	local cmd="$1"
 	case $cmd in
@@ -56,6 +66,14 @@ function printBashCompletion()
 	exit
 }
 
+function oob_helpMode()
+{
+	local -A clInput; bgCmdlineParse -RclInput "<cmd>" "$@"
+	case ${clInput[cmd]:-main} in
+		main) man "${0##*/}" ;;
+		*) man static::Config::${clInput[cmd]} ;;
+	esac
+}
 
 
 ###############################################################################
