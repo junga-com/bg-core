@@ -548,13 +548,6 @@ function oob_invokeOutOfBandSystem()
 		local cmdFolder="$(dirname $0)"
 		local oobOpt="$1"; shift
 		case $oobOpt in
-			# OBSOLETE: the current _bgbc-complete-viaCmdDelegation function will not generate separate calls for options/non-options
-			# -hbo)
-			# 	declare -A _bgbcData=(); arrayFromString _bgbcData "$_bgbcDataStr"
-			# 	[ "${daemonDefaultStartLevels+isset}" ]     && daemon_oob_printOptBashCompletion "$@"
-			# 	[ "$(type -t oob_printOptBashCompletion)" ] && oob_printOptBashCompletion "$@"
-			# 	[ "$(type -t printOptBashCompletion)" ]     && printOptBashCompletion "$@"
-			# 	;;
 			-hb|-hbOOBCompGen)
 				local -A _bgbcData=(); arrayFromString _bgbcData "$_bgbcDataStr"
 				local -A options=()
@@ -582,7 +575,7 @@ function oob_invokeOutOfBandSystem()
 			-hd) [ -f $cmdFolder/.$cmd ] && $(getUserCmpApp) "$@" $0 $cmdFolder/.$cmd ;;
 
 			*)  [ "${helpMode+exists}" ]      && { helpMode="-h"; return; }
-				[ "$(type -t oob_helpMode)" ] && { oob_helpMode 0 "$@"; bgExit; }
+				[ "$(type -t oob_helpMode)" ] && { oob_helpMode  "$@"; bgExit; }
 				man $(basename $0)  ;;
 		esac
 		bgExit
@@ -603,7 +596,7 @@ function oob_invokeOutOfBandSystem()
 	# user does not need to know how to map the command line to the bash functions they wrap. This is
 	# only right for sub command style command scripts that wrap functions in their corresponding library.
 	[ "${helpMode+exists}" ]      && [ "${!#}" == "-h" ] && { helpMode="-h"; return; }
-	[ "$(type -t oob_helpMode)" ] && [ "${!#}" == "-h" ] && { oob_helpMode 0 "$@"; bgExit; }
+	[ "$(type -t oob_helpMode)" ] && [ "${!#}" == "-h" ] && { import bg_outOfBandScriptFeatures.sh ;$L1;$L2; oob_helpMode "$@"; bgExit; }
 
 	# The oob_getRequiredUserAndGroup optional call back function lets the script author
 	# tell us which user and group this command should b run as. The group is typically
@@ -617,7 +610,7 @@ function oob_invokeOutOfBandSystem()
 		import bg_outOfBandScriptFeatures.sh ;$L1;$L2
 
 		declare -A options=()
-		local userAndGroup="$($userGroupCB 0 $0 "$@")"
+		local userAndGroup="$($userGroupCB "$@")"
 		local reqUser="${userAndGroup%%:*}"
 		local reqGroup; [[ ! "$userAndGroup" =~ : ]] && reqGroup="${userAndGroup##*:}"
 
@@ -824,9 +817,9 @@ function bgsudo()
 			 options+=("-n")
 			 ;;
 		-d)  debug="echo " ;;
-		-r*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
-		-w*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
-		-c*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
+		-r*|--read) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
+		-w*|--write) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
+		-c*|--create) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
 		-o*|--chown*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-o$testFile") ;;
 
 		-[paghpuUrtCc]*|--role*|--prompt*|--close-from*|--group*|--user*|--host*|--type*|--other-user*)
@@ -961,9 +954,9 @@ function _bgsudoAdjustPriv()
 			;;
 		--actionVar*)   bgOptionGetOpt val: actionVar   "$@" && shift ;;
 		--defaultAction*) bgOptionGetOpt val: _sapAction "$@" && shift ;;
-		-r*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
-		-w*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
-		-c*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
+		-r*|--read) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
+		-w*|--write) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
+		-c*|--create) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
 		-o*|--chown*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-o$testFile") ;;
 		-[paghpuUrtCcO]*|--role*|--prompt*|--close-from*|--group*|--user*|--host*|--type*|--other-user*)
 			bgOptionGetOpt opt: "$sudoOptsVar" "$@" && shift
@@ -3813,7 +3806,7 @@ function fsTouch()
 		--perm*)      bgOptionGetOpt val: permMode   "$@" && shift
 			permMode="${permMode// }"
 			[ ${#permMode} -eq 9 ] && permMode=".$permMode" # the caller can leav out the file type bit
-			[ "$permMode" ] && [[ ! "$permMode" =~ ^[-fdp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.][-w.][-x.]$ ]] && assertError "The --perm=<rwxBits> must be a 9 or 10 character string matching [.fdp-]?[.r-][.w-][.x-][.r-][.w-][.x-][.r-][.w-][.x-]"
+			[ "$permMode" ] && [[ ! "$permMode" =~ ^[-fdp.][-r.][-w.][-xsS.][-r.][-w.][-xsS.][-r.][-w.][-x.]$ ]] && assertError "The --perm=<rwxBits> must be a 9 or 10 character string matching [.fdp-]?[.r-][.w-][.x-][.r-][.w-][.x-][.r-][.w-][.x-]"
 		;;
 		-p|--makePaths) recurseMkdirFlag="-p" ;;
 		-f|--force) forceFlag="-f" ;;
@@ -3908,28 +3901,28 @@ function fsTouch()
 		if [[ ! "$curMode" =~ ^[^:]*:[^:]*:$permMode ]]; then
 			local modeStr=""
 			case $permMode in
-				[-dp.]r*) modeStr+=",u+r" ;;&
-				[-dp.]-*) modeStr+=",u-r" ;;&
-				[-dp.][-r.]w*) modeStr+=",u+w" ;;&
-				[-dp.][-r.]-*) modeStr+=",u-w" ;;&
-				[-dp.][-r.][-w.]x*) modeStr+=",u+x" ;;&
-				[-dp.][-r.][-w.]s*) modeStr+=",u+xs" ;;&
-				[-dp.][-r.][-w.]S*) modeStr+=",u+s,u-x" ;;&
-				[-dp.][-r.][-w.]-*) modeStr+=",u-xs" ;;&
-				[-dp.][-r.][-w.][-x.]r*) modeStr+=",g+r" ;;&
-				[-dp.][-r.][-w.][-x.]-*) modeStr+=",g-r" ;;&
-				[-dp.][-r.][-w.][-x.][-r.]w*) modeStr+=",g+w" ;;&
-				[-dp.][-r.][-w.][-x.][-r.]-*) modeStr+=",g-w" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.]x*) modeStr+=",g+x" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.]s*) modeStr+=",g+xs" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.]S*) modeStr+=",g+s,g-x" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.]-*) modeStr+=",g-xs" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.]r*) modeStr+=",o+r" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.]-*) modeStr+=",o-r" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.]w*) modeStr+=",o+w" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.]-*) modeStr+=",o-w" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.][-w.]x) modeStr+=",o+x" ;;&
-				[-dp.][-r.][-w.][-x.][-r.][-w.][-x.][-r.][-w.]-) modeStr+=",o-x" ;;&
+				?r????????) modeStr+=",u+r" ;;&
+				?-????????) modeStr+=",u-r" ;;&
+				??w???????) modeStr+=",u+w" ;;&
+				??-???????) modeStr+=",u-w" ;;&
+				???x??????) modeStr+=",u+x,u-s" ;;&
+				???s??????) modeStr+=",u+xs"    ;;&
+				???S??????) modeStr+=",u+s,u-x" ;;&
+				???-??????) modeStr+=",u-xs"    ;;&
+				????r?????) modeStr+=",g+r" ;;&
+				????-?????) modeStr+=",g-r" ;;&
+				?????w????) modeStr+=",g+w" ;;&
+				?????-????) modeStr+=",g-w" ;;&
+				??????x???) modeStr+=",g+x,g-s" ;;&
+				??????s???) modeStr+=",g+xs"    ;;&
+				??????S???) modeStr+=",g+s,g-x" ;;&
+				??????-???) modeStr+=",g-xs"    ;;&
+				???????r??) modeStr+=",o+r" ;;&
+				???????-??) modeStr+=",o-r" ;;&
+				????????w?) modeStr+=",o+w" ;;&
+				????????-?) modeStr+=",o-w" ;;&
+				?????????x) modeStr+=",o+x" ;;&
+				?????????-) modeStr+=",o-x" ;;&
 			esac
 			modeStr="${modeStr#,}"
 
@@ -4319,13 +4312,13 @@ function daemonDeclare()
 #    function cr_fileExists::check() { [ -e "$1" ]; }
 #    function cr_fileExists::apply() { touch "$1"; }
 #
-# The ::check() must return 0 if the host configuration complies with the creqStatment and non-zero if it does not. It may write
+# The ::check() must return 0 if the host configuration complies with the creqStatement and non-zero if it does not. It may write
 # to stdout to display information whether or not it returns 0. Typically it might write a message about why the host does not pass.
 # It probably should not write to stdout if the check passes but it can if it wnats to. If it is not able to complete the check for
 # any reason it should exit or raise an exception by calling an assertError* function. By convention, it should write an error
 # message to stderr if its going to exit. The arguments in the creqStatement are passed to the check function.
 #
-# The ::apply() should attempt to change the host configuarion so that it will comply with the creqStatment. It may produce informative
+# The ::apply() should attempt to change the host configuarion so that it will comply with the creqStatement. It may produce informative
 # output on stdout but does not need to. If it is successful in changing the host to comply, it must return 0. If it is not successfull,
 # it must either return non-zero or exit (typically by calling an assertError* function). It is good practice to write an error
 # message to stderr if it return non-zero or exits. The ::apply() function will only get called if the ::check() function has been
@@ -4335,7 +4328,7 @@ function daemonDeclare()
 # The author can optionally define a ::construct() function which will be called first, once per creqStatement execution.
 # The ::construct() function is passed the creqStatement arguments and would typically process and store the results in variables
 # that the ::check() and ::apply() functions would then use instead of repeating the work to process the arguments from scratch.
-# The entire creqStatment is executed in a subshell so the ::construct(), ::check() and ::apply() functions share a private 'global'
+# The entire creqStatement is executed in a subshell so the ::construct(), ::check() and ::apply() functions share a private 'global'
 # variable scope that they can use to communicate between each other. This means that as long as the ::construct() function does not
 # decalare a variable that it sets as 'local', that variable will be avaialble to the ::check() and ::apply() functions. Because the
 # ::check() function is always called before the ::apply() function, the author could use the ::check() function to process the
@@ -4359,7 +4352,7 @@ function daemonDeclare()
 #
 # In the call to DeclareCreqClass, the author can provide template strings to use or in the ::*() functions, it can set the actual
 # message to use. Note that a difference is that when passed to the DeclareCreqClass, it must be a template because those strings
-# are constant for all creqStatments but when set in one of the ::*() functions, the statement arguments are available so the code
+# are constant for all creqStatements but when set in one of the ::*() functions, the statement arguments are available so the code
 # can compose the text directly.
 #
 # The author can provide one msg that will be used as the display text for all <resultState>s or can provide different text for

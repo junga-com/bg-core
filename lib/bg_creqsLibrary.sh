@@ -6,6 +6,8 @@
 #    See man(3) fsTouch
 # See Also:
 #    man(3) fsTouch
+#    man(3) cr_fileExists
+#    man(3) cr_fileNotExists
 DeclareCreqClass cr_fileObjHasAttributes
 function cr_fileObjHasAttributes::check() { fsTouch --checkOnly "$@"; }
 function cr_fileObjHasAttributes::apply() { fsTouch "$@"; }
@@ -76,6 +78,18 @@ function cr_systemGroupNotExists::apply() {
  	bgsudo -p "removing group '$sysGroupname' [sudo] " groupdel "$sysGroupname"
 }
 
+
+# usage: creq cr_systemUserIsInGroup <username> <groupname>
+# declare that the host should NOT have the specified system user group configured
+DeclareCreqClass cr_systemUserIsInGroup
+function cr_systemUserIsInGroup::check() {
+	username="$1"
+	groupname="$2"
+	[[ " $(id -nG "$username") " =~ " $groupname " ]]
+}
+function cr_systemUserIsInGroup::apply() {
+	bgsudo -p "adding user '$username' to group '$groupname' [sudo] " adduser  "$username"  "$groupname"
+}
 
 
 # usage: cr_fileExistsWithContent <filename> <contents>
@@ -185,6 +199,8 @@ function cr_symlinkExists::apply() {
 #            templateStr:..           : use the template system to expand the remainder of the argument as a template string into
 #                                       <filename>
 #            string:...               : write the remainder of the argument as a literal string into <filename>
+# See Also:
+#    man(3) cr_fileObjHasAttributes
 DeclareCreqClass cr_fileExists "
 	passMsg: file %filename% exists
 	failMsg: file %filename% is missing
@@ -323,6 +339,18 @@ function cr_folderNotExits::apply() {
 	else
 		bgsudo -c "$foldername" rmdir "$foldername"
 	fi
+}
+
+
+# cr_packageInstalled packageName
+# declares that the specified package should be installed on the host
+DeclareCreqClass cr_packageInstalled
+function cr_packageInstalled::check() {
+	packageName="$1"
+	[ "$(dpkg-query -W  -f'${db:Status-Abbrev}\n' "$packageName")" == "ii " ]
+}
+function cr_packageInstalled::apply() {
+	bgsudo -p "installing pkg '$packageName'" apt-get -q -y install "$packageName"
 }
 
 
@@ -505,59 +533,6 @@ function cr_configRedirected()
 					sudo mv "$source" "${source}.orig$suffix"
 				fi
 				ln -T --suffix=".orig" -b -s "$destination" "$source"
-			fi
-			;;
-
-		*) cr_baseClass "$@" ;;
-	esac
-}
-
-# OBSOLETE: instead wrap service config creqs in 'creqsTrackChangesStart -s <serviceName>' and 'creqsTrackChangesStart <serviceName>'
-# usage: cr_serviceRunningCurrentConfig <service> [<restartRequiredFlag>]
-# declare that a service is running. The restartRequiredFlag indicates whether
-# the service needs to be restarted. It can be "" (no), "1" (yes), or the name of
-# a varName used to track changes with  creqsTrackChangesStart
-# restartRequiredFlag is typically
-function cr_serviceRunningCurrentConfig()
-{
-	case $objectMethod in
-		objectVars) echo "service restartRequiredFlag command" ;;
-		construct)
-			service="$1"
-			restartRequiredFlag="${2}"
-
-			# if the restartRequiredFlag is not "" or "1", then take it as a varName
-			if [[ ! "$restartRequiredFlag" =~ ^1*$ ]]; then
-				restartRequiredFlag="${creqsChangetrackers[$restartRequiredFlag]}${creqsChangetrackersActive[$restartRequiredFlag]}"
-			fi
-			command=""
-			displayName="serviceRunningCurrentConfig: service '$service'"
-			;;
-
-		check)
-			# note that many initv scripts are written in a way that sudo is required to run 'status'
-			# we can put a sudo config that allows running sudo * status w/o a password
-			if ! sudo service $service status >/dev/null; then
-				noPassMsg="serviceRunningCurrentConfig: service '$service' is not running"
-				command="start"
-				return 2
-			fi
-			if [ "$restartRequiredFlag" ]; then
-				noPassMsg="serviceRunningCurrentConfig: service '$service' requires a restart"
-				command="restart"
-				return 1
-			fi
-			passMsg="serviceRunningCurrentConfig: service '$service' is running"
-			return 0
-			;;
-
-		apply)
-			echo service $service ${command:-restart}
-			if ! service $service ${command:-restart}; then
-				failedMsg="serviceRunningCurrentConfig: service '$service' failed to '${command:-restart}'"
-				return 1
-			else
-				appliedMsg="serviceRunningCurrentConfig: service '$service' was ${command:-restart}ed"
 			fi
 			;;
 
@@ -1006,39 +981,6 @@ function cr_sedEnabled()
 	esac
 }
 
-# usage: cr_XXXXXX
-# declare that the server does not have the old, insecure super servers daemon installed
-function cr_XXXXXX()
-{
-	case $objectMethod in
-		objectVars) echo "" ;;
-		construct) : ;;
-
-		check)
-			[ ! -d "/etc/xinet" ] && [ ! -d "/etc/inet" ]
-			;;
-		apply) false ;;
-
-		*) cr_baseClass "$@" ;;
-	esac
-}
-
-# usage: cr_XXXXXX
-# declare that the server does not have the old, insecure super servers daemon installed
-function cr_XXXXXX()
-{
-	case $objectMethod in
-		objectVars) echo "" ;;
-		construct) : ;;
-
-		check)
-			[ ! -d "/etc/xinet" ] && [ ! -d "/etc/inet" ]
-			;;
-		apply) false ;;
-
-		*) cr_baseClass "$@" ;;
-	esac
-}
 
 # usage: cr_usersInitScriptDoNotContain <lineRegex> [<commentID>]
 # This declares that none of the user bash init files on this host have lines matching the lineRegex

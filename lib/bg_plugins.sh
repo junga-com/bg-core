@@ -330,21 +330,25 @@ function static::Plugin::loadAllOfType()
 	done < <(manifestGet $manifestOpt  plugin "$pluginType:.*")
 }
 
-# usage: $Plugin::addNewAsset <newAssetName>
+# usage: $Plugin::addNewAsset <subType> <newAssetName>
 # This is invoked by the "bg-dev asset plugin.<pluginType> <newAssetName>" command to add a new asset to the current project folder
 # of this plugin type.  This default implementation assumes that there is a system template named newAsset.plugin.<pluginType> which it
 # expands to make a new asset file at <projectRoot>/plugins/<newAssetName>.<pluginType>.  A particular <pluginType> may override
 # this static function to perform different actions if needed.
 function static::Plugin::addNewAsset()
 {
+	local subType="$1"; shift
 	local newAssetName="$1"; shift; assertNotEmpty newAssetName
+
+	[ "$subType" == "--" ] && subType=""
+	[ "$subType" ] && subType=".$subType"
 
 	local destFile="./plugins/$newAssetName.${static[name]}"
 	[ -e "$destFile" ] && assertError "An asset already exists at '$destFile'"
 
 	import bg_template.sh  ;$L1;$L2
-	local templateFile; templateFind -R templateFile "newAsset.plugin.${static[name]}"
-	[ ! "$templateFile" ] && assertError -v templateName:"-lnewAsset.plugin.${static[name]}" -v "plugintype:-l${static[name]}" "The template to create a new plugin asset of this type was not found on this host."
+	local templateFile; templateFind -R templateFile "newAsset.plugin.${static[name]}$subType"
+	[ ! "$templateFile" ] && assertError -v templateName:"-lnewAsset.plugin.${static[name]}$subType" -v subType -v "plugintype:-l${static[name]}" "The template to create a new plugin asset of this type was not found on this host."
 
 	templateExpand "$templateFile" "$destFile"
 	echo "A new asset has been added at '$destFile' with default values. Edit that file to customize it."

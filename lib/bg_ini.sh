@@ -173,12 +173,15 @@ function iniSectionExists()
 function listIniSection() { iniSectionList "$@"; }
 function iniSectionList()
 {
-	local iniFile="$1"; assertNotEmpty iniFile
+	local ipg_iniFileSpec="$1"
 	local filterRegex="${2:-".*"}"
 
+	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
 	bgawk -n --include bg_ini.awk '
-		iniLineType=="section" {print iniSectionNorm};
-	' $(fsExpandFiles -f $iniFile) | grep "^$filterRegex$"
+		iniLineType=="setting" && iniSectionNorm=="." {sectionsList[iniSectionNorm]=1}
+		iniLineType=="section" {sectionsList[iniSectionNorm]=1};
+		END {for (sectionName in sectionsList) print sectionName}
+	' "${ipg_iniFiles[@]}" | grep --color=never "^$filterRegex$"
 }
 
 # usage: iniSectionGet <iniFile> <sectionName>
@@ -355,15 +358,15 @@ function iniParamExists()
 function listIniParam() { iniParamList "$@"; }
 function iniParamList()
 {
-	local iniFile="$1"; assertNotEmpty iniFile
+	local ipg_iniFileSpec="$1"
 	local sectionName="$2"
 	local filterRegex="${3:-".*"}"
 
-	awk -v iniTargetSection="${sectionName:-]none}" --include bg_ini.awk '
-
-		inTarget && iniLineType=="setting" {print iniParamName}
-
-	' $(fsExpandFiles -f $iniFile) | grep "^$filterRegex$"
+	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
+	gawk -v iniTargetSection="${sectionName:-.}" --include bg_ini.awk '
+		inTarget && iniLineType=="setting" {settingsList[iniParamName]=1}
+		END {for (settingsName in settingsList) print settingsName}
+	' "${ipg_iniFiles[@]}" | grep --color=never "^$filterRegex$"
 }
 
 
@@ -443,7 +446,7 @@ function iniParamGet()
 
 	if [ "$ipg_foundInFile" == "notset" ] && [ "$ipg_addFlag" ]; then
 		# if we have multiple files, set it only in the first one
-		setIniParam $ipg_sectPad "$ipg_iniFileSpec" "$ipg_sectionName" "$ipg_paramName" "$ipg_defaultValue"
+		setIniParam $ipg_sectPad "${ipg_iniFiles[0]}" "$ipg_sectionName" "$ipg_paramName" "$ipg_defaultValue"
 	fi
 
 	[ "$ipg_templateFlag" ] && templateExpandStr -R ipg_value "$ipg_value"
@@ -457,39 +460,59 @@ function iniParamGet()
 
 
 
-# usage: getAllIniParams [-t] [-A <retArrayName>] <inifile> [<sectionName>]
-# retrieves a set of the ini style settings from a config file. The default is to print them to stdout but the -A
-# options , the output will be returned in the specified variable(s) and there will be nothing written to stdout.
+# usage: iniParamGetAll [-t|--expandValue] [-A <retArrayName>] [-d|--scopeDelim=<delim>] [-f|--fullyQualyfied] <inifile> [<sectionName>]
+# retrieves a set of the ini style settings from a config file. If <sectionName> is specified, it returns only settings from that
+# section and the setting names will not, by default, be fully qualified with the section name. The -f|--fullyQualyfied option forces
+# it to fully qualify the names when a <sectionName> is specified. If the <sectionName> is not specified, it returns all settings
+# in the configuration using fully qualified setting names.
+#
+# The default is to print the output to stdout as lines like "<name>=<value" but the -A option will cause it to return the results
+# in the specified associative array variable where <value> is the value of the key <name>. <name> may or may not be fully qualified
+# as described above.
+#
+# Qualifying Names:
+# When a fully qualified name is returned, it consists of a <sectionName> and <settingName>. By default, a '.' is used to
+# separate the two part like "<sectionName>.<settingName>". Since its possible for either or both of the <sectionName> and <settingName>
+# to contain '.', it might be desirable to use a different delimiter which can be specified with the -d|--scopeDelim=<delim> option.
+# If <delim> is '[' or ']', the format will be [<sectionName>]<settingName>, otherwise it will be <sectionName><delim><settingName>
+#
+# Since the <sectionName> of the top section in an ini style config is the empty string, the plain setting name of settings in the
+# top section is the fully qualified name. The delimiter in this case will not be present in the fully qualified name.
 #
 # Params:
-#    <inifile>     : filename of config file. Can be a comma separated list of config files in which case the value of the first file
-#                    that defines <sectionName> <paramName> will be used or <defaultValue> if none define it
-#    <sectionName> : If specified, only params in that section will be returned and names will NOT be prefixed with the <sectionName>
+#    <inifileSpec> : filename of config file. Can be a comma separated list of config files in which case the results are a combination
+#                    of the data from all files where values in earlier files, take precendence over values of the same fully qualified
+#                    settings that might be present in later files. Each fully qualified setting name present in the data, will appear
+#                    only once in the results using the value from the earliest file that contains that setting.
+#    <sectionName> : If specified, only params in that section will be returned and names will NOT, by default, be fully qualified.
+#                    Use '.' to specify the top section before any section header.
 # Options:
-#    -f|--fullyQualified : determines if the names returned include the <sectionName>.
+#    -f|--fullyQualified : forces the determines if the names returned include the <sectionName>.
 #           By default, if <sectionName> is used to specify a single section, the returned names will not be fully qualified
-#           will be fully qualified otherwise. This option makes the returned names be fully qualified regardless of <sectionName>
+#           This option makes the returned names be fully qualified regardless of whether <sectionName> is specified.
 #    -d|--scopeDelim : default is '.'. determines how the <sectionName> and <paramName> are combined to form a fully qualified name
 #           '[' or ']'  : use the format [<sectionName>]<paramName>
 #           '.'         : (default) use the format <sectionName>.<paramName>
 #           ':'         : use the format <sectionName>:<paramName>
 #           '<delim>'   : use the format <sectionName><delim><paramName>
-#    -t|--expandValue   : expand each value as a template before returning it
+#    -t|--expandValue   : expand each value as a template string before returning it
 #    -A|--array <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>)
-#          that will be filled in with the values <retArrayName>[[sect.]name]=value
+#          that will be filled in with the settings like <retArrayName>[[sect.]name]=value
 function getAllIniParams() { iniParamGetAll "$@"; }
 function iniParamGetAll()
 {
 	local templateFlag retArray scopeDelim fullyQualifiedFlag
 	while [ $# -gt 0 ]; do case $1 in
 		-f|--fullyQualified) fullyQualifiedFlag="full" ;;
-		-d|--scopeDelim*)  bgOptionGetOpt val: scopeDelim "$@" && shift ;;
-		-t|--expandValue)  templateFlag="-t" ;;
-		-A*|--array*) bgOptionGetOpt val: retArray "$@" && shift ;;
+		-d*|--scopeDelim*)   bgOptionGetOpt val: scopeDelim "$@" && shift ;;
+		-t|--expandValue)    templateFlag="-t" ;;
+		-A*|--array*)        bgOptionGetOpt val: retArray "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local iniFile="$1"
+	local ipg_iniFileSpec="$1"
 	local sectionName="$2"
+
+	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
 
 	local maxNameLen
 	{
@@ -512,28 +535,31 @@ function iniParamGetAll()
 			arrayCreate(settings)
 			arrayCreate(fullNames)
 			maxNameLen=0
-			if (iniTargetSection == "]all" && !fullyQualifiedFlag)
+			if (iniTargetSection == "]all")
 				fullyQualifiedFlag="full"
 			if (!scopeDelim)
 				scopeDelim="."
 		}
 		inTarget && iniLineType=="setting" {
-			if (fullyQualifiedFlag || iniSection=="") {
-				name=iniParamName
-			} else if (scopeDelim~"[][]") {
-				name="["iniSection"]"iniParamName
-			} else {
-				name=iniSection""scopeDelim""iniParamName
+			if (! (iniParamFullName in fullNames)) {
+				fullNames[iniParamFullName]=1
+				if (!fullyQualifiedFlag || iniSection=="") {
+					name=iniParamName
+				} else if (scopeDelim~"[][]") {
+					name="["iniSection"]"iniParamName
+				} else {
+					name=iniSection""scopeDelim""iniParamName
+				}
+				maxNameLen=max(maxNameLen, length(name))
+				settings[name]=iniValue
 			}
-			maxNameLen=max(maxNameLen, length(name))
-			settings[name]=iniValue
 		}
 		END {
 			print maxNameLen
 			for (name in settings)
 				printf("%*s %s\n", -maxNameLen, norm(name), settings[name])
 		}
-	' "$iniFile")
+	' "${ipg_iniFiles[@]}")
 }
 
 # usage: setIniParam [<options>] <inifile> <sectionName> <paramName> [<paramValue>]
@@ -566,8 +592,10 @@ function iniParamGetAll()
 #   -S|--statusVar=<var> : a variable name that will be set to "changed" if the <iniFile> was changed as a result of this command.
 #         This is a "one shot" status meaning that this function call may set it to 'changed' but it will not clear it if the file
 #         was not changed. This facilitates passing the status variable to multiple function calls and in the end, if any
-#         changed the file, this status variable will be set to "changed". Use -R <var> if you want to know the actual result.
-#   -c <comment> : place this comment after the assignment like "name=value # comment"
+#         changed the file, this status variable will be set to "changed". Use -R <var> if you want to know the outcome of just this
+#         call.
+#   -c <comment> : add this <comment> associated with the setting. By default it will be inline like "name=value # comment" but the
+#         --commentsStyle option can change it to be suppressed "NONE" or to be on lines before the setting "BEFORE"
 #
 # Ini File Protocol Options...
 # Note that this library is tolerant most padding and quoting variations when reading so those options are mainly used to force
@@ -735,9 +763,11 @@ function iniParamRemove()
 		-d*|--delim*)       bgOptionGetOpt val: paramDelim     "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local iniFile="$1";     assertNotEmpty iniFile
+	local ipg_iniFileSpec="$1";     assertNotEmpty ipg_iniFileSpec
 	local sectionName="$2"
 	local paramName="$3";   assertNotEmpty paramName
+
+	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
 
 	local _ipsResults="$(bgawk -i  \
 		-v iniTargetSection="$sectionName" \
@@ -751,9 +781,12 @@ function iniParamRemove()
 			deleteLine()
 		}
 		END {
-			print (found) ? "changed" : "nochange" >"/dev/fd/3"
+			print (found) ? "changed" : "" >"/dev/fd/3"
 		}
-	' "$iniFile" 3>&1)"
+	' "${ipg_iniFiles[@]}" 3>&1)"
+
+	# b/c re support removed from multiple files, _ipsResults will be empty or may have "change" repeated multiple times.
+	[[ "$_ipsResults" =~ changed ]] && _ipsResults="changed" || _ipsResults="nochange"
 
 	setReturnValue "$resultsVarName" "$_ipsResults"
 	[ "$_ipsResults" != "nochange" ] && setReturnValue "$statusVarName" "changed"
@@ -1180,18 +1213,18 @@ function cr_configNameNotExists()
 			;;
 
 		check)
-			creqLog3 "! grep -q \"^[[:space:]]*$name\b\" \"$filename\""
 			[ ! -s "$filename" ] && return 0
-			! grep -q "^[[:space:]]*$name\b" "$filename" 2>/dev/null
+			! grep -q "^[[:space:]]*$name\b" "$filename"
 			;;
 
 		apply)
 			[ ! -s "$filename" ] && return 0
 
-			# remove the # (comment) if present
 			if [ "$commentFlag" ]; then
+				# add a leading # comment char instead of removing it
 				sed -i -e 's/^[ \t]*'"$name"'\>.*$/#&/' "$filename"
 			else
+				# simply remove the matching line
 				sed -i -e '/^[ \t]*'"$name"'\>.*$/d' "$filename"
 			fi
 			;;
@@ -1799,8 +1832,10 @@ function configDropinCntr()
 				bgsudo -w "$enabledFolder/$dropin" -p "enabling config '$dropinDispName' [sudo]:" \
 					ln -s -f "$(pathGetRelativeLinkContents "$enabledFolder/$dropin" "$availFolder/$dropin")"  "$enabledFolder/$dropin"
 				return 0
+			else
+				[ "$statusFlag" ] && return 0
+				return 1
 			fi
-			return 1
 			;;
 		disable:symlink)
 			if [ -e "$enabledFolder/$dropin" ]; then
@@ -1971,7 +2006,7 @@ function cr_configDropinCntr()
 
 		check) configDropinCntr -s "$enabledFolder" "$availFolder" "$dropin" "$targetState" ;;
 
-		apply) configDropinCntr "$enabledFolder" "$availFolder" "$dropin" "$targetState" ;;
+		apply) configDropinCntr "$enabledFolder" "$availFolder" "$dropin" "$targetState"; true ;;
 
 		*) cr_baseClass "$@" ;;
 	esac

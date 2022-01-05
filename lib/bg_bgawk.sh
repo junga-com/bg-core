@@ -193,17 +193,14 @@ function bgawk()
 			return 1
 		fi
 
-		# determine if we need sudo to read or write an input/output file
-		local sudoOpts
-		[ ${#file[@]} -gt 0 ] && if [ "$inplace" ]; then
-			bgsudo --makeOpts sudoOpts "${file[@]/#/-w}"
-		else
-			bgsudo --makeOpts sudoOpts "${file[@]/#/-r}"
-		fi
+		# determine if we need sudo to read  an input file (if $inplace, we might need sudo later to write to a file but this is
+		# only the sudoOpts that we need to invoke gawk with)
+		local sudoOpts=()
+		bgsudo --makeOpts sudoOpts -r"/dev/null" "${file[@]/#/-r}"
 
 		# if we need sudo and the script writes to /dev/fd/3 to return a status while stdout is being used to write to an in-place
 		# file, fix it up b/c sudo will close all fd above 2
-		local resultsFile
+		local resultsFile=""
 		if [[ ! "${sudoOpts[*]}" =~ skip ]] && [[ "$script" =~ /dev/fd/3 ]]; then
 			resultsFile="$(mktemp -u)"
 			bgsudo -O sudoOpts touch "$resultsFile"
@@ -220,14 +217,14 @@ function bgawk()
 		#       Another solution could be to replace "/dev/fd/3" in the script with "/tmp/<tempfile>" and then cat "/tmp/<tempfile>" >&3
 		#       after awk runs.
 		case ${file:+fileExists}:${inplace:+inplace} in
-			fileExists:inplace) bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}" 3>&1 | ${inplaceSort:-cat} > "$tmpFile" ;;
-			fileExists:)        bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}"                   ;;
-			          :inplace) gawk "${passThruOpts[@]}" "$script"              3>&1 > "$tmpFile" ;;
-			          :)        gawk "${passThruOpts[@]}" "$script"                                ;;
+			fileExists:inplace) { bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}" | ${inplaceSort:-cat} > "$tmpFile" ; } 3>&1 ;;
+			fileExists:)          bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}"                   ;;
+			          :inplace)   gawk "${passThruOpts[@]}" "$script"              3>&1 > "$tmpFile" ;;
+			          :)          gawk "${passThruOpts[@]}" "$script"                                ;;
 		esac; local exitCode=$?
 
 		# if a temp resultsFile was created, process it now
-		if [ "$resultsFile" ]; then
+		if [ "$resultsFile" ] && [ -e "$resultsFile" ]; then
 			cat "$resultsFile"
 			bgsudo -O sudoOpts rm -f "$resultsFile"
 		fi

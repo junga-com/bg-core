@@ -1349,9 +1349,6 @@ function cr_templateIsExpanded()
 			elif [ -s "$destFile" ]; then
 				res="1"
 			fi
-			creqLog4 "$(cat "$destFile" | awk '{print ((NR==1)?"actual: ":"      : ")$0}')"
-			creqLog4 "$(cat "$tempFile" | awk '{print ((NR==1)?"wanted: ":"      : ")$0}')"
-			creqLog4 "res='$res'"
 			rm "$tempFile" &>/dev/null
 			return $res
 			;;

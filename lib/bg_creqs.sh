@@ -66,22 +66,23 @@ creqApplyLog="/var/log/creqs.log"
 # man(5) creqClassProtocal:
 # A creq class can be implemented as an external command written in any language. This library provides a shell function stub which
 # allows a creqClass to be implemented easily in a bash script without having to deal with the protocol. It is expected that other
-# language environments would implement a similar framework that would allow the check and apply algotithm of a new creqClass to be
+# language environments would implement a similar framework that would allow the check and apply algorithm of a new creqClass to be
 # written without having to understand and comply with this protocol explicitly. This protocol description is intended for library
-# writers in other languages who wish to support written creqClasses in those languages.
+# writers in other languages who wish to support writing creqClasses in those languages.
 #
-# Regardless of how its creq class is implemented, every creq statement is executed as one command exection exection of the creqClass
+# Regardless of how its creq class is implemented, every creq statement is executed as one command execution of the creqClass
 # command passing the arguments of the statement to the command.
 #
-# The creqClass command uses stdout and stderr according to the standard convention. General informative information is written to
-# stdout and only if an error occurrs, an error message is written to stdout. The exit code should be 0 when no error occurrs.
-# None of the the exit code, stdout and stderr output of the command determines the real outcome of an executed creqStatement. Only
-# the output on file descriptor 3 (FD(3)) determines the output.
+# The creqClass command uses stdout, stderr and exit code according to standard *nix conventions, however the frameworks that run
+# creqStatements ignores those things in favor of the protocol written to file descriptior 3. A creqClass author can write information
+# to stdout and stderr freely and the creq runner determines if that information will be displayed to the user or not.
 #
-# It is mandatory that the creqClass command writes a message to its file descriptor number 3 (FD(3)) in the form...
+# It is mandatory that the creqClass command writes a message to its file descriptor number 3 (FD(3)) to indicate the outcome of its
+# execution. If it fails to do so, the outcome is set to 'ErrorInProtocol'.
+# The message written to FD(3) is one line of text in the form ...
 #    `<resultState>[<whitespace><descriptionMsg>]`
 # Where...
-#    <resultState> : indicates the result of the creqStatment execution.
+#    <resultState> : indicates the result of the creqStatement execution.
 #       for creqAction='check', <resultState> must be one of (Pass|Fail|ErrorInCheck)
 #       for creqAction='apply', <resultState> must be one of (Pass|Applied|ErrorInCheck|ErrorInApply)
 #       If <resultState> is not one of the expected words it is set to "ErrorInProtocol" regardless of what was written.
@@ -391,6 +392,9 @@ function creqStartSession()
 		[creqCountTotal]=0
 	)
 
+	# init the tracking system use to know if a service needs to restart
+	_creqsTrackInit
+
 	declare -g stderrFile; bgmktemp stderrFile
 	declare -g stdoutFile; bgmktemp stdoutFile
 }
@@ -408,6 +412,8 @@ function creqEndSession()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
+	# fire any services that need restarting
+	_creqsTrackFire
 
 	creqRun[countCompliant]="$(( ${creqRun[countPass]:-0}+${creqRun[countApplied]:-0} ))"
 	creqRun[completeness]="$(( ${creqRun[countCompliant]:-0} * 100 / ${creqRun[countTotal]:-1} ))"
@@ -434,6 +440,7 @@ function creqEndSession()
 }
 
 # usage: creqPrintResult <resultState> <policyID> <stmText> [<stdoutFile> <stderrFile>]
+# This is the summary output called after each reqStatement is ran.
 # Environment:
 #    <logFileFD> : if this env var exists, and <resultState> starts with 'Error' <stdoutFile> and <stderrFile>
 function creqPrintResult()
@@ -454,14 +461,6 @@ function creqPrintResult()
 		Fail)
 			[ ${verbosity:-1} -ge 1 ] && printf "${csiHiYellow}%-7s${csiNorm} : %s %s\n" "${resultState^^}" "$policyID"  "$stmText"
 		;;
-		# ErrorInProtocol)
-		# 	[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : \ntext returned by creqClass='%s'\n" "$resultState"  "$resultMsg"
-		# 	if [ "$logFileFD" ]; then
-		# 		printf "ErrorInProtocol : \ntext returned by creqClass='%s'" "$resultMsg" >&$logFileFD
-		# 		[ "$stdoutFile" ] && awk '{print "   stdout: " $0}' "$stdoutFile" >&$logFileFD
-		# 		[ "$stderrFile" ] && awk '{print "   stderr: " $0}' "$stderrFile" >&$logFileFD
-		# 	fi
-		# ;;
 		Error*)
 			[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s %s\n" "$resultState" "$policyID"   "$stmText"
 			if [ "$logFileFD" ]; then
@@ -505,11 +504,28 @@ function creq()
 
 	((creqRun[creqCountTotal]++))
 
-	# A creqID is a hash of the <creqStatment>. The options of the
+	# A creqID is a hash of the <creqStatement>. The options of the
 	[ ! "$policyID" ] && creqMakeID -R policyID "$creqClass" "$@"
+	local creqStatement="$(cmdLine "$creqClass" "$@")"
+
+	# record the policyID and creqStatement in the policyID database
+	# TODO: profile the performance of updating the policyID database. consider caching and updating all at the end
+	bgawk -i \
+		-v policyID="$policyID" \
+		-v creqStatement="$creqStatement" '
+		function writePolicy() {
+			if (!doneWroteIt) {
+				doneWroteIt=1
+				printf("%s %s\n", policyID, creqStatement)
+			}
+		}
+		$1==policyID {deleteLine();}
+		!doneWroteIt && $1>policyID {writePolicy()}
+		END {writePolicy()}
+	' "/var/lib/bg-core/creqPolicyIDs.txt"
 
 	if [ "$creqAction" == "reportIDs" ]; then
-		printf "%-50s %s\n" "${creqRun[profileID]}:$creqClass-$policyID" "$creqClass $*"
+		printf "%-50s %s\n" "${creqRun[profileID]}:$creqClass-$policyID" "$creqStatement"
 		return
 	fi
 
@@ -527,6 +543,14 @@ function creq()
 	((creqRun[count${resultState^}]++))
 	[[ "$resultState" =~ ^ErrorIn ]] && ((creqRun[countError]++))
 
+	# the the host was modified, hit all of the active tracker variables. This is typically used to know when a service restart is neeed.
+	if [ "$resultState" == "Applied" ]; then
+		local i; for i in "${!creqsChangetrackersActive[@]}"; do
+			creqsChangetrackersActive[$i]+="1"
+		done
+	fi
+
+	# this is the only user output during a profile run
 	creqPrintResult "$resultState" "$policyID" "$stmText" "$stdoutFile" "$stderrFile"
 }
 
@@ -534,12 +558,19 @@ function creq()
 # creqCheck is the runner used to run creqStatement outside of a creqProfile to only test to see if the host is compliant.
 function creqCheck()
 {
-	varExists creqRun && assertError "Creq statements can not be executed with creqCheck nor creqApply inside a creq Statndards or Config profile "
+	varExists creqRun && assertError "Creq statements can not be executed with creqCheck nor creqApply inside a creq Standards or Config profile "
 
 	local verbosity="${verbosity:-1}"
 	while [ $# -gt 0 ]; do case $1 in
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+
+	# if the caller specifies only the <policyID>, we can look up the statement and set it as if the caller passed it on the cmdline
+	if [ $# -eq 1 ] && [[ "$1" =~ ^[0-9a-fA-F]{8}$ ]]; then
+		local args; utUnEsc args $(gawk -v policyID="$1" '$1==policyID {$1=""; print $0}' "/var/lib/bg-core/creqPolicyIDs.txt")
+		set -- "${args[@]}"
+	fi
+
 	local defaultMsg="$*"; defaultMsg="${defaultMsg#cr_}"; defaultMsg="${defaultMsg/$'\n'*/ ...}"; defaultMsg="${defaultMsg:0:100}"
 	local creqClass="$1"; shift
 
@@ -558,21 +589,6 @@ function creqCheck()
 	stmText="${stmText:-$defaultMsg}"
 
 	creqPrintResult "$resultState" "$policyID" "$stmText"
-	# case $resultState in
-	# 	Pass)
-	# 		[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
-	# 		return 0
-	# 		;;
-	# 	Fail)
-	# 		[ ${verbosity:-1} -ge 1 ] && printf "${csiHiYellow}%-7s${csiNorm} : %s\n" "FAILED"  "$stmText"
-	# 		return 1
-	# 		;;
-	# 	ErrorInCheck|ErrorInApply|ErrorInProtocol)
-	# 		[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
-	# 		return 202
-	# 		;;
-	# 	*) assertLogicError
-	# esac
 }
 
 
@@ -580,12 +596,19 @@ function creqCheck()
 # creqApply is the runner used to run creqStatement outside of a creqProfile in apply mode
 function creqApply()
 {
-	varExists creqRun && assertError "Creq statements can not be executed with creqCheck nor creqApply inside a creq Statndards or Config profile "
+	varExists creqRun && assertError "Creq statements can not be executed with creqCheck nor creqApply inside a creq Standards or Config profile "
 
 	local verbosity="${verbosity:-1}"
 	while [ $# -gt 0 ]; do case $1 in
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+
+	# if the caller specifies only the <policyID>, we can look up the statement and set it as if the caller passed it on the cmdline
+	if [ $# -eq 1 ] && [[ "$1" =~ ^[0-9a-fA-F]{8}$ ]]; then
+		local args; utUnEsc args $(gawk -v policyID="$1" '$1==policyID {$1=""; print $0}' "/var/lib/bg-core/creqPolicyIDs.txt")
+		set -- "${args[@]}"
+	fi
+
 	local defaultMsg="$*"; defaultMsg="${defaultMsg#cr_}"; defaultMsg="${defaultMsg/$'\n'*/ ...}"; defaultMsg="${defaultMsg:0:100}"
 	local creqClass="$1"; shift
 
@@ -595,7 +618,7 @@ function creqApply()
 	# run the statement with the cmd we just determined
 	exec {outFD}>&1
 	local resultMsg="$( (objectMethod="newStyle" creqAction="apply" $creqClass "$@") 3>&1  >&$outFD)"
-	exec {outFD}>-
+	exec {outFD}>&-
 
 	# parse the stdout msg:  <resultState> <msg text...>
 	local resultState="${resultMsg%%[ $'\n\t']*}"
@@ -604,21 +627,6 @@ function creqApply()
 	stmText="${stmText:-$defaultMsg}"
 
 	creqPrintResult "$resultState" "$policyID" "$stmText" "$stdoutFile" "$stderrFile"
-	# case $resultState in
-	# 	Pass)
-	# 		[ ${verbosity:-1} -ge 2 ] && printf "${csiGreen}%-7s${csiNorm} : %s\n" "PASSED" "$stmText"
-	# 		return 0
-	# 		;;
-	# 	Applied)
-	# 		[ ${verbosity:-1} -ge 1 ] && printf "${csiBlue}%-7s${csiNorm} : %s\n" "APPLIED"  "$stmText"
-	# 		return 0
-	# 		;;
-	# 	ErrorInCheck|ErrorInApply|ErrorInProtocol)
-	# 		[ ${verbosity:-1} -ge 0 ] && printf "${csiHiRed}%-7s${csiNorm} : %s\n" "$resultState"  "$stmText"
-	# 		return 202
-	# 		;;
-	# 	*) assertLogicError
-	# esac
 }
 
 
@@ -629,10 +637,6 @@ function creqApply()
 ### functions to use in creqProfile scripts (Standards and Config)
 #   For example to keep track of what has changed to know if a daemon needs to be restarted
 
-declare -A creqsChangetrackers
-declare -A creqsChangetrackersActive
-declare -A creqsTrackedServices
-declare -A creqsTrackedServicesActions
 
 # usage: creqGetState
 # returns "check", "apply", or empty string to indication whether the creq system is running and in what state
@@ -646,15 +650,56 @@ function creqIsCheck() { [ "$creqAction" == "check" ]; }
 # test if the configuration required system is in the 'apply' mode
 function creqIsApply() { [ "$creqAction" == "apply" ]; }
 
+# usage: creqWasChanged file1 [ file2 [ .. fileN] ]
+# test the files to see if any have a modification time stamp newer than the start of the
+# creqInit run. This can be called any time before the creqEndSession call
+# returns 0 (true) if any of the files have been changed
+# returns 1 (false) if none have been changed
+function creqWasChanged()
+{
+	while [ "$creqStartTimeFile" ] && [ "$1" ]; do
+		if [ "$1" -nt "$creqStartTimeFile" ]; then
+			return 0
+		fi
+		shift
+	done
+	return 1
+}
+
+# usage: _creqsTrackInit
+# init the system that tracks when applies change the host system. Called by creqStartSession
+function _creqsTrackInit()
+{
+	declare -gA creqsChangetrackers=()
+	declare -gA creqsChangetrackersActive=()
+	declare -gA creqsTrackedServices=()
+	declare -gA creqsTrackedServicesActions=()
+}
 
 # usage: creqsTrackChangesStart -s <serviceName>[:<action>] [<varName>]
 # usage: creqsTrackChangesStart <varName>
-# start tracking changes with varName. If a cr_ is applied while varName is tracking changes,
-# it will be set to a non empty string (true). This facilitates surrounding a set of cr_ statements
-# with a start/stop pair and if any of those statements resulted in a change(apply), then varName
-# will be true. This -s form records serviceName so that at the end it will be restarted if its coresponding
-# varName has be set to true. The default varName is serviceName if the second param is not specified
-# a varName can be stopped and restarted multiple times.
+# The creqsTrack* family of functions provide a system for performing actions only if relavant host configuration has changed during
+# a creq profile run. It is typically used to restart or reload a service only if configuration that that service depends on has
+# changed.  If a creqStatement located between creqsTrackChangesStart <varName> and creqsTrackChangesStop <varName> calls executes
+# its apply operation, it is assumed that it changed host configuration and <varName> will be set to true.
+#
+# When called with the -s <serviceName>[:<action>] option, it not only tracks changes but will perform <action> on <serviceName>
+# in the creqEndSession function if and only if the corresponding <varName> recorded a configuration change.  The default <varName>
+# used to track changes is the <serverName> but a different <varName> can be provided which could be used to register several service
+# actions to be performed using the same <varName>
+#
+# When called without the -s option, it tracks <varName> but does not perform any action automatically. The creq profile author can
+# use if creqsTrackCheck <varName>; then ...; fi to perform any arbitrary action if the tracked configuration was changed.
+#
+# Note that multiple blocks of creqStatements can be surrounded by start/stop calls with the same <varName>. If a change is made
+# durring any block, <varName> will be true.
+#
+# Options:
+#    -s <serviceName>[:<action>] : register <serviceName> and <action> so that the <action> will be performed on <serverName>
+#         automatically at the end of the profile session if the corresponding <varName> change tracker is true.
+# Prarms:
+#    <varName> : the name of the variable to start tracking changes for. If -s is specified, the default value is the <serverName>.
+#         Otherwise it is required.
 function creqsTrackChangesStart()
 {
 	local serviceName serviceAction varName
@@ -677,11 +722,19 @@ function creqsTrackChangesStart()
 
 # usage: creqsTrackChangesStop -s <serviceName>[:<action>] [<varName>]
 # usage: creqsTrackChangesStop <varName>
-# stop tracking varName. This means that if a cr_ results in an applied and makes a change,
-# varName will not be set to true.
-# this also returns the value of varName so that the caller can stop tracking changes and
-# check to see if any changes had been made while it was tracking in one operation.
-# if creqsTrackChangesStop apacheRestartNeeded; then ...
+# stop tracking varName. See creqsTrackChangesStart.
+# Options:
+#    -s <serviceName>[:<action>] : this function does not register the <serverName> but the -s option is supportted so that it
+#         accpets the same cmdline as creqsTrackChangesStart. This makes it easy to copy and past the start line and change only
+#         the name of the function from ..Start to ...Stop.
+# Params:
+#    <varName> : the name of the variable to stop tracking changes for. If -s is specified, the default value is the <serverName>.
+#         Otherwise it is required.
+# Exit Code:
+# returns the value of varName so that the caller can stop tracking changes and check to see if any changes had been made
+# while it was tracking in one operation.  e.g. if creqsTrackChangesStop <varName>; do something...
+#    0(true)  : changes were made while tracking this <varName>
+#    1(false) : no changes were made while tracking this <varName>
 function creqsTrackChangesStop()
 {
 	local serviceName varName
@@ -699,10 +752,14 @@ function creqsTrackChangesStop()
 	[ "${creqsChangetrackers[$varName]}" ]
 }
 
-# usage: creqsTrackChangesCheck <varName>
+# usage: creqsTrackCheck <varName>
 # check the tracking varName value. see creqsTrackChangesStart for a description.
-# typical: if creqsTrackChangesCheck apacheRestartNeeded; then ...
-function creqsTrackChangesCheck()
+# Params:
+#    <varName> : the name of the variable to check.
+# Exit Code:
+#    0(true)  : changes were applied while <varName> was being tracked
+#    1(false) : no changes were applied while <varName> was being tracked
+function creqsTrackCheck()
 {
 	local varName="$1"
 	[ "$varName" ] || return 1
@@ -710,44 +767,18 @@ function creqsTrackChangesCheck()
 	[ "${creqsChangetrackers[$varName]}" ]
 }
 
-# usage: creqServiceAction <serviceName> <action> [<varName>]
-# Perform an action (ie. restart,reload, etc..) on a service daemon only if varName has been set and the mode is 'apply'
-# This is typically only called by creqEndSession at the end of a creq run on any service/actions that have been registered
-# during the creq run with creqsTrackChangesStart/Stop or creqsDelayedServiceAction.
-# It only does the action in apply mode so check mode can be sure not to change anything on the host.
-# Typically, varName is the service name and if any creq changes are applied between creqsTrackChangesStart/Stop statements
-# for varName, it will be set and the service action will be performed at the end of the run
-function creqServiceAction()
+# usage: _creqsTrackFire
+# Called by creqEndSession. If any services are registered to track changes and changes happenned, restart them
+function _creqsTrackFire()
 {
-	local serviceName="$1"
-	local action="$2"
-	local varName="${3:-$serviceName}"
-	assertNotEmpty varName
 	if creqIsApply; then
-		if creqsTrackChangesCheck $varName; then
-			_creqEcho -v1 "${action^^}ing... : service '$serviceName' because its configuration has changed USER='$USER'"
-			# note: 2015-09 the sudo prefix to service is needed even if you are already root. related to User Sessions for upstart services
-			local line temp; while IFS="" read -r temp; do
-				line="${temp/+-M-+/$line}"
-				_creqEcho -v1 -o "${action^^}ing... : $line"
-			done < <(sudo service $serviceName $action || echo "FAILED($?) +-M-+")
-			_creqEcho -v1 -o "${action^^}ed '$serviceName' : $line"
-		fi
+		local service
+		for service in "${!creqsTrackedServices[@]}"; do
+			if creqsTrackCheck "${creqsTrackedServices[$service]}"; then
+				local action="${creqsTrackedServicesActions[$service]}"
+				echo "${action^^}ing : service '$service' because a configuration it depends on was changed"
+				sudo service "$service" "$action"
+			fi
+		done
 	fi
-}
-
-# usage: creqWasChanged file1 [ file2 [ .. fileN] ]
-# test the files to see if any have a modification time stamp newer than the start of the
-# creqInit run. This can be called any time before the creqEndSession call
-# returns 0 (true) if any of the files have been changed
-# returns 1 (false) if none have been changed
-function creqWasChanged()
-{
-	while [ "$creqStartTimeFile" ] && [ "$1" ]; do
-		if [ "$1" -nt "$creqStartTimeFile" ]; then
-			return 0
-		fi
-		shift
-	done
-	return 1
 }

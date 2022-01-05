@@ -38,9 +38,15 @@ while [ $# -gt 0 ]; do case $1 in
 	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 done
 
+# if the caller specifies only the <policyID>, we can look up the statement and set it as if the caller passed it on the cmdline
+if [ $# -eq 1 ] && [[ "$1" =~ ^[0-9a-fA-F]{8}$ ]]; then
+	utUnEsc args $(gawk -v policyID="$1" '$1==policyID {$1=""; print $0}' "/var/lib/bg-core/creqPolicyIDs.txt")
+	set -- "${args[@]}"
+fi
+
 creqClass="$1"
 if ! type -t $creqClass &>/dev/null; then
-	read -r scrap library <<<"$(man "$creqClass" 2>/dev/null | grep file:)"
+	read -r scrap library <<<"$(man "$creqClass" "$creqClass::apply" "$creqClass::check" 2>/dev/null | grep file: | head -n1 )"
 	library="${library##*/}"
 	library="${library%\'}"
 	if [ "$library" ]; then

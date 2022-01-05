@@ -65,9 +65,11 @@ import bg_creqsLibrary.sh ;$L1;$L2
 # ConfigName:
 # The ConfigName is used to distingshish the various ways that a ConfigType can be configured. It is the most specific part of the
 # fully qualified pluginKey (Config:<ConfigType>:<ConfigName>) so each ConfigName corresponds to one particular plugin instance.
-# There is typically one unique
-# ConfigName that
-
+# There is typically one unique ConfigName that represents the default or 'off' state of the ConfigType being configured.
+#
+# See Also:
+#    man(1) bg-configCntr
+#    man(7) bg_creqs.sh
 DeclarePluginType Config "
 	columns: ConfigType(-18) name(-18) cmd_run(-18) activationState(-10) runSchedule(13) lastResult lastRunTime goal tags description
 	keyCol: name
