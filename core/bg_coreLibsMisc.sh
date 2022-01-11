@@ -817,10 +817,11 @@ function bgsudo()
 			 options+=("-n")
 			 ;;
 		-d)  debug="echo " ;;
-		-r*|--read) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
-		-w*|--write) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
+		-r*|--read)   bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
+		-w*|--write)  bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
 		-c*|--create) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
 		-o*|--chown*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-o$testFile") ;;
+		-a*|--attr*)  bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-a$testFile") ;;
 
 		-[paghpuUrtCc]*|--role*|--prompt*|--close-from*|--group*|--user*|--host*|--type*|--other-user*)
 			bgOptionGetOpt opt: options "$@" && shift
@@ -954,10 +955,11 @@ function _bgsudoAdjustPriv()
 			;;
 		--actionVar*)   bgOptionGetOpt val: actionVar   "$@" && shift ;;
 		--defaultAction*) bgOptionGetOpt val: _sapAction "$@" && shift ;;
-		-r*|--read) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
-		-w*|--write) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
+		-r*|--read)   bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
+		-w*|--write)  bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
 		-c*|--create) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
 		-o*|--chown*) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-o$testFile") ;;
+		-a*|--attr*)  bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-a$testFile") ;;
 		-[paghpuUrtCcO]*|--role*|--prompt*|--close-from*|--group*|--user*|--host*|--type*|--other-user*)
 			bgOptionGetOpt opt: "$sudoOptsVar" "$@" && shift
 			;;
@@ -996,36 +998,47 @@ function _bgsudoAdjustPriv()
 		local term; for term in "${testFiles[@]}"; do
 			local testMode="${term:0:2}"
 			local fileToAccess="${term:2}"
-			{ [[ ! "$testMode" =~ ^-[rwco]$ ]] || [ ! "$fileToAccess" ]; } && assertLogicError -v testMode -v fileToAccess
+			{ [[ ! "$testMode" =~ ^-[rwcoa]$ ]] || [ ! "$fileToAccess" ]; } && assertLogicError -v testMode -v fileToAccess
+
+			# see if we need to escalate to change the permission attributes of this file
+			if [ "$testMode" == "-a" ]; then
+				if [ ! -O "$fileToAccess" ]; then
+					_sapAction="escalate"
+				fi
+				continue
+			fi
 
 			# see if we need to escalate to change the user or group ownership of this file
 			if [ "$testMode" == "-o" ]; then
-				if [[ "$_sapAction" =~ ^(deescalate|skipSudo)$ ]]; then
-					local uOwn gOwn; IFS=: read -r fileToAccess uOwn gOwn <<<$"$fileToAccess"
-					local curU curG; IFS=: read -r curU curG <<<$"$(stat -c"%U:%G" "$fileToAccess")"
-					# if we are not the owner, we need to escalate to make any change
-					if [ "$curU" != "$USER" ]; then
-						_sapAction="escalate"
-					# if we are changing the user owner to someone else we need to escalate
-					elif [ "$uOwn" ] && [ "$uOwn" != "$curU" ]; then
-						_sapAction="escalate"
-					# if we are changing the group to one that we are not a member of
-					elif [ "$gOwn" ] && [ "$gOwn" != "$curG" ]; then
-						local memG="$(id -Gn)"
-						if [[ ! " $memG " =~ [\ ]$gOwn[\ ] ]]; then
+				local uOwn gOwn; IFS=: read -r fileToAccess uOwn gOwn <<<$"$fileToAccess"
+				if [ -e "$fileToAccess" ]; then
+					if [[ "$_sapAction" =~ ^(deescalate|skipSudo)$ ]]; then
+						local curU curG; IFS=: read -r curU curG <<<$"$(stat -c"%U:%G" "$fileToAccess" 2>/dev/null)"
+						# if we are not the owner, we need to escalate to make any change
+						if [ "$curU" != "$USER" ]; then
 							_sapAction="escalate"
+						# if we are changing the user owner to someone else we need to escalate
+						elif [ "$uOwn" ] && [ "$uOwn" != "$curU" ]; then
+							_sapAction="escalate"
+						# if we are changing the group to one that we are not a member of
+						elif [ "$gOwn" ] && [ "$gOwn" != "$curG" ]; then
+							local memG="$(id -Gn)"
+							if [[ ! " $memG " =~ [\ ]$gOwn[\ ] ]]; then
+								_sapAction="escalate"
+							fi
 						fi
 					fi
+					continue
 				fi
-				continue
 			fi
 
 			# handle the case where we need to check the parent's permissions because fileToAccess does not exist or -c was specified
 			local path="${fileToAccess%/}"
 			if [ ! -e "$path" ] || [ "$testMode" == "-c" ]; then
-				# if the file is read access and does not exist, it might be an error, but its not a permission issue. If the caller is going
-				# to create the missing file, it should have specified that it needs write or create access
-				[ "$testMode" == "-r" ] && continue
+				# if we are tesing to read or change the ownership and the file does not exist, it might be an error, but its not a
+				# permission issue. If the caller is going to create the missing file, it should have specified that it needs write
+				# or create access
+				[[ "$testMode" =~ ^-[ro] ]] && continue
 
 				# both -w and -c at this point need write access to the parent folder
 				testMode=-w
@@ -3927,7 +3940,7 @@ function fsTouch()
 			modeStr="${modeStr#,}"
 
 			[ "$checkOnlyFlag" ] && return 7
-			bgsudo "${sudoPrompt[@]}" -c "$fileOrFolder" chmod $modeStr "$fileOrFolder" || assertError
+			bgsudo "${sudoPrompt[@]}" --attr "$fileOrFolder" chmod $modeStr "$fileOrFolder" || assertError
 		fi
 	fi
 }

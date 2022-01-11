@@ -708,7 +708,7 @@ function creqsTrackChangesStart()
 			[[ "$serviceName" =~ : ]] && splitAttribute "$serviceName" serviceName serviceAction
 			varName="${2:-$serviceName}"
 			creqsTrackedServices["$serviceName"]="$varName"
-			creqsTrackedServicesActions["$serviceName"]="${serviceAction:-restart}"
+			creqsTrackedServicesActions["$serviceName"]="${serviceAction}"
 			;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -777,7 +777,7 @@ function _creqsTrackFire()
 			if creqsTrackCheck "${creqsTrackedServices[$service]}"; then
 				local action="${creqsTrackedServicesActions[$service]}"
 				echo "${action^^}ing : service '$service' because a configuration it depends on was changed"
-				sudo service "$service" "$action"
+				sudo systemctl "${action:-reload-or-restart}" "$service"
 			fi
 		done
 	fi
