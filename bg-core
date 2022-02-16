@@ -172,6 +172,12 @@ function complianceCntr()
 }
 
 
+###############################################################################
+# Command manpage: bg-core-config
+# usage: bg-core config get|set|remove|view
+# This interface allows manipulating hte system-wide config system. The system wide config behaves similar to an ini-style config
+# file except that there is one logical file that is a composite from multiple scopes.
+# ... 
 function configCntr()
 {
 	local cmd="$1"; shift

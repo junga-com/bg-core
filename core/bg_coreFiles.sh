@@ -6,6 +6,35 @@
 #######################################################################################################################################
 ### File Functions
 
+# usage: fsMakeParent <path>
+# This ensures that the parent folder of <path> exists.
+# Params:
+#    <path> : the last component of path can be a folder or a file. It does not matter because this function only makes the parent
+# Options:
+#    -p : similar to mkdir -p. without -p this function will make at most one new folder but with -p it will create the entire
+#         folder hierarchy as needed. This is a safety mechanism. Often, it is expected that the root hierarchy already exists
+#         but the last folder in the hierarchy may need to be created. In this case it is safer to not use -p because a mistake
+#         early in the <path> could cause a whole new hierarchy to be created when that was not the intention.
+function fsMakeParent()
+{
+	local deepFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-p) deepFlag="-p" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local path="${1%/}"  # we dont care if the last component is a folder or not so remove a trailing / if present
+	[[ "$path" =~ / ]] || return # if its just a filename with no folder parts, there is nothing to do
+	local parent="${path%/*}"
+	if [ ! "$deepFlag" ]; then
+		local grandParent="${parent%/*}"
+		[ ! -d "$grandParent" ] && assertError -v grandParent -v path "Could not create parent folder of <path> because the grandParent folder does not exist and the -p option was not specified"
+		[ ! -d "$parent" ] && mkdir "$parent"
+	else
+		[ ! -d "$parent" ] && mkdir -p "$parent"
+	fi
+}
+
+
 # usage: fsIsEmpty <fileOrFolder>
 # returns 0(true) if a file is 0 length or a folder contains no entries or if the path does not exist
 # Params:
@@ -165,9 +194,9 @@ function fsMakeTemp()
 
 
 # usage: fsIsNewer <filename1> <filename2>
-# this is a wrapper over the [ <filename1> -nt <filename2> ] syntax.
-# Either file can be non-existent or an empty filename. Returns 0(true) only if <filename1> exists and either has a newer timestamp
-# than <filename2> or <filename2> does not exist.
+# When <filename2> is built from <filename1> this returns true if <filename2> does not exist, or is older than <filename1>
+# If <filename1> does not exist, it always returns false assuming that <filename1> is required to build <filename2>.
+# This just a wrapper over the [ <filename1> -nt <filename2> ] syntax.
 function fsIsNewer()
 {
 	[ "$1" -nt "$2" ]
@@ -455,8 +484,8 @@ function fsMergeFoldersRecursively()
 # usage: fsMove <src> <dst>
 # This will move the contents of <src> into <dst>, creating <dst> if needed.
 # Params:
-#    <src> : path to a folder whose content will be moved int <dst>
-#            It is not an error if it does not exist. In that case, there is simply no content to move
+#    <src> : path to a folder whose content will be moved into <dst>
+#            It is not an error if <src> does not exist. In that case, there is simply no content to move
 #            It is not an error if <src> and <dst> are the same path. In that case, there is simply no (new) content to move
 #            if <src> is a symlink it logically operates on the target of the sysmlink. i.e. if the target does not exist then
 #            <src> does not exist and there will be no content to move.

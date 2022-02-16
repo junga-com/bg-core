@@ -7,7 +7,7 @@ import bg_awkDataSchema.sh  ;$L1;$L2
 # queries a cache data file and returns matching rows.
 # Params:
 #   <awkDataID> :
-#       The object type being queried (like a table name). Can optionally include prefixes that limit the the data set to a particular scope.
+#       The object type being queried (like a table name).
 #       if the --awkDataID option is specified, then this parameter must not be provided
 #   <outputColumns> :
 #       an ordered list of columns to include in the output. Supports several special features
@@ -69,7 +69,9 @@ function awkData_query()
 	assertNotEmpty awkDataID
 
 	# columns can be specified as a part of the awkDataID term like <awkDataID>.<coluList>
-	if ! [[ "$awkDataID" =~ [|] ]] && [[ "${awkDataID##/}" =~ [.] ]]; then
+	# TODO: this condition does not cover all case. change to a regex which matches the (<awkDataID>)(<cols>). That might confuse
+	#       a filename ext with a column so pop and append until <awkDataID> is recognized
+	if ! [[ "$awkDataID" =~ [|/] ]] && [[ "${awkDataID##/}" =~ [.] ]]; then
 		columns="${awkDataID#*.}"
 		awkDataID="${awkDataID%%.*}"
 	fi
@@ -94,7 +96,7 @@ function awkData_query()
 	# also indicates that the awkDataID needs building, then we fail.
 	local result i
 	for ((i=0; i<2; i++)); do
-		awk -v awkDataID="$awkDataID" \
+		gawk -v awkDataID="$awkDataID" \
 			-v columns="$columns" \
 			-v filters="$filters" \
 			-v noDirtyCheckFlag="$noDirtyCheckFlag" \
@@ -105,6 +107,9 @@ function awkData_query()
 			-v outputTemplate="$outputTemplate" \
 			-i "bg_awkDataQueries.awk" '
 			BEGIN {
+				if (schemas[awkDataID]["awkFile"] == "")
+					assert("no data file found for awkDataID="awkDataID)
+
 				### prepare the output format
 				tblFmt_get(tblFmt, outputTemplate)
 				#bgtraceVars("tblFmt outputTemplate csiNorm")
@@ -212,7 +217,7 @@ function awkData_getValue()
 				--count:)       printf "%4s %s\n" "$count" "$value" ;;
 				       :)       printf "%s\n" "$value" ;;
 			esac
-		done < <(awk -v awkDataIDList="$awkObjData" \
+		done < <(gawk -v awkDataIDList="" \
 			-v awkDataID="$awkDataID" \
 			-v columns="$columns" \
 			-v filters="$filters" \
@@ -223,6 +228,8 @@ function awkData_getValue()
 			-v assertOneFlag="$assertOneFlag" \
 			-i "bg_awkDataQueries.awk" '
 			BEGIN {
+				if (schemas[awkDataID]["awkFile"] == "")
+					assert("no data file found for awkDataID="awkDataID)
 				matchCount=0
 				arrayCreate(matchValues)
 				if (length(outFields) == 1)

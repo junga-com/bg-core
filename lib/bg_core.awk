@@ -338,6 +338,17 @@ function split2(str, array, elName, delim) {
 	return split(str, array[elName], delim)
 }
 
+# usage: arrayJoin(array,sep)
+# convert the <array> into a string by concatenating its elements separated by the string <sep>
+function arrayJoin(array,sep) {
+	return join(array,sep)
+}
+
+# usage: arrayJoini(array,sep)
+# the same as arrayJoin but joins the indexes of <array> instead of its element values
+function arrayJoini(array,sep) {
+	return joini(array,sep)
+}
 
 
 
@@ -419,11 +430,27 @@ function appendStr(str,strToAdd,sep) {
 	if (!str) sep=""
 	return str sep strToAdd
 }
+
+# usage: join(array,sep)
+# convert the <array> into a string by concatenating its elements separated by the string <sep>
 function join(array,sep,           i,wsep,result) {
 	if (!sep) sep=","
 	wsep=""; result=""
 	for (i in array) {
 		result=result wsep array[i]
+		wsep=sep
+	}
+	return result
+}
+
+
+# usage: joini(array,sep)
+# the same as join but use the indexes of <array> instead of its element values
+function joini(array,sep,           i,wsep,result) {
+	if (!sep) sep=","
+	wsep=""; result=""
+	for (i in array) {
+		result=result wsep i
 		wsep=sep
 	}
 	return result

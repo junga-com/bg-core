@@ -3829,6 +3829,8 @@ function fsTouch()
 	done
 	local fileOrFolder="$1"; shift; assertNotEmpty fileOrFolder
 
+	[ ! "$sudoPrompt" ] && sudoPrompt=(-p "[sudo] fsTouch '$fileOrFolder': ")
+
 	# if <fileOrFolder> ends in a '/', it indicates that fileMode should be -d
 	if [ "${fileOrFolder: -1}" == "/" ]; then
 		[ "${typeMode:-d}" != "d" ] && assertError "conflicting types specified. The file object type specified in the --typeMode options conflicts with the fact that <fileOrFolder> ends with a '/' which indicates it is a folder"

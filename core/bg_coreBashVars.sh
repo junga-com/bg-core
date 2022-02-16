@@ -762,16 +762,17 @@ function arrayFind()
 }
 
 # usage: arrayDelete <varName> <value>
+# remove a value from a numeric array
 function arrayDelete()
 {
-	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"; shift
+	local -n aa_varRef; aa_varRef="$1" || assertError -v varName:aa_varRef "varName is invalid. can not create reference"
 	local _i; for _i in "${!aa_varRef[@]}"; do
 		if [ "${aa_varRef[$_i]}" == "$2" ]; then
 			unset aa_varRef[$_i]
 		fi
 	done
 	# re-index so that they are consequetive
-	aa_varRef=("${aa_varRef[$_i][@]}")
+	aa_varRef=("${aa_varRef[@]}")
 }
 
 

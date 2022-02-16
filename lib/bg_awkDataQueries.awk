@@ -17,7 +17,7 @@ BEGIN {
 	if (!noDirtyCheckFlag && schema_isDirty(schema))
 		hardExit(3)
 
-	if (!awkDataID) {
+	if (!awkDataID && !awkDataIDList) {
 		assert("awkDataID is a required input to the bg_awkDataQueries.awk script")
 	}
 
@@ -42,6 +42,7 @@ BEGIN {
 
 	### add the awkFile to the input file list if its not already there
 	# if the awkFile does not exist, the dirtyCheck will return 3 but the dirty check could have been turned off
-	if (!awkData_initDataScan(schemas[awkDataID]))
-		hardExit(4)
+	awkData_initDataScan(schemas[awkDataID])
+#	if (!awkData_initDataScan(schemas[awkDataID]))
+#		hardExit(4)
 }

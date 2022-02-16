@@ -80,6 +80,8 @@ BEGIN {
 	if (!awkDataIDList && awkDataID) {
 		awkDataIDList=awkDataID
 		awkDataID=""
+		if (awkDataIDList~/[/]/ && fsExists(awkDataIDList))
+			awkDataIDList="|"awkDataIDList
 	}
 
 	arrayCreate(schemas)
@@ -105,7 +107,7 @@ BEGIN {
 	}
 
 	#printfVars("schemas awkDataID")
-	#for (i in schemas) printf("registered schema '%s'\n", i)
+	#for (i in schemas) printf("registered schema '%s'\n", i) >"/dev/fd/2"
 }
 
 
@@ -343,14 +345,14 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 
 	# For one-off tables, the user might specify either the awkFile alone and then we glean the table name from the filename
 	if (!awkObjName && awkFile)
-		awkObjName=gensub(/(^.*\/)|([.].*$)/,"","g",awkFile)
+		awkObjName=gensub(/(^.*\/)|([.][^\/]*$)/,"","g",awkFile)
 
 	# typical case: lookup the schema from the table name
 	if (!awkSchemaFile && awkObjName) {
 		arrayCreate(schemas)
 		manifestGet("^data.awkDataSchema$", "^"awkObjName"$", schemas)
 		switch (length(schemas)) {
-			case 0: assert("No data.awkDataSchema asset installed for table name '"awkObjName"'")
+			case 0: break; #assert("No data.awkDataSchema asset installed for table name '"awkObjName"'")
 			case 1: awkSchemaFile=schemas[1]; break
 			default: assert("multiple manifest entries matched for type='awkDataSchema' and name ='"awkObjName"'")
 		}
@@ -359,7 +361,7 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 	# If the schemaFile field contains a simple table name, look up the schema asset
 	# This is a case where the caller is crafting a new data table from an existing schema definition. The caller can assign a new
 	# table name and awkFile location and an existing installed schema.
-	if ( (awkSchemaFile !~ /[/.]/) && !fsExists(awkSchemaFile)) {
+	if ( (awkSchemaFile!="") && (awkSchemaFile !~ /[/.]/) && !fsExists(awkSchemaFile)) {
 		arrayCreate(schemas)
 		manifestGet("awkDataSchema", awkSchemaFile, schemas)
 		switch (length(schemas)) {
@@ -382,7 +384,7 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 
 	# If only the awkDataSchemaFile was specified, the awkDataFile was not available when we first tried to glean the name so check it again
 	if (!awkObjName && awkFile)
-		awkObjName=gensub(/(^.*\/)|([.].*$)/,"","g",awkFile)
+		awkObjName=gensub(/(^.*\/)|([.][^\/]*$)/,"","g",awkFile)
 
 	return awkObjName"|"awkFile"|"awkSchemaFile
 }
@@ -455,7 +457,7 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 
 	schemaFileRead=""
 	schemaSection=""
-	while (getline < info["awkSchemaFile"]  > 0) {
+	if (info["awkSchemaFile"]!="") while (getline < info["awkSchemaFile"]  > 0) {
 		schemaFileRead="yes"
 		delete info["noSchemaDataFound"]
 

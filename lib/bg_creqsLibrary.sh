@@ -8,9 +8,19 @@
 #    man(3) fsTouch
 #    man(3) cr_fileExists
 #    man(3) cr_fileNotExists
-DeclareCreqClass cr_fileObjHasAttributes
-function cr_fileObjHasAttributes::check() { fsTouch --checkOnly "$@"; }
-function cr_fileObjHasAttributes::apply() { fsTouch "$@"; }
+DeclareCreqClass cr_fileObjHasAttributes "
+	passMsg: %shortFilename% exists with the correct permissions
+	failMsg: %shortFilename% does NOT exist with the correct permissions
+	appliedMsg: %shortFilename% now exists with the correct permissions
+	maxContentSize: 70
+"
+function cr_fileObjHasAttributes::check() {
+	shortFilename=${@: -1}; shortFilename="${shortFilename#${repoRoot}/}"
+	fsTouch --checkOnly "$@"
+}
+function cr_fileObjHasAttributes::apply() {
+	fsTouch "$@"
+}
 
 
 # usage: creq cr_systemUserExists [-c|--comment=<comment>] <username>
@@ -317,11 +327,11 @@ function cr_folderExists::apply() {
 	bgsudo -c "$1" mkdir -p "$1"
 }
 
-# cr_folderNotExits [-f] foldername
+# cr_folderNotExists [-f] foldername
 # declares that the specified folder should exist
 # apply will only remove the folder if its empty unless -f is specified, which will remove its contents and then remove the folder
-DeclareCreqClass cr_folderNotExits
-function cr_folderNotExits::construct() {
+DeclareCreqClass cr_folderNotExists
+function cr_folderNotExists::construct() {
 	forceFlag=''
 	while [ $# -gt 0 ]; do case $1 in
 		-f) forceFlag="-f" ;;
@@ -329,11 +339,11 @@ function cr_folderNotExits::construct() {
 	done
 	foldername="$1"
 }
-function cr_folderNotExits::check() {
+function cr_folderNotExists::check() {
 	! [ -d "$foldername" ]
 }
-function cr_folderNotExits::apply() {
-	[[ "$foldername" =~ ^/[^/]*/{0,1}$ ]] && assertError "the folder passed to 'cr_folderNotExits $foldername' can not be root or a top level folder"
+function cr_folderNotExists::apply() {
+	[[ "$foldername" =~ ^/[^/]*/{0,1}$ ]] && assertError "the folder passed to 'cr_folderNotExists $foldername' can not be root or a top level folder"
 	if [ "$forceFlag" ]; then
 		bgsudo -c "$foldername" rm -rf "${opts[@]}" "$foldername"
 	else
