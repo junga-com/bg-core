@@ -45,7 +45,7 @@ function lsbLoadInfo()
 	# if the file exists, its quickest to just read from it. This has been tested and works in Ubuntu, Other OS might
 	# need different cases.
 	if [ -f /etc/lsb-release ]; then
-		read -r _lsbDistribID _lsbDistribRelease _lsbDistribCodeName _lsbDistribDesc < <(awk -F"=" '
+		read -r _lsbDistribID _lsbDistribRelease _lsbDistribCodeName _lsbDistribDesc < <(gawk -F"=" '
 			BEGIN {id="--"; release="--"; codeName="--"; desc="--"}
 			$1=="DISTRIB_ID"          {id=$2}
 			$1=="DISTRIB_RELEASE"     {release=$2}

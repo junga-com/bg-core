@@ -791,11 +791,14 @@ function oob_printBashCompletionDefault()
 #             can use -O <optVar> to specify the arguments more compactly and without repeating the work.
 #    --defaultAction : one of (nativeRoot-skipSudo|escalate|skipSudo|deescalate) default is deescalate. This is the starting privilege
 #         level before any -r|-w|-c <fileN> are considered. The action taken will be either this or a higher privilege level
-#    -r <file> : adjust privilege to provide read access to <file>
-#    -w <file> : adjust privilege to provide write access to <file>
-#    -c <file> : adjust privilege to provide access create or remove <file>. This requires permission on the parent but not necessarily
-#                the <file> itself. Note -w will automatically fall back to the permission to create <file> if it does not exist so
+#    -r|--read <file> : adjust privilege to provide read access to <file>
+#    -w|--write <file> : adjust privilege to provide write access to <file>
+#    -c|--create <file> : adjust privilege to provide access create, rename or remove <file>.
+#                These requires permission on the parent folder but not necessarily the <file> itself.
+#                Note -w will automatically fall back to the permission to create <file> if it does not exist so
 #                this is primaily used when you want to remove a file.
+#    -o|--chown <file> : adjust privilege to provide access to change the user or group owner
+#    -a|--attr <file> : adjust privilege to provide access to change the files attributes
 #    -nn    : sudo's -n fails instead of prompting for a password. -nn extends that to also supress the error.
 function bgsudo()
 {
@@ -3510,7 +3513,7 @@ function assertDefaultFormatter()
 	if [ ! "$_ae_msg" ]; then
 		# this case supports the "<cmd> || assertError" syntax that prints information about <cmd> automatically.
 		if [ "${BASH_SOURCE[1+1]}" ] && [ "${BASH_LINENO[1]}" ]; then
-			_ae_msg="$(awk 'NR=="'"${BASH_LINENO[1]}"'" {sub("^[[:space:]]*",""); print;exit}' "${BASH_SOURCE[1+1]}")"
+			_ae_msg="$(gawk 'NR=="'"${BASH_LINENO[1]}"'" {sub("^[[:space:]]*",""); print;exit}' "${BASH_SOURCE[1+1]}")"
 
 			# add the captured exitCode from the last command to the _ae_contextVars context
 			# This assumes that the standard pattern was used. If its 0, then it was probably called differently
@@ -3538,7 +3541,7 @@ function assertDefaultFormatter()
 		fi
 
 	elif type -t awk &>/dev/null; then
-	 	_ae_msg="$(awk '
+	 	_ae_msg="$(gawk '
 			BEGIN {
 				# start if off larger than it should ever be
 				for (i=1;i<100;i++) leadingTabsToRemove+="\t";
@@ -3585,7 +3588,7 @@ function extractVariableRefsFromSrc()
 
 	if [ ! "$srcCode" ] && [ "$(type -t "$functionName")" == "function" ]; then
 		local srcFile srcLine; bgStackGetFunctionLocation "$functionName" srcFile srcLine
-		srcCode="$(awk -v srcLine="$srcLine" 'NR>srcLine {print $@} NR>srcLine && /^}\s*$/ {exit} ' "$srcFile")"
+		srcCode="$(gawk -v srcLine="$srcLine" 'NR>srcLine {print $@} NR>srcLine && /^}\s*$/ {exit} ' "$srcFile")"
 	fi
 
 	# this is the term that assertDefaultFormatter would need if it is changed to use this function
@@ -3819,7 +3822,7 @@ function fsTouch()
 		--perm*)      bgOptionGetOpt val: permMode   "$@" && shift
 			permMode="${permMode// }"
 			[ ${#permMode} -eq 9 ] && permMode=".$permMode" # the caller can leav out the file type bit
-			[ "$permMode" ] && [[ ! "$permMode" =~ ^[-fdp.][-r.][-w.][-xsS.][-r.][-w.][-xsS.][-r.][-w.][-x.]$ ]] && assertError "The --perm=<rwxBits> must be a 9 or 10 character string matching [.fdp-]?[.r-][.w-][.x-][.r-][.w-][.x-][.r-][.w-][.x-]"
+			[ "$permMode" ] && [[ ! "$permMode" =~ ^[-fdp.][-r.][-w.][-xsS.][-r.][-w.][-xsS.][-r.][-w.][-x.]$ ]] && assertError -v permMode "The --perm=<rwxBits> must be a 9 or 10 character string matching [.fdp-]?[.r-][.w-][.x-][.r-][.w-][.x-][.r-][.w-][.x-]"
 		;;
 		-p|--makePaths) recurseMkdirFlag="-p" ;;
 		-f|--force) forceFlag="-f" ;;

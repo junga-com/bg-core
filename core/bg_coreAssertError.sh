@@ -50,7 +50,7 @@ function assertLogicError()
 {
 	# collect the context of the error
 	local -A stackFrame=(); bgStackFrameGet +1  stackFrame
-	local context="$(awk '
+	local context="$(gawk '
 		NR>=('"${stackFrame[cmdLineNo]}"'-7) {printf("%4s: %s\n", NR, $0)}
 		NR>=('"${stackFrame[cmdLineNo]}"'+2) {exit}
 	' < "${stackFrame[cmdFile]}")"

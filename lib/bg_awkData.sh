@@ -16,5 +16,5 @@ AwkData::__construct() {
 }
 
 AwkData::loadSchema() {
-	this[columns]="$(awk -F= '$1=="columns" {print $2}')"
+	this[columns]="$(gawk -F= '$1=="columns" {print $2}')"
 }

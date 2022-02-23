@@ -180,7 +180,7 @@ function _onelineReadProgressLoop()
 				# monitor the other things that can right to the terminal and when ever the cursor moves down a line (which may or may not
 				# scroll the terminal), we mirror that by writing a newline to the ipcFile. In this way, the ipcFile always tells us how
 				# many lines up from the current cursor each progressScope line is
-				lineOffset="$(awk -v progressScope="$progressScope" '
+				lineOffset="$(gawk -v progressScope="$progressScope" '
 					$0~"^"progressScope":" {line=NR}
 					END {print (line)?(NR-line+1):"NOTFOUND"}
 				' "$ipcFile" 2>/dev/null || echo "NOTFOUND")"

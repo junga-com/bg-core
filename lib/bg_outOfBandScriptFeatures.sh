@@ -498,7 +498,7 @@ function bgMakeUsageSpec() {
 			else
 				_syntaxSpecVar[options]+=" $name "
 			fi
-		done < <(awk '
+		done < <(gawk '
 			@include "bg_core.awk"
 			/invokeOutOfBandSystem/ {trigger=1}
 			/^done|^esac/ {trigger=0}

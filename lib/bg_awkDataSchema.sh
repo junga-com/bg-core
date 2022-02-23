@@ -16,8 +16,9 @@ import bg_ini.sh ;$L1;$L2
 #
 # An awkData 'table' consists of a text file containing the data (refered to as the awkDataFile) and optionally an ini style file
 # that describes the structure and attributes of the table (refered to as the awkDataSchemaFile). By default, the first couple lines
-# of the awkDataFile is a header that describes the column and optionally a few other attributes.  There is typically a one to one
-# correspondence between an awkDataFile and an awkDataSchemaFile but there are some exceptions.
+# of the awkDataFile is a header that describes the column and optionally a few other attributes. That header enables a awkDataFile
+# to work without a corresponding schema file. There is typically a one to one correspondence between an awkDataFile and an
+# awkDataSchemaFile but there are some exceptions.
 #
 # Caching Host Configuration and Provisioning Information:
 # Often an awkData table is used to cache some system configuration information that is stored on the host in various formats. This
@@ -40,7 +41,7 @@ import bg_ini.sh ;$L1;$L2
 # It is often valid to exclude one or two parts by leaving them empty. Trailing pipe characters can be ommitted.
 #
 # If the awkData table is registered on the host, then the <awkTableName> alone is sufficient to identify the table. For a registered
-# awkData table the <awkDataSchemaFile> is an asset in the host manifest with an assetType="data.awkDataSchema" and
+# awkData table the <awkDataSchemaFile> is an asset in the host manifest with an assetType="awkDataSchema" and
 # assetName=<awkTableName>. This allows looking up the <awkDataSchemaFile> from the <awkTableName> and the <awkDataSchemaFile>'s
 # awkDataFile attrubute points to the <awkDataFile>.
 #
@@ -220,7 +221,7 @@ import bg_ini.sh ;$L1;$L2
 #
 # Examples:
 #     manifest                # only the <awkTableName> is specified. The other two fields will be looked up from an installed
-#                               asset with assetName="manifest" and assetType="data.awkDataSchema"
+#                               asset with assetName="manifest" and assetType="awkDataSchema"
 #    |/tmp/myTempData.cache   # only the data file path is specified. The table name will be considered the base name of the data file.
 #                               The <awkDataSchemaFile> will remain empty as it is not alway needed.
 #    ||/tmp/myTempSchema      # only the <awkDataSchemaFile> is specified. The <awkDataFile> will be retrieved from the 'awkFile'
@@ -251,16 +252,16 @@ function awkData_parseID()
 
 	# typical case: lookup the schema from the table name
 	if [ "$awkTableNameValue" ] && [ ! "$awkDataSchemaFileValue" ]; then
-		awkDataSchemaFileValue="$(manifestGet -o '$4' "data.awkDataSchema" "$awkTableNameValue")"
-		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID -v awkTableNameValue "No data.awkDataSchema asset installed for table name"
+		awkDataSchemaFileValue="$(manifestGet -o '$4' "awkDataSchema" "$awkTableNameValue")"
+		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID -v awkTableNameValue "No awkDataSchema asset installed for table name"
 	fi
 
 	# If the schemaFile field contains a simple table name, look up the schema asset
 	# This is a case where the caller is crafting a new data table from an existing schema definition. The caller can assign a new
 	# table name and awkFile location and an existing installed schema.
 	if [[ ! "$awkDataSchemaFileValue" =~ [/.] ]] && [ ! -f "$awkDataSchemaFileValue" ]; then
-		awkDataSchemaFileValue="$(manifestGet -o '$4' "data.awkDataSchema" "$awkDataSchemaFileValue")"
-		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID "Invalid awkDataSchemaFile specified in the awkDataID. It should be either the full path to a schema file or the asset name of a installed data.awkDataSchema asset on the host"
+		awkDataSchemaFileValue="$(manifestGet -o '$4' "awkDataSchema" "$awkDataSchemaFileValue")"
+		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID "Invalid awkDataSchemaFile specified in the awkDataID. It should be either the full path to a schema file or the asset name of a installed awkDataSchema asset on the host"
 	fi
 
 	# typical case: lookup the data file from the schema file
@@ -291,7 +292,7 @@ function awkData_parseID()
 # usage: awkData_listAwkDataIDs [<filterRegex>]
 # prints a list of awkDataID names installed on this host to stdout.
 # awkDataIDs are the table names of data in the bg-core configuration and provisioning system. They are installed on a host via
-# assets in packages that follow the bg-ore conventions. An assetType of 'data.awkDataSchema' will introduce a new awkDataID using
+# assets in packages that follow the bg-ore conventions. An assetType of 'awkDataSchema' will introduce a new awkDataID using
 # the assetName as the awkDataID name.
 #
 # A local or domain admin with sufficient privilege can also install awkDataIDs directly.
@@ -304,7 +305,7 @@ function awkData_parseID()
 function awkData_listAwkDataIDs()
 {
 	local filterSpec="$1"
-	manifestGet -o '$3' data.awkDataSchema '.*'
+	manifestGet -o '$3' awkDataSchema '.*'
 	return
 }
 

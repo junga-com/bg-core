@@ -802,7 +802,7 @@ function directUT_runTestCases()
 			local utParams="${BASH_REMATCH[2]}"
 			utfRunner_execute $debugFlag "$bgUnitTestScript" "$utFunc" "$utParams"
 		fi
-	done < <(awk -v lineNumFlag='on' \
+	done < <(gawk -v lineNumFlag='on' \
 				 -v fullyQualyfied='' \
 				 -v expectCommentsFlag='on' '
 		@include "bg_unitTest.awk"

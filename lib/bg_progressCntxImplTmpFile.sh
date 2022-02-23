@@ -38,7 +38,7 @@ function _progressStackGet()
 	# if set, progressScope is the file that this thread is writing its progress messages to
 	if [ "$progressScope" ]; then
 		[ -f "$progressScope" ] || assertError -v progressScope "progress scope file is missing"
-		varSetRef --array "$retArrayVar" $(awk '
+		varSetRef --array "$retArrayVar" $(gawk '
 			{parent=parent sep $1; sep="/"}
 			END {
 				print parent" "$0

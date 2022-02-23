@@ -557,7 +557,7 @@ function bgtraceXTrace()
 		marker:*)
 			local label="$1"; shift
 			local msg="$*"; msg="$msg${msg:+\n}"
-			local lineCount="$(awk '/^lines since last marker/ {lastCount=NR} END{ print NR-lastCount}' "$file")"
+			local lineCount="$(gawk '/^lines since last marker/ {lastCount=NR} END{ print NR-lastCount}' "$file")"
 			printf "lines since last marker = %-6s -- %s\n" "$lineCount" "$label" >> "$file.markCounts"
 			cat >> "$file" <<-EOS
 

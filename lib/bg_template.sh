@@ -1016,7 +1016,7 @@ function templateEnterNewScope()
 	if [ ! "$templateFile" ]; then
 		_templateGetCurrentScopeFiles currentFilesInScope
 		read -r templateFile templateSection templateName templateLineNum < \
-			<(awk -v iniTargetSection="${templateSection:-$srcTemplate}" '
+			<(gawk -v iniTargetSection="${templateSection:-$srcTemplate}" '
 				'"$awkLibINIFiles"'
 				inTarget {
 					contextFile=FILENAME; sub("^.*/","",contextFile)
@@ -1050,7 +1050,7 @@ function templateEnterNewScope()
 			# if there is also a section specified, find it in the file
 			if [ "$templateSection" ]; then
 				read -r templateLineNum < \
-					<(awk -v iniTargetSection="${templateSection}" '
+					<(gawk -v iniTargetSection="${templateSection}" '
 						'"$awkLibINIFiles"'
 						inTarget {
 							print FNR

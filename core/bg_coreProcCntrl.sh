@@ -698,7 +698,7 @@ function cronCntr()
 	case ${cmd:-show} in
 		state)
 			if [ -f "$cronFile" ]; then
-				spec="$(awk '
+				spec="$(gawk '
 					$0~"^[ \t]*#[ \t]*cronSpec:.*$"	{
 						spec=$0; sub("^.*:[[:space:]]*","", spec)
 						print spec

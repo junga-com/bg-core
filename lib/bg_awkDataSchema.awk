@@ -5,12 +5,12 @@
 # specified on the cmd line.
 # AwkDataID Short and Long Form Syntax:
 # awkDataID is a token (no spaces) that describes the data file and schema information of the tablular data to be operated on.
-# The short form relies on there being an asset of type data.awkDataSchema with an asset name that matches the value of the awkDataID.
-# That data.awkDataSchema asset is an ini file describing everything that is needed to operate on the data including the location
+# The short form relies on there being an asset of type awkDataSchema with an asset name that matches the value of the awkDataID.
+# That awkDataSchema asset is an ini file describing everything that is needed to operate on the data including the location
 # of the data file on the host.
 #
 # The long form has the form "awkDataID|awkObjName|awkFile|awkSchemaFile" and allows specifying the information required to operate
-# on the data in a more flexible way that may or may not rely on the existence of the data.awkDataSchema asset.
+# on the data in a more flexible way that may or may not rely on the existence of the awkDataSchema asset.
 #    awkDataID   : This is a token that identifies the data and schema. It could be the path to a data file, or path to a schema ini
 #                  file, or the awkObjName
 # TODO: the awkDataID field seems redundant now and maybe we should make the long form contain only 3 fields
@@ -350,9 +350,9 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 	# typical case: lookup the schema from the table name
 	if (!awkSchemaFile && awkObjName) {
 		arrayCreate(schemas)
-		manifestGet("^data.awkDataSchema$", "^"awkObjName"$", schemas)
+		manifestGet("^awkDataSchema$", "^"awkObjName"$", schemas)
 		switch (length(schemas)) {
-			case 0: break; #assert("No data.awkDataSchema asset installed for table name '"awkObjName"'")
+			case 0: break; #assert("No awkDataSchema asset installed for table name '"awkObjName"'")
 			case 1: awkSchemaFile=schemas[1]; break
 			default: assert("multiple manifest entries matched for type='awkDataSchema' and name ='"awkObjName"'")
 		}
@@ -365,7 +365,7 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 		arrayCreate(schemas)
 		manifestGet("awkDataSchema", awkSchemaFile, schemas)
 		switch (length(schemas)) {
-			case 0: assert("Invalid awkDataSchemaFile specified in the awkDataID. It should be either the full path to a schema file or the asset name of a installed data.awkDataSchema asset on the host awkDataSchemaFile='"awkSchemaFile"'")
+			case 0: assert("Invalid awkDataSchemaFile specified in the awkDataID. It should be either the full path to a schema file or the asset name of a installed awkDataSchema asset on the host awkDataSchemaFile='"awkSchemaFile"'")
 			case 1: awkSchemaFile=schemas[1]; break
 			default: assert("multiple manifest entries matched for type='awkDataSchema' and name ='"awkSchemaFile"'")
 		}
@@ -640,7 +640,7 @@ function gleanColumnWidth(colStr, colName                      ,token,rematch) {
 #          the sec key(s) are recorded in here so that later they can be merged if the prime key is later associated or can create a
 #          stand alone record (which might be a dublicate)
 #    ["associatedSecKeysSet"][<secKeyVal1>[...,<secKeyValN>]] : this is the transpose of associatedSecKeys.
-#    ["noFileHeader"] : ""*false or "1"(true) indicating whether the data file contains header lines (false) or whether the data
+#    ["noFileHeader"] : ""(false) or "1"(true) indicating whether the data file contains header lines (false) or whether the data
 #                       starts on the first line of the file (true)
 # See Also:
 #     awkData_getSchema
