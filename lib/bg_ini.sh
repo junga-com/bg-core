@@ -388,7 +388,8 @@ function iniParamList()
 #    -a|--addIfNotFound     : if the value does not exist, add the default value to the <inifile> (requires write privilege and might prompt for a sudo password)
 #    -t|--expandAsTemplate  : expand the value as a template before returning it. If the value has "%<varName>%" tokens they will be replaced by the
 #          value of bash environment variables of the same name. See man(5) bgTemplateFileFormat for the full supported syntax
-#    -x--noSectionPad       : suppress section padding. if -a is specified and a new section is added this is passed through to iniParamSet.
+#    -x|--noSectionPad      : suppress section padding. if -a is specified and a new section is added this is passed through to iniParamSet.
+#    -v|--schema=<schema>   : assert that the value must comply with the <schema>
 #
 # Return Codes:
 #      0 (true)  : the parameter was found in the config file(s) and returned
@@ -399,13 +400,14 @@ function iniParamList()
 function getIniParam() { iniParamGet "$@"; }
 function iniParamGet()
 {
-	local ipg_addFlag ipg_iniDelim ipg_templateFlag retVar ipg_sectPad
+	local ipg_addFlag ipg_iniDelim ipg_templateFlag retVar ipg_sectPad ipg_schema
 	while [ $# -gt 0 ]; do case $1 in
 		-R*|--retVar*)         bgOptionGetOpt val: retVar       "$@" && shift ;;
 		-d*|--delim*)          bgOptionGetOpt val: ipg_iniDelim "$@" && shift ;;
 		-a|--addIfNotFound)    ipg_addFlag="-a" ;;
 		-t|--expandAsTemplate) ipg_templateFlag="-t" ;;
 		-x|--noSectionPad)     ipg_sectPad="-x" ;;
+		-v*|--schema*)         bgOptionGetOpt val: ipg_schema "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local ipg_iniFileSpec="$1"
@@ -450,6 +452,8 @@ function iniParamGet()
 	fi
 
 	[ "$ipg_templateFlag" ] && templateExpandStr -R ipg_value "$ipg_value"
+
+	[ "$ipg_schema" ] && iniValidate "$ipg_schema" "$ipg_value"
 
 	returnValue "$ipg_value" "$retVar"
 
@@ -596,6 +600,7 @@ function iniParamGetAll()
 #         call.
 #   -c <comment> : add this <comment> associated with the setting. By default it will be inline like "name=value # comment" but the
 #         --commentsStyle option can change it to be suppressed "NONE" or to be on lines before the setting "BEFORE"
+#   -v|--schema=<schema>   : assert that the value must comply with the <schema>
 #
 # Ini File Protocol Options...
 # Note that this library is tolerant most padding and quoting variations when reading so those options are mainly used to force
@@ -621,7 +626,7 @@ function iniParamGetAll()
 function setIniParam() { iniParamSet "$@"; }
 function iniParamSet()
 {
-	local quoteMode comment sectComment statusVarName resultsVarName mkdirFlag paramDelim paramPad commentsStyle
+	local quoteMode comment sectComment statusVarName resultsVarName mkdirFlag paramDelim paramPad commentsStyle ipg_schema
 	local sectPad=" " verbosity="$verbosity"
 	while [ $# -gt 0 ]; do case $1 in
 		-p|--mkdir)         mkdirFlag="-p" ;;
@@ -637,6 +642,7 @@ function iniParamSet()
 		--paramPad*)        bgOptionGetOpt val: paramPad       "$@" && shift ;;
 		-x|--noSectionPad)  sectPad="" ;;
 		--commentsStyle*)   bgOptionGetOpt val: commentsStyle  "$@" && shift ;;
+		-v*|--schema*)      bgOptionGetOpt val: ipg_schema     "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
@@ -644,6 +650,8 @@ function iniParamSet()
 	local sectionName="$2"
 	local paramName="$3";   assertNotEmpty paramName
 	local paramValue="$4"
+
+	[ "$ipg_schema" ] && iniValidate "$ipg_schema" "$paramValue"
 
 	local _ipsResults="$(bgawk -i -n  \
 		-v iniTargetSection="$sectionName" \
@@ -1454,7 +1462,7 @@ function configLineReplace()
 	# used or if it should be delted because a better one is coming up later in the file
 	local knownToContainAMatchingLine="unknown"
 	if [ "$commentFlag" ]; then
-		knownToContainAMatchingLine="$(awk -v mutexLineRegEx="$mutexLineRegEx" '$0~mutexLineRegEx {f=1; print "yes"; exit} END{if (!f) print "no"}' "$filename")"
+		knownToContainAMatchingLine="$(gawk -v mutexLineRegEx="$mutexLineRegEx" '$0~mutexLineRegEx {f=1; print "yes"; exit} END{if (!f) print "no"}' "$filename")"
 	fi
 
 
@@ -2140,4 +2148,23 @@ function cr_configNoCommentLines()
 
 		*) cr_baseClass "$@" ;;
 	esac
+}
+
+
+# usage: iniValidate <schema> <value>
+function iniValidate()
+{
+	local schema="$1"
+	local value="$2"
+	local schemaType="${schema%%:*}"
+	local schemaData; [[ "$schema" =~ : ]] && schemaData="${schema#*:}"
+	local schemaRE
+	case $schemaType in
+		enum)  schemaRE="^(${schemaData//[ :,$'\t']/|})$" ;;
+		int)   schemaRE="^[-+0-9]*$" ;;
+		real)  schemaRE="^[-+0-9.]*$" ;;
+		*) assertError -v schema -v schemaType "unknown schema type" ;;
+	esac
+
+	[[ "$value" =~ ${schemaRE} ]] || assertError -v schema -v schemaRE -v value "value failed validation check"
 }

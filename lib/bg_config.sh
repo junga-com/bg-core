@@ -64,9 +64,11 @@ function configScopeList()
 # usage: configGet [-R|--retVar=<retVar>] [-t|--expandAsTemplate] <sectionName> <settingName> [<defaultValue>]
 # retrieve the value of a setting from the system wide config.
 # Options:
+#    -s|--scope=<scope>)  : retrieve the <value> at <scope> level instead of using the normal algorithm to retrieve the effective value
 #    -R|--retVar=<retVar> : return the value into the variable name <retVar> instead of writing it to stdout
 #    -t|--expandAsTemplate : treat the value as a template string and expand %<varRef>% expressions to the value of the environment
 #                            variable named <varRef>
+#    -v|--schema=<schema>    : assert that the value must comply with the <schema>. The short option is -v for "validate" b/c -s is taken
 # Params:
 #    <sectionName>   : the name of the ini style section (e.g. [ <sectionName> ]) that the setting is in. An empty value or '.'
 #                      indicates that the setting is in the top section of the file before any [ <section> ] line is encountered.
@@ -78,21 +80,26 @@ function configScopeList()
 #     man(1) bg-core-config
 function configGet()
 {
-	local passThruOpts _cgTemplateFlag retVar _cgValue
+	local passThruOpts _cgTemplateFlag retVar _cgValue _csScope
 	while [ $# -gt 0 ]; do case $1 in
+		-s*|--scope*)  bgOptionGetOpt val: _csScope "$@" && shift ;;
 		-R*|--retVar*) bgOptionGetOpt val: retVar       "$@" && shift ;;
 		-t|--expandAsTemplate)  _cgTemplateFlag="-t" ;;
-		# TODO: it seems that -d and -x should not be supportted b/c the format of the system wide config is set
-		# -d*|--delim*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
-		# -x|--noSectionPad)  bgOptionGetOpt opt  passThruOpts "$@" && shift ;;
+		-v*|--schema*) bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local ipg_sectionName="$1"
 	local ipg_paramName="$2";  assertNotEmpty ipg_paramName
 	local ipg_defaultValue="$3"
 
-	iniParamGet "${passThruOpts[@]}" -R _cgValue  "${configScopes[orderedFileList]:-$(_configGetScopedFilesList)}"  "$ipg_sectionName" "$ipg_paramName" "$ipg_defaultValue"
-	local result=$?
+	if [ "$_csScope" ]; then
+		local _csFile="${configScopes[$_csScope]}";  assertNotEmpty _csFile -v scope:_csScope -v configScopes "No configuration file is associated with the specified scope"
+		iniParamGet "${passThruOpts[@]}" -R _cgValue  "$_csFile"  "$ipg_sectionName" "$ipg_paramName" "$ipg_defaultValue"
+		local result=$?
+	else
+		iniParamGet "${passThruOpts[@]}" -R _cgValue  "${configScopes[orderedFileList]:-$(_configGetScopedFilesList)}"  "$ipg_sectionName" "$ipg_paramName" "$ipg_defaultValue"
+		local result=$?
+	fi
 
 	[ "$_cgTemplateFlag" ] && templateExpandStr -R _cgValue "$_cgValue"
 
@@ -153,8 +160,8 @@ function configGetAll()
 	iniParamGetAll "${passThruOpts[@]}" "${configScopes[orderedFileList]:-$(_configGetScopedFilesList)}" "$@"
 }
 
-# usage: configGet [-R|--retVar=<retVar>] [-t|--expandAsTemplate] <sectionName> <settingName> <value>
-# retrieve the value of a setting from the system wide config.
+# usage: configSet [<options>] <sectionName> <settingName> <value>
+# set the value of a setting in the system wide config.
 # Options:
 #    -s|--scope=<scope>)  : write the <value> at <scope> level in the config system. Writing the value at a specific scope makes
 #         it the value for all machines in that scope that do not have the same [<sectionName>]<settingName> set an a more specific
@@ -171,6 +178,7 @@ function configGetAll()
 #         changed the file, this status variable will be set to "changed". Use -R <var> if you want to know the outcome of just this
 #         call.
 #   -c <comment> : add this comment associated with the setting.
+#   -v|--schema=<schema>    : assert that the value must comply with the <schema>. The short option is -v for "validate" b/c -s is taken
 # Params:
 #    <sectionName>   : the name of the ini style section (e.g. [ <sectionName> ]) that the setting is in. An empty value or '.'
 #                      indicates that the setting is in the top section of the file before any [ <section> ] line is encountered.
@@ -187,16 +195,8 @@ function configSet()
 
 		-S*|--statusVar*)   bgOptionGetOpt opt: passThruOpts  "$@" && shift ;;
 		-R*|--resultsVar*)  bgOptionGetOpt opt: passThruOpts  "$@" && shift ;;
-		-c*|--comment*)     bgOptionGetOpt opt: passThruOpts   "$@" && shift ;;
-		# TODO: it seems that the follow options  should not be supportted b/c the format of the system wide config is set
-		# -qN|--noQuote)      bgOptionGetOpt opt passThruOpts   "$@" && shift ;;
-		# -q1|--singleQuote)  bgOptionGetOpt opt passThruOpts   "$@" && shift ;;
-		# -q2|--doubleQuote)  bgOptionGetOpt opt passThruOpts   "$@" && shift ;;
-		# -d*|--delim*)       bgOptionGetOpt opt: passThruOpts    "$@" && shift ;;
-		# --commentsStyle*)   bgOptionGetOpt opt: passThruOpts    "$@" && shift ;;
-		# --paramPad*)        bgOptionGetOpt opt: passThruOpts    "$@" && shift ;;
-		# --sectPad*)         bgOptionGetOpt opt: passThruOpts    "$@" && shift ;;
-		# -x|--noSectionPad)  bgOptionGetOpt opt  passThruOpts "$@" && shift ;;
+		-c*|--comment*)     bgOptionGetOpt opt: passThruOpts  "$@" && shift ;;
+		-v*|--schema*)      bgOptionGetOpt opt: passThruOpts  "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local sectionName="$1"

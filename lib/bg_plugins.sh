@@ -287,7 +287,7 @@ function static::Plugin::get()
 # The <libraryFilename> can be a bash script or some opaque executable that implements the plugin libary protocol.
 function _pluginLoadContainingLibrary()
 {
-	local _pl_pluginKey="$1";       shift; assertNotEmpty _pl_pluginKey
+	local _pl_pluginKey="$1";       shift
 	local _pl_libraryFilename="$1"; shift; assertNotEmpty _pl_libraryFilename
 
 	local _pl_fileTypeInfo="$(file "$_pl_libraryFilename")"
@@ -302,7 +302,7 @@ function _pluginLoadContainingLibrary()
 		assertError -v libraryFilename:_pl_libraryFilename "could not load plugin library file '$_pl_libraryFilename' because it is not a bash script and not an executable"
 	fi
 
-	[ "${loadedPlugins[$_pl_pluginKey]+exists}" ] || assertError "failed to load plugin '$_pl_pluginKey' contained in file '$_pl_libraryFilename'"
+	[ ! "$_pl_pluginKey" ] || [ "${loadedPlugins[$_pl_pluginKey]+exists}" ] || assertError "failed to load plugin '$_pl_pluginKey' contained in file '$_pl_libraryFilename'"
 }
 
 

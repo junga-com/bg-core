@@ -320,7 +320,8 @@ function daemonCntrGetType()
 }
 
 # usage: daemonCntrIsEnabled [-q] <daemonName>
-# returns whether the daemon is currently configured to start automatically
+# returns whether the daemon is currently configured to start automatically. To return true, it must be installed in one of the
+# init systems and configured in that system to start automatically on boot.
 # Params:
 #     <daemonName> : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
 # Options:
@@ -351,9 +352,11 @@ function daemonCntrIsEnabled()
 
 
 # usage: daemonCntrEnable [-q] <daemonName>
-# enable the daemon to automatically start
+# enable the daemon to automatically start on boot.
 # The auto mechanism has two states. Whether it is installed using sysv,upstart, or systemd and whether
 # the installed mechanism is configured to automatically start.
+# Enable/Diable only refers to the second state. Enabling a daemon that is not installed with any mechaism will assertError because
+# this function can not achieve the goal of making it start on boot.
 # Params:
 #     <daemonName> : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
 function daemonCntrEnable()
@@ -372,9 +375,11 @@ function daemonCntrEnable()
 }
 
 # usage: daemonCntrDisable <daemonName>
-# disable the daemon from automatically starting
+# disable the daemon from automatically starting on boot
 # The auto mechanism has two states. Whether it is installed using sysv,upstart, or systemd and whether
 # the installed mechanism is configured to automatically start.
+# Enable/Diable only refers to the second state. Disabling a daemon that is not installed with any mechaism is not an error becasue
+# by definition, it will not start on boot
 # Params:
 #     <daemonName> : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
 function daemonCntrDisable()
@@ -387,6 +392,82 @@ function daemonCntrDisable()
 		echo "manual" > /etc/init/$daemonName.override
 	elif [ -f /etc/init.d/$daemonName ]; then
 		update-rc.d -f "$daemonName" remove &>/dev/null
+	fi
+}
+
+# usage: daemonCntrSetEnableState <daemonName> enable|disable
+# Set the state of this daemon that determines whether it will start automatically on boot.
+# The auto mechanism has two states. Whether it is installed using sysv,upstart, or systemd and whether
+# the installed mechanism is configured to automatically start.
+# Params:
+#     <daemonName>    : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
+#     enable|disable  :
+function daemonCntrSetEnableState()
+{
+	local daemonName="$1"
+	local enableState="$2"
+	# be torerant of the d! enable(d) and disable(d)
+	if [[ "${enableState,,}" =~ ^enable[d]?$ ]]; then
+		daemonCntrEnable "$daemonName"
+	elif [[ "${enableState,,}" =~ ^disable[d]?$ ]]; then
+		daemonCntrDisable "$daemonName"
+	else
+		assertError -v enableState "unknown enableState. expected 'enable[d]|disable[d]'"
+	fi
+}
+
+# usage: daemonCntrSetState <daemonName> "sysv|upstart|systemd|none|any|default"   "enable|disable"
+# Set the complete state of this daemon.
+# The auto mechanism has two states. Whether it is installed using sysv,upstart, or systemd and whether
+# the installed mechanism is configured to automatically start.
+# This function sets both
+# Params:
+#     <daemonName>    : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
+#     sysv|upstart|systemd|none|any|default : the type of init that controls this daemon
+#     enable|disable  : whether this daemon will auto start on boot
+function daemonCntrSetState()
+{
+	local daemonName="$1"
+	local targetType="$2"
+	local targetState="$3"
+
+	assertNotEmpty daemonName
+	[[ "$targetType" =~ ^(|sysv|upstart|systemd|none|any|default)$ ]] || assertError -v targetType "targetType should be one of sysv|upstart|systemd|none|any"
+	[[ "$targetState" =~ ^(|enable[d]?|disable[d]?)$ ]] || assertError -v targetState "targetState should be one of enable|disable"
+
+	daemonCntrInstallAutoStart "$daemonName"  "$targetType"
+	daemonCntrSetEnableState   "$daemonName"  "$targetState"
+}
+
+# usage: daemonCntrCheckState <daemonName> "sysv|upstart|systemd|none|any|default"   "enable|disable"
+# returns whether the <daemonName> is installed and configured as specified.
+# The auto mechanism has two states. Whether it is installed using sysv,upstart, or systemd and whether
+# the installed mechanism is configured to automatically start.
+# This function checks both
+# Params:
+#     <daemonName>    : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
+#     sysv|upstart|systemd|none|any|default : the type of init that controls this daemon
+#     enable|disable  : whether this daemon will auto start on boot
+function daemonCntrCheckState()
+{
+	local daemonName="$1"
+	local targetType="${2,,}"
+	local targetState="${3,,}"
+
+	assertNotEmpty daemonName
+	[[ "$targetType" =~ ^(|sysv|upstart|systemd|none|any|default)$ ]] || assertError -v targetType "targetType should be one of sysv|upstart|systemd|none|any"
+	[[ "$targetState" =~ ^(|enable[d]?|disable[d]?)$ ]] || assertError -v targetState "targetState should be one of enable|disable"
+
+	[ "$targetType" == "default" ] && daemonCntrGetDefaultAutoStartType targetType
+	local curType="$(daemonCntrGetType "$daemonName")"
+
+	[ "$targetType" == "any" ] && [ "$curType" == "none" ] && return 1
+	[ "$targetType" == "any" ]                             && return 0
+	[ "$targetType" != "$curType" ]                        && return 1
+	if daemonCntrIsEnabled "$daemonName"; then
+		[[ "$targetState" =~ ^enable[d]?$ ]]; return
+	else
+		[[ "$targetState" =~ ^disable[d]?$ ]]; return
 	fi
 }
 
@@ -443,12 +524,23 @@ function daemonCntrIsAutoStartInstalled()
 #     <autoStartType> : one of sysv,upstart,systemd,any "any" will pick the best default for how the host is configured
 function daemonCntrInstallAutoStart()
 {
-	local daemonName="$1"; [ $# -gt 0 ] && shift
-	local autoStartType="$1"; [ $# -gt 0 ] && shift
+	local daemonName="$1"
+	local autoStartType="${2,,}"
+	local curType="$(daemonCntrGetType "$daemonName")"
 
-	# choose the default based on whats installed on this host
-	if [ "${autoStartType:-any}" == "any" ]; then
+	# if any if asked for and any is installed, there is nothing to do
+	if [ "${autoStartType:-any}" == "any" ] && [ "curType" != "none" ]; then
+		return 0
+	fi
+
+	# if a specific type was not asked for, choose the default based on whats installed on this host
+	if [[ "${autoStartType,,}" =~ ^(|any|default)$ ]]; then
 		daemonCntrGetDefaultAutoStartType autoStartType
+	fi
+
+	# if the type we decided to install is the type already installed there is nothing to do
+	if [ "${autoStartType,,}" == "${curType,,}" ]; then
+		return 0
 	fi
 
 	case ${autoStartType,,} in
@@ -520,9 +612,12 @@ function daemonCntrInstallAutoStart()
 				WantedBy=multi-user.target
 			EOS
 			;;
+		none)
+			daemonCntrUninstallAutoStart "$daemonName" "any"
+			;;
 	esac
 
-	daemonCntrEnable $daemonName
+	daemonCntrEnable "$daemonName"
 }
 
 
@@ -530,6 +625,7 @@ function daemonCntrInstallAutoStart()
 # uninstall any auto start mechanism for this daemon (sysv,upstart,systemd)
 # The auto mechanism has two states. Whether it is installed using sysv,upstart, or systemd and whether
 # the installed mechanism is configured to automatically start.
+# This actually uninstalls it as opposed to configuring it not to auto start on boot
 # Params:
 #     <daemonName>    : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
 #     <autoStartType> : one of sysv,upstart,systemd,any "any" will pick the best default for how the host is configured
@@ -810,58 +906,6 @@ function cr_daemonRunningStateIs::apply() {
 	fi
 }
 
-
-# usage: cr_daemonAutoStartIsSetTo <daemonName> sysv|upstart|systemd|none|any|default  enabled|disabled
-# declare that the daemon auto start is enabled or disabled
-# Apply will install the specified type of control file and set it to the specified enabled/disabled state
-DeclareCreqClass cr_daemonAutoStartIsSetTo
-function cr_daemonAutoStartIsSetTo::check() {
-	daemonName="$1"
-	targetType="${2:-any}"
-	targetState="${3:-disabled}"
-	assertNotEmpty daemonName
-	[ "$targetType" == "default" ] && daemonCntrGetDefaultAutoStartType targetType
-	[[ "$targetType" =~ ^(sysv|upstart|systemd|none|any)$ ]] || assertError "targetType should be one of sysv|upstart|systemd|none|any"
-	{ [ "$targetType" != "none" ] && [[ ! "$targetState" =~ ^(enabled|disabled)$ ]]; } && assertError "targetState should be one of enabled|disabled"
-
-	local curType="$(daemonCntrGetType $daemonName)"
-	local curAutoState="$(daemonCntrIsEnabled $daemonName)"
-
-	if [ "$targetType" == "any" ]; then
-		[ "$curType" != "none" ] && [ "$targetState" == "$curAutoState" ]
-	else
-		[ "${targetType,,}" == "${curType,,}" ] && [ "$targetState" == "$curAutoState" ]
-	fi
-}
-function cr_daemonAutoStartIsSetTo::apply() {
-	case $targetType in
-		sysv)
-			$daemonName auto installSysV
-			$daemonName auto uninstallSystemd
-			$daemonName auto uninstallUpstart
-			$daemonName auto "${targetState:0:-1}"
-			;;
-		upstart)
-			$daemonName auto installUpstart
-			$daemonName auto uninstallSystemd
-			$daemonName auto uninstallSysV
-			$daemonName auto "${targetState:0:-1}"
-			;;
-		systemd)
-			$daemonName auto installSystemd
-			$daemonName auto uninstallUpstart
-			$daemonName auto uninstallSysV
-			$daemonName auto "${targetState:0:-1}"
-			;;
-		none)
-			$daemonName auto uninstall
-			;;
-		any)
-			$daemonName auto install
-			$daemonName auto "${targetState:0:-1}"
-			;;
-	esac
-}
 
 
 

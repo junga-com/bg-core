@@ -76,7 +76,7 @@ function manifestReadTypes()
 	while read -r type count; do
 		[ "$type" == "<error>" ] && assertError -v manifestFile -v pkgName "The manifest file does not exist."
 		mapSet $typesVar "$type" "$count"
-	done < <(awk '
+	done < <(gawk '
 		{types[$2]++}
 		END {
 			for (type in types)
@@ -92,21 +92,27 @@ function manifestReadTypes()
 #    <assetType>    : the type of asset to return
 # Options:
 #    -f|--file=<manifestFile> : the default manifest file is $manifestInstalledPath
+#    --names : return <assetName>|<assetFile> instead of only <asstFile> in each elelment of the returned array
 function manifestReadOneType()
 {
-	local manifestFile; manifestGetHostManifest manifestFile
+	local manifestFile; manifestGetHostManifest manifestFile namesFlag
 	while [ $# -gt 0 ]; do case $1 in
 		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		--names) namesFlag="--names" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local filesVar="$1"
 	local type="$2"
 
-	local file
-	while read -r file; do
-		varSet "$filesVar[$((i++))]" "$file"
-	done < <(awk -v type="$type" '
-		$2==type {print $4}
+	local _name file
+	while read -r _name file; do
+		if [ "$namesFlag" ]; then
+			varSet "$filesVar[$((i++))]" "${_name}|${file}"
+		else
+			varSet "$filesVar[$((i++))]" "$file"
+		fi
+	done < <(gawk -v type="$type" '
+		$2==type {print $3" "$4}
 	' "$manifestFile")
 }
 

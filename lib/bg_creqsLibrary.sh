@@ -179,10 +179,15 @@ function cr_sudoConfigNotExists::apply() {
 
 
 
-# usage: cr_symlinkExists <targetPath> <symlinkPath>
+# usage: cr_symlinkExists [-b|--bakup=<bakExt>] <targetPath> <symlinkPath>
 # declare that the symlink should exist with the specified target
 DeclareCreqClass cr_symlinkExists
 function cr_symlinkExists::construct() {
+	bakExt=""
+	while [ $# -gt 0 ]; do case $1 in
+		-b*|--backup*) bgOptionGetOpt val: bakExt "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	targetPath="$1"
 	symlinkPath="$2"
 }
@@ -190,7 +195,95 @@ function cr_symlinkExists::check() {
 	[ -h "$symlinkPath" ] && [ "$(readlink "$symlinkPath")" == "$targetPath" ]
 }
 function cr_symlinkExists::apply() {
-	ln -sf "$targetPath" "$symlinkPath"
+	if [ ! -h "$symlinkPath" ] && [ -e "$symlinkPath" ]; then
+		[[ "$symlinkPath" =~ ^(([^/])|(/[^/]+/)) ]] || assertError -v symlinkPath "can not apply this symlink because it would require removing or moving a top level folder"
+		if [ "$bakExt" ]; then
+			bgsudo -c "$symlinkPath.orig"  mv "$symlinkPath"{,.$bakExt}
+		else
+			bgsudo -c "$symlinkPath"  rm -rf "$symlinkPath"
+		fi
+	fi
+	bgsudo -w "$symlinkPath" ln -sf "$targetPath" "$symlinkPath"
+}
+
+# usage: cr_symlinkNotExists <symlinkPath> [<content>]
+# declare that a symlink does not exist at this path. If <content> is provided, then a regular file with that content must exist.
+# Apply:
+# Apply will remove a symlink at that location and if <content> or <bakExt> are provided it will also create a regular file with
+# the specified content. If neither are provided then apply will accept no file or a file with any content
+# Options:
+#    -b|--backup=<bakExt>  : this is the compliment to the same option in cr_symlinkExists so that this action will restore the
+#                            backup made by cr_symlinkExists. If the backup file is missing, <content> will be used to make the file.
+#                            If the backup file is missing and <content> is empty, an empty file will be created
+# Params:
+#    <symlinkPath>   : the path being operated on
+#    <content>       : the content that should be in a regular file instead of it being a symlink. If not provided, no file should
+#                      exist. If neither <bakExt> nor <content> are provided, apply will not create an empty file, nor remove a
+#                      file that might exist. See cr_fileExistsWithContent for syntax supported by <content>
+DeclareCreqClass cr_symlinkNotExists
+function cr_symlinkNotExists::construct() {
+	bakExt=""
+	while [ $# -gt 0 ]; do case $1 in
+		-b*|--backup*) bgOptionGetOpt val: bakExt "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	symlinkPath="$1"
+	contentTerm="$2"
+	if [[ "$contentTerm" =~ ^file: ]]; then
+		contentType="from file ${contentTerm#file:}"
+		content="$(cat "${contentTerm#file:}")"
+	elif [[ "$contentTerm" =~ ^template: ]]; then
+		contentType="from template file '${contentTerm#template:}'"
+		import bg_template.sh ;$L1;$L2
+		content="$(templateExpand "${contentTerm#template:}")"
+	elif [ ! "$contentTerm" ]; then
+		content=""
+		contentType=""
+	else
+		# its a string content that might be a template. If not a template, it may or may not start with 'string:'
+		content="$(strRemoveLeadingIndents "${contentTerm#string:}")"
+		contentType="from string '%contentClip%'"
+		if [[ "$content" =~ ^templateStr: ]]; then
+			templateStr="${content#templateStr:}"
+			contentType="from template string '%contentClip%'"
+			import bg_template.sh ;$L1;$L2
+			templateExpandStr -R content "$templateStr"
+		fi
+		contentClip="${content:0:${cr_fileExists[maxContentSize]}}"; contentClip="${contentClip//$'\n'/\\n}";
+		[ ${#content} -gt ${cr_fileExists[maxContentSize]:-0} ] && contentClip="${contentClip:0:$((${cr_fileExists[maxContentSize]}-3))}..."
+		contentType+=" '$contentClip'"
+	fi
+
+	# <bakExt> overrides <content> if the backup file exists
+	if [ "$bakExt" ]; then
+		if [ -f "$symlinkPath.$bakExt" ]; then
+			contentType="from backup file $symlinkPath.$bakExt"
+			content="$(cat "$symlinkPath.$bakExt")"
+		elif [ ! "$contentType" ]; then
+			contentType="from backup file $symlinkPath.$bakExt"
+		fi
+	fi
+}
+function cr_symlinkNotExists::check() {
+	[ -h "$symlinkPath" ] && return 1
+
+	# if its not a symlink, if either or both of <bakExt> or <content> are provided, we also have to check that a file with the
+	# right content exists.
+	[ ! "$contentType" ] || [ "$content" == "$(cat "$symlinkPath")" ]
+}
+function cr_symlinkNotExists::apply() {
+	[ -h "$symlinkPath" ] && bgsudo -c "$symlinkPath" rm -f "$symlinkPath"
+
+	if [ "$contentType" ]; then
+		if [ -e "$symlinkPath" ] && [ ! -f "$symlinkPath" ]; then
+			[[ "$symlinkPath" =~ ^(([^/])|(/[^/]+/)) ]] || assertError -v symlinkPath "can not apply because it would require removing or moving a top level folder"
+			bgsudo -c "$symlinkPath" rm -rf "$symlinkPath"
+		fi
+
+		if [ ! -e "$symlinkPath" ] || [ "$content" != "$(cat "$symlinkPath")" ]; then
+			echo "$content" | bgsudo -w "$symlinkPath" tee "$symlinkPath" >/dev/null
+		fi
+	fi
 }
 
 
@@ -352,7 +445,7 @@ function cr_folderNotExists::apply() {
 }
 
 
-# cr_packageInstalled packageName
+# cr_packageInstalled <packageName>
 # declares that the specified package should be installed on the host
 DeclareCreqClass cr_packageInstalled
 function cr_packageInstalled::check() {
@@ -361,6 +454,20 @@ function cr_packageInstalled::check() {
 }
 function cr_packageInstalled::apply() {
 	bgsudo -p "installing pkg '$packageName'" apt-get -q -y install "$packageName"
+}
+
+# cr_packageNotInstalled <packageName> [purge]
+# declares that the specified package should be not be installed on the host
+# Apply:
+# Apply will either uninstall or purge the package depending on the second parameter
+DeclareCreqClass cr_packageNotInstalled
+function cr_packageNotInstalled::check() {
+	packageName="$1"
+	applyCmd="${2:-uninstall}"
+	[ "$(dpkg-query -W  -f'${db:Status-Abbrev}\n' "$packageName")" != "ii " ]
+}
+function cr_packageNotInstalled::apply() {
+	bgsudo -p "${applyCmd} pkg '$packageName'" apt-get -q -y "${applyCmd}" "$packageName"
 }
 
 
@@ -691,43 +798,6 @@ function cr_mysqlDBIndexExists()
 }
 
 
-# usage: cr_packageTypeSetTo <pckCmdPrefix> <type>
-# declares that a package should be set to a particular config type
-# The package must provide "pckCmdPrefix-setType" and "pckCmdPrefix-status" commands that follow
-# the standard pattern. If now, the check method will fail instead of reporting pass/no pass.
-function cr_packageTypeSetTo()
-{
-	case $objectMethod in
-		# define the variables used and set there values in the constructor
-		objectVars) echo "pckCmdPrefix type cmdSetType cmdStatus" ;;
-		construct)
-			pckCmdPrefix="$1"
-			type="$2"
-			cmdSetType="${pckCmdPrefix}-setType"
-			cmdStatus="${pckCmdPrefix}-status"
-			displayName="cmdSetType should be $type"
-			;;
-
-		check)
-			if ! which $cmdStatus &>/dev/null; then
-				failedMsg="error: '$cmdStatus' command not found"
-				echo "error: $failedMsg"
-			fi
-			[ "$($cmdStatus -t)" == "$type" ]
-			;;
-
-		apply)
-			if ! which $cmdSetType &>/dev/null; then
-				failedMsg="error: '$cmdSetType' command not found"
-				echo "error: $failedMsg"
-			fi
-			$cmdSetType "$type"
-			;;
-
-		*) cr_baseClass "$@" ;;
-	esac
-}
-
 # usage: cr_snmpBaseConfig <requiredTextInSNMPConfig>
 # installs the Avature Standard SNMP config file.
 # this is its own cr because we need to do some stuff before installing it
@@ -849,7 +919,7 @@ function cr_noUnauthorizedLocalUserAccounts()
 			;;
 
 		check)
-			local locUsers="$(awk -F":" '$7=="/bin/bash"{print $1}'  /etc/passwd)"
+			local locUsers="$(gawk -F":" '$7=="/bin/bash"{print $1}'  /etc/passwd)"
 			local unauthUsers="$(strSetSubtract "$locUsers" "$uathorizedUsers")"
 			[ ! "$unauthUsers" ]
 			;;
@@ -945,7 +1015,7 @@ function cr_noRootSSHAccess()
 		construct) : ;;
 
 		check)
-			[ "$(awk '/^PermitRootLogin[ \t]/{print $2}' /etc/ssh/sshd_config)" == "no" ]
+			[ "$(gawk '/^PermitRootLogin[ \t]/{print $2}' /etc/ssh/sshd_config)" == "no" ]
 			;;
 		apply)
 			sudo sed -i -e 's/^\(PermitRootLogin[ \t][ \t]*\).*$/\1 no/' /etc/ssh/sshd_config
@@ -1132,4 +1202,26 @@ function cr_hostTimezoneSetTo()
 
 		 *) cr_baseClass "$@" ;;
 	esac
+}
+
+# usage: cr_daemonAutoStartIsSetTo <daemonName> sysv|upstart|systemd|none|any|default  enabled|disabled
+# declare that the daemon auto start is enabled or disabled
+# Apply will install the specified type of control file and set it to the specified enabled/disabled state
+DeclareCreqClass cr_daemonAutoStartIsSetTo
+function cr_daemonAutoStartIsSetTo::construct() {
+	daemonName="$1"
+	targetType="${2:-any}";       targetType="${targetType,,}"
+	targetState="${3:-disabled}"; targetState="${targetState,,}"
+
+	assertNotEmpty daemonName
+	[[ "$targetType" =~ ^(|sysv|upstart|systemd|none|any|default)$ ]] || assertError -v targetType "targetType should be one of sysv|upstart|systemd|none|any"
+	[[ "$targetState" =~ ^(|enable[d]?|disable[d]?)$ ]] || assertError -v targetState "targetState should be one of enable|disable"
+
+	import bg_coreDaemon.sh  ;$L1;$L2
+}
+function cr_daemonAutoStartIsSetTo::check() {
+	daemonCntrCheckState "$daemonName" "$targetType"  "$targetState"
+}
+function cr_daemonAutoStartIsSetTo::apply() {
+	daemonCntrSetState  "$daemonName" "$targetType" "$targetState"
 }
