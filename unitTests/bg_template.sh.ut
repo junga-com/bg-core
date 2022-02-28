@@ -8,7 +8,7 @@ function ut_templateFind() {
 	local -x packageName="bg-testPkg"
 
 	ut test
-	templateFind -p bg-examplePkg  --listPaths
+	templateFind -p bg-examplePkg  foo
 }
 
 function ut_templateExpand() {

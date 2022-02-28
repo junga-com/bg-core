@@ -207,54 +207,75 @@ if [ "$packageName" ]; then
 fi
 
 
-# usage: templateFind [options] <templateNameSpec>
+# usage: templateFind [-R|--retVar=<retVar>] [-p|--pkg=<preferedPkg>] [--manifest=<file>] <templateName>
 # finds a template file among those installed on the host.
-#
 # This is similar to how linux finds a command in the system $PATH and has similar security concerns because a template can be used
 # as the basis for system configuration.
 #
+# When ever a template is expanded, the template filename is passed though this function. If its an absolute path that exists, it
+# will be returned without modification. Then the name is looked up in the host manifest file and if found, that path is returned.
+# Finally, if it was not found in the manifest, but it is a relative path that exists, that path is returned.
+#
 # The general idea is that packages can provide templates and privileged admins can override and add to the set of installed templates.
-# Domain admins can override or add to templates on a set of hosts. A local sysadmin can override or add to the templates installed
-# on that particular host.
+# Domain admins can override or add to templates on a set of hosts and a local sysadmin can override or add to the templates installed
+# on that particular host. Unpriviledged users can not add to or modify the set of system templates installed on the host.
 #
 # Templates have types. Code that uses a template will only look for templates of a particular type. When more than one template of
 # the requested type exists, the code may allow the unprivileged user to select among the available installed templates of that type.
 #
-# This function is implemented as a wrapper over the findInPaths function, hardcoding the serach path to the proper set of system folders.
-# <templateNameSpec> can contain wildcards to return all matching templates in the system path. See findInPaths.
+# Templates are assets that are registered in the host manifest file with the assetType 'template' ro 'template.folder'. Packages
+# built with bg-dev will register the assets they contain when they are installed on a host. A system admin can also add assets
+# including templates.
 #
 # Naming Convention:
 # The naming convention is <baseType>[.<typePart1>.[.<typePart2>...]]
 # <baseType>
 #    The <baseType> identifies the purpose of the template which typically means what code uses the template.
 #    The code that expands the template will typically pick a hard coded <baseType> name that is sufficiently
-#    unique to describe its use. All the system template paths use ./<packageName>/ so as to avoid conflicts.
-#    with other packages.
+#    unique to describe its use.
 # <typePartN>
 #    The <typePartN> part of the name is used to allow runtime identification of which template will be used.
 #    The code that expands the template can choose to dynamically obtain the value for <typePart1> from a config
 #    file or command parameter and append it to the <baseType>. The sysadmin can then specify which <typePart1>
 #    value and therefore which template would be used.
 #
-# Rules:
-#    This search order and naming convention results in these rules.
-#      Code that uses Templates
-#        * a package introduces a <baseType> by including code that calls this function with <baseType> and documenting its use.
-#          (For example a package could have a createWebVhost command that uses the <baseType> 'webVhost')
-#        * The code that uses the template can require 0 or more <typePartN>  (e.g webVhost.<srvType> where <srvType> is one of [ngix|appache])
-#        * After the required <typePartN>, the code that uses the template may support arbitrary names which become options that can
-#          be choosen by the user invoking the code. (e.g. webVhost.nginx.myCoolSite)
-#      Templates from Packages
-#        1) any package can provide a new template name used by its own code or the code in any other package
-#        2) a template name provided and used in a package can not be overriden by another package
-#        3) virtually installed package are respected on non=production hosts so that template changes can be tested alongside code changes
-#      Templates from Admins
-#        4) the domain admin can override any template for all servers, those at a location or a particular server or provides a new template
-#        5) a host sysadmin can have the last word by putting a template in /etc/bgtemplates/ and override all others
-#      Template from Users
-#        6) unprivileged users can not provide templates returned by this command (except on development hosts via vinstall)
+# Overriding Templates:
+# The manifest can contain templates with the same assetName as long as the pkg field is different. Every asset must have a unique
+# triplet (pkg,assetType,assetName) and since the assetType is 'template[.folder]', templates must have a unique pair (pkg,assetName).
 #
-# Example:
+# If there are multiple templates with the exact assetName, the pkg fields must be different and there is a ordering of pkg values
+# that determines which one is returned.
+#
+# Pkg fields values have this order for templates with the exact same assetName. The one of these found will be returned.
+#    * admin       : a user with local admin priviledge on the host added a template
+#    * domainAdmin : a user with domain admin priviledge added a template that is seen by this host
+#    * <selfPkg>   : this is the package of the code that is calling findTemplate. i.e. is the code is in myFooPkg, a template
+#                    provided by myFooPkg will be prefered over ones provided by other packages.
+#    * <otherPkg> ... : if none of the above exist for the assetName but one or more exist from foriegn packages, one is returned
+#                    indeterminently.
+# Note that it is common that a package that expands a particular template assetName, will provide a template by that name. It is
+# not common for the above search to go past <selfPkg>.
+#
+# Note that the overriding algorithm only kicks in for templates with the exact same assetName. A similar but different concept is
+# providing multiple templates from multiple packages of the same base type but different full assetNames.
+#
+# Template Groups:
+# Templates whose asset names share a common prefix are logically groups together. The code that expands the template will hardcode
+# one or more parts but can then allow configuration or dynamic variables to specify the remainder of the assetName to match an
+# exact assetName.
+#
+# Example - awkDataQuery:
+# For example, the awkDataQuery code uses a template of 'awkDataTblFmt' base type. It exposes two concepts that the caller can
+# choose from that will form the complete assetName of the template to use. One is the 'type' of output controlled by the
+# --tblFormat=<type> option and the other is the vertical vs horizontal output style determined by the SQL like '\G' query term.
+# The full template that it uses will have the assetName 'awkDataTblFmt.<type>[.vert]'. A third party package or a system admin can
+# provide a new output type for use with awkDataQuery by adding a new template named 'awkDataTblFmt.<newTypeName>' and optionally
+# another named 'awkDataTblFmt.<newTypeName>.vert' if the vertical style is supported.
+#
+# The bash completion code can query which templates are available to provide suggestions for completing the --tblFormat=<tab><tab>
+# option.
+#
+# Example - Web Server Vhosts:
 #    Code that creates a new web server virtual host from a template could use the web server type (apache2|nginx)
 #    as typePart1 and the type of vhost (plain|reverseProxy) as typePart2.
 #        vhostConf.<webServerType>.<vhostType>
@@ -262,26 +283,6 @@ fi
 #    and let the sysadmin specify the vhostType.  The sysadmin or other packages could add new templates
 #    named with new vhostTypes. The code can present which types are available (for example in a bash completion
 #    routine, by calling this function with a wild coard for the type like templateFind vhostConf.*
-#
-# Default Search Path:
-#.nf
-#    This function now uses the manifest file first to find templates and then falls back to this search path if the template was
-#    not found in the manifest.  At some point the search paths algorithm may be removed.
-#
-#    The returned template full path will be the first of the following folders that contain the templateNameSpec
-#    The vinstall folders will only be searvhed if the host is not in a production mode and the package is vinstalled
-#      # first, a set of sysadmin/domain admin controlled folders will be checked. The admins can override
-#        the packages provided by packages and also add new templates to extend features.
-#         /etc/bgtemplates/[<packageName>/]
-#         /<domFolder>/servers/$(domWhoami)/[<packageName>/]               (if there is a selected domData)
-#         /<domFolder>/locations/$(domWhereami)/templates/[<packageName>/] (if there is a selected domData)
-#         /<domFolder>/templates/[<packageName>/]                          (if there is a selected domData)
-#      # next, the specific folder for the package thats requesting the template (or its vinstalled folder)
-#         <virtuallyInstalled_packageName_folder>/data/templates/          (if <packageName> is virtually installed)
-#         /usr/share/<packageName>/templates/
-#      # and last, any package provided templates
-#         <any_virtuallyInstalled_folder>/data/templates/                  (if <packageName> is virtually installed)
-#         /usr/share/*/data/templates/                                     (the template folders of other packages)
 #
 # Comment Tags:
 #    Code that uses a template can use several comment tags to help the sysadmin know that the <baseType>
@@ -291,129 +292,132 @@ fi
 #		# TEMPLATEVAR : <baseName> : <varName> : <description>...
 #
 # Params:
-#    <templateNameSpec> : the name of the template
-#    <searchPathN>  : each is a ":" separated list of folders. More that one can be specified. The order is relevant
+#    <templateName> : the name of the system template or the path to a template.
+#
 #
 # Options:
-#   -R <retVar> : return the first value found in this  variable name
-#   -A <arrayVar> : return every value found by appending to this array variable name
-#   -d : allow duplicates. if a matching template exists in more than one path, this causes all occurrences
-#        to be returned instead of only the first found.
-#   -p <packageName> : limit the default search path to package related templates provided by this package.
-#   --debug : instead of returning the matching template(s), print the processed search paths and the find
-#        command that would be exected. This is useful in test cases and debugging
-#   --return-relative : instead of returning the fully qualified absolute paths, return just the template
-#        names relative to the search path where it is found. This is useful when using wildcards to
-#        find out which template names are available to use.
+#   -R|--retVar=<retVar> : return the value found in this  variable name
+#   -p|--pkg=<packageName> : prefer a match from this package over the package that is using the template.
 # SECURITY: templateFind needs to return only trusted, installed templates by default because they can be used to change system config.
+#           this function only returns files listed as assets in the hostmanifest file which only admins can write to
 function templateFind()
 {
-	local type debug allowDupes returnRelative packageOverride retVar retArray listPathsFlag
+	local manifestFile retOpts retVar packageOverride result
 	local -a retOpts=(--echo -d $'\n')
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-d) allowDupes="-d" ;;
-		-p*) bgOptionGetOpt val: packageOverride "$@" && shift ;;
-		--debug) debug="--debug" ;;
-		--listPaths) listPathsFlag="--listPaths" ;;
-		--return-relative) returnRelative="--return-relative" ;;
-		-A*|--retArray*) bgOptionGetOpt val: retArray "$@" && shift; retOpts=(-A "$retArray") ;;
-		-R*|--retVar*)   bgOptionGetOpt val: retVar   "$@" && shift; retOpts=(-R "$retVar") ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-p*|--pkg*) bgOptionGetOpt val: packageOverride "$@" && shift ;;
+		-R*|--retVar*)   bgOptionGetOpt val: retVar   "$@" && shift; retOpts=(-R "$retVar");  ;;
+		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local templateNameSpec="$1"; [ $# -gt 0 ] && shift
+	local templateName="$1"
+
+	# if its already an absolute path, just return it. Note that all assetFile paths in the host manifest must be absolute paths
+	# so system templates will always be an absoulte path.
+	# Code that takes a template name or path will run it through this function to turn it into a working path.
+	if [[ "$templateName" =~ ^/ ]] && [ -e "$templateName" ]; then
+		varSetRef "${retOpts[@]}" "$templateName"
+		return
+	fi
 
 	local localPkgName="${packageOverride:-${packageName}}"
+	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
-	### first, try to find the template in the manifest file.
+	# look it up in the manifest -- exact name matches only
+	[ ! "$result" ] && result="$(gawk \
+		-v templateName="$templateName" \
+		-v packageName="$localPkgName" '
+		@include "bg_template.find.awk"
+		' "$manifestFile")"
 
-	if [ ! "$listPathsFlag$debug" ]; then
-		local -A resultSet=()
-		local templatePkg templatePath templateName
-		while read -r templatePkg scrap templateName templatePath; do
-			if [ ! "${resultSet["$templateName"]}" ] || [ "$templatePkg" == "$localPkgName" ]; then
-				resultSet["$templateName"]="$templatePath"
-		 	fi
-		done < <(manifestGet --pkg="${packageOverride:-.*}" template "$templateNameSpec")
+	# support the user expanding local, non system files as long as they are not valid system template names (i.e. found in manifest)
+	# if no system template was found, then <templateName> might refer to a local file or folder template.
+	# SECURITY: we only fall back to this if <templateName> is not a system template name so that a user can not override an
+	#           installed template by using a path to a local template
+	[ ! "$result" ] && [ -e "$templateName" ] && result="$templateName"
 
-		if [ ${#resultSet[@]} -gt 0 ]; then
-			if [ "$returnRelative" ]; then
-				outputValue "${retOpts[@]}"  "${!resultSet[@]}"
-			else
-				outputValue "${retOpts[@]}"  "${resultSet[@]}"
-			fi
-			return 0
-		fi
-	fi
+	# SECURITY: see todo below...
+	# TODO: consider if this function should check the permissions on the found path and refuse to return a path to a non-system file?
+	#       I think that the default should be to check the permissions, but a flag --allow-user-templates would override it
+	[ "$result" ] && varSetRef "${retOpts[@]}" "$result"
+}
 
-	### Next search the filesystem for installed templates. (not sure this will be needed anymore after manifest is well supported)
+# usage: templateList [-A|--retArray=<retArray>] <templateSpec>
+# list installed system templates that match <templateSpec>
+# System templates are installed from packages or by a user with sufficient loacl host or domain priviledges. Templates are named
+# hierarchicly with '.' separating the parts. <templateSpec> is a regex that matches the assetName of assets in the host manifest
+# whose assetType is template(.folder)?. A '^' is prepended to <templateSpec> to make it anchored to the start of the assetName.
+# Typically, only a prefix is given like "funcman" would match a template "funcman"  and any sub type like "funcman.1.bashCmd"
+function templateList()
+{
+	local manifestFile retOpts retVar name
+	local -a retOpts=(--echo -d $'\n')
+	while [ $# -gt 0 ]; do case $1 in
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
+		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local templateSpec="$1"
 
-	# This feature was removed for SECURITY. This function should only return templates it finds in system paths so that the caller
-	# can trust that the template is the product of only priviledged access.
-	# if [ -f "$templateNameSpec" ]; then
-	# 	returnValue "$templateNameSpec" "$retVar"
-	# 	return
-	# fi
+	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
-	if [ $# -gt 0 ]; then
-		assertError "specifying paths to search for templates has been removed for security concerns -- templateFind will only
-			return templates that are under system control and can not be modified by normal users when the host is in production
-			mode"
+	while read -r name; do
+		varSetRef "${retOpts[@]}" "$name"
+	done < <(gawk \
+		-v templateSpec="$templateSpec" '
+		@include "bg_template.list.awk"
+		' "$manifestFile")
+}
 
-	else
-		# the order that the paths are added is the order that they will be searched
+# usage: templateGetSubtypes <templateSpec>
+# return the list of sub types that could be appended to <templateSpec> to make a fully qualified template name.
+# Template names are hierarchical with parts separated by '.'. <templateSpec> is typically the base type of the template but
+# could also contain additional parts. This function scans all the template names and returns the additional sub types that exist.
+function templateGetSubtypes()
+{
+	local manifestFile retOpts retVar name
+	local -a retOpts=(--echo -d $'\n')
+	while [ $# -gt 0 ]; do case $1 in
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
+		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local templateSpec="$1"
 
-		# sysadminFolders will be under an -r <pkgName>: option so that the package specific version will be found first
-		local sysadminFolders="/etc/bgtemplates/"
+	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
-		# we can not guarantee that a domFolder will be available because this code is needed to initialize a new domdata.
-		# domResolveDefaultDomFolder -> domContentInit(on local domFolder) -> awkData_lookup -> templateFind
-		local domFolder; type -t domGetFolder&>/dev/null && domGetFolder domFolder
-		if [ "$domFolder" ]; then
-			sysadminFolders+=":$domFolder/servers/me/templates"
-			sysadminFolders+=":$domFolder/locations/me/templates"
-			sysadminFolders+=":$domFolder/templates/"
-			local pathArray=(); fsExpandFiles -A pathArray $domFolder/templates/*/
-			local i; for i in "${!pathArray[@]}"; do
-				sysadminFolders+=":${pathArray[$i]}/"
-			done
-		fi
-
-		# add the path for this package taking into account if the package is vinstalled. Note that if it is vininstalled, that
-		# overrides the installed content. This allows for a vininstalled package removing a template that may still exist in the
-		# last installed version.
-		# SECURITY: if in non-development mode, we must not consider the virtually installed folders which non-admins could write to.
-		local thisPackageFolder
-		if [ "$localPkgName" ]; then
-			thisPackageFolder="/usr/share/${localPkgName}/templates/"
-		fi
-		local bgLibPathsAry;
-		if [ ! "$bgSourceOnlyUnchangable" ]; then
-			IFS=":" read -a bgLibPathsAry <<<$bgLibPath
-			local path; for path in "${bgLibPathsAry[@]}"; do
-				[[ "$path" =~ (^|[/])$localPkgName([/]|$) ]] && thisPackageFolder="${path}/data/templates/"
-			done
-		fi
+	while read -r name; do
+		varSetRef "${retOpts[@]}" "$name"
+	done < <(gawk \
+		-v templateSpec="$templateSpec" \
+		-v outFormat="getSubtypes" '
+		@include "bg_template.list.awk"
+		' "$manifestFile")
+}
 
 
-		[ "$debug" ] && printfVars packageOverride packageName
+# usage: templateTree <templateSpec>
+# print a tree showing the hierachy of installed templates.
+# Template names are hierarchical with parts separated by '.'. <templateSpec> is typically the base type of the template but
+# could also contain additional parts. This function scans all the template names and returns the additional sub types that exist.
+function templateTree()
+{
+	local manifestFile retOpts retVar name
+	local -a retOpts=(--echo -d $'\n')
+	while [ $# -gt 0 ]; do case $1 in
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
+		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local templateSpec="$1"
 
-		# see man(3) findInPaths for explanation of the -r option. It maintains a statefull list of relative paths that are added
-		# to each path encountered on the cmd line. When its "", the paths are taken as is. If its a list, each path encountered
-		# produces N paths by concatenating it with each of the relative paths. If the -r list contains an empty relative path as
-		# well as some relative paths (i.e. the : appears at the start or the end or :: appears in the middle) then the base path
-		# will added too.
-		if [ "$packageOverride" ]; then
-			findInPaths ${retVar:+-R "$retVar"} ${retArray:+-A "$retArray"} $debug $allowDupes $returnRelative $listPathsFlag --no-scriptFolder "${templateNameSpec:-"*"}" \
-			 	-r "${packageOverride}${packageOverride:+:}"   "$sysadminFolders"  \
-				-r ""                "$thisPackageFolder"
-		else
-			findInPaths ${retVar:+-R "$retVar"} ${retArray:+-A "$retArray"} $debug $allowDupes $returnRelative $listPathsFlag --no-scriptFolder "${templateNameSpec:-"*"}" \
-			 	-r "${localPkgName}${localPkgName:+:}"   "$sysadminFolders" \
-				-r ""                "$thisPackageFolder" \
-				-r "data/templates/" "${bgLibPathsAry[@]}" \
-				-r ""                /usr/share/??-*/templates/
-		fi
-	fi
+	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
+
+	gawk \
+		-v templateSpec="$templateSpec" \
+		-v outFormat="getSubtypes" '
+		@include "bg_template.tree.awk"
+	' "$manifestFile"
 }
 
 

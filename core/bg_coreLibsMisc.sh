@@ -78,7 +78,7 @@ function manifestGet() {
 declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"
 declare -gx pluginManifestInstalledPath="/var/lib/bg-core/pluginManifest"
 
-# usage: manifestGetHostManifest
+# usage: manifestGetHostManifest [<retVar>]
 # returns the file path to the prevailing host manifest file. In production this would be "$manifestInstalledPath"
 # but vinstalling a sandbox overrides it
 function manifestGetHostManifest() {
@@ -3786,6 +3786,11 @@ function fsParseContent()
 #       f : regular file
 #       d : directory (aka folder)
 #       p : named pipe
+#    --policy=<policy>  : policies are permissions that need to be applied differently for files and folders.
+#                groupwrite : all:g+rw      folders:g+rws
+#                groupread  : all:g+r,g-w   folders:g+r-s,g-w
+#    -u|--user=<user>   : the user owner
+#    -g|--group=<group> : the group owner
 #    --perm=<rwxBits> : specify UGO permissions that <filename> should or should not have. <rwxBits> is a 10 character string similar
 #       to that displayed by `stat -c"%A" <filename>`. A 9 character string is also accepted and is interpretted
 #       as the <type> bit being unspecified. Spaces can be added between the clusters of bits to aid in readability. If a position
@@ -3811,19 +3816,25 @@ function fsParseContent()
 #                      context to what operation they are entering a password to complete.
 function fsTouch()
 {
-	local checkOnlyFlag recurseMkdirFlag typeMode permMode forceFlag updateTimeFlag sudoPrompt userOwner groupOwner enforceContentFlag
+	local checkOnlyFlag recurseMkdirFlag typeMode permMode forceFlag updateTimeFlag sudoPrompt userOwner groupOwner enforceContentFlag policy
 	while [ $# -gt 0 ]; do case $1 in
 		--checkOnly)  checkOnlyFlag="--checkOnly" ;;
 		--updateTime) updateTimeFlag="--updateTime" ;;
 		-d|--directory) typeMode="d" ;;
 		--typeMode*)  bgOptionGetOpt val: typeMode   "$@" && shift ;;
-		-u|--user*)   bgOptionGetOpt val: userOwner  "$@" && shift ;;
-		-g|--group*)  bgOptionGetOpt val: groupOwner "$@" && shift ;;
+		-u*|--user*)  bgOptionGetOpt val: userOwner  "$@" && shift ;;
+		-g*|--group*) bgOptionGetOpt val: groupOwner "$@" && shift ;;
 		--perm*)      bgOptionGetOpt val: permMode   "$@" && shift
-			permMode="${permMode// }"
-			[ ${#permMode} -eq 9 ] && permMode=".$permMode" # the caller can leav out the file type bit
-			[ "$permMode" ] && [[ ! "$permMode" =~ ^[-fdp.][-r.][-w.][-xsS.][-r.][-w.][-xsS.][-r.][-w.][-x.]$ ]] && assertError -v permMode "The --perm=<rwxBits> must be a 9 or 10 character string matching [.fdp-]?[.r-][.w-][.x-][.r-][.w-][.x-][.r-][.w-][.x-]"
+			if [[ "$permMode" =~ ^(groupread|groupwrite)$ ]]; then
+				policy="$permMode"
+				permMode=""
+			else
+				permMode="${permMode// }"
+				[ ${#permMode} -eq 9 ] && permMode=".$permMode" # the caller can leave out the file type bit
+				[ "$permMode" ] && [[ ! "$permMode" =~ ^[-fdp.][-r.][-w.][-xsS.][-r.][-w.][-xsS.][-r.][-w.][-x.]$ ]] && assertError -v permMode "The --perm=<rwxBits> must be a 9 or 10 character string matching [.fdp-]?[.r-][.w-][.x-][.r-][.w-][.x-][.r-][.w-][.x-]"
+			fi
 		;;
+		--policy*) bgOptionGetOpt val: policy   "$@" && shift ;;
 		-p|--makePaths) recurseMkdirFlag="-p" ;;
 		-f|--force) forceFlag="-f" ;;
 		--enforceContent) enforceContentFlag="--enforceContent" ;;
@@ -3836,15 +3847,16 @@ function fsTouch()
 
 	# if <fileOrFolder> ends in a '/', it indicates that fileMode should be -d
 	if [ "${fileOrFolder: -1}" == "/" ]; then
-		[ "${typeMode:-d}" != "d" ] && assertError "conflicting types specified. The file object type specified in the --typeMode options conflicts with the fact that <fileOrFolder> ends with a '/' which indicates it is a folder"
+		[ "${typeMode:-d}" != "d" ] && assertError -v typeMode "conflicting types specified. The file object type specified in the --typeMode option conflicts with the fact that <fileOrFolder> ends with a '/' which indicates it is a folder"
 		typeMode="d"
+		[[ ! "${permMode:0:1}" =~ ^[d.]?$ ]] && assertError -v permMode "conflicting types specified. The file object type specified in the first character of the --perm option conflicts with the fact that <fileOrFolder> ends with a '/' which indicates it is a folder"
 	fi
 	fileOrFolder="${fileOrFolder%/}"
 
 	# get the fileType from the permMode if specified
 	if [ "$permMode" ] && [ "${permMode:0:1}" != "." ]; then
 		local typeFromPerm="${permMode:0:1}"; [ "$typeFromPerm" == "-" ] && typeFromPerm="f"
-		[ "$typeMode" ] && [ "$typeMode" != "$typeFromPerm" ] && assertError "conflicting types specified. first character of the --perm=<mode> option conflicts with the file object type specified via either the -d, or --typeMode options or <fileOrFolder> ending with a '/' which indicates that it should be a folder"
+		[ "$typeMode" ] && [ "$typeMode" != "$typeFromPerm" ] && assertError -v typeMode -v typeFromPerm "conflicting types specified. first character of the --perm=<mode> option conflicts with the file object type specified via either the -d, or --typeMode options or <fileOrFolder> ending with a '/' which indicates that it should be a folder"
 		typeMode="$typeFromPerm"
 		[ "${permMode:0:1}" == "f" ] && permMode="-${permMode:1}"
 	fi
@@ -3904,18 +3916,20 @@ function fsTouch()
 		esac
 	fi
 
-	if [ "$permMode$userOwner$groupOwner" ]; then
+	if [ "$permMode$userOwner$groupOwner$policy" ]; then
 		local curMode="$(stat -L -c"%U:%G:%A" "$fileOrFolder")"
 	fi
 
 	if [ "$userOwner$groupOwner" ]; then
+		# note that this blocks works if one or the other is empty
 		if [[ ! "$curMode" =~ ^${userOwner:-[^:]*}:${groupOwner:-[^:]*}:.*$ ]]; then
 			[ "$checkOnlyFlag" ] && return 6
 			bgsudo "${sudoPrompt[@]}" --chown "$fileOrFolder:$userOwner:$groupOwner" chown $userOwner:$groupOwner "$fileOrFolder"  || assertError
 		fi
 	fi
 
-	if [ "$permMode" ]; then
+	if [ "${permMode}${policy}" ]; then
+		fsPolicyToPerms -R permMode "$policy"
 		if [[ ! "$curMode" =~ ^[^:]*:[^:]*:$permMode ]]; then
 			local modeStr=""
 			case $permMode in
@@ -3949,6 +3963,72 @@ function fsTouch()
 		fi
 	fi
 }
+
+# usage: fsPolicyToPerms [-R <permVar>] <policy>
+# convert the <policy> term to a 10 character perm string.
+# Policy Values:
+#    groupread  : files and folder
+function fsPolicyToPerms()
+{
+	local permVar typeMode
+	while [ $# -gt 0 ]; do case $1 in
+		-R*|--retVar*)  bgOptionGetOpt val: permVar  "$@" && shift ;;
+		--typeMode*)    bgOptionGetOpt val: typeMode "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local policy="$1"
+
+	# get the perms passed in via the -R option if any
+	local _perms
+	if [ "$permVar" ]; then
+		_perms="${!permVar}"
+		[ ${#_perms} -eq 9 ] && _perms=".${_perms}"
+	fi
+	# if empty, init perms to the default.
+	[ ! "${_perms}" ] && _perms=".........."
+
+	[ ${#_perms} -ne 10 ] && assertError -v _perms -v permVar ${permVar:+-v $permVar} "bad value for _perms. should be a 10 character str like 'drw-rw-r--'"
+
+	if [ ! "$typeMode" ] && [[ "${_perms:0:1}" =~ [-dfp]  ]]; then
+		typeMode="${_perms:0:1}"
+		[ "$typeMode" == "-" ] && typeMode="f"
+	fi
+
+	case ${policy:-none} in
+		groupread)
+			#0123456789
+			#drwxrwxrwx
+			#    r-s
+			if [ "$typeMode" == "d" ]; then
+				_perms="${_perms:0:4}r-s${_perms:7:3}"
+			else
+				_perms="${_perms:0:4}r-.${_perms:7:3}"
+			fi
+			;;
+		groupwrite)
+			#0123456789
+			#drwxrwxrwx
+			#    rws
+			if [ "$typeMode" == "d" ]; then
+				_perms="${_perms:0:4}rws${_perms:7:3}"
+			else
+				_perms="${_perms:0:4}rw.${_perms:7:3}"
+			fi
+			;;
+		none)
+			;;
+		*) assertError "unknown file access policy. expected one of groupread|groupwrite" ;;
+	esac
+
+	case $typeMode in
+		f|-) _perms="-${_perms:1}" ;;
+		p)   _perms="p${_perms:1}" ;;
+		d)   _perms="d${_perms:1}" ;;
+	esac
+
+	returnValue "$_perms" "$permVar"
+}
+
 
 # usage: fsExpandFiles|bgfind [<options>] <fileSpec1> ... <fileSpecN> [<findTestExpression>]
 # usage:    where <options> are [-f] [-F|-D] [-R|+R] [-A <retArrayVar>] [-S <setName>] [-b] [-B <prefix>]

@@ -67,6 +67,27 @@ import bg_creqsLibrary.sh ;$L1;$L2
 # fully qualified pluginKey (Config:<ConfigType>:<ConfigName>) so each ConfigName corresponds to one particular plugin instance.
 # There is typically one unique ConfigName that represents the default or 'off' state of the ConfigType being configured.
 #
+# Methods to be Implemented For Each Config:
+#  Methods the derived class should implement...
+#    function static::<ConfigType>:<ConfigName>::preCheck()
+#          : (or an external command set in the cmd_preCheck attribute)
+#            Optional. asserts an assertConfigPreCheck error if the preconditions to running this Config creq profile are not met.
+#            Typically this could be checking the system wide config to see if required settings are configured.
+#    function <ConfigType>:<ConfigName>::run()
+#          : (or an external command set in the cmd_run attribute)
+#            run is the creq profile function. It typically contains only cr_* statements.
+# Methods Provided by the Config Base Class:
+#    __construct()
+#    check()           : invokes the run method inside a creq check environment
+#    apply()           : invokes the run method inside a creq apply environment
+#    static $Config::list()     : list the Config plugin instances installed on the host in various ways
+#    static $Config::report()   : print a table showing the current mutable state of each ConfigType installed on the host
+#    static $Config::activate() : activates the specified Config plugin instance with a schedule
+#    static $Config::deactivate() : removes specified Config plugin instance from the active schedules
+#    static $Config::check()    : convenience function to construct and check a specified Config plugin instance
+#    static $Config::apply()    : convenience function to construct and apply a specified Config plugin instance
+#    static $Config::runAll()   : invoke any activated Plugins whose schedules indicated that they need to run
+#
 # See Also:
 #    man(1) bg-configCntr
 #    man(7) bg_creqs.sh
@@ -289,7 +310,12 @@ function static::Config::activate()
 	local testCronSched; cronNormSchedule -R testCronSched "$runSchedule"
 
 	if [ ! "$configName" ]; then
-		: lookup the default activation config name
+		: # TODO: lookup the default activation config name
+	fi
+
+	# do preCheck if present
+	if [ "$(type -t static::$configType:$configName::preCheck)" == "function" ]; then
+		static::$configType:$configName::preCheck "$@" || exit
 	fi
 
 	configSet "$typeKey" "activeConfig" "$configName"
@@ -362,6 +388,11 @@ function static::Config::check()
 	[ ! "$configName" ] && configGet -R configName ConfigType:$configType lastConfig
 	[ ! "$configName" ] && assertError "Unspecified config. When no config of type '$configType' is activated nor has one been applied, you must explicily specify the config to run"
 
+	# do preCheck if present
+	if [ "$(type -t static::$configType:$configName::preCheck)" == "function" ]; then
+		static::$configType:$configName::preCheck "$@" || exit
+	fi
+
 	local pluginKey="Config:$configType:$configName"
 	local cp; $Plugin::get "$pluginKey" cp
 
@@ -388,6 +419,11 @@ function static::Config::apply()
 	[ ! "$configName" ] && configGet -R configName ConfigType:$configType activeConfig
 	[ ! "$configName" ] && configGet -R configName ConfigType:$configType lastConfig
 	[ ! "$configName" ] && assertError "Unspecified config. When no config of type '$configType' is activated nor has one been applied, you must explicily specify the config to run"
+
+	# do preCheck if present
+	if [ "$(type -t static::$configType:$configName::preCheck)" == "function" ]; then
+		static::$configType:$configName::preCheck "$@" || exit
+	fi
 
 	local pluginKey="Config:$configType:$configName"
 	local cp; $Plugin::get "$pluginKey" cp
@@ -501,6 +537,7 @@ function Config::check()
 {
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
 	configSet "ConfigType:${this[configType]}" lastRunTime "$EPOCHSECONDS"
+	$_this.invoke "cmd_preCheck"
 	Try:
 		import bg_creqs.sh  ;$L1;$L2
 		import bg_creqsLibrary.sh  ;$L1;$L2
@@ -538,6 +575,7 @@ function Config::apply()
 {
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
 	configSet "ConfigType:${this[configType]}" lastRunTime "$EPOCHSECONDS"
+	$_this.invoke "cmd_preCheck"
 	Try:
 		import bg_creqs.sh  ;$L1;$L2
 		import bg_creqsLibrary.sh  ;$L1;$L2
@@ -555,4 +593,10 @@ function Config::apply()
 		configSet "ConfigType:${this[configType]}" lastConfig "${this[configName]}"
 		Rethrow
 	}
+}
+
+# TODO: add better formatting and possibly glean some information from the plugin to present to the user.
+function assertConfigPreCheck()
+{
+	assertError "$@"
 }

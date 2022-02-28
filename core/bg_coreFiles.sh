@@ -621,11 +621,15 @@ function fsCopyAttributes()
 function pipeToFile() { fsPipeToFile "$@"; }
 function fsPipeToFile()
 {
-	local channelID mode tmpdir
+	local channelID mode tmpdir fileOpts=()
 	while [ $# -gt 0 ]; do case $1 in
-		--channelID*)  bgOptionGetOpt  val: channelID         "$@" && shift ;;
+		--channelID*)  bgOptionGetOpt  val: channelID        "$@" && shift ;;
 		--didChange)   mode="--didChange" ;;
 		-p*|--tmpdir*) bgOptionGetOpt  val: tmpdir           "$@" && shift ;;
+		-u*|--user*)   bgOptionGetOpt opt: fileOpts          "$@" && shift ;;
+		-g*|--group*)  bgOptionGetOpt opt: fileOpts          "$@" && shift ;;
+		--perm*)       bgOptionGetOpt opt: fileOpts          "$@" && shift ;;
+		--policy*)     bgOptionGetOpt opt: fileOpts          "$@" && shift ;;
 	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local destFile="$1"; assertNotEmpty destFile
@@ -670,5 +674,6 @@ function fsPipeToFile()
 		[ "$channelID" ] && touch "$assertOut.$channelID"
 	fi
 	rm "$tmpFile"
+	[ -f "$destFile" ] && [ ${#fileOpts[@]} -gt 0 ] && fsTouch "${fileOpts[@]}" "$destFile"
 	return 0
 }

@@ -42,7 +42,7 @@ function oob_printBashCompletion()
 
 	case $cmd:$posCwords in
 		*:0) echo $supportedCmds ;;
-		templates:1) echo "types list find expand getVars paths" ;;
+		templates:1) echo "tree list find expand install getVars" ;;
 		templates:*)
 			subCmd="$1"; shift; ((posCwords--))
 			case $subCmd:$((posCwords)) in
@@ -102,21 +102,25 @@ function oob_helpMode()
 
 
 
-
+# Command manpage: bg-core-templates
+# a sub-command of bg-core that gives the access to the bash template system.
+# Bash templates is a system for creating and using simple text template files with out dependancy on any large platform.
+# Sub commands:
+#     * expand <templateNameOrAbsPath> [<dstFile>] : expand the given template against the current linux environment
+#     * find <templateName> : looks up <templateName> in the host manifest and returns its full path if found
+#     * list [<namePrefix>] : lists the current set of installed templates.
+#     * tree [<namePrefix>] : prints the hierarchical tree of system installed templates
+#     * install <templatePath> [<templateName>] : installs the template at <templatePath> into the system paths as <templateName>
+#     * getVars <templateNameOrAbsPath> : list the variable names referenced in <templateNameOrAbsPath>
 function templateCntr()
 {
 	local cmd="${1:-list}"; shift
 	case ${cmd} in
-		types)      templateListTypes     "$@" ;;
-		list)       templateListTemplates "$@" ;;
-		find)       templateFind          "$@" || assertError "no template found for '$@'" ;;
 		expand)     templateExpand        "$@" ;;
-		paths)
-			echo "These folders will be searched in order to resolve template names. The first folders will reflect the package where "
-			echo "templateFind is called from so that code will find the templates provided by the pkg that it is delivered in first"
-			echo "A sysadmin can override any template by creating a template with the same name in the first folder."
-			templateFind --listPaths
-			;;
+		find)       templateFind          "$@" || assertError "no template found for '$@'" ;;
+		tree)       templateTree          "$@" ;;
+		list)       templateList          "$@" ;;
+		install)    assertError "not yet implemented"; templateInstall       "$@" ;;
 		getVars)
 			if ((verbosity<=1)); then
 				templateListVars      "$@"
@@ -177,7 +181,7 @@ function complianceCntr()
 # usage: bg-core config get|set|remove|view
 # This interface allows manipulating hte system-wide config system. The system wide config behaves similar to an ini-style config
 # file except that there is one logical file that is a composite from multiple scopes.
-# ... 
+# ...
 function configCntr()
 {
 	local cmd="$1"; shift

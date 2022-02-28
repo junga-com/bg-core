@@ -118,6 +118,7 @@ function cr_sudoConfigExists::construct() {
 	filename="/etc/sudoers.d/${1#/etc/sudoers.d/}"
 	configname="${filename#/etc/sudoers.d/}"
 	contentTerm="$2"
+	# TODO: replace this code with fsParseContent
 	if [[ "$contentTerm" =~ ^file: ]]; then
 		contentType="from file ${contentTerm#file:}"
 		content="$(cat "${contentTerm#file:}")"
@@ -229,6 +230,7 @@ function cr_symlinkNotExists::construct() {
 	done
 	symlinkPath="$1"
 	contentTerm="$2"
+	# TODO: replace this code with fsParseContent
 	if [[ "$contentTerm" =~ ^file: ]]; then
 		contentType="from file ${contentTerm#file:}"
 		content="$(cat "${contentTerm#file:}")"
@@ -316,6 +318,7 @@ function cr_fileExists::check() {
 }
 function cr_fileExists::apply() {
 	contentTerm="$2"
+	# TODO: replace this code with fsParseContent
 	if [[ "$contentTerm" =~ ^file: ]]; then
 		contentType="from file ${contentTerm#file:}"
 		cp "${contentTerm#file:}" "$filename"
@@ -359,6 +362,7 @@ DeclareCreqClass cr_fileExistsWithContent "
 function cr_fileExistsWithContent::construct() {
 	filename="$1"
 	contentTerm="$2"
+	# TODO: replace this code with fsParseContent
 	if [[ "$contentTerm" =~ ^file: ]]; then
 		contentType="from file ${contentTerm#file:}"
 		content="$(cat "${contentTerm#file:}")"

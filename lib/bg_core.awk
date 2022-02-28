@@ -21,22 +21,25 @@ function manifestGet(assetTypeMatch, assetNameMatch, array                    ,m
 	close(cmd)
 }
 
-# TODO: change to use splitOptions() function
-function templateFind(templateName, options                      ,manFile,templatePath,cmd) {
-	manFile=manifestGetFile()
-	while ((getline < manFile) >0) {
-		if ($2=="template" && $3 == templateName) {
-			templatePath = $4
-			if ($1 == options["pkg"] || $1 == options["pkgOverride"])
-				break;
-		}
-	}
+# usage: templateFind(templateName, "[--pkg=<pkgName>] [--pkgOverride=<pkgName>]")
+# Return the path to the template specified in templateName
+# See man(3sh) templateFind
+function templateFind(templateName, optionsAryOrStr                      ,manFile,templatePath,cmd,localPkgName) {
+	splitOptions(optionsAryOrStr, options)
+	if (templateName~/^\// && fsExists(templateName))
+		templatePath=templateName
 
 	if (!templatePath) {
-		cmd = "bg-core templates find " templateName
+		manFile=manifestGetFile()
+		localPkgName=options["--pkg"]
+		if ("pkgOverride" in options) localPkgName=options["--pkgOverride"]
+		cmd = "gawk -v templateName="templateName" -v packageName="localPkgName" -i bg_template.find.awk '' "manFile
 		cmd | getline templatePath
 		close(cmd)
 	}
+
+	if (!templatePath && fsExists(templateName))
+		templatePath=templateName
 
 	return templatePath
 }
@@ -244,6 +247,8 @@ function arrayPop(array                      , element) {
 # remove and return the first element from the start of <array>
 function arrayShift(array                      , element, i,startLength) {
 	startLength=length(array);
+	if (startLength==0)
+		return null
 	element=array[1];
 	for (i=1; i<length(array); i++)
 		array[i]=array[i+1];

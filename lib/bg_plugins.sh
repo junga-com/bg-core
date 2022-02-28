@@ -552,14 +552,28 @@ function Plugin::setAttribute()
 }
 
 
-# usage: $Plugin.invoke <entryPointName> [<arg1>..<argN>]
+# usage: $Plugin.invoke [-q] <entryPointName> [<arg1>..<argN>]
 # invoke a plugin method. These are not bash object methods because the plugin might be implemented in another language
+# If implemented in bash, the plugin can simply provide a function named <pluginID>::<entryPointName> or static::<pluginID>::<entryPointName>
+# If th plugin is not implemented in bash it can create an attribute named cmd_<entryPointName> whose value is a command line that
+# will be executed.
+# Options:
+#    -q  : quiet. if the entryPointName does not exist in the plugin, do nothing instad of throughing an assertError
 function Plugin::invoke()
 {
+	local quietFlag; [ "$1" == "-q" ] && { quietFlag="-q"; shift; }
 	local entryPointName="$1"; shift
-	# SECURITY: this invokes the data contents of the <entryPointName> attribute. It relies plugins being installed only from trusted sources
+	local normEntryPointName="${entryPointName#cmd_}"
+	# SECURITY: this invokes the data contents of the <entryPointName> attribute. It relies on plugins being installed only from trusted sources
 	# if the attribute is not set, the default is to try the <pluginID>::<entryPointName>. This makes declaring bash script plugins
 	# support a nicer format.
-	# TODO: split up the following line and do better error reporting
-	${this[$entryPointName]:-${this[pluginID]}::$entryPointName} "$@"
+	local fnName="${this[cmd_$normEntryPointName]}"
+	[ ! "$fnName" ] && [ "$(type -t ${this[pluginID]}::$normEntryPointName)" == "function" ]         && fnName="${this[pluginID]}::$normEntryPointName"
+	[ ! "$fnName" ] && [ "$(type -t static::${this[pluginID]}::$normEntryPointName)" == "function" ] && fnName="static::${this[pluginID]}::$normEntryPointName"
+	[ ! "$fnName" ] && [ "$(type -t ${this[pluginID]}::$entryPointName)" == "function" ]             && fnName="${this[pluginID]}::$entryPointName"
+	[ ! "$fnName" ] && [ "$(type -t static::${this[pluginID]}::$entryPointName)" == "function" ]     && fnName="static::${this[pluginID]}::$entryPointName"
+
+	[ ! "$fnName" ] && [ ! "$quietFlag" ] && assertError -v this[pluginID] -v entryPointName "Plugin method (aka entryPointName) not found"
+
+	[ "$fnName" ] && $fnName "$@"
 }
