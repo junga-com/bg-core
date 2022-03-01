@@ -586,11 +586,12 @@ function fsCopyAttributes()
 {
 	local srcFile="$1" ; assertFileExists "$srcFile"
 	local dstFile="$2" ; assertFileExists "$dstFile"
-	local octalStr fuser; read -r octalStr fuser <<<"$(stat -c "%a %U" "$srcFile")"
+	local octalStr; read -r octalStr <<<"$(stat -c "%a" "$srcFile")"
+	local fuser; read -r fuser <<<"$(stat -c "%U" "$dstFile")"
 	if [ "$USER" != "$fuser" ]; then
-		sudo -p "changing file permissions '$dstFile' [sudo] " chmod $octalStr "$dstFile"
+		sudo -p "changing file permissions '$dstFile' [sudo] " chmod $octalStr "$dstFile" || assertError
 	else
-		chmod $octalStr "$dstFile"
+		chmod $octalStr "$dstFile" || assertError
 	fi
 }
 

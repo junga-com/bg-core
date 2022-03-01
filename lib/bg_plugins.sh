@@ -69,6 +69,10 @@ function DeclarePlugin()
 	local pluginType="$1"; shift
 	local pluginID="$1"; shift
 	local -n pluginInst
+	# load the PluginType if its not already loaded. This was added to support importing a plugin on its own -- the usecase was "bg-creqApply a08ce1ec"
+	if ! varExists "$pluginType[name]"; then
+		import "${pluginType}.PluginType" ;$L1;$L2
+	fi
 	ConstructObject "$pluginType" pluginInst "$pluginType" "$pluginID" "$@"
 	$Plugin::register "$pluginType:$pluginID" "$pluginInst"
 	pluginInst[package]="$packageName"

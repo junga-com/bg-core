@@ -1252,20 +1252,28 @@ function progressCntr()
 ### From bg_unitTest.sh
 
 
-# usage: utEsc [<p1> ...<pN>]
-# usage: cmdline [<p1> ...<pN>]
+# usage: utEsc   [-q] [-R|--retVar=<retVar> [<p1> ...<pN>]
+# usage: cmdline [-q] [-R|--retVar=<retVar> [<p1> ...<pN>]
 # this escapes each parameter passed into it by replacing each IFS character with its %nn equivalent token and returns all parameters
 # as string with a single IFS character separating each parameter. If that string is subsequently passed to utUnEsc, it will populate
 # an array properly with each element containing the original version of the parameter
+# Options:
+#    -q : quotes. add quotes around any parameter that contains whitespace
+#    -R|--retVar=<retVar> : return the result in the array variable <retVar> instead of on stdout
 function cmdline() { utEsc "$@" ; }
 function cmdLine() { utEsc "$@" ; }
 function utEsc()
 {
-	if [ "$1" == "-q" ]; then
-		shift
+	local quotesMode retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-q|--quotes) quotesMode="-q" ;;
+		-R*|--retVar*) bgOptionGetOpt val: retVar "$@" && shift ;;
+		*)  break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	if [ "$quotesMode" ]; then
 		local params=("$@")
 		local i; for i in "${!params[@]}"; do
-			[[ "${params[$i]}" =~ [\ ] ]] && params[$i]="'${params[$i]}'"
+			[[ "${params[$i]}" =~ [[:space:]] ]] && params[$i]="'${params[$i]}'"
 		done
 	else
 		local params=("$@")
@@ -1279,7 +1287,7 @@ function utEsc()
 			params[$i]="${params[$i]:---}"
 		done
 	fi
-	echo "${params[*]}"
+	returnValue "${params[*]}" "$retVar"
 }
 
 # usage: utUnEsc <retArrayVar> [<escapedP1> ...<escapedPN>]
@@ -4469,7 +4477,7 @@ function daemonDeclare()
 #     msg     : a template string that will be the default creqStatement text if a more specific msg is not defined.
 #     passMsg : template string to use when as the the creqStatement when the check passes
 #     failMsg : template string to use when as the the creqStatement when the check does not pass and its running in check mode
-#     appliedMsg : template string to use when as the the creqStatement when the apply function suceeds in making the host comply
+#     appliedMsg : template string to use when as the the creqStatement when the apply function succedes in making the host comply
 # The template strings can reference any variables set in either the ::construct() or ::check() functions. Also the variable creqStatement
 # can be used in template strings.
 #
@@ -4499,6 +4507,21 @@ function DeclareCreqClass()
 	[ $# -gt 0 ] && parseDebControlFile $creqClass "$@"
 	eval '
 		function '$creqClass'() {
+			if [ "$(type -t creqShellFnImplStub)" != "function" ]; then
+				import bg_creqs.sh ;$L1;$L2
+			fi
 			creqClass="'"$creqClass"'" creqShellFnImplStub "$@" ;
 		}'
+}
+
+#FUNCMAN_SKIP
+# this is a stub to load bg_plugins.sh library if something calls DeclarePlugin. This allows plugin library files to be imported
+# like any other library without needing to load its dependents.
+# Note: that this is needed only because we do not require plugin library files to import bg_plugins.sh. We could add that to all
+# plugins if needed.
+function DeclarePlugin()
+{
+	((myreccount++>10)) && assertError
+	import bg_plugins.sh  ;$L1;$L2
+	DeclarePlugin "$@"
 }

@@ -225,7 +225,7 @@ function import()
 	IFS=":"
 	for incPath in ${includePaths}; do
 		incPath="${incPath%/}"
-		for tryPath in "$incPath${incPath:+/}"{,lib/,creqs/,core/,coreOnDemand/}"$scriptName"; do
+		for tryPath in "$incPath${incPath:+/}"{,lib/,creqs/,core/,coreOnDemand/,plugins/}"$scriptName"; do
 			if [ -f "$tryPath" ]; then
 				foundScriptPath="$tryPath"
 				break

@@ -392,6 +392,10 @@ function creqStartSession()
 		[creqCountTotal]=0
 	)
 
+	# this will be a cache of creq statements that were executed during the run
+	declare -gA creqPolicyIDs=()
+
+
 	# init the tracking system use to know if a service needs to restart
 	_creqsTrackInit
 
@@ -411,6 +415,9 @@ function creqEndSession()
 		-R*|--retVar*)  bgOptionGetOpt val: mapVar "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+
+	### flush the policyID cache to the creqPolicyIDs.txt database file
+	creqFlushPolicyIDsToDB
 
 	# fire any services that need restarting
 	_creqsTrackFire
@@ -473,22 +480,6 @@ function creqPrintResult()
 	esac
 }
 
-# usage: creqMakeID [-R <retVar>] <creqStatement...>
-function creqMakeID()
-{
-	local retVar
-	while [ $# -gt 0 ]; do case $1 in
-		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-	done
-
-	creqID="$*"
-	creqID="$(echo "${creqID// }" | sha256sum)"
-	creqID="${creqID:6:8}"
-
-	returnValue "$creqID" "$retVar"
-}
-
 # usage: creq <creqClass> [<arg1>..<argN>]
 # creq is the creqStatement runner used inside creqStartSession and creqEndSession calls used to run Standards and Config plugin
 # creqProfiles. This function invokes the creqStatement using the check or apply mode set by creqStartSession
@@ -504,25 +495,11 @@ function creq()
 
 	((creqRun[creqCountTotal]++))
 
-	# A creqID is a hash of the <creqStatement>. The options of the
-	[ ! "$policyID" ] && creqMakeID -R policyID "$creqClass" "$@"
-	local creqStatement="$(cmdLine "$creqClass" "$@")"
-
-	# record the policyID and creqStatement in the policyID database
-	# TODO: profile the performance of updating the policyID database. consider caching and updating all at the end
-	bgawk -i \
-		-v policyID="$policyID" \
-		-v creqStatement="$creqStatement" '
-		function writePolicy() {
-			if (!doneWroteIt) {
-				doneWroteIt=1
-				printf("%s %s\n", policyID, creqStatement)
-			}
-		}
-		$1==policyID {deleteLine();}
-		!doneWroteIt && $1>policyID {writePolicy()}
-		END {writePolicy()}
-	' "/var/lib/bg-core/creqPolicyIDs.txt"
+	# A creqID is a hash of the <creqStatement>.
+	[ ! "$policyID" ] && creqMakePolicyID -R policyID "$creqClass" "$@"
+	local creqStatement; cmdLine -R creqStatement "$creqClass" "$@"
+	creqGleanSrcFile "creqStatement"
+	creqPolicyIDs[$policyID]="$creqStatement"
 
 	if [ "$creqAction" == "reportIDs" ]; then
 		printf "%-50s %s\n" "${creqRun[profileID]}:$creqClass-$policyID" "$creqStatement"
@@ -567,7 +544,7 @@ function creqCheck()
 
 	# if the caller specifies only the <policyID>, we can look up the statement and set it as if the caller passed it on the cmdline
 	if [ $# -eq 1 ] && [[ "$1" =~ ^[0-9a-fA-F]{8}$ ]]; then
-		local args; utUnEsc args $(gawk -v policyID="$1" '$1==policyID {$1=""; print $0}' "/var/lib/bg-core/creqPolicyIDs.txt")
+		local args; creqRestoreStatementFromPolicyID "$1" args
 		set -- "${args[@]}"
 	fi
 
@@ -578,9 +555,10 @@ function creqCheck()
 	import bg_creqsLibrary.sh  ;$L1;$L2
 
 	# run the statement with the cmd we just determined
+	local outFD
 	exec {outFD}>&1
 	local resultMsg="$( (objectMethod="newStyle" creqAction="check" $creqClass "$@") 3>&1  >&$outFD)"
-	exec {outFD}>-
+	exec {outFD}>&-
 
 	# parse the stdout msg:  <resultState> <msg text...>
 	local resultState="${resultMsg%%[ $'\n\t']*}"
@@ -605,7 +583,7 @@ function creqApply()
 
 	# if the caller specifies only the <policyID>, we can look up the statement and set it as if the caller passed it on the cmdline
 	if [ $# -eq 1 ] && [[ "$1" =~ ^[0-9a-fA-F]{8}$ ]]; then
-		local args; utUnEsc args $(gawk -v policyID="$1" '$1==policyID {$1=""; print $0}' "/var/lib/bg-core/creqPolicyIDs.txt")
+		local args; creqRestoreStatementFromPolicyID "$1" args
 		set -- "${args[@]}"
 	fi
 
@@ -616,6 +594,7 @@ function creqApply()
 	import bg_creqsLibrary.sh  ;$L1;$L2
 
 	# run the statement with the cmd we just determined
+	local outFD
 	exec {outFD}>&1
 	local resultMsg="$( (objectMethod="newStyle" creqAction="apply" $creqClass "$@") 3>&1  >&$outFD)"
 	exec {outFD}>&-
@@ -629,7 +608,160 @@ function creqApply()
 	creqPrintResult "$resultState" "$policyID" "$stmText" "$stdoutFile" "$stderrFile"
 }
 
+##############################################################################################
+### Policy ID Database functions
 
+# man(5) creqPolicyIDs.txt
+# Simple text database table for storing creqStatements by their policyIDs
+#
+# Order:
+# The file is sorted by <policyID> which makes for more eficient maintenance and retrieval.
+# Line Format:
+#    <policyID> <creqStatement>
+# Where <policyID> is an 8 hex character string. See man(3) creqMakePolicyID
+# and <creqStatement> is the statement with whitespace in its parameters escaped with %NN tokens. (e.g. " " is %20).
+# Whitespace is used to separate the tokens in the <creqStatement>. The first token contains the creqClass which will be either
+# a bash function or an external command. If that token contains '::' then the creqClass is prefixed with <libraryName>:: or
+# <path>:: depending if its a function or an external command.
+#
+# See Also:
+#    man(3) creqMakePolicyID
+#    man(3) creq
+#    man(3) creqGleanSrcFile
+#    man(3) creqRestoreStatementFromPolicyID
+#    man(3) creqFlushPolicyIDsToDB
+
+# usage: creqMakePolicyID [-R <retVar>] <creqStatement...>
+# returns a unique 8 character ID for the <creqStatement>
+function creqMakePolicyID()
+{
+	local retVar
+	while [ $# -gt 0 ]; do case $1 in
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	creqID="$*"
+	creqID="$(echo "${creqID// }" | sha256sum)"
+	creqID="${creqID:6:8}"
+
+	returnValue "$creqID" "$retVar"
+}
+
+# usage: creqGleanSrcFile <statementVar>
+# lookup where the creqClass of <statementVar> comes from and prepend it to the creqClass
+# Example:
+#   input:    "cr_fileExists /path/foo"
+#   output:   "bg_creqsLibrary.sh::cr_fileExists /path/foo"
+# Param:
+#    <statementVar> : is the variable name that contains the escaped creqStatement strings. The tokens are separated by spaces.
+#                     Spaces within tokens are replaced with %NN
+function creqGleanSrcFile()
+{
+	local -n _statementVar="$1"
+	local creqClass="${_statementVar%%[[:space:]]*}"
+	local creqClassType="$(type -t "$creqClass")"
+	local srcFile scrap
+	case $creqClassType in
+		function)
+			local fnToCheck="$creqClass"; type -t $creqClass::check &>/dev/null && fnToCheck="$creqClass::check"
+			read -r scrap scrap srcFile < <(declare -F "$fnToCheck" )
+			if [ ! "$srcFile" ]; then
+				read -r scrap srcFile <<<"$(man "$creqClass" "$creqClass::apply" "$creqClass::check" 2>/dev/null | grep "^[[:space:]]*file: " | head -n1 )"
+			fi
+			srcFile="${srcFile##*/}"
+			srcFile="${srcFile%\'}"
+			;;
+		file)
+			srcFile="$(type -p "$creqClass")"
+			;;
+	esac
+
+	[ "$srcFile" ] && _statementVar="${srcFile}::${_statementVar}"
+}
+
+# usage: creqRestoreStatementFromPolicyID <policyID> <statementTokensVar>
+# lookup the <policyID> in the creqPolicyIDs.txt and return the creqStatement if found
+# Whenever creq profiles run on a host, each unique CreqStatement encountered is written to the creqPolicyIDs.txt database.
+# When errors are reported with the <policyID> the admin can use the <policyID> to re-run that CreqStatement with bg-creqCheck or
+# bg-creqApply to get more information on why it failed.
+# Params:
+#    <policyID>           : a <policyID> is an eight character hash of the statement text. When a creq profile is executed, the
+#                           <policyID> is calculated, saved in the creqPolicyIDs.txt database, and shown in the results.
+#    <statementTokensVar> : this is the variable name that the tokens from the statement are returned in. The element at [0] will be
+#                           the creqClass
+function creqRestoreStatementFromPolicyID()
+{
+	local policyID="$1"
+	local -n statementTokensVar="$2"
+
+	statementTokensVar=()
+	utUnEsc statementTokensVar $(gawk -v policyID="$policyID" '
+		$1==policyID {
+			$1=""; print $0
+			exit
+		}
+		$1>policyID {bgtrace("!!!ending it alll"); exit;}
+		' "/var/lib/bg-core/creqPolicyIDs.txt")
+	[ ${#statementTokensVar[@]} -eq 0 ] && assertError -v policyID "creq policyID not found."
+
+	if [[ "${statementTokensVar[0]}" =~ :: ]]; then
+		local srcFile="${statementTokensVar[0]%%::*}"
+		statementTokensVar[0]="${statementTokensVar[0]#*::}"
+		if [[ ! "$srcFile" =~ [/] ]]; then
+			! type -t "${statementTokensVar[0]}" &>/dev/null && import $srcFile  ;$L1;$L2
+		fi
+	fi
+
+	# if its still not a command (either external or a bash function), try gleaning the src library from its manpage
+	if ! type -t ${statementTokensVar[0]} &>/dev/null; then
+		local scrap srcFile
+		read -r scrap srcFile <<<"$(man "${statementTokensVar[0]}" "${statementTokensVar[0]}::apply" "${statementTokensVar[0]}::check" 2>/dev/null | grep "^[[:space:]]*file: " | head -n1 )"
+		srcFile="${srcFile##*/}"
+		srcFile="${srcFile%\'}"
+		[[ ! "$srcFile" =~ ^[[:space:]]*$ ]] && import $srcFile ;$L1;$L2
+	fi
+	! type -t ${statementTokensVar[0]} &>/dev/null && assertError -v creqClass "The creq class does not appear to exist on this host"
+}
+
+# usage: creqFlushPolicyIDsToDB
+# during a creq profile run, the creq runner records each creqStatement it runs in the creqPolicyIDs[<policyID>]=<creqStatement>
+# map. This function flushes them all to the creqPolicyIDs.txt file which has line format="<policyID> <creqStatement>"
+# The file is sorted by <policyID> so that this function can do a merge insert efficiently.
+function creqFlushPolicyIDsToDB()
+{
+	local policyID; for policyID in "${!creqPolicyIDs[@]}"; do
+		echo "$policyID ${creqPolicyIDs[$policyID]}"
+	done | bgawk -i '
+		function writePolicy() {
+			printf("%s %s\n", orderedIDs[current], policyIDs[orderedIDs[current]] )
+			current++
+		}
+		BEGIN {
+			while ((getline <"/dev/stdin")>0) {
+				policyID=$1
+				statement=gensub(/^[^[:space:]]*[[:space:]]+/,"","g",$0)
+				policyIDs[policyID]=statement
+			}
+			count=asorti(policyIDs, orderedIDs)
+			current=1
+		}
+
+		/^[^#]/ && current<=count {
+			while (current<=count && orderedIDs[current] < $1) {
+				writePolicy()
+			}
+			if (current<=count && orderedIDs[current] == $1) {
+				writePolicy()
+				deleteLine()
+			}
+		}
+		END {
+			while (current<=count)
+				writePolicy()
+		}
+	' "/var/lib/bg-core/creqPolicyIDs.txt"
+}
 
 
 

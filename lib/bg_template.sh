@@ -1,6 +1,7 @@
 
 # Library
 # Provides simple text templates without being dependant on any platform
+# TODO: support a new expression syntax (like %[sectionName]settingName%) that uses the system wide config as its variable context
 # This library provides template expansion from the linux command line without relying on any platform. The parser is written in
 # bash ans awk which are generally available on any linux system.
 #
@@ -1307,43 +1308,3 @@ cr_templateIsExpanded::apply() {
 		fsTouch "${fileOpts[@]}" "$destFile"
 	fi
 }
-# function cr_templateIsExpanded()
-# {
-# 	case $objectMethod in
-# 		objectVars) echo "templateFile destFile contentFlag templateParser" ;;
-# 		construct)
-# 			templateParser="templateExpand"
-# 			while [[ "$1" =~ ^- ]]; do case $1 in
-# 				-c)  contentFlag="-c" ;;
-# 				-e)  templateParser="templateExpandExtended" ;;
-# 			esac; shift; done
-# 			templateFile="$1"
-# 			destFile="$2"
-# 			destFolder="$(dirname "$destFile")"
-# 			displayName="templateExpanded ${destFile}"
-# 			;;
-#
-# 		check)
-# 			[ ! -f "$destFile" ] && return 1
-# 			[ ! "$contentFlag" ] && return 0
-# 			local tempFile="$(mktemp)"
-# 			($templateParser "$templateFile" 2>&1 | pipeToFile "$tempFile")
-# 			[ -s "$templateFile" ] && [ ! -s "$tempFile" ] && echo "$templateParser failed to expand the template file" >&2
-# 			local res="0"
-# 			if [ -s "$tempFile" ]; then
-# 				diff -q "$tempFile" "$destFile" &>/dev/null
-# 				res=$?
-# 			elif [ -s "$destFile" ]; then
-# 				res="1"
-# 			fi
-# 			rm "$tempFile" &>/dev/null
-# 			return $res
-# 			;;
-#
-# 		apply)
-# 			$templateParser "$templateFile" | pipeToFile "$destFile"
-# 			;;
-#
-# 		*) cr_baseClass "$@" ;;
-# 	esac
-# }

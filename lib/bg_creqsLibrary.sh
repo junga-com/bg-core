@@ -1229,3 +1229,29 @@ function cr_daemonAutoStartIsSetTo::check() {
 function cr_daemonAutoStartIsSetTo::apply() {
 	daemonCntrSetState  "$daemonName" "$targetType" "$targetState"
 }
+
+
+
+# usage: cr_isAGitFolder <folderName>
+# declare that the specified folder is a git controlled folder.
+# Apply will git init the folder and create an initial commit with any content in the folder
+DeclareCreqClass cr_isAGitFolder
+function cr_isAGitFolder::construct() {
+	folderName="$1"
+	assertNotEmpty folderName
+	# TODO: assert that git is installed
+}
+function cr_isAGitFolder::check() {
+	# note that .git is sometimes aa file and sometimes a folder
+	[ -e "${folderName}/.git" ]
+}
+function cr_isAGitFolder::apply() {
+	(
+		cd "$folderName" || assertError
+		git init || assertError
+		git -A . || assertError
+		if [ "$(git status -s)" ]; then
+			git commit -m"initial commit" || assertError
+		fi
+	)
+}
