@@ -358,3 +358,59 @@ function configSettingList()
 		iniParamList   "${configScopes[orderedFileList]:-$(_configGetScopedFilesList)}" "$@"
 	fi
 }
+
+# usage: configFlatten [-M|--map=<mapVar>]
+# returns the entire logical system wide config in the format
+#     [<sectionName>]settingName=<value>
+# Options:
+#    -M|--map=<mapVar> : instead of writing the settings to stdout, set them into mapVar[<sectionName>]=<value>
+function configFlatten()
+{
+	local -n mapVar
+	local doMap
+	while [ $# -gt 0 ]; do case $1 in
+		-M*|--map*)  bgOptionGetOpt val: mapVar "$@" && shift; doMap="1" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	local _cgFiles="${configScopes[orderedFileList]:-$(_configGetScopedFilesList)}"
+	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${_cgFiles//,/ }
+
+	local name value
+	while read -r name value; do
+		name="${name//%20/ }"
+		if [ "${doMap}" ]; then
+			if [[ "$name" =~ ^[[].[]] ]]; then
+				name="${name/#[[].[]]}"
+			else
+				name="${name#[[]}"
+				name="${name/[]]/.}"
+			fi
+			mapVar[$name]="$value"
+		else
+			echo "$name=$value"
+		fi
+	done < <(bgawk -n \
+		--include="bg_ini.awk" '
+
+		BEGIN {
+			arrayCreate(data)
+		}
+
+		# collect the data on each settings line we encounter. the first time we encounter a iniParamFullName its the effective value
+		# The susequent times we encounter a iniParamFullName are hidden values that would not be visible because they are hidden by the first.
+		iniLineType=="setting" {
+			if (! (iniParamFullName in data)) {
+				data[iniParamFullName]=iniValue
+			}
+		}
+
+		END {
+			PROCINFO["sorted_in"]="@ind_str_asc"
+			for (name in data) {
+				gsub(/[ ]/,"%20",name)
+				printf("%s %s\n", name, data[name])
+			}
+		}
+	' "${ipg_iniFiles[@]}")
+}
