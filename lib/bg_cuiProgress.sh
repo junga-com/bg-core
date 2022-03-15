@@ -82,7 +82,7 @@ import bg_ini.sh  ;$L1;$L2
 # The value of progressTemplate can be set to several names or can be an actual template expanded against the progress meassage fields.
 #    'plain'   : (terse) [<parentSubTasks>/]<subTask>:<updateMsg>
 #    'detailed': (more vebose) <deltaTime> <-s|-u|-e> [<parentSubTasks>/]<subTask>:<updateMsg>
-#    <templateSyntax> : 2020-11 thisis not yet implemented
+#    <templateSyntax> : 2020-11 this is not yet implemented
 #
 # Passthrough Progress Stream Protocol:
 # When a driver sets the progress protocol to "passthrough", rendered messages suitable for direct display are sent to the progress
@@ -175,7 +175,9 @@ import bg_ini.sh  ;$L1;$L2
 # Beyond that, the progress data will start to make the scipt take longer to run.
 #
 # Options:
-#    -s|--start  : start a sub-task under the current task
+#    -s|--start [--async]  : start a sub-task under the current task
+#      --async: signal that this start call should start its own progress stack frame. Typically this is done when you spawn
+#               a new thread.
 #    -u|--update : update the state of the current task
 #    -e|--end    : end the current sub-task and pop back to the previous
 # Params:
@@ -202,20 +204,26 @@ function progress()
 {
 	# 2016-06 bobg. by short circuiting this the off case at the top of this function, running 350 unit
 	# tests went from 22sec(using oneline) to 20sec(using null w/o short circuit) to 16sec(short circuit)
+	# 2022-03 bobg: I did not update comments after a pretty big refactor. The shortcircuit mechanism is now that there is a
+	#               progress() stub function in bg_coreLibMisc.sh that loads this library only if progressDisplayType is not set
+	#               to (none|null|off), but its not really needed anymore because now there is plugable progress stack
+	#               implementations and the default Array impl is about as fast as the short circuit.
+	#                      305 testcases:
+	#                         short circuit: ~ 2m46s
+	#                         Array stack  : ~ 2m47s
+	#                         file stack   : ~ 3m05s
+	#               The Array stack can not update the parent's status automatically but thats OK for many scenarios.
 
 	# if progress is being called for the first time and the script has not set a specific progress driver,
 	# set the default driver now
 	declare -gAx _progressDriver
 	declare -gx progressScope
-
-	# if the script calls us when there is no progress UI driver active, start the default driver
 	[ ! "$_progressDriver" ] && progressCntr start default
 
+	# likewise, if there is not yet a stack driver loaded, load the default now
 	type -t _progressStackInit &>/dev/null || progressCntr loadCntxImpl default
 
-
-	# the 'off' driver tells us to noop all the progress calls. 'null' is similar but will cause the information to be created
-	# but not displayed
+	# this is probably not needed since the progress() stub wont even load this library if its set to (off|null|none)
 	[ "$_progressDriver" == "off" ] && return 0
 
 	# -u is the default command
@@ -232,15 +240,11 @@ function progress()
 	#       1. keep track of the PID and PPID for each progress call in the subTask stack of the current progressScope
 	#       2. if we see a progress call from a second sibling, create a new progressScope
 	#       3. if we see a progress call from a parent while a child is still open, create a new progressScope
-	if [ ! "$progressScope" ] || [ "$asyncFlag" ]; then
+	if [ ! "$progressScope" ] || { [ "$cmd" == "-s" ] && [ "$asyncFlag" ]; }; then
 		_progressStackInit
 	fi
 
 	assertNotEmpty progressScope
-
-	# TODO: support a second, lighter _progressStack that does not support a subshell updating its parent's subtask.
-	#       * each new PID seen will get a new subTask created on demand if a -u is seen before a -s
-	#       * the _progressStack* functions will store the stack in an array variable instead of a tmp file
 
 	local -a data
 	local indent=0
@@ -296,6 +300,19 @@ function progress()
 			data[7]=${data[6]} # current now equals target
 
 			indent=${data[0]//[^\/]}; indent=$((${#indent}))
+
+			if [ "$asyncFlag" ]; then
+				if [ "${_progressDriver["userFeedbackFD"]}" ] && [ -w "/dev/fd/${_progressDriver["userFeedbackFD"]}" ]; then
+					local pipeError
+					[ "${progressFSync:-${_progressDriver["fsync"]}}" ] && sync
+					bgTrapStack push PIPE 'pipeError="1"'
+					echo "@scopeEnd $progressScope" >&${_progressDriver["userFeedbackFD"]} 2>/dev/null
+					bgTrapStack pop PIPE
+					[ "$pipeError" ] && { progressCntr off; bgtrace "progress pipe write failed. turning progress system off"; }
+					[ "${progressFSync:-${_progressDriver["fsync"]}}" ] && sync
+				fi
+				return 0
+			fi
 			;;
 
 		-h) progressCntr hide
@@ -399,6 +416,7 @@ function progressCntr()
 			# importing this replaces the _progressStack* functions with a different implementation
 			local implName="$2"
 			[[ "$implName" =~ ^(default|)$ ]] && implName="Array"
+			#implName="TmpFile"
 			import bg_progressCntxImpl${implName}.sh ;$L1;$L2
 			;;
 
@@ -491,6 +509,7 @@ function _progressStartDriver()
 		fi
 	fi
 
+	# the default protocol is passThru. The driver may change it.
 	_progressDriver["protocol"]="passThru"
 
 	case $type in

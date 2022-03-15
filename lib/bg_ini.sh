@@ -528,7 +528,7 @@ function iniParamGetAll()
 
 	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
 
-	local maxNameLen
+	local maxNameLen name value
 	{
 		read -r maxNameLen
 		while read -r name value; do

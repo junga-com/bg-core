@@ -1070,6 +1070,7 @@ function winWrite() {
 			csiSubstr -d "" --chopCSI    -R tmpStr -- "${_wcWin[lines${_wcWin[curY]}]}" "0"                                               "$((_wcWin[curX]-1))"
 			csiSubstr -d "" --chopCSI -a -R tmpStr -- "$line"                           "$((((_wcWin[curX]-1)<0)?(-(_wcWin[curX]-1)):0))"
 			csiSubstr -d "" --chopCSI -a -R tmpStr -- "${_wcWin[lines${_wcWin[curY]}]}" "$((_wcWin[curX]-1+lineLen))"
+			csiRender tmpStr
 			_wcWin[lines${_wcWin[curY]}]="${tmpStr}"
 			((_wcWin[curX]+=lineLen))
 		fi
@@ -1109,6 +1110,7 @@ function winWriteAt() {
 			csiSubstr -d "" --chopCSI    -R tmpStr -- "${_wcWin[lines${cy}]}" "0"                          "$((cx-1))"
 			csiSubstr -d "" --chopCSI -a -R tmpStr -- "$line"                 "$((((cx-1)<0)?(-(cx-1)):0))"
 			csiSubstr -d "" --chopCSI -a -R tmpStr -- "${_wcWin[lines${cy}]}" "$((cx-1+lineLen))"
+			csiRender tmpStr
 			_wcWin[lines${cy}]="${tmpStr}"
 			((_wcWin[curX]+=lineLen))
 		fi
@@ -1121,6 +1123,8 @@ function winWriteAt() {
 
 # usage: winPaint <bufVar>
 function winPaint() {
+	# TODO: The paintScript is composed with rendered \033 bytes b/c we 'printf "%s" "$paintScript"' at the end. Why did I do that
+	#       instead of just doing 'printf "$paintScript"'? When I have time I will try it. The bg_debugger_integrated.sh uses this.
 	local -n _wcWin="$1"
 	local paintScript; printf -v paintScript "${CSI}${cSave}"
 	local renderedCsiNorm; printf -v renderedCsiNorm "%s" "${csiNorm}"
@@ -1143,6 +1147,7 @@ function winPaint() {
 		[ "$additionalFontAttributes" ] && line="${additionalFontAttributes}${line//"${renderedCsiNorm}"/${renderedCsiNorm}${additionalFontAttributes}}"
 
 		local tmpStr; csiSubstr -R tmpStr --pad -- "$line" "0" "${_wcWin[width]}"
+		csiRender tmpStr
 		printf -v paintScript "%s${CSI}$((_wcWin[y1]+i-1));${_wcWin[x1]}${cMoveAbs}%s" "$paintScript" "$tmpStr"
 	done
 	printf -v paintScript "%s${csiNoOverline}${csiNoUnderline}${CSI}${cRestore}" "$paintScript"
@@ -1173,9 +1178,9 @@ function winScrollOff() {
 
 # usage: csiSplitOnCSI <string> [<retArray>]
 # splits apart the input <string> into alternating text and CSI escape sequences. Even elements returned ([0], [2], ...) are
-# guaranteed to be text and odd elements are guaranteed to be CSI escape sequences. Text elements can "" empty string whenever a CSI
-# sequences is not preceeded by text such as when a CSI sequence appears first in the <string> or when multiple CSI sequences appear
-# next to each other.
+# guaranteed to be text and odd elements are guaranteed to be CSI escape sequences. Text elements can be "" (empty string) whenever
+# a CSI sequences is not preceeded by text such as when a CSI sequence appears first in the <string> or when multiple CSI sequences
+# appear next to each other.
 #
 # Ascii vs Binary Escape:
 # This function will recognize an ESC character either as the 4 characters "\033" or "\x1b" or "\x1B" or as the single binary,
@@ -1210,12 +1215,22 @@ function csiSplitOnCSI() {
 	# stop the string of text on whether a single character matches or not. If we stopped on the '\' character, there would be false
 	# positives when '\' the 3 characters following it are not '033'. Also, since there are several different ways to represent ESC,
 	# this normalizes them so the algorithm does not have to deal with them all.
-	#_string="${_string//\\033/$'\033'}"
-	#_string="${_string//\\x1[bB]/$'\033'}"
+	# 2022-03 bobg: the three lines that convert \033 and \x1b text to binary and binary back to \033 were commented out. I dont
+	#               remember why. The unit tests were failing so I uncommented them. We will see if there was a reason.
+	_string="${_string//\\033/$'\033'}"
+	_string="${_string//\\x1[bB]/$'\033'}"
 
-	while [[ "${_string//\\033/$'\033'}" =~ ^([^$'\033']*)($'\033'\[([0-9;]*)?([\ !\"#$%&\'()*+,./-]*)?[]@A-Z\^_\`a-z{|}~[])(.*)$ ]]; do
+	# Hello\033[34m World
+	# '---''------''----'
+	#                         .-Hello-----..---\033[-..--34--.?.----------------------.?.--------m---------. . World.
+	while [[ "${_string}" =~ ^([^$'\033']*)($'\033'\[([0-9;]*)?([\ !\"#$%&\'()*+,./-]*)?[]@A-Z\^_\`a-z{|}~[])(.*)$ ]]; do
+		#                     '-----1-----''---------------------------2------------------------------------''-5-'
+		#                                            '---3---' '---------4------------'
 		rematch=("${BASH_REMATCH[@]}")
-		#rematch[2]="${rematch[2]//$'\033'/\\033}"
+		# rematch[1]=<asciiTextOrEmpty>
+		# rematch[2]=<escapeSeq>
+		# rematch[<last>]=<remainderToParse>
+		rematch[2]="${rematch[2]//$'\033'/\\033}"
 		outputValue -a --array "$retArray" -- "${rematch[1]}" "${rematch[2]}"
 		_string="${rematch[@]: -1}" #"
 	done
@@ -1312,9 +1327,8 @@ function csiSubstr() {
 	if ((_cssStart<0)); then
 		_cssOutLen=$(( ((-_cssStart) < _cssLen) ? (-_cssStart) : _cssLen ))
 		_cssStart=0
-		[ "$padFlag" ] && printf -v _cssOut "%*s" "$_cssOutLen"  ""
+		[ "$padFlag" ] && printf -v _cssOut "%*s" "$_cssOutLen"  "" #"
 	fi
-
 	local _cssParts; csiSplitOnCSI -- "$_cssLine" _cssParts
 	local i; for ((i=0; i<${#_cssParts[@]}; i+=2)); do
 		if ((_cssStart>0)); then
@@ -1336,7 +1350,7 @@ function csiSubstr() {
 	done
 
 	[ "$padFlag" ] && printf -v _cssOut "%s%*s" "$_cssOut"  $((_cssLen-_cssOutLen)) ""
-	outputValue "${retOpts[@]}" -- "$_cssOut"
+	outputValue "${retOpts[@]}" -- "$_cssOut" #"
 }
 
 # usage: csiStrip <lineVar>
@@ -1360,6 +1374,17 @@ function csiStrip() {
 	done
 	returnValue "$_csOut" "$retVar"
 }
+
+
+
+# usage: csiRender <lineVar>
+# changes \033 and \x1b into $'\033' so that the csi codes will work even in the data of a printf
+function csiRender() {
+	local -n lineVar="$1"
+	lineVar="${lineVar//\\033/$'\033'}"
+	lineVar="${lineVar//\\x1[bB]/$'\033'}"
+}
+
 
 
 

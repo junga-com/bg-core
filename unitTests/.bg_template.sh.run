@@ -147,16 +147,13 @@ Default as a var       -- %nickName:$name% : bobg
 
 # expect an exception to be thrown
 cmd> templateExpand -f "$templateFile"
-This is a test template that contains variables that exercise all the supported features.
-Required var           -- %+name%          : 
-Plain var w/value      -- %size1%          : 
-Plain var w/empty      -- %size2%          : 
-Plain var no exists    -- %size3%          : 
-Default var w/value    -- %color1:red%     : red
-Default var w/empty    -- %color2:red%     : red
-Default var no exists  -- %color3:red%     : red
-Default as a var       -- %nickName:$name% : 
-
+** Exception thrown by testcase **
+   catch_errorClass='assertTemplateError'
+   catch_errorFn='templateEvaluateVarToken'
+   catch_errorCode='36'
+   catch_errorDescription='
+                           error: templateEvaluateVarToken: required template var 'name' is not defined
+                               context='/tmp/bgmktemp.<redacted>''
 ## bg_template.sh:templateExpandMissingRequired: finished
 ###############################################################################################################################
 

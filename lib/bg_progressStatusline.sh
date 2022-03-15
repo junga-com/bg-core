@@ -86,6 +86,7 @@ function _readProgressMsgLoop()
 		cmdGotoUpperLeft+="${CSI}1;0${cMoveAbs}"
 		cmdGotoHome+="${CSI}$(( termHeight - ${#linesByScope[@]} ));0${cMoveAbs}"
 		cmdScrollUp1="${CSI}1${cScrollUp}"
+		cmdScrollDn1="${CSI}1${cScrollDown}"
 		cmdUPLineCnt="${CSI}${#linesByScope[@]}${cUP}"
 		cmdScrollUpLineCnt="${CSI}${#linesByScope[@]}${cScrollUp}"
 		cmdClearLines=""; for lineOffset in "${linesByScope[@]}"; do
@@ -136,6 +137,24 @@ function _readProgressMsgLoop()
 				hidden=""
 				;;
 
+			@scopeEnd)
+				local progressScope="$1"; shift
+				if  [ "${linesByScope[$progressScope]}" ]; then
+					local ourLineNo="${linesByScope[$progressScope]}"
+					for i in ${!linesByScope[@]}; do
+						if (( "${linesByScope[$i]}" > ourLineNo )); then
+							(( linesByScope[$i]-- ))
+						fi
+					done
+					unset linesByScope[$progressScope]
+					renderCsiCmds
+
+					# set the scroll region to the whole screen and scroll everything up one line (including our status lines)
+					# then set the scroll region to exclude our status lines and put the cursor at the end of the scroll region
+					printf "${csiSave}${CSI}0;$(( termHeight - ourLineNo ))${cSetScrollRegion}${cmdGotoUpperLeft}${cmdScrollDn1}${cmdSetScrollPartial}${csiRestore}${csiDOWN}" >/dev/tty
+				fi
+				;;
+
 			@1)	local progressScope="$1"; shift
 				local formattedStr="$1"; shift
 				local progCmd="$1"; shift
@@ -183,8 +202,9 @@ function _readProgressMsgLoop()
 
 				if [ "$target" ]; then
 					local divCol msgSection meter meterBarStart meterBarEnd meterDiv meterBar="" marker
-					divCol=$(( ${#formattedStr} +1 ))
-					divCol=$(( (divCol < termWidth*60/100) ? divCol : termWidth*60/100 ))
+					# divCol=$(( ${#formattedStr} +1 ))
+					# divCol=$(( (divCol < termWidth*60/100) ? divCol : termWidth*60/100 ))
+					divCol=$((termWidth*40/100))
 					stringShorten -j left --pad -R formattedStr "$divCol"
 					printf -v meter "[%2s of %-2s " "$current" "$target"
 					stringShorten --pad --fill="-" -R meterBar $(( termWidth - divCol -${#meter} -1 ))
