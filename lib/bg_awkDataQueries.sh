@@ -1,6 +1,12 @@
 
+# Library
+# Part of the awkDataSystem that contains the query functions.
+# See man(7) awkDataSystem for the complete description.
+
+
 import bg_template.sh  ;$L1;$L2
 import bg_awkDataSchema.sh  ;$L1;$L2
+
 
 # usage: awkData_query [options] <awkDataID> [ column1:value1 [ column2:value2 ... ] ] [\G]
 # usage: while IFS=$'\b' read -r $colList; do ...; done < <(awkData_query -d$'\b' "$awkObjName" "$colList" ... )

@@ -56,7 +56,7 @@
 #    -p|--pkg|--pkgName=<pkgMatch>   : specify a regex(gawk) to match the pkg field. '.*' is the default
 #    -o|--output=<outStr>  : specify what is returned for each matching asset record. default is '$0'. This can use the the terms
 #                            $1,$2,$3,$4 to refer to the columns of the manifest file respectively. $0 is all colums.
-#    --manifest=<file>     : override the path of the manifest file to use.
+#    --manifest=<file>     : override the path of the manifest file to use. This string is prepended with 'print ' and executed in awk.
 function manifestGet() {
 	local manifestFile
 	local pkgMatch=".*" outputStr='$0'
@@ -73,6 +73,13 @@ function manifestGet() {
 	gawk --sandbox  -v assetTypeMatch="$assetTypeMatch"  -v assetNameMatch="$assetNameMatch" -v pkgMatch="$pkgMatch" '
 		$1~"^"pkgMatch"$" && $2~"^"assetTypeMatch"$" && $3~"^"assetNameMatch"$" {print '"$outputStr"'}
 	' $manifestFile
+}
+
+# usage: manifestAwk [<awkOptions>] <awkScript>
+# This runs gawk to scan the manifest file without having to know where the manifest file is
+function manifestAwk() {
+	local manifestFile; manifestGetHostManifest manifestFile
+	gawk --sandbox "$@" $manifestFile
 }
 
 declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"

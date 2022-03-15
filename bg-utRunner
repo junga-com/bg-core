@@ -1,5 +1,43 @@
 #!/bin/bash
 
+# Command
+# This is the command used in the shebang comment of unittest scripts so that they can be ran directly.
+# usage: bg-utRunner <utFile> list|run|debug [<utSpec>]
+# usage: #!/usr/bin/env bg-utRunner
+#        <utFile> list|run|debug [<utFunction>[:<utCmdlineName>]]
+# This command runs a unit test library script directly, as opposed to inside the bg-dev-test system.
+# When developing unittest testcases, it is convenient to run them directly in a terminal to see the output and any errors that might
+# ocur. This also makes it easier to run in the debugger and easier to use tracing techniques like bgtrace*.
+#
+# Typically, you dont run this command directly but instead set it as the shebang script processor of script library files that contain
+# unittests. The shebang line is shown above in the synopsis section. The script also needs to have the execute bit set (chmod a+x <script>)
+# This makes the script itself runnable.
+#
+# With the shebang added to the test script file, it will automatically have bash command line completion so the user does not have
+# to remember how to invoke the unittest file or precisely how the testcase function and args are named.
+#
+# Note that the output of the testcase(s) printed in the terminal may be slightly different from the output captured and stored
+# in the .run and .plato files.
+#
+# Sub Commands:
+# list   : print the testcase IDs contained in the unittest script file.
+# run [<utSpec>] : run testcases contained in the unittest script file that match <utSpec>. The default is to run them all.
+# debug [<utID>] : launch the script inside the debugger stopping on the first line of <utID>. Note that if you dont specify
+#                     <utID> it will run all testcases with an implicit breakpoint at the start of each testcase.
+#
+# Running the Other Way:
+# When the unittest script file "./unitTests/<utFilename>.ut" is ran under bg-dev-tests, the combined output of each testcase
+# within is captured and written in sections of the "./unitTests/.<utFilename>.run". For each testcase, its section in the .run file
+# is compared to its section in the .plato file (i.e. "./unitTests/.<utFilename>.plato") to see if it passes. The .run and .plato
+# files are committed to git.
+#
+# See Also:
+#    man(1) bg-dev-tests
+#    man(7) bg_unitTest.sh
+#    man(7) bg_unitTestsRunner.sh
+#    man(3) ut
+
+
 source /usr/lib/bg_core.sh
 
 declare -gx bgUnitTestScript="$1"; shift
@@ -16,14 +54,3 @@ source "$bgUnitTestScript"
 #done
 
 utfDirectScriptRun "$@"
-
-
-# Command
-# usage bg-utRunner <utFile> list|run|debug [<utSpec>]
-# usage #!/usr/bin/env bg-utRunner
-# This runs a unit test library script directly, as opposed to inside the bg-dev system which runs them to save their output and
-# update the results in the project.
-#
-# Typically, you never run this command directly but instead set it as the shebang script processor of script library files so
-# that they can be ran directly as commands themselves to directly test the output.
-#

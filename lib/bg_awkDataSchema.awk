@@ -1,26 +1,12 @@
 @include "bg_core.awk"
 
 # Library bg_awkDataSchema.awk
-# Including this library will automatically initialize the schemas array to contain schemas for each of the awkDataID or awkObjData
+# Including this library will automatically initialize the schemas array to contain schemas for each of the awkDataID or awkDataIDList
 # specified on the cmd line.
-# AwkDataID Short and Long Form Syntax:
-# awkDataID is a token (no spaces) that describes the data file and schema information of the tablular data to be operated on.
-# The short form relies on there being an asset of type awkDataSchema with an asset name that matches the value of the awkDataID.
-# That awkDataSchema asset is an ini file describing everything that is needed to operate on the data including the location
-# of the data file on the host.
 #
-# The long form has the form "awkDataID|awkObjName|awkFile|awkSchemaFile" and allows specifying the information required to operate
-# on the data in a more flexible way that may or may not rely on the existence of the awkDataSchema asset.
-#    awkDataID   : This is a token that identifies the data and schema. It could be the path to a data file, or path to a schema ini
-#                  file, or the awkObjName
-# TODO: the awkDataID field seems redundant now and maybe we should make the long form contain only 3 fields
-#    awkObjName    : is the simple name of the awkData data and schema. This is like a table name in a database
-#    awkFile       : path to the data file that will be operated on. If it is empty, then the awkSchemaFile must be specified and it
-#                    must contain an awkFile entry that provides the path to the data file.
-#                    The path string can optionally include a trailing + or - that indicates that the data file either has (+) header
-#                    lines or does not have (-) header lines.
-#    awkSchemaFile : identifies awkdata schema file that describes the structure of the table and various attributes that affect
-#                    how the data is queried.
+# This library provides functions and also has BEGIN {} code.  The BEGIN code recognizes the awkDataID or awkDataIDList inputs
+# and restores the schemas[awkDataObj] datat for each awkDataID specified. Often only one awkDatID is specified.
+#
 # Input:
 #    -v awkDataIDList="<awkDataID1> [..<awkDataIDN>]"  : each <awkDataIDN> can be the long form or short form but not all short forms
 #          are supported. The short form is supported to allow testing common awkData on the comand line.
@@ -28,16 +14,57 @@
 #    -v domFolder="<domFolder>"  : if any of the awkDataIDN are short form which are relative to the domData, the domFolder must be
 #          specified either with this explicit variable or in ENVIRON["domFolder"]
 # Output:
-# After this library is included, in any section, a script can reference the schemas[] array that contains the schema data for any
-# awkDataID specified in the awkDataIDList variable on the cmd line.
+#     global schema[]  : contains restored schema information. The index is the <awkObjName>.
+#     global awkDataID : regardless of how awkDataID was specified as an input, it will become the <awkObjName> of the main or
+#                        default schema to be operated on.
+# After this library is included, in any section, a script can reference these two output global variables.
+#
 # Additional schemas[<awkDataIDN>] can be added by a script by using schema_new(<awkDataIDN>, ...) or scheam_restore(<awkDataIDN>).
-# Typically that is used to add derived schemas such as the allColName.
-#    schemas[]
-#           [<awkDataID1>][]
-#           [<awkDataID2>][]
-#           ...
-# See Also:
-#     awkData_getSchema
+# In particular, a biuld script may create a new schema such as an 'allColumnData'.
+#
+# AwkDataID Short and Long Form Syntax:
+# awkDataID is a token (no spaces) that describes the data file and schema information of the tablular data to be operated on.
+# If the token contains one or two '|' characters it is considered the long form containing 3 pieces of information. Some of the
+# 3 can be empty.
+#
+#   Long Form = <awkObjName>|<awkDataFile>|<awkDataSchemaFile>
+#
+# The short form contains no '|' characters so it contains only 1 of the 3 pieces of information. The assumption is that the short
+# form contains the awkObjName but it can contain either the awkDataFile or awkDataSchemaFile under some circumstances.
+#
+#   Short Form = <probablyObjNameButCouldBeAFile>
+#
+# The typical case is the shortform specifies the awkObjName of an asset registered in the host manifest file where the assetType is
+# 'awkDataSchema' and the assetName is the <awkObjName>. When code is in a project which will be built into a package that will be
+# installed on a host, it is best to include an awkDataSchema asset and have the code usde that <awkObjName> as the awkDataID.
+#
+# The long form can be incomplete. By providing at least one '|' the specified part(s) are unambiguously identified and the gleaning
+# algorithm is bypassed. '<awkObjName>|' is very similar to the typical short form but it bypasses the gleaning algorithm.
+#     <awkObjName>|[|]  # Specifies a definite <awkObjName> and the only way this works is if an awkDataSchema asset is available
+#                         in the manifest
+#     |<awkDataFile>[|] # Specifies a definite <awkDataFile>. The <awkObjName> will be the base filename. If a file exists with
+#                         the same filename with the extension replaced with '.schema', it will be taken as <awkSchemaFile>.
+#     ||<awkSchemaFile> # Specifies a definite <awkSchemaFile>. The <awkObjName> will be the base filename. If the schema file
+#                         includes an awkFile= attribute that will be used as the <awkDataFile> otherwise it will be the same
+#                         filename as the <awkSchemaFile> with the extension replaced with '.cache'.
+#
+# Overriding <awkDataFile>.
+# Typically there is exactly one data file instance for each awkDataSchema asset installed on a host but in rare cases it can make
+# sense to create multiple data files with the same schema. This is possible by fully specifiying a schemFile (either by a installed
+# awkObjName asset or by specifying the filename of a schemaFile) and also specifying the awkDataFile. Typically you would not specify
+# both because the schema file will specify the location of the data file but when you specify both, the data file specified in the
+# schema will be ignored.
+#
+# Installed vs One-Off awkDataID:
+# We support the notion that the awkData tools can operate on any dataFile with a compatible format so that sys admins can experiment,
+# prototype and solve one off problems without having to register/install a awkDataSchema asset on the host. A awkDataFile can stand
+# alone by including a simple header that provides just the essential schema information. The only required schema information is
+# the list of column names corresponding to the $1..$NF records in awk.  If the sysadmin needs to specify more schema information
+# for a one-off awkDataFile they can create an awkDataSchemaFile with the same path and base name as the awkDataFile but with the
+# extension 'schema'. They can also create just the schema file and use it as the awkDataID with the schema information including
+# the location of the data file.
+#
+#
 # Functions:
 # This library provides these functions that scripts can optionally use.
 #    schema_new(schemaName, columns, primeKey) : add an additional schema/table to the set being built. example, <awkObjName>.allColNames
@@ -52,6 +79,9 @@
 #          primary and secondary keys associated with it. If the data is perfect that will be all but if there is data
 #          for which the primary key is not known they will be identified as possible duplicates and any conflicting
 #          records will be identified.
+#
+# See Also:
+#    man(7) awkDataSystem  : the top level documentation
 
 
 
@@ -76,34 +106,19 @@ BEGIN {
 	opNormal["<="]="<="
 	opNormal[">="]=">="
 
-	# the caller can opt to specify a single awkDataID in awkDataID instead of putting in awkDataIDList
-	if (!awkDataIDList && awkDataID) {
-		awkDataIDList=awkDataID
-		awkDataID=""
-		if (awkDataIDList~/[/]/ && fsExists(awkDataIDList))
-			awkDataIDList="|"awkDataIDList
+	arrayCreate(schemas)
+
+	# if awkDataID is specified, it will be the main,default schema to be operated on.
+	if (awkDataID) {
+		awkDataID=schema_restore(awkDataID)
 	}
 
-	arrayCreate(schemas)
+	# the caller can also specify additional schemas to restore
 	if (awkDataIDList) {
 		spliti(awkDataIDList, awkDataIDSet)
-		for (i in awkDataIDSet) {
-			schema_restore(i)
+		for (oneElement in awkDataIDSet) {
+			schema_restore(oneElement)
 		}
-	}
-
-	# make sure that schemas[awkDataID] points to a valid schema
-	if (!awkDataID && length(schemas)==1) {
-		for (i in schemas) if (i) awkDataID=i;
-	}
-	if (!(awkDataID in schemas) && awkDataID ~ /[|]/) {
-		split(awkData_parseID(awkDataID), awkObjData, "|")
-		if ((awkObjData[1] in schemas))
-			awkDataID=awkObjData[1]
-		else if ((awkObjData[2] in schemas))
-			awkDataID=awkObjData[2]
-		else if ((awkObjData[3] in schemas))
-			awkDataID=awkObjData[3]
 	}
 
 	#printfVars("schemas awkDataID")
@@ -333,17 +348,26 @@ function awkData_readHeader() {
 	}
 }
 
-# usage: akwDataIDLongForm awkData_parseID(awkDataIDShortForm|akwDataIDLongForm)
-# Returns the long form of akwDataID regardless of whether the short or long form is passed in.
+# usage: akwDataIDLongForm=awkData_parseID(awkDataIDShortForm|akwDataIDLongForm)
+# Fills in the missing pieces of the long form reqardless of what is passed in. If the awkDataID passed in is the short form (i.e. no '|')
+# then if it contains one of [/.] it will be interpreted as a filename which could be the data file or the schema file.
 function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchemaFile,schemas,script,cmd) {
+	# if its the short form (w/o any '|') and it continains the path separator char '/' glean it into an incomplete long form
+	if (awkDataID !~ /[|]/ && awkDataID~/[\/]/) {
+		if (awkDataID ~ /[.](schema|awkDataSchema)$/)
+			awkDataID="||"awkDataID
+		else
+			awkDataID="|"awkDataID
+	}
+
 	#awkObjName|awkDataFile|awkSataSchemaFile
-	# 1          2       3
+	#    1          2            3
 	split(awkDataID, awkObjData, "|")
 	awkObjName=awkObjData[1];
 	awkFile=awkObjData[2];
 	awkSchemaFile=awkObjData[3];
 
-	# For one-off tables, the user might specify either the awkFile alone and then we glean the table name from the filename
+	# For one-off tables, the user might specify either the data or schema file alone and then we glean the awkObjName name from the filename
 	if (!awkObjName && awkFile)
 		awkObjName=gensub(/(^.*\/)|([.][^\/]*$)/,"","g",awkFile)
 
@@ -373,9 +397,10 @@ function awkData_parseID(awkDataID,      awkObjData,awkObjName,awkFile,awkSchema
 
 	# typical case: lookup the data file from the schema file
 	if (awkSchemaFile && ! awkFile) {
-		script="$1==\"awkFile\" {print gensub(/[[:space:]]*#.*$/,\"\",\"g\",$2);exit(0)} /^[[:space:]]*[[]/ {exit(0)}"
+		script="$1==\"awkFile\" {print $2;exit(0)} /^[[:space:]]*[[]/ {exit(0)}"
 		cmd="gawk -F= '"script"' " awkSchemaFile
 		cmd | getline awkFile
+		awkFile=gensub(/^[[:space:]]*["]?|["]?[[:space:]]*$/, "", "g", awkFile)
 		close(cmd)
 		if ( !awkFile )
 			assert("Neither the awk schema file nor the awkDataID specify the awkFile path. awkDataID="awkDataID)
@@ -450,7 +475,7 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 	split(awkData_parseID(awkDataID), awkObjData, "|")
 
 	# set the information from the parsed awkDataID
-	info["awkDataID"]=awkDataID
+	info["awkDataID"]=awkObjData[1]
 	info["awkObjName"]=awkObjData[1]
 	info["awkFile"]=awkObjData[2]
 	info["awkSchemaFile"]=awkObjData[3]
@@ -472,7 +497,7 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 		}
 
 		# attribute setting line (name=value)
-		if  (NF>0 && $1!~/^#/ && match($0, /^[[:space:]]*([^=[:space:]]*)[[:space:]]*=[[:space:]]*(.*)$/, rematch)) {
+		if  (NF>0 && $1!~/^[[:space:]]#/ && match($0, /^[[:space:]]*([^=[:space:]]*)[[:space:]]*=[[:space:]]*(.*)$/, rematch)) {
 			# dont overwrite awkFile if it was provided in the awkDataID
 			if (rematch[1]!="awkFile" || !info["awkFile"]) {
 				if (schemaSection=="" || schemaSectionScope==info["scopeType"]) {
@@ -491,7 +516,7 @@ function schemaInfo_restore(info, awkDataID            ,awkDataIDLongForm,awkObj
 	}
 	close(info["awkSchemaFile"])
 
-	# manifest and plugins have .awkDataSchema files that sets the awkFile but we want to honor the vinstalled manifest if present
+	# awkObjNames in the manifest have .awkDataSchema files that sets the awkFile but we want to honor the vinstalled manifest if present
 	# so they use the special tokens "<installedManifest>" and "<installedPluginManifest>" to trigger this processing
 	if (info["awkFile"] == "<installedManifest>") {
 		info["awkFile"] = ENVIRON["bgVinstalledManifest"]
@@ -674,6 +699,7 @@ function schema_restore(awkDataID            ,awkDataIDLongForm,awkObjData) {
 	if (! ("noSchemaDataFound" in schemas[awkDataID]["info"])) {
 		schema_construct(schemas[awkDataID], schemas[awkDataID]["info"])
 	}
+	return awkDataID
 }
 
 # usage: schema_new(schemaName, columns, primeKey, secKeyCols)

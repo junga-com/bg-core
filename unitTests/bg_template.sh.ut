@@ -2,14 +2,117 @@
 
 import bg_template.sh  ;$L1;$L2
 
-function ut_templateFind() {
-	ut setup
-	local -x bgLibPath=""
-	local -x packageName="bg-testPkg"
+### changed the way Find works -- now its only uses the manifest file an ddoes not have a notion of a search path
+# function ut_templateFind() {
+# 	ut setup
+# 	local -x bgLibPath=""
+# 	local -x packageName="bg-testPkg"
+#
+# 	ut test
+# 	templateFind -p bg-examplePkg  foo
+# }
 
-	ut test
-	templateFind -p bg-examplePkg  foo
+
+function ut_templateExprRegex() {
+	ut setup
+	local -a tests=(
+		"env1 %myVarname% env1"
+		"env2 %myVarname[myIdxName]% env2"
+		"env1-def %myVarname:myDef% env1"
+		"env2-def %myVarname[myIdxName]:myDef% env2"
+		"env1-req %+myVarname% env1"
+		"env2-req %+myVarname[myIdxName]% env2"
+		""
+		"obj1 %\$myObjName.attr% obj1"
+		"obj2 %\$myObjName[attr].myMethod 'p1' 'p2'% obj2"
+		"obj1-def %\$myObjName.attr:myDef% obj1"
+		"obj2-def %\$myObjName[attr].myMethod 'p1' 'p2':myDef% obj2"
+		"obj1-req %+\$myObjName.attr% obj1"
+		"obj2-req %+\$myObjName[attr].myMethod 'p1' 'p2'% obj2"
+		""
+		"cnf1 %config[mySect:subsect]myName% cnf1"
+		"cnf2 %config[.]myName% cnf2"
+		"cnf1-def %config[mySect:subsect]myName:myDef% cnf1"
+		"cnf2-def %config[.]myName:myDef% cnf2"
+		"cnf1-req %+config[mySect:subsect]myName% cnf1"
+		"cnf2-req %+config[.]myName% cnf2"
+		""
+		'esc1 %\%'
+		'esc2 %\\%'
+		'esc3 %\\\%'
+	)
+
+	ut noecho
+	rePrefix="[+]"
+	reVar="[a-zA-Z0-9_]*"
+	reIndex="[[]([^]]+)[]]"
+	reTNameEnv="(${reVar}+)(${reIndex})?"
+	reTNameObj="([\$])([^:%]+)"
+	reTNameConfig="(config(${reIndex})?(${reVar}+))"
+	reDefVal="[^%]*"
+	reEsc="[\]*"
+	reVarExp="(${rePrefix})?((${reTNameConfig})|(${reTNameObj})|(${reTNameEnv}))(:(${reDefVal}))?"
+	templateExprRegEx="%((${reVarExp})|(${reEsc}))%"
+	verbosity=0
+
+	###
+	echo "#### this is the section you need to copy to bg_template.sh if you change the regEx and the indexes"
+	ut echo
+	: 0;  local xxx=0
+	: 1;  local xxx=1
+	: 2;  local xxx=2
+	: 3;  local _idxReqFlag=3
+	: 4;  local xxx=4
+	: 5;  local xxx=5
+
+	: 6;  local _idxConfigExpr=6
+	: 7;  local _idxConfigSect=8
+	: 8;  local _idxConfigName=9
+
+	: 9;  local xxx=9
+	: 10; local xxx=10
+
+	: 11; local _idxObjFlag=11
+	: 12; local _idxObjExpr=12
+
+	: 13; local _idxEnvExpr=13
+	: 14; local _idxEnvVar=14
+	: 15; local xxx=15
+	: 16; local _idxEnvInd=16
+	: 17; local xxx=17
+	: 18; local _idxDef=18
+	: 19; local _idxEsc=19
+
+	printfVars templateExprRegEx # noecho
+
+	ut test noecho
+	for testName in "${!tests[@]}"; do
+		[ ! "${tests[$testName]}" ] && { echo; continue;  }
+		printf "\nINPUT: %s\n"  "${tests[$testName]}"
+		local rematch=""
+		if match "${tests[$testName]}"  $templateExprRegEx rematch; then
+			[ ${verbosity:-0} -gt 0 ] && printfVars rematch
+			if [ "${rematch[$_idxConfigExpr]}" ]; then
+				printf "CONFIG: sect=%-20s  name=%-24s  def=%-10s  required=%-20s\n"  "${rematch[$_idxConfigSect]}" "${rematch[$_idxConfigName]}" "${rematch[$_idxDef]}" "${rematch[$_idxReqFlag]}"
+				#printfVars rematch
+			elif [ "${rematch[$_idxObjFlag]}" == "\$" ]; then
+				printf "OBJ: expr=%-54s  def=%-10s  required=%-10s\n"  "${rematch[$_idxObjExpr]}" "${rematch[$_idxDef]}" "${rematch[$_idxReqFlag]}"
+				#printfVars rematch
+			elif [ "${rematch[$_idxEnvExpr]}" ]; then
+				printf "ENV: name=%-10s  index=%-10s expr=%-20s  def=%-10s  required=%-20s\n"  "${rematch[$_idxEnvVar]}"  "${rematch[$_idxEnvInd]:-NONE}" "${rematch[$_idxEnvExpr]}"  "${rematch[$_idxDef]}" "${rematch[$_idxReqFlag]}"
+				#printfVars rematch
+			elif [ "${rematch[$_idxEsc]}" ]; then
+				printf "ESC: value=%s\n" "${rematch[$_idxEsc]}"
+			else
+				printf "unknown: \n"
+				printfVars rematch
+			fi
+		else
+			echo "NOMATCH: '$1'"
+		fi
+	done
 }
+
 
 function ut_templateExpand() {
 	ut setup
@@ -36,6 +139,7 @@ function ut_templateExpand() {
 }
 
 function ut_templateExpandMissingRequired() {
+	# expect: an exception to be thrown
 	ut setup
 	local templateFile; fsMakeTemp templateFile
 	cat - >$templateFile <<-'EOS'
@@ -51,5 +155,6 @@ function ut_templateExpandMissingRequired() {
 	EOS
 
 	ut test
+	ut expect: an exception to be thrown
 	templateExpand -f "$templateFile"
 }

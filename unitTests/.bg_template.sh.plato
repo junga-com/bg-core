@@ -1,22 +1,104 @@
 
 ###############################################################################################################################
-## bg_template.sh:templateFind: start
+## bg_template.sh:templateExprRegex: start
 ## expect: 
 
 ##----------
 ## setup
-##     | cmd> local -x bgLibPath=""
-##     | cmd> local -x packageName="bg-testPkg"
+##     | cmd> local -a tests=(
+##     | #### this is the section you need to copy to bg_template.sh if you change the regEx and the indexes
+##     | cmd> : 0;  local xxx=0
+##     | cmd> : 1;  local xxx=1
+##     | cmd> : 2;  local xxx=2
+##     | cmd> : 3;  local _idxReqFlag=3
+##     | cmd> : 4;  local xxx=4
+##     | cmd> : 5;  local xxx=5
+##     | cmd> : 6;  local _idxConfigExpr=6
+##     | cmd> : 7;  local _idxConfigSect=8
+##     | cmd> : 8;  local _idxConfigName=9
+##     | cmd> : 9;  local xxx=9
+##     | cmd> : 10; local xxx=10
+##     | cmd> : 11; local _idxObjFlag=11
+##     | cmd> : 12; local _idxObjExpr=12
+##     | cmd> : 13; local _idxEnvExpr=13
+##     | cmd> : 14; local _idxEnvVar=14
+##     | cmd> : 15; local xxx=15
+##     | cmd> : 16; local _idxEnvInd=16
+##     | cmd> : 17; local xxx=17
+##     | cmd> : 18; local _idxDef=18
+##     | cmd> : 19; local _idxEsc=19
+##     | templateExprRegEx='%((([+])?(((config([[]([^]]+)[]])?([a-zA-Z0-9_]*+)))|(([$])([^:%]+))|(([a-zA-Z0-9_]*+)([[]([^]]+)[]])?))(:([^%]*))?)|([\]*))%'
 
 ##----------
 ## test
-cmd> templateFind -p bg-examplePkg  --listPaths
-templatFolders[]
-              [0]='/etc/bgtemplates/bg-examplePkg'
-              [1]='/etc/bgtemplates'
-              [2]='/usr/share/bg-examplePkg/templates'
 
-## bg_template.sh:templateFind: finished
+INPUT: env1 %myVarname% env1
+ENV: name=myVarname   index=NONE       expr=myVarname             def=            required=                    
+
+INPUT: env2 %myVarname[myIdxName]% env2
+ENV: name=myVarname   index=myIdxName  expr=myVarname[myIdxName]  def=            required=                    
+
+INPUT: env1-def %myVarname:myDef% env1
+ENV: name=myVarname   index=NONE       expr=myVarname             def=myDef       required=                    
+
+INPUT: env2-def %myVarname[myIdxName]:myDef% env2
+ENV: name=myVarname   index=myIdxName  expr=myVarname[myIdxName]  def=myDef       required=                    
+
+INPUT: env1-req %+myVarname% env1
+ENV: name=myVarname   index=NONE       expr=myVarname             def=            required=+                   
+
+INPUT: env2-req %+myVarname[myIdxName]% env2
+ENV: name=myVarname   index=myIdxName  expr=myVarname[myIdxName]  def=            required=+                   
+
+
+INPUT: obj1 %$myObjName.attr% obj1
+OBJ: expr=myObjName.attr                                          def=            required=          
+
+INPUT: obj2 %$myObjName[attr].myMethod 'p1' 'p2'% obj2
+OBJ: expr=myObjName[attr].myMethod 'p1' 'p2'                      def=            required=          
+
+INPUT: obj1-def %$myObjName.attr:myDef% obj1
+OBJ: expr=myObjName.attr                                          def=myDef       required=          
+
+INPUT: obj2-def %$myObjName[attr].myMethod 'p1' 'p2':myDef% obj2
+OBJ: expr=myObjName[attr].myMethod 'p1' 'p2'                      def=myDef       required=          
+
+INPUT: obj1-req %+$myObjName.attr% obj1
+OBJ: expr=myObjName.attr                                          def=            required=+         
+
+INPUT: obj2-req %+$myObjName[attr].myMethod 'p1' 'p2'% obj2
+OBJ: expr=myObjName[attr].myMethod 'p1' 'p2'                      def=            required=+         
+
+
+INPUT: cnf1 %config[mySect:subsect]myName% cnf1
+CONFIG: sect=mySect:subsect        name=myName                    def=            required=                    
+
+INPUT: cnf2 %config[.]myName% cnf2
+CONFIG: sect=.                     name=myName                    def=            required=                    
+
+INPUT: cnf1-def %config[mySect:subsect]myName:myDef% cnf1
+CONFIG: sect=mySect:subsect        name=myName                    def=myDef       required=                    
+
+INPUT: cnf2-def %config[.]myName:myDef% cnf2
+CONFIG: sect=.                     name=myName                    def=myDef       required=                    
+
+INPUT: cnf1-req %+config[mySect:subsect]myName% cnf1
+CONFIG: sect=mySect:subsect        name=myName                    def=            required=+                   
+
+INPUT: cnf2-req %+config[.]myName% cnf2
+CONFIG: sect=.                     name=myName                    def=            required=+                   
+
+
+INPUT: esc1 %\%
+ESC: value=\
+
+INPUT: esc2 %\\%
+ESC: value=\\
+
+INPUT: esc3 %\\\%
+ESC: value=\\\
+
+## bg_template.sh:templateExprRegex: finished
 ###############################################################################################################################
 
 
@@ -53,7 +135,7 @@ Default as a var       -- %nickName:$name% : bobg
 
 ###############################################################################################################################
 ## bg_template.sh:templateExpandMissingRequired: start
-## expect: 
+## expect:  an exception to be thrown
 
 ##----------
 ## setup
@@ -62,6 +144,8 @@ Default as a var       -- %nickName:$name% : bobg
 
 ##----------
 ## test
+
+# expect an exception to be thrown
 cmd> templateExpand -f "$templateFile"
 ** Exception thrown by testcase **
    catch_errorClass='assertTemplateError'

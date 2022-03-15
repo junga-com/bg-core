@@ -220,10 +220,10 @@ function ut_listIniParam()
 	echo "$1" | tee "$iniFile"
 
 	ut test
-	listIniParam "$iniFile" '.'
-	listIniParam "$iniFile" 'sect1'
-	listIniParam "$iniFile" 'sect2'
-	listIniParam "$iniFile" 'sect:1'
+	listIniParam -s "$iniFile" '.'
+	listIniParam -s "$iniFile" 'sect1'
+	listIniParam -s "$iniFile" 'sect2'
+	listIniParam -s "$iniFile" 'sect:1'
 }
 
 

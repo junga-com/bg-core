@@ -8,34 +8,34 @@
 ##     | cmd> makeTestData
 ##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
 ##     | cmd> cat "$bgVinstalledManifest"
-##     | ut awkDataSchema type1                /tmp/tmp.<redacted>
-##     | ut template      awkDataTblFmt.wiki   /tmp/tmp.<redacted>
+##     | ut awkDataSchema type1                /tmp/tmp.<redacted>/type1.awkDataSchema
+##     | ut template      awkDataTblFmt.wiki   /tmp/tmp.<redacted>/awkDataTblFmt.wiki
 
 ##----------
 ## test
 cmd> awkData_query type1 one:blue
-      blue     2              
+      blue     2 
 cmd> awkData_query type1.all two:1
-       red     1              
+       red     1 
 cmd> awkData_query type1.one two:1
 red
 cmd> awkData_query -H type1
-[2m[7m       one[0m [2m[7m  two[0m [2m[7m        three[0m
-       red     1              
-      blue     2              
-     green     3              
+[2m[7m       one[0m [2m[7m  two[0m [2m[7mthree[0m
+       red     1      
+      blue     2      
+     green     3      
 cmd> awkData_query -e type1
-       red     1            --
-      blue     2            --
-     green     3            --
+       red     1 --
+      blue     2 --
+     green     3 --
 cmd> awkData_query -w type1
 {| class=\"wikitable sortable\"
 |-
-|        red ||     1 ||              
+|        red ||     1 || 
 |-
-|       blue ||     2 ||              
+|       blue ||     2 || 
 |-
-|      green ||     3 ||              
+|      green ||     3 || 
 |}
 
 ## bg_awkDataQueries.sh:awkData_lookup: finished

@@ -5,6 +5,7 @@
 
 ##----------
 ## setup
+##     | ut filter 'sed[a-zA-Z0-9]{6}:###<redacted>:'
 ##     | cmd> local tmpFile; fsMakeTemp --auto tmpFile
 ##     | cmd> cat "$tmpFile"
 ##     | one
@@ -58,7 +59,7 @@ five
 
 # expect that sudo fails because it cant create the tmp file but bgsudo succeeds
 cmd> sed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
-stderr> sed: couldn't open temporary file /tmp/bgmktemp.<redacted>
+stderr> sed: couldn't open temporary file /tmp/bgmktemp.<redacted>/<redacted>: Permission denied
 I am grut
 [exitCode 4]
 cmd> bgsed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"

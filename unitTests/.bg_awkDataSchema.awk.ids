@@ -1,8 +1,7 @@
-awkData_parseID:0 
-awkData_parseID:1 
-awkData_parseID:2 
-awkData_parseID:3 
-schema_restore: 
+awkData_parseID: 
+schema_restore:installedSchema 
+schema_restore:oneOffSchemaFile 
+schema_restore:oneOffDataFile 
 expr_compile:empty 
 expr_compile:andTerms 
 expr_compile:orTerms 

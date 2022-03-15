@@ -358,14 +358,24 @@ function iniParamExists()
 function listIniParam() { iniParamList "$@"; }
 function iniParamList()
 {
+	local sortFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-s|--sort) sortFlag="-s" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local ipg_iniFileSpec="$1"
 	local sectionName="$2"
 	local filterRegex="${3:-".*"}"
 
 	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
-	gawk -v iniTargetSection="${sectionName:-.}" --include bg_ini.awk '
+	gawk -v iniTargetSection="${sectionName:-.}" -v sortFlag="$sortFlag" --include bg_ini.awk '
 		inTarget && iniLineType=="setting" {settingsList[iniParamName]=1}
-		END {for (settingsName in settingsList) print settingsName}
+		END {
+			if (sortFlag)
+				PROCINFO["sorted_in"] = "@ind_str_asc"
+			for (settingsName in settingsList)
+				print settingsName
+		}
 	' "${ipg_iniFiles[@]}" | grep --color=never "^$filterRegex$"
 }
 

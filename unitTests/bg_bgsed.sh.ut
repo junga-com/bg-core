@@ -18,6 +18,7 @@ import bg_bgsed.sh  ;$L1;$L2
 function ut_bgsed()
 {
 	ut setup
+	ut filter 'sed[a-zA-Z0-9]{6}:###<redacted>:'
 	local tmpFile; fsMakeTemp --auto tmpFile
 	cat >"$tmpFile" <<-EOS #noecho
 		one

@@ -266,14 +266,16 @@ function templateListVars()
 	if [ ${#reqVars[@]} -gt 0 ]; then
 		printf "Required Template Variables\n"
 		for varName in "${!reqVars[@]}"; do
-			printf "   %-23s %-23s %s\n" "$varName" "def='${reqVars[$varName]}'" "cur='${!varName}'"
+			local _nameETV _valueETV; templateEvaluateVarToken "$varName"  _nameETV _valueETV
+			printf "   %-23s %-23s %s\n" "$varName" "def='${reqVars[$varName]}'" "cur='${_valueETV}'"
 		done
 	fi
 
 	if [ ${#optVars[@]} -gt 0 ]; then
 		printf "Optional Template Variables\n"
 		for varName in "${!optVars[@]}"; do
-			printf "   %-23s %-23s %s\n" "$varName" "def='${optVars[$varName]}'" "cur='${!varName}'"
+			local _nameETV _valueETV; templateEvaluateVarToken "$varName"  _nameETV _valueETV
+			printf "   %-23s %-23s %s\n" "$varName" "def='${optVars[$varName]}'" "cur='${_valueETV}'"
 		done
 	fi
 }
@@ -294,8 +296,10 @@ function templateListVars()
 #    templateListVars
 function templateGetVarTokens()
 {
+	# "%(  ([$+]*     []:a-zA-Z0-9._[]* (:[^%]*)*)   |([\]*)   )%"
+	#     '$ or +'    '------<expr>---'  :<def>      or \\...
 	templateGetContent "$@" \
-		| grep -o "%\(\([$+]*[]a-zA-Z0-9._[]*\(:[^%]*\)*\)\|\([\]*\)\)%" \
+		| grep -o "%\(\([$+]*[]:a-zA-Z0-9._[]*\(:[^%]*\)*\)\|\([\]*\)\)%" \
 		| tr -d "%" | sed -e "s/ /%20/g; /^[[:space:]]*$/d" \
 		| sort -u
 }
@@ -358,9 +362,9 @@ function completeTemplateVariables()
 }
 
 
-# usage: templateEvaluateVarToken <varNameToken> <nameReturnVar> <valueReturnVar> [<scrContextForErrors>]
+# usage: templateEvaluateVarToken <exprToken> <nameVar> <valueVar> [<scrContextForErrors>]
 # This is a helper function to the templateExpand* family of parser functions. This function defines what variable syntax is
-# supported. Given the <varNameToken> which could contain various syntax for default value and other features, this function parses
+# supported. Given the <exprToken> which could contain various syntax for default value and other features, this function parses
 # out the variable name and attributes and then evaluates its value. The variable name and value are returned to the caller.
 #
 # The syntax that this function supports is documented in the man(5) bgTemplateFileFormat page defined at the top of this file.
@@ -368,110 +372,112 @@ function completeTemplateVariables()
 # Variables used from Parent Scope :
 #    _objectContextES : points to the current object context for evaluating object style template vars
 # Params:
-#    <varNameToken> : the variable token as written in the template file and returned by templateGetVarTokens
-#         The <varNameToken> is everything between the %% but does not include the %%
-#    <nameReturnVar> : output var to receive the name of the variable being referenced
-#    <valueReturnVar> : output var to receive the string value that the token evaluates to
+#    <exprToken>           : the template expression to evaluate as returned by templateGetVarTokens
+#                            The <exprToken> is everything between the %% but does not include the %%
+#    <nameVar>             : output var to receive the name of the variable being referenced in <exprToken>
+#                            this is the <exprToken> with the optional + and default values removed
+#    <valueVar>            : output var to receive the string value that the <exprToken> evaluates to
 #    <scrContextForErrors> : optional context string. If this function asserts an error, this string
-#         is included as the context of where the error happened.
+#                            is included as the context of where the error happened.
 # See Also:
 #    man(5) bgTemplateFileFormat
 #    man(3) completeObjectSyntax (for syntax of the $objSyntax)
 #    man(3) templateExpandExtended (for more syntax specific to it)
 function templateEvaluateVarToken()
 {
-	local _varNameTokenETV="${1//%20/ }"
-	local _nameReturnVarETV="$2"
-	local _resultReturnVarETV="$3"; assertNotEmpty _resultReturnVarETV
-	local context="$4"
-	local _varValueETV="" _varDefValueETV="" _requiredETV="" _foundETV="" _objRefETV
+	local _expressionTokenETV="%${1//%20/ }%"
+	local _nameVarETV="$2"
+	local _valueVarETV="$3"; assertNotEmpty _valueVarETV
+	local _contextETV="$4"
 
-	### parse the token
+	local _nameValueETV _valueValueETV _defaultValueETV _requiredFlagETV _foundFlagETV
 
-	# TODO: create one or a few regex with captures to parse the token directly
+	# to check or change this regex, look at the bg_template.sh:templateExprRegex: unit test testcase
+	local templateExprRegEx='%((([+])?(((config([[]([^]]+)[]])?([a-zA-Z0-9_]*+)))|(([$])([^:%]+))|(([a-zA-Z0-9_]*+)([[]([^]]+)[]])?))(:([^%]*))?)|([\]*))%'
+	local _idxReqFlag=3
+	local _idxConfigExpr=6
+	local _idxConfigSect=8
+	local _idxConfigName=9
+	local _idxObjFlag=11
+	local _idxObjExpr=12
+	local _idxEnvExpr=13
+	local _idxEnvVar=14
+	local _idxEnvInd=16
+	local _idxDef=18
+	local _idxEsc=19
 
-	# _varNameETV will be whittled down to just identifier by removing each optional syntax in turn
-	local _varNameETV="$_varNameTokenETV"
+	local rematch
+	if match "${_expressionTokenETV}"  $templateExprRegEx rematch; then
+		_requiredFlagETV="${rematch[$_idxReqFlag]}"
+		_defaultValueETV="${rematch[$_idxDef]}"
 
-	# parse out the default value if present.
-	if [[ "$_varNameETV" =~ : ]]; then
-		_varDefValueETV="${_varNameETV#*:}"
-		_varNameETV="${_varNameETV%%:*}"
-	fi
+		# if config type expression
+		if [ "${rematch[$_idxConfigExpr]}" == "config" ]; then
+			local _sectETV="${rematch[$_idxConfigSect]}"
+			local _settingETV="${rematch[$_idxConfigName]}"
+			_nameValueETV="${rematch[$_idxConfigExpr]}"
 
-	# parse out the + token which indicates that its required.
-	if [[ "$_varNameETV" =~ ^\+ ]]; then
-		_varNameETV="${_varNameETV#+}"
-		_requiredETV="1"
-	fi
+			# cache the system wide config if it has not already been cached
+			! type -t configFlatten &>/dev/null && import bg_config.sh  ;$L1;$L2
+			if [ ${#_templateConfigCtx[@]} -eq 0 ]; then
+				! varExists _templateConfigCtx && declare -gA _templateConfigCtx
+				configFlatten -M _templateConfigCtx
+			fi
 
-	# if it contains a '.' (dot), its an object ref. The leading '$' is optional
-	if [[ "$_varNameETV" =~ \. ]]; then
-		_varNameETV="${_varNameETV#$}"
-		_objRefETV="1"
-	fi
+			# look up the value if it exists
+			[ "$_sectETV" == "." ] && _sectETV=""
+			if [ ${_templateConfigCtx[${_sectETV}${_sectETV:+.}${_settingETV}]+exits} ]; then
+				_valueValueETV="${_templateConfigCtx[${_sectETV}${_sectETV:+.}${_settingETV}]}"
+				_foundFlagETV="1"
+			fi
 
-	#"; Atom syntax highlight bug fix
+		# if Object type expression
+		elif [ "${rematch[$_idxObjFlag]}" == "\$" ]; then
+			_nameValueETV="${_objectContextES}${_objectContextES:+.}${rematch[$_idxObjExpr]}"
+			if _valueValueETV="$(objEval $_nameValueETV 2>/dev/null)"; then
+				_foundFlagETV="1"
+			fi
 
-	### perform the evaluation
+		# if Environment Var type expression (the typical case)
+		elif [ "${rematch[$_idxEnvExpr]}" ]; then
+			_nameValueETV="${rematch[$_idxEnvExpr]}"
+			if varExists "$_nameValueETV"; then
+		 		_foundFlagETV="1"
+				_valueValueETV="${!_nameValueETV}"
+			fi
 
-	# do the supported escape sequences to insert literal % into the output
-	# if the _varNameETV contains only one or more '/' then we replace each '/' with a %
-	# however, if we insert the % in the sed script like we would a normal value, in some cases they would be interpretted as a new var
-	# so we use  $templateMagicEscToken as a place holder that we replace latter with %
-	if [[ "$_varNameETV" =~ ^\\\\*$ ]]; then
-		_foundETV="1"
-		_varValueETV="${_varNameETV//\\/$templateMagicEscToken}"
+		# if its one or more escaped %
+		elif [ "${rematch[$_idxEsc]}" ]; then
+			_foundFlagETV="1"
+			_valueValueETV="${rematch[$_idxEsc]//\\/$templateMagicEscToken}"
 
-	# recognize config refs
-	# there are two syntaxes
-	#     $config[<sectName>]<settingName>%
-	#     $config.<sectName>.<settingName>%
-	elif [[ "$_varNameETV" =~ ^config[[]([^]]*)[]](.*)$  ]] || [[ "$_varNameETV" =~ ^config[.]([^.]*)[.](.*)$  ]]; then
-		local _sectETV="${BASH_REMATCH[1]}"
-		local _settingETV="${BASH_REMATCH[2]}"
-
-		! type -t configFlatten &>/dev/null && import bg_config.sh  ;$L1;$L2
-		if [ ${#_templateConfigCtx[@]} -eq 0 ]; then
-			! varExists _templateConfigCtx && declare -gA _templateConfigCtx
-			configFlatten -M _templateConfigCtx
+		# error: some unknown syntax
+		else
+			assertLogicError "The template regex matched the expression but the code does not recognize which type of syntax matched"
 		fi
-		[ "$_sectETV" == "." ] && _sectETV=""
-		_varValueETV="${_templateConfigCtx[${_sectETV}${_sectETV:+.}${_settingETV}]}"
-		_foundETV="1"
+	else
+		assertError -v expression:_expressionTokenETV "Could not parse the template expression. Did not recognize it as any known syntax"
+	fi
 
-	# do the supported object reference syntax
-	# I dont know why we use the _objRefETV flag instead of doing the check here (i dont remember and I dont want to disturb it now 2022-03)
-	elif [ "$_objRefETV" ]; then
-		_varNameETV="${_objectContextES}${_objectContextES:+.}${_varNameETV}"
-		_varValueETV="$(objEval $_varNameETV 2>/dev/null)" && _foundETV="1"
-
-	# if the variable exists as a ENV var
-	elif [ "${!_varNameETV+test}" == "test" ]; then
-	 	_foundETV="1"
-		_varValueETV="${!_varNameETV}"
+	# if its required but its not found, throw an exception
+	if [ "$_requiredFlagETV" ] && [ ! "$_foundFlagETV" ]; then
+		assertTemplateError -v context:_contextETV "required template var '$_nameValueETV' is not defined"
 	fi
 
 	# if not found, set the default value if any
-	if [ ! "$_foundETV" ]; then
-		if [[ "$_varDefValueETV" =~ ^\$ ]]; then
-			_varDefValueETV="${_varDefValueETV:1}"
-			[[ ! "$_varDefValueETV" =~ ^[a-zA-Z0-9_]*$ ]] && assertTemplateError -v context -v _varNameTokenETV "an indirect default value can not contain special characters besides the leading \$"
-			_varValueETV="${!_varDefValueETV}"
+	if [ ! "$_foundFlagETV" ]; then
+		# SECURITY: we allow the default to refer to env variables as long as it does not contain special chars that could execute arbitrary code
+		if [[ "$_defaultValueETV" =~ ^\$ ]]; then
+			_defaultValueETV="${_defaultValueETV:1}"
+			[[ ! "$_defaultValueETV" =~ ^[a-zA-Z0-9_]*$ ]] && assertTemplateError -v context:_contextETV -v expression:_expressionTokenETV "an indirect default value can not contain special characters besides the leading \$"
+			_valueValueETV="${!_defaultValueETV}"
 		else
-			_varValueETV="$_varDefValueETV"
+			_valueValueETV="$_defaultValueETV"
 		fi
 	fi
 
-	### finish
-
-	if [ "$_requiredETV" ] && [ ! "$_foundETV" ]; then
-		assertTemplateError -v context "required template var '$_varNameETV' is not defined"
-	fi
-
-	# SECURITY: refactor this function using -n to avoid using eval
-	eval $_nameReturnVarETV="\$_nameReturnVarETV"
-	eval $_resultReturnVarETV="\$_varValueETV"
+	setReturnValue "$_nameVarETV" "$_nameValueETV"
+	returnValue "$_valueValueETV" "$_valueVarETV"
 }
 
 

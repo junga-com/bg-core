@@ -6,16 +6,18 @@ function makeTestData() {
 
 	declare -g utDataFolder="$(mktemp -d)"
 
+	### Make type1 complete awkDataID registered, with data and schema files
 
-	cat - >"$utDataFolder/manifest" <<-EOS
-		ut awkDataSchema  foo /usr/share/ut/foo.awkDataSchema
-	EOS
+	# add it to the manifest which points to the schema file
+	echo "ut awkDataSchema type1 $utDataFolder/type1.awkDataSchema" >>"$utDataFolder/manifest"
 
+	# type1 schema file which points to the data file
 	cat - >"$utDataFolder/type1.awkDataSchema" <<-EOS
 		columns=one(10) two(5) three(13)
 		awkFile="$utDataFolder/type1.cache"
 	EOS
 
+	# type1 data file
 	cat - >"$utDataFolder/type1.cache" <<-EOS
 		one(10) two(5) three(13)
 		<dependentsList>
@@ -24,42 +26,95 @@ function makeTestData() {
 		green     3        --
 	EOS
 
-	echo "ut awkDataSchema type1 $utDataFolder/type1.awkDataSchema" >>"$utDataFolder/manifest"
+
+
+	### Make a one-off data file
+
+	# foo data file
+	cat - >"$utDataFolder/foo.data" <<-EOS
+		manufacture  model serial
+
+		supermicro    CU465       12345
+		supermicro    SM305       12346
+		ibm           x306        12347
+		ibm           x3650       12347
+	EOS
+
+
+	### Make a one-off data file
+
+	# bar schema file
+	cat - >"$utDataFolder/bar.schema" <<-EOS
+		columns=one(10) two(5) three(13)
+		awkFile="$utDataFolder/bar.cache"
+	EOS
 }
 
 
-declare -A ut_awkData_parseID=(
-	[0]="foo"
-	[1]="./foo"
-	[2]="foo|"
-	[3]="foo|./foo.cache|./foo.schema"
-)
 function ut_awkData_parseID() {
 	ut setup
 	makeTestData
 	export bgVinstalledManifest="$utDataFolder/manifest"
 	cat "$bgVinstalledManifest"
-	echo "awkDataID=$1"
+	ls -1 "$utDataFolder/"
 
 	ut test
-	awk  -v awkDataID="$1" '
-		@include "bg_awkDataSchema.awk"
-		BEGIN {print("long form = " awkData_parseID(awkDataID))}
-	'
+	ut expect "that the long form ID is completely filled in from the manifest"
+	awkDataID="type1"
+	awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
+
+	ut test
+	ut expect "empty file parts because type2 does ot exist in the manifest"
+	awkDataID="type2"
+	awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
+
+	ut test
+	ut expect "the data one-off data file with no schema"
+	awkDataID="$utDataFolder/foo.data"
+	awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
+
+	ut test
+	ut expect "the one-off data file does not need to exist"
+	awkDataID="$utDataFolder/type2.data"
+	awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
+
+	ut test
+	ut expect "the one-off data file with the same base name as an installed awkObjName will use its schema"
+	awkDataID="$utDataFolder/type1.myData"
+	awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
+
+	ut test
+	ut expect "an exception because the specified schema file does not exit"
+	awkDataID="$utDataFolder/type2.schema"
+	awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
+
+	ut test
+	ut expect "specify an existing schema file but the data file does not yet exit"
+	awkDataID="$utDataFolder/bar.schema"
+	awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
+
+	ut test
+	ut expect "we can use an existing awkObjName schema with a totally new data file name"
+	awkDataID="|$utDataFolder/bar.schema|type1"
+	awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
+
 }
 
-
+declare -A ut_schema_restore=(
+	["installedSchema"]="type1"
+	["oneOffSchemaFile"]="<utDataFolder>/bar.schema"
+	["oneOffDataFile"]="<utDataFolder>/foo.data"
+)
 function ut_schema_restore() {
 	ut setup
 	makeTestData
+	awkDataID="${1//<utDataFolder>/$utDataFolder}"
 	export bgVinstalledManifest="$utDataFolder/manifest"
 	cat "$bgVinstalledManifest"
 
 	ut test
-	awk  -v awkDataIDList="type1" '
-		@include "bg_awkDataSchema.awk"
-		BEGIN {printfVars("schemas")}
-	'
+	echo "awkDataID=$awkDataID" #noecho
+	awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("schemas awkDataID", "-o/dev/stdout")}'
 }
 
 declare -A ut_expr_compile=(
@@ -82,15 +137,18 @@ function ut_expr_compile() {
 	makeTestData
 	export bgVinstalledManifest="$utDataFolder/manifest"
 	cat "$bgVinstalledManifest"
+	awkScript='
+		@include "bg_awkDataSchema.awk"
+		BEGIN {
+			PROCINFO["sorted_in"]="@ind_str_asc";
+			arrayCreate(compiledExpr);
+			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
+			printfVars("compiledExpr", "-o/dev/stdout");
+		}
+	'
+	echo "$awkScript"
 
 	ut test
 	echo "$1"
-	awk  -v awkDataIDList="type1" -v filterExpr="$1" '
-		@include "bg_awkDataSchema.awk"
-		BEGIN {
-			arrayCreate(compiledExpr);
-			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-			printfVars("compiledExpr");
-		}
-	'
+	awk  -v awkDataIDList="type1" -v filterExpr="$1" "$awkScript"
 }

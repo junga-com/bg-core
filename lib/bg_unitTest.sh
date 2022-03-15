@@ -8,12 +8,14 @@
 #        function ut_myTest() { ...}
 # This is a bash script library that implements a unit test script system.
 # Unit test scripts are simple bash scripts that follow a minimal pattern. They can be invoked directly from the command line or
-# within the unit test framework provided by the `bg-dev` package. They get bash command line completion support automatically. The
-# command line syntax allows listing the testcase names contained within, running a specific testcase, or lauching the debugger
-# stopped at the first line of a specific testcase.
+# within the unit test framework provided by the `bg-dev` package.
 #
-# Writing a testcase is no harder than writing a one-off test script. A unit test script contains one or more functions and the
-# command line arguments allow you to select which function will run and with what arguments.
+# Writing a testcase is no harder than writing a simple one-off test script. A unittest script contains one or more functions. Each
+# function can optionally have a global array with the same name. Each element in that array creates a single testcase that invokes
+# the function with the arguments contained in the element. The relative testcase ID is <utFunction>:<arrayIndex>.  The array can
+# be numeric or associative. They are often associative arrays so that the <arrayIndex> names can be more descriptive but sometimes
+# numeric names are fine. If the coresponding global array is not defined, the function will have one testcase named <utFunction>:
+# that invokes the function with no arguments.
 #
 # These test scripts can be used to test not only bash script libraries and commands, but also the output and effects of any cli
 # program written in any language. The premise of the system is that the testcase produces output on stdout, stderr, and the
@@ -26,30 +28,34 @@
 #    1) create a script file using these naming conventions.
 #       * end in the .ut extension. This tells the bash completion loader provided by bg-core to enable BC.
 #       * place the file in a project's ./unitTests/ folder. This allows it to participate in the project's unit testing.
+#         # TODO: update unittest code to use the manifest instead of requiring that they be in the ./unitTests folder.
 #       * by convention, use the name of the library that it will test. e.g. unitTests/bg_coreStack.sh.ut contains tests for bg_coreStack.sh
 #    2) make the file executable (chmode a+x uitTests/<file>.ut)
 #    3) put this text on the file's first line "#!/usr/bin/env bg-utRunner"
-#    4) define one or more testcase Functions starting with ut_
+#    4) define one or more testcase Functions starting with ut_ and their optional gloabl arrays with invocation arguments.
+#    5) if you want the function to be run multiple times passing in different arguments, declare an array variable with the same
+#       name as the function. Each element in the array creates a separate testcase.
 #
-# Now you can invoke the test script from the command line, using <tab><tab> to have bash completion lead you through composing the
-# command line.  Running directly from the command line sends the normalized output of a testcase to stdout so that you can
-# quickly develop and debug each testcase. It does not tell you if the testcase passes or fails.
+# Now you can invoke the test script from the command line, using "./unitTests/<utFilename>.ut <tab><tab>" to have bash completion
+# lead you through composing the command line.  Running directly from the command line sends the normalized output of a testcase to
+# stdout so that you can quickly develop and debug each testcase. It does not tell you if the testcase passes or fails.
 #
 # You can also run the testcases from the project's unit test system.
-#    `bg-dev tests run <fileNameWith_.ut_removed>[:<testcaseName>]`
-# The first time you run the new script, the state of its testcases will be "unintialized". Run ...
-#    `bg-dev tests show <fileNameWith_.ut_removed>[:<testcaseName>]`
-#  ...to open a comparison application (default is `meld`) which allows you to create the expected data (aka 'plato' data). Creating
-# the plato data is documenting the expected behavior of the target code being tested so make sure that you review the output of the
-# new tests carefully. If its a work-in-progress, edit the plato data to either be the exact output that it should eventually be, or
-# just type a note explaining what the output should be in the future. As long as the plato data is not a match to the actual output,
-# the testcase will report as being in the failed state, indicating that work needs to be done before the target code and testcase
-# are finished.
+#    `bg-dev tests run <fileNameWithout_.ut>[:<utFunctionName>[:<utArgsName>]]`
 #
+# The first time you run the new script, the state of its testcases will be "unintialized". Run ...
+#    `bg-dev tests show <fileNameWith_.ut_removed>[:<utFunctionName>[:<utArgsName>]]
+# ...to open a comparison application (default is `meld` See man getUserCmpApp) which allows you to create the expected data
+# (aka 'plato' data). Creating the plato data is documenting the expected behavior of the target code being tested so make sure
+# that you review the output of the new tests carefully. If its a work-in-progress, edit the plato data to either be the exact
+# output that it should eventually be, or just type a note explaining what the output should be in the future. As long as the
+# plato data is not a match to the actual output, the testcase will report as being in the failed state, indicating that work needs
+# to be done before the target code and testcase are finished. Note that lines in the output that start with # do not need to match
+# for the testcase to pass.
 #
 # Creating Testcases:
 # A unit test script can have multiple, independent testcase functions and for each function can specify multiple command lines
-# to invoke the function with. Each (function + arguments) command line is a unique testcase that run independently of other test
+# to invoke the function with. Each (function + arguments) command line is a unique testcase that runs independently of other test
 # cases.
 #
 # **Testcase Functions** : Any function defined in the file that starts with ut_* is a testcase function. By default the test
@@ -180,6 +186,9 @@
 #
 # **ut expect "..."**
 # The expect directive is a comment with the specific intention to tell the reader what to expect in the output that follows.
+# Note that this is one of two ways to specify the expected behavior. The other is a comment in the form "# expect: <description>"
+# The comment expect applies to the entire testcase and appears at the top of the output reguardless of where it appears. The "ut expect"
+# applies to what is directly after it. For example "ut expect: that the next command's exit code is not 0"
 #
 # **ut filter '<matchRegEx>[###<replaceText>]'**
 # When the code being tested has output that changes with each run, a filter can be used to 'redact' that output so that the output
@@ -222,8 +231,10 @@
 #
 #
 # See Also:
-#    man(1) bg-unitTest.ut
 #    man(1) bg-dev-tests
+#    man(1) bg-utRunner
+#    man(7) bg_unitTestsRunner.sh
+#    man(3) ut
 
 # bgUnitTestMode=utRuntime|direct
 declare -g bgUnitTestMode="utRuntime"; [[ "$bgLibExecCmd" =~ ([.]ut)|(bg-utRunner)$ ]] && bgUnitTestMode="direct"
@@ -542,7 +553,7 @@ function _ut_debugTrap()
 # usage: utfRunner_execute <utFilePath> <utFunc> <utParams>
 # execute one testcase. A testcasse is a call to the utFunc with a particular array of cmdline arguments identified by utParams.
 # This function is written so that it will do what ever work it needs to to setup the environment for the testcase to run, but it
-# will detect if the caller has already done the work to set the environment and use it without repeatin the work. This makes it
+# will detect if the caller has already done the work to set the environment and use it without repeating the work. This makes it
 # efficient to call in a batch and functional to call on its own for a single testcase. This is the only function that executes
 # testcases.
 #
@@ -767,7 +778,7 @@ function utfDirectScriptRun()
 	local cmd="${1:-list}"; shift
 
 	case $cmd in
-		list)   directUT_listContainedUtIDs ;;
+		list)   directUT_listContainedUtIDs "$@" ;;
 		run)    directUT_runTestCases "$@" ;;
 		debug)  directUT_runTestCases "--debug" "$@" ;;
 		*)      assertError -v cmd -v bgUnitTestScript "unkown cmd. expecting list run or debug"
@@ -820,26 +831,27 @@ function directUT_runTestCases()
 	[ ${count:-0} -eq 0 ] && assertError -v spec "utID spec did not match any testcases"
 }
 
+# usage: directUT_listContainedUtIDs [-f|--fullyQualyfied=file|pkg]
 function directUT_listContainedUtIDs()
 {
-	local fullyQualyfiedFlag
+	local qualyficationType
 	while [ $# -gt 0 ]; do case $1 in
-		-f|--fullyQualyfied) fullyQualyfiedFlag="--fullyQualyfied" ;;
+		-f*|--fullyQualyfied*)  bgOptionGetOpt val: qualyficationType "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	awk -v fullyQualyfied="$fullyQualyfiedFlag" '@include "bg_unitTest.awk"' "$bgUnitTestScript"
+	gawk -v fullyQualyfied="$qualyficationType" '@include "bg_unitTest.awk"' "$bgUnitTestScript"
 }
 
 function directUT_listContainedUtFuncs()
 {
-	awk -v cmd='getUtFuncs' '@include "bg_unitTest.awk"' "$bgUnitTestScript"
+	gawk -v cmd='getUtFuncs' '@include "bg_unitTest.awk"' "$bgUnitTestScript"
 }
 
 function directUT_listContainedUTParamsForUtFunc()
 {
 	local utFunc="$1"
-	awk -v cmd='getUtParamsForUtFunc' -v utFunc="$utFunc" '@include "bg_unitTest.awk"' "$bgUnitTestScript"
+	gawk -v cmd='getUtParamsForUtFunc' -v utFunc="$utFunc" '@include "bg_unitTest.awk"' "$bgUnitTestScript"
 }
 
 # this is invoked by invokeOutOfBandSystem when -hb is the first param

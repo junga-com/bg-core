@@ -371,7 +371,7 @@ argsV[]
 
 ###############################################################################################################################
 ## bg_objects.sh:initialState: start
-## expect:  shows the classes that ae initially created and their content
+## expect:  shows the classes that are initially created and their content
 
 ##----------
 ## setup
@@ -379,10 +379,8 @@ argsV[]
 
 ##----------
 ## test
-cmd> echo Object ${Object[subClasses]}
+cmd> ./unitTests/bg_objectsInitialStateTest.sh
 Object Class NullObject Stack Array Map
-cmd> local class; for class in Object ${Object[subClasses]}; do
-cmd> showClass "$class"
 #
 #
 #------------------ Object --------------------
@@ -447,8 +445,6 @@ Object_vmt[]
       [_method::clear           ]='Object::clear'
       [_method::getStaticMethods]='Object::getStaticMethods'
 
-cmd> local class; for class in Object ${Object[subClasses]}; do
-cmd> showClass "$class"
 #
 #
 #------------------ Class --------------------
@@ -500,8 +496,6 @@ Class_vmt[]
      [_method::clear                ]='Object::clear'
      [_method::getStaticMethods     ]='Object::getStaticMethods'
 
-cmd> local class; for class in Object ${Object[subClasses]}; do
-cmd> showClass "$class"
 #
 #
 #------------------ NullObject --------------------
@@ -521,8 +515,6 @@ NullObjectInstance[]
           [_Ref  ]='assertError Null Object reference called <NULL>'
           [0     ]='assertError Null Object reference called <NULL>'
           [_OID  ]='NullObjectInstance'
-cmd> local class; for class in Object ${Object[subClasses]}; do
-cmd> showClass "$class"
 #
 #
 #------------------ Stack --------------------
@@ -538,8 +530,6 @@ Stack[]
 #    
 Stack_vmt[]
 
-cmd> local class; for class in Object ${Object[subClasses]}; do
-cmd> showClass "$class"
 #
 #
 #------------------ Array --------------------
@@ -557,8 +547,6 @@ Array[]
 #    
 Array_vmt[]
 
-cmd> local class; for class in Object ${Object[subClasses]}; do
-cmd> showClass "$class"
 #
 #
 #------------------ Map --------------------
@@ -1169,6 +1157,7 @@ obj : <instance> of Object
 
 ##----------
 ## setup
+##     | ut filter '^(subClasses[[:space:]]*=).*$###\1<redacted>'
 ##     | cmd> local -n obj; ConstructObject Object obj
 
 ##----------
@@ -1203,7 +1192,7 @@ methods       =Object::addMethod
 + Object::toFlatINI
 + Object::toString
 staticMethods =
-subClasses    =Class NullObject Stack Array Map
+subClasses    =<redacted>
 name          =Object
 
 ## bg_objects.sh:Object_staticCallSyntax: finished

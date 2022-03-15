@@ -13,7 +13,10 @@ supportedCmds="query count get"
 
 ###############################################################################
 # Command manpage
-# usage: bg-core [-q|-v] templates [<subCmdOptions>] [<subCmdArguments>]
+# usage: bg-awkData -q|--query     [options] <awkDataID> [<filterTerm1>...<filterTermN>]
+# usage: bg-awkData -s|--summary   [options] <awkDataID> [<filterTerm1>...<filterTermN>]
+# usage: bg-awkData -g|--get       [options] <awkDataID> [<filterTerm1>...<filterTermN>]
+# usage: bg-awkData -i|--tableInfo [options] <awkDataID>
 # query and manipulate general host settings and resources.
 # The bg-core package provides various addons to the base OS distribution.
 #
@@ -23,6 +26,36 @@ supportedCmds="query count get"
 #  * dropin    : see status of and enable/disable various dropin configurations
 #  * config    : query and set host and domain configuration settings
 #
+# Options:
+#   Operations...
+#    -q|--query)          : query a table with filters
+#    -s|--summary)        : query a table for unique values of one or more columns showing how many times each unique value appears
+#    -g|--get)            : return the value of one or more columns for a set of filters. This is similar to query but has a different
+#                           signature to make it easier to get a specific value. Typically this is used with a primary key type query
+#                           to identify a single row.
+#    -i|--tableInfo)      : pint out the schema information for a table
+#
+#   Other options...
+#    -c*|--columns*)      : specify the columns that should be in the result set. You can also list the columns after the <awkDataID>
+#                           i.e. "bg-awkData manifest.assetType,assetName" is the same as "bg-awkData -c assetType,assetName manifest"
+#    -n|--noDirtyCheck)   : assume the table is up-to-date and do not try to rebuild it even if its dirty
+#    -f|--forceRebuild)   : attempt a rebuild of the table unconditionally before going on to perform the specified operation.
+#    -r|--refresh)        : attempt a rebuild of the table unconditionally and return without attempting an operation
+#    -e|--escapeOutput)   : do not unescape the output. This would mean that spaces in fields will be represented as %20 and the
+#                           only whitespace in the output will be the separators between column values.
+#    -H|--header)         : display the column names before the query results
+#    -F*|--tblFormat*)    : specify a different template to format the result set into the output
+#    -w|--wiki)           : shortcut for -Fwiki
+#    -p|--plainFilter)    : ignore the default filters specified in the schema. For example, a schema might have a default filter
+#                           that excludes records with a archived column set. Normally the user does not want to see those but this
+#                           option gives the user a chance to query the archived records too.
+#    -1|--assertOneValue) : declare that the query filters should act as a primary key to make sure that the result set includes
+#                           exactly one record if its found or no records if it is not.  If the query has multiple result records
+#                           an assertError will be thrown
+#
+# Params:
+#    <awkDataID>  : the table identifier. Its either the assetName of an awkDataSchema assetType in the hostmanifest or it can be
+#                   a path to a schema or data file.
 # See Also:
 
 ###############################################################################
@@ -121,6 +154,6 @@ case ${cmd:-query} in
 	query)      awkData_query        "${passThruOpts[@]}" "$awkDataID" "$@" ;;
 	summary)    awkData_countValues  "${passThruOpts[@]}" "$awkDataID" "$@" ;;
 	get)        awkData_getValue     "${passThruOpts[@]}" "$awkDataID" "$@" ;;
-	tableInfo)  awkData_showSchema   "${passThruOpts[@]}" "$awkDataID" "$@" ;;
+	tableInfo)  awkData_tableInfo    "${passThruOpts[@]}" "$awkDataID" "$@" ;;
 	*) assertError -v cmd "unknown cmd" ;;
 esac

@@ -872,13 +872,13 @@ cmd> iniSectionExists    "$iniFile" 'sect:1'
 
 ##----------
 ## test
-cmd> listIniParam "$iniFile" '.'
+cmd> listIniParam -s "$iniFile" '.'
 [exitCode 1]
-cmd> listIniParam "$iniFile" 'sect1'
+cmd> listIniParam -s "$iniFile" 'sect1'
 [exitCode 1]
-cmd> listIniParam "$iniFile" 'sect2'
+cmd> listIniParam -s "$iniFile" 'sect2'
 [exitCode 1]
-cmd> listIniParam "$iniFile" 'sect:1'
+cmd> listIniParam -s "$iniFile" 'sect:1'
 [exitCode 1]
 
 ## bg_ini.sh:listIniParam:empty finished
@@ -904,16 +904,16 @@ cmd> listIniParam "$iniFile" 'sect:1'
 
 ##----------
 ## test
-cmd> listIniParam "$iniFile" '.'
+cmd> listIniParam -s "$iniFile" '.'
+honey
 p1
 p2
 p3.a
-honey
-cmd> listIniParam "$iniFile" 'sect1'
+cmd> listIniParam -s "$iniFile" 'sect1'
 [exitCode 1]
-cmd> listIniParam "$iniFile" 'sect2'
+cmd> listIniParam -s "$iniFile" 'sect2'
 [exitCode 1]
-cmd> listIniParam "$iniFile" 'sect:1'
+cmd> listIniParam -s "$iniFile" 'sect:1'
 [exitCode 1]
 
 ## bg_ini.sh:listIniParam:noSections finished
@@ -942,14 +942,14 @@ cmd> listIniParam "$iniFile" 'sect:1'
 
 ##----------
 ## test
-cmd> listIniParam "$iniFile" '.'
+cmd> listIniParam -s "$iniFile" '.'
 [exitCode 1]
-cmd> listIniParam "$iniFile" 'sect1'
+cmd> listIniParam -s "$iniFile" 'sect1'
 p1
 p2
-cmd> listIniParam "$iniFile" 'sect2'
+cmd> listIniParam -s "$iniFile" 'sect2'
 honey
-cmd> listIniParam "$iniFile" 'sect:1'
+cmd> listIniParam -s "$iniFile" 'sect:1'
 [exitCode 1]
 
 ## bg_ini.sh:listIniParam:noTopLevel finished
@@ -978,15 +978,15 @@ cmd> listIniParam "$iniFile" 'sect:1'
 
 ##----------
 ## test
-cmd> listIniParam "$iniFile" '.'
+cmd> listIniParam -s "$iniFile" '.'
 p1
 p2
-cmd> listIniParam "$iniFile" 'sect1'
+cmd> listIniParam -s "$iniFile" 'sect1'
 p1
 p2
-cmd> listIniParam "$iniFile" 'sect2'
+cmd> listIniParam -s "$iniFile" 'sect2'
 honey
-cmd> listIniParam "$iniFile" 'sect:1'
+cmd> listIniParam -s "$iniFile" 'sect:1'
 [exitCode 1]
 
 ## bg_ini.sh:listIniParam:topAndSections finished
@@ -1016,14 +1016,14 @@ cmd> listIniParam "$iniFile" 'sect:1'
 
 ##----------
 ## test
-cmd> listIniParam "$iniFile" '.'
+cmd> listIniParam -s "$iniFile" '.'
 p1
 p2
-cmd> listIniParam "$iniFile" 'sect1'
+cmd> listIniParam -s "$iniFile" 'sect1'
 [exitCode 1]
-cmd> listIniParam "$iniFile" 'sect2'
+cmd> listIniParam -s "$iniFile" 'sect2'
 [exitCode 1]
-cmd> listIniParam "$iniFile" 'sect:1'
+cmd> listIniParam -s "$iniFile" 'sect:1'
 p1
 p2
 
@@ -1074,7 +1074,7 @@ cmd> listIniSection "$iniFile" "sect:.*"
 ##----------
 ## test
 cmd> listIniSection "$iniFile"
-[exitCode 1]
+.
 cmd> listIniSection "$iniFile" 'sect.*'
 [exitCode 1]
 cmd> listIniSection "$iniFile" "sect:.*"
@@ -1107,13 +1107,13 @@ cmd> listIniSection "$iniFile" "sect:.*"
 ##----------
 ## test
 cmd> listIniSection "$iniFile"
+sect14
 sect1
 sect2
-sect14
 cmd> listIniSection "$iniFile" 'sect.*'
+sect14
 sect1
 sect2
-sect14
 cmd> listIniSection "$iniFile" "sect:.*"
 [exitCode 1]
 
@@ -1146,6 +1146,7 @@ cmd> listIniSection "$iniFile" "sect:.*"
 cmd> listIniSection "$iniFile"
 sect1
 sect2
+.
 cmd> listIniSection "$iniFile" 'sect.*'
 sect1
 sect2
@@ -1180,6 +1181,7 @@ cmd> listIniSection "$iniFile" "sect:.*"
 ##----------
 ## test
 cmd> listIniSection "$iniFile"
+.
 sect:1
 sect:2
 cmd> listIniSection "$iniFile" 'sect.*'
@@ -1661,21 +1663,21 @@ PASS    : char ':' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c\c'
-stderr> awk: warning: escape sequence `\c' treated as plain `c'
+stderr> gawk: warning: escape sequence `\c' treated as plain `c'
 unquoted      value written and reread = 'cc'
-stderr> awk: warning: escape sequence `\c' treated as plain `c'
+stderr> gawk: warning: escape sequence `\c' treated as plain `c'
 single quoted value written and reread = 'cc'
-stderr> awk: warning: escape sequence `\c' treated as plain `c'
+stderr> gawk: warning: escape sequence `\c' treated as plain `c'
 double quoted value written and reread = 'cc'
-stderr> awk: warning: escape sequence `\N' treated as plain `N'
+stderr> gawk: warning: escape sequence `\N' treated as plain `N'
 read from [readDataTest]'test\Name'      (expect 'hello') as = 'badValue'
-stderr> awk: warning: escape sequence `\N' treated as plain `N'
-stderr> awk: warning: escape sequence `\N' treated as plain `N'
+stderr> gawk: warning: escape sequence `\N' treated as plain `N'
+stderr> gawk: warning: escape sequence `\N' treated as plain `N'
 written and read back from [writeParamNameTest]test\Name' as = 'hello'
-stderr> awk: warning: escape sequence `\N' treated as plain `N'
+stderr> gawk: warning: escape sequence `\N' treated as plain `N'
 read from [test\Name]p1        (expect 'howdy') as = 'badValue'
-stderr> awk: warning: escape sequence `\N' treated as plain `N'
-stderr> awk: warning: escape sequence `\N' treated as plain `N'
+stderr> gawk: warning: escape sequence `\N' treated as plain `N'
+stderr> gawk: warning: escape sequence `\N' treated as plain `N'
 written and read back from [NewSection\Name]foo as = 'howdy'
 INVALID : char '\' can NOT be used in unquoted value
 INVALID : char '\' can NOT be used in single quoted value

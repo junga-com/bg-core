@@ -8,15 +8,17 @@
 #
 # Format:
 # The manifest file has four columns. Each row is a single asset.
-#    <pkgName>        <assetType>      <assetName>     <assetPath>
+#    <pkg>        <assetType>      <assetName>     <path>
+#
+# <pkg> is typpically the owning package name but can also be localadmin or domainadmin for assets installed directly by a user.
 #
 # The <assetType> consists of the base type optionally followed by qualifications separated by '.'. Each qualification is a subclass
 # of the preeding type. For example, all assets that start with "cmd*" are linux commands, both binary and script based but those
 # starting with "cmd.script*" are text based scripts, and "cmd.script.bash" are written to the bash script standard.
 #
-# The <assetName> is typically the base filename with no path an dno extension but does not have to be.
+# The <assetName> is typically the base filename with no path and no extension but does not have to be.
 #
-# the <assetPath> is the location of the asset on the local host. It can be any filesystem object -- file, folder, etc...
+# the <path> is the location of the asset on the local host. It can be any filesystem object -- file, folder, etc...
 #
 # See Also:
 #    man(1) bg-dev-manifest  : from the bg-dev package which supports creating and distributing projects that contain assets.
@@ -40,7 +42,7 @@ function manifestSummary()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	cat "$manifestFile" | awk '
+	cat "$manifestFile" | gawk '
 		{
 			pkg=$1; type=$2
 			types[pkg][type]++
@@ -60,7 +62,7 @@ function manifestSummary()
 # usage: manifestReadTypes [-f|--file=<manifestFile>] [<typesRetVar>]
 # get the list of asset types present in the project's manifest file
 # Params:
-#    <typesRetVar>  : the variable name of an array to return the asset type names in
+#    <typesRetVar>  : the variable name of an associative (-A) array to return the asset type names in its indexes
 # Options:
 #    -f|--file=<manifestFile> : the default manifest file is $manifestInstalledPath
 function manifestReadTypes()
@@ -93,10 +95,13 @@ function manifestReadTypes()
 # Options:
 #    -f|--file=<manifestFile> : the default manifest file is $manifestInstalledPath
 #    --names : return <assetName>|<assetFile> instead of only <asstFile> in each elelment of the returned array
+#    -p|--pkg|--pkgName=<pkgName> : restrict the output to assets owned by <pkgName>
 function manifestReadOneType()
 {
-	local manifestFile; manifestGetHostManifest manifestFile namesFlag
+	local manifestFile; manifestGetHostManifest manifestFile
+	local namesFlag pkgMatch=".*"
 	while [ $# -gt 0 ]; do case $1 in
+		-p*|--pkg*|--pkgName*) bgOptionGetOpt val: pkgMatch "$@" && shift ;;
 		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		--names) namesFlag="--names" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
@@ -104,15 +109,15 @@ function manifestReadOneType()
 	local filesVar="$1"
 	local type="$2"
 
-	local _name file
+	local _name file i=0
 	while read -r _name file; do
 		if [ "$namesFlag" ]; then
 			varSet "$filesVar[$((i++))]" "${_name}|${file}"
 		else
 			varSet "$filesVar[$((i++))]" "$file"
 		fi
-	done < <(gawk -v type="$type" '
-		$2==type {print $3" "$4}
+	done < <(gawk -v type="$type" -v pkgMatch="$pkgMatch" '
+		$1~"^"pkgMatch"$" && $2==type {print $3" "$4}
 	' "$manifestFile")
 }
 
@@ -126,7 +131,7 @@ function manifestReadOneType()
 # Based on the arguments passed, it can either create the manifest from scratch or remove one pkg's data or update/add one pkg's
 # data. The add operation works as an update operation if an older version of the package is already installed.
 #
-# This function only handles the real, installed manifest files. There is another version of this function  in the bg_manifestScanner.sh
+# This function only handles the real, installed manifest files. There is another version of this function  in the PackageAsset.PluginType
 # library from the bg-dev package that is used to create and maintain the vinstalled sandbox's manifest files.
 function manifestUpdateInstalledManifest() {
 	local action="$1"
@@ -213,4 +218,120 @@ function manifestUpdateInstalledManifest() {
 			;;
 	esac
 	return 0
+}
+
+# usage: manifestGetTermType <term> [<retVar>]
+# returns a list of the column names in the manifest file that contain <term>.
+# Example:
+#    $ manifestGetTermType bg-core
+#    pkgName assetName
+# because 'bg-core' is both a package name and also a assetName for the command 'bg-core'
+function manifestGetTermType()
+{
+	local manifestFile; manifestGetHostManifest manifestFile
+	while [ $# -gt 0 ]; do case $1 in
+		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local term="$1"
+	local retVar="$2"
+
+	local _types="$(gawk -v term="$term" '
+		$1==term {isPkg="1"}
+		$2==term {isType="1"}
+		$3==term {isName="1"}
+		$4==term {isFile="1"}
+		END {
+			if (isPkg)
+				printf("pkg ")
+			if (isType)
+				printf("assetType ")
+			if (isName)
+				printf("assetName ")
+			if (isFile)
+				printf("path")
+			printf("\n")
+		}
+	' "$manifestFile")"
+	returnValue "$_types" "$retVar"
+}
+
+# usage: manifestIsPkgName <term>
+# returns true(0) or false(1) to reflect if <term> exists in the pkgName column of the manifest file
+function manifestIsPkgName()
+{
+	local manifestFile; manifestGetHostManifest manifestFile
+	while [ $# -gt 0 ]; do case $1 in
+		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	gawk -v term="$1" '
+		$1==term {found=1; exit(0);}
+		END {
+			if (found)
+				exit(0)
+			else
+				exit(1)
+		}
+	' "$manifestFile"
+}
+
+# usage: manifestIsAssetType <term>
+# returns true(0) or false(1) to reflect if <term> exists in the assetType column of the manifest file
+function manifestIsAssetType()
+{
+	local manifestFile; manifestGetHostManifest manifestFile
+	while [ $# -gt 0 ]; do case $1 in
+		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	gawk -v term="$1" '
+		$2==term {found=1; exit(0);}
+		END {
+			if (found)
+				exit(0)
+			else
+				exit(1)
+		}
+	' "$manifestFile"
+}
+
+# usage: manifestIsAssetName <term>
+# returns true(0) or false(1) to reflect if <term> exists in the assetName column of the manifest file
+function manifestIsAssetName()
+{
+	local manifestFile; manifestGetHostManifest manifestFile
+	while [ $# -gt 0 ]; do case $1 in
+		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	gawk -v term="$1" '
+		$3==term {found=1; exit(0);}
+		END {
+			if (found)
+				exit(0)
+			else
+				exit(1)
+		}
+	' "$manifestFile"
+}
+
+# usage: manifestIsPath <term>
+# returns true(0) or false(1) to reflect if <term> exists in the assetName column of the manifest file
+function manifestIsPath()
+{
+	local manifestFile; manifestGetHostManifest manifestFile
+	while [ $# -gt 0 ]; do case $1 in
+		-f*|--file*|--manifest*) bgOptionGetOpt val: manifestFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	gawk -v term="$1" '
+		$4==term {found=1; exit(0);}
+		END {
+			if (found)
+				exit(0)
+			else
+				exit(1)
+		}
+	' "$manifestFile"
 }

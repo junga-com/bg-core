@@ -1,60 +1,51 @@
 
+# Library
+# Part of the awkDataSystem that contains functions for reading and manageing schemas. A schema is typically an ini style file
+# with the awkDataSchema extension that is registered as an asset in the host manifest. Unregistered schema files are also supported.
+# A stand alone data file is also supported without an external schema file. In that case the file starts with a brief header
+# that at a minimum, lists the names of the columns.
+#
+# See man(7) awkDataSystem for the complete description.
+
+
 import bg_strings.sh ;$L1;$L2
 import bg_ini.sh ;$L1;$L2
 
 
-######################################################################################################
-### Schema data operations  -- objectTypes (tables), columns, and ranges of values
-#
 
-# MAN(7) bgawkDataSystem
+# MAN(7) awkDataSystem bg.awkDataSystem
 # The awkData system defines a simple text format for tabular data which can be easily queried and operated on by awk scripts.
+# A principle design goal is to support the simplest of files with as few requirements as possible while also allowing more
+# complex behavior comparable to some features of databases.
 #
 # The bg-awkData command provides a way to query and perform other operations on the data from the command line. The data to be
 # operated on is identified by passing bg-awkData a awkDataID which is similar to a table name.  The awkDataID is not simply a
-# table name because it can identify the data in several different ways.
+# table name because it can identify the data in several different ways. See man(3) bg_awkDataSchema.awk for deatials on <awkDataID>
+# syntax.
 #
 # An awkData 'table' consists of a text file containing the data (refered to as the awkDataFile) and optionally an ini style file
 # that describes the structure and attributes of the table (refered to as the awkDataSchemaFile). By default, the first couple lines
 # of the awkDataFile is a header that describes the column and optionally a few other attributes. That header enables a awkDataFile
-# to work without a corresponding schema file. There is typically a one to one correspondence between an awkDataFile and an
-# awkDataSchemaFile but there are some exceptions.
+# to work without a corresponding schema file.
+#
+# The most typical way to use the awkData system is to use a bg-dev style package project which provides a awkDataSchema asset and
+# scripts in that project would use the assetName as the awkDataID when calling awkData functions.
+#
+# This system all support a sysadmin using the awkData tools on a one-off file that does not have a schema asset intalled on the
+# system. See man(3) bg_awkDataSchema.awk for ways to specify an awkDataID for a table without an installed awkDataSchema asset.
 #
 # Caching Host Configuration and Provisioning Information:
 # Often an awkData table is used to cache some system configuration information that is stored on the host in various formats. This
-# makes the information accessible in a standard way. To facilitate building and keeping the data up-to-date, a schema can specify
-# a builder cmd and dependent files.  If the awkDataFile does not exist or if any of the dependent files has a more recent timestamp
-# than the awkDataFile, it is considered dirty and will be rebuilt on demand.
+# makes the information accessible in a standard way.
 #
-# AwkData Schema Registry:
-# AwkData tools can be used to access one-off files that are not registered on the host but by registering an awkDataSchemaFile
-# asset on the host, the table becomes discoverable and logically becomes part of the configuration and providioning data on the
-# host.
+# The author of a bg-dev style package project would create an awkDataSchema asset in the project. That schema would include the
+# builder and dependents attributes information. That information makes the table become updatable on demand. If the awkDataFile
+# does not exist or if any of the dependent files has a more recent timestamp than the awkDataFile, it is considered dirty and will
+# be rebuilt on demand hte next time the table is accesed.
 #
 # This is powerful because it allows disparate systems, written by different teams with different tools, standards and practices,
 # to become part of a standard object oriented state of the host. We can start thinking about the host as a uniform object oriented
 # system with identity, state, and behavior which makes the host easier to automate and control.
-#
-# awkDataID Format:
-# A fully qualified awkDataID consists of 3 parts separated by the pipe character.
-#    <awkTableName>|<awkDataFile>|<awkDataSchemaFile>
-# It is often valid to exclude one or two parts by leaving them empty. Trailing pipe characters can be ommitted.
-#
-# If the awkData table is registered on the host, then the <awkTableName> alone is sufficient to identify the table. For a registered
-# awkData table the <awkDataSchemaFile> is an asset in the host manifest with an assetType="awkDataSchema" and
-# assetName=<awkTableName>. This allows looking up the <awkDataSchemaFile> from the <awkTableName> and the <awkDataSchemaFile>'s
-# awkDataFile attrubute points to the <awkDataFile>.
-#
-# It is also sufficient to only specify the <awkDataFile> if it includes at least the column header. This is tyically used when
-# creating and using a one-off data file that will not be registered.
-#
-# It is also sufficient to only specify the <awkDataSchemaFile>. This is typically used when creating and using a one-off data file
-# that will not be registered but needs to specify additional table attributes or needs to persist even when the data file is deleted.
-#
-# The <awkDataSchemaFile> typically specifies the <awkDataFile> so there is a one-to-one correspondence between them, but it is
-# possible to create a second data table that uses the same schema by specifying both <awkDataFile> and <awkDataSchemaFile>. When
-# <awkDataFile> is specified in the awkDataID, it will override the one speicied in the awkfile attribute of the <awkDataSchemaFile>.
-#
 #
 # Example AwkDataFile:
 #     $ cat -n manifestExample
@@ -99,76 +90,15 @@ import bg_ini.sh ;$L1;$L2
 
 
 # MAN(5) bgawkDataSchemaFileFormat
-# This man page describes the file format of a awkData Schema file.
-#
-#The data file is often considered a
-# cache of some other information and may be deleted. If it has a fully functioning awkDataSchemaFile, it will be recreated automatically
-# as needed.
-#
-# The awkData schema file is a way to define a awkData cache file that is persistent past the deletion
-# of its actual cache file. Say the cache file is deleted because its dirty. In order for it to be rebuilt
-# the metadata to know the columns and buildCmd need to be known. Sometimes it is convenient to hardcode
-# that metadata in a script that will rebuild the cache file as needed whenever it runs but often its
-# better to create a schema file. The presence of a schema file, even an empty one, signifies that the
-# awkDataID identified by its filename should exist. If it additionally contains a buildCmd attribute
-# the tools can automatically build the cache file whenever its needed.
-#
-# A generic buildCmd will read its input files and column name list from the schema file instead of
-# hardcoding them. That way multiple schema files can use the same buildCmd to produce very different
-# restults.
-#
-# By @including bg_awkDataSchema.awk, a script will automatically read the schema file identified in the awkObjData
-# passed into it. See schema_restore() in the bg_awkDataSchema.awk library
-#
-# A schema file is similar to a DB table definition. That is why the columns attribute is called columns.
-#
-# Defintions:
-#    awkObjName : the simple name of the table. No / or :. Just a word that could be a valid variable name.
-#    awkDataID : the awkObjName with optional specifiers. The awkDataID value can be in the short form or the long form.
-#                The short form is a consice description of the identity which may or may not be relative to the current domData
-#                The long form is a string of | separated components where the first component is the short form and the other
-#                components are the attributes that the identity implies which may include information derived from the current domData
-#                the awkDataID short form is the natural key for identifing what to operate on.
-#                The short form supports several formats.
-#                See awkData_parseID
-#    awkFile   : the path to the cache file that contains the data for this table (may or may not exist)
-#    awkSchemaFile :  the path to the schema file that contains the definition for this table (may or may not exist)
-#    dependents : file list with optional globs that are the input files to build the table
-#
-# Schema File Locations:
-# If an awkData query function is called with an awkDataID whose cache file does not exist or is dirty,
-# if a schema can be located for the awkDataID, it will be used to invoke the buildCmd to create an
-# up-to-date cache file.
-#
-# The awkDataID of an awkData cache file that is independent of a domData is the path used to access it.
-# The path may be relative or absolute so it can vary. Relative names are preserved but when compared,
-# a temporary absolute path will be created to do the comparison. Indendent awkData files can have a
-# schema file by placing a similarly named .schema file next to the cache file. If the cache file ends
-# in .cache, .cache is replaced with .schema. If that does not produce the path of an existing file,
-#   .schema is appended to the whole filename and its check again for existence.
-#
-# AwkDataID that are a part of a domData have simple names without paths and without extensions.
-# Schema files are located in $domFolder/schema/<awkDataID>.schema
-# The corresponding cache file is at $domFolder/cache/*.cache
+# This man page describes the file format and attributes of a awkDataSystem Schema file.
+# An awkDataSystem schema file is a form of database table description. It uses the ini file style structure to describe the attributes
+# of an awkDataSystem data file which is a database table. An external awkDataSchemaFile is optional but common.
 #
 # Schema File Format:
 # Schema files use the INI file format. see man(5) bginiFileFormat
 # The awkDataID attributes are stored in ParameterSettings of the INI schema file
-#  INI Sections:
-# The atributes in the top level, default INI section corespond to the global scope of the domData.
-# If the awkDataID is not in a domData, the scheam file can only contain the top level section.
-# In the context of a domData, however, additional sections can be added to describe the cache files
-# for this awkDataID that are created and stored in scope folders of the domData (e.g. servers/ or locations/)
-# The attributes of the top level section are inherited at the scope level so only the attributes that
-# are different need to be specified in the scope section. A typical scenario would be for the scoped
-# section would specify a buildCmd and dependents input files that extract the information from source files
-# collected for each scope and then the global scope (top level INI section) would use the akwDataFileMerge
-# builder function to aggregate the cache files from the scope into one larger file at the global level.
 #
-#  AwkData Attributes:
-# The schema file contains attributes of the awkDataID stored in the ParameterSettings. These attributes
-# are primarily helpful to the buildCmd to influence how it creates the cache file but sometimes query
-# or other operations may be influenced by these attributes too.
+# AwkData Attributes:
 #
 #     buildCmd  : the *nix style commandline to invoke to build the cache file. Some %<name>% template
 #        variables can be used
@@ -195,92 +125,88 @@ import bg_ini.sh ;$L1;$L2
 #         that should be used as the default identifying name.
 #     dirtyStateMethod : obsolete. you may see it in old schema files but it is now ignored.
 #
-# Other attributes can exist. Mostly, the builder function named in the buildCmd line determines which
-# attributes are available and may be required.
+# Other attributes can exist. A builder function named in the buildCmd attribute may define additional required and optional
+# attributes that the awkData table can have.
 #
 # See Also:
 #     man(1) bg-awkData
-#     man(5) bgawkDataFileFormat
-#     man(5) bginiFileFormat
-#     man(3) awkData_parseID  : defines the supported syntax of awkDataIDs
+#     man(5) awkDataFileFormat
+#     man(5) bgawkDataSchemaFileFormat
+#     man(3) bg_awkDataSchema.awk  : defines the supported syntax of awkDataIDs
 
 
 
 
-
-# usage: awkData_parseID <awkDataID> <awkTableNameVar> <awkDataFileVar> <awkDataSchemaFileVar>
-# Given the <awkDataID>, return the <awkTableName> <awkDataFile> and <awkDataSchemaFile> values in the given vars passed in.
+# MAN(5) awkDataFileFormat bg.awkDataFileFormat
+# This documents the format of awkDataSystem data files.
+# An awkDataSystem data file is a form of database table. Rows corresponds to record. Columns corresponds to attributes.
 #
-# An <awkDataID> is a token (without whitespace) that has up to 3 fields separated by the pipe character. Not all fields must be
-# specified so this function can be used to parse the token into its 3 parts and also fill in the missing parts.
+# A data file always needs at least a minimal schema information. The minimal schema is just a list of column names that corresponds
+# to the $1..$NF fields that awk provides when operating on each line of a file. This allows queries to use column names instead of
+# numbers.
 #
-# Syntax:
-# The full syntax is ...
-#     <awkTableName>|<awkDataFile>|<awkDataSchemaFile>
-# Any of the fields may be empty. Trailing pipe characters that result from one or more empty fields can be omitted.
+# Simple awkDataFiles can contain all the schema information they needs in the file itself in one of two header formats which are
+# described here. It is actually more common for an external schema file to exist. The format of that file is docmented in
+# man(5) bgawkDataSchemaFileFormat. If an external schema exists, the data file may still contain one of the two headers or the
+# schema may specify that the data file contains only data lines.
 #
-# Examples:
-#     manifest                # only the <awkTableName> is specified. The other two fields will be looked up from an installed
-#                               asset with assetName="manifest" and assetType="awkDataSchema"
-#    |/tmp/myTempData.cache   # only the data file path is specified. The table name will be considered the base name of the data file.
-#                               The <awkDataSchemaFile> will remain empty as it is not alway needed.
-#    ||/tmp/myTempSchema      # only the <awkDataSchemaFile> is specified. The <awkDataFile> will be retrieved from the 'awkFile'
-#                               attribute inside the schema file. The <awkTableName> will be the base name of the <awkDataFile>
-#    tmpManifest|/tmp/m|manifest # all 3 fields are specified to explicitly use a new data file that uses the same schema definition
-#                                  as the manifest table. Because the <awkDataSchemaFile> specified is not the full path to a file,
-#                                  it will be looked up the same way as when only the <awkTableName> is specified. However, since the
-#                                  <awkDataFile> was also specified, the awkFile attribute in the <awkDataSchemaFile> will not be used.
+# No Header:
+# If the noFileHeader attribute is specified in the schema, the first and all lines of the file are data lines.
+# There is a shorcut to setting the noFileHeader attribute in cases where no external schema file exist. If the <awkDataFile> is
+# explicitly specified in the awkDataID and it has a trailing '-', that '-' will be removed from the filename and the noFileHeader
+# attribute will be set. This could be useful if you have a file from a foriegn system on which you want to use awkData tools.
+#
+# Standard Header:
+# If the file contains header lines, they can be one of two formats. This is the most common.
+# The first token of the first line of the file determines if the file contains a Standard or Extended header. If that token matches
+# the regex of a version number (/^[0-9]{1,3}\\.[0-9]{1,3}(\\..*)?$/) the head is an Extended header and if it does not it is a
+# Standard head.
+#
+# The Standard header consistes of exactly two lines.
+#
+# **Line 1**
+# The first line is the list of column names. This corresponds to the 'columns' attribute of the schema.
+# .
+# **Line 2**
+# The second line contains a list of dependent files. This list can be empty which effectively disables its dirty mechanism.
+#
+# The third and subsequent lines are data lines.
+#
+# Extended Header:
+# If the first token of the first line of the file matches the regex of a version number the file contains an extended header.
+# An extended header can have a variable number of lines.
+#
+# **Line 1 format**
+#   <version> <colLinePos> <depLinePos> <dataLinePos> <buildCmd>
+# The tokens are whitespace separated.
+# **Field Meanings**
+#   <version>     : The version number of the extended header.
+#   <colLinePos>  : the line number in the file (NR) that contains the column list (which is the same as the first line of the
+#                   Standard header)
+#   <depLinePos>  : the line number in the file (NR) that contains the dependents list (which is the same as the second line of the
+#                   Standard header)
+#   <dataLinePos> : the line number in the file (NR) that contains the first data line. This allows inserting a variable number of
+#                   header lines that could contain anything.
+#   <buildCmd>    : The cmdline that when executed would rebuild this data file possibly picking up new records.
+#
+# As of the time of this writing, the extended header is not used but defining it means that future formats that we might want to
+# add in the future can maintain compatibility with the data files that we create today. The header version number allows us the
+# ultimate freedom that if we update this code to know about a future version, we could support existing files along side a completely
+# new file format.
+#
+#
+# Data Lines:
+# The data portion of the awkDataFile consists of lines which contain data fields separated by whitespace whose values corresponds
+# to the columns names. Typically all the rows will have the same number of fields but it is not an error for one or all of the
+# lines to have a different number of fields. If it has less fields that column names, the column at the end will be considered to
+# have empty values. If it has more, the extra fields are ignored.
+#
+# Since the values on each line are separated by whitespace, they can not contain whitespace so whitespace and any other characters
+# that would be problematic (such as non-ascii or non-printable characters)
+#
 # See Also:
-#    awkData_getSchema      : super set of this function that goes on to read the schema attributes too
-#    awkData_listAwkDataIDs : list <awkDataID> that exist on the host
-function awkData_parseID()
-{
-	local awkDataID="$1";    [ ! "$awkDataID" ] && return 1
-	local awkTableNameVar="$2"
-	local awkDataFileVar="$3"
-	local awkDataSchemaFileVar="$4"
-
-	local awkTableNameValue awkDataFileValue awkDataSchemaFileValue
-	stringSplit -d'|' "$awkDataID" awkTableNameValue awkDataFileValue awkDataSchemaFileValue
-
-	# For one-off tables, the user might specify either the awkFile alone and then we glean the table name from the filename
-	if [ ! "$awkTableNameValue" ]; then
-		local filename="$awkDataFileValue"
-		awkTableNameValue="${filename##*/}"
-		awkTableNameValue="${awkTableNameValue%.*}"
-	fi
-
-	# typical case: lookup the schema from the table name
-	if [ "$awkTableNameValue" ] && [ ! "$awkDataSchemaFileValue" ]; then
-		awkDataSchemaFileValue="$(manifestGet -o '$4' "awkDataSchema" "$awkTableNameValue")"
-		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID -v awkTableNameValue "No awkDataSchema asset installed for table name"
-	fi
-
-	# If the schemaFile field contains a simple table name, look up the schema asset
-	# This is a case where the caller is crafting a new data table from an existing schema definition. The caller can assign a new
-	# table name and awkFile location and an existing installed schema.
-	if [[ ! "$awkDataSchemaFileValue" =~ [/.] ]] && [ ! -f "$awkDataSchemaFileValue" ]; then
-		awkDataSchemaFileValue="$(manifestGet -o '$4' "awkDataSchema" "$awkDataSchemaFileValue")"
-		[ "$awkDataSchemaFileValue" ] || assertError -v awkdatID "Invalid awkDataSchemaFile specified in the awkDataID. It should be either the full path to a schema file or the asset name of a installed awkDataSchema asset on the host"
-	fi
-
-	# typical case: lookup the data file from the schema file
-	if [ "$awkDataSchemaFileValue" ] && [ ! "$awkDataFileValue" ]; then
-		awkDataFileValue="$(gawk -F= '$1=="awkFile" {print gensub(/[[:space:]]*#.*$/,"","g",$2)}' "$awkDataSchemaFileValue")"
-		[ "$awkDataFileValue" ] || assertError -v awkdatID -v awkDataSchemaFileValue "Neither the awk schema file nor the awkDataID specify the awkFile path"
-	fi
-
-	# If only the awkDataSchemaFile was specified, the awkDataFile was not available when we first tried to glean the name so check it again
-	if [ ! "$awkTableNameValue" ]; then
-		local filename="${awkDataFileValue:-$awkDataSchemaFileValue}"
-		awkTableNameValue="${filename##*/}"
-		awkTableNameValue="${awkTableNameValue%.*}"
-	fi
-
-	setReturnValue "$awkTableNameVar"      "$awkTableNameValue"
-	setReturnValue "$awkDataFileVar"       "$awkDataFileValue"
-	setReturnValue "$awkDataSchemaFileVar" "$awkDataSchemaFileValue"
-}
+#    man(7) awkDataSystem
+#    man(5) bgawkDataSchemaFileFormat
 
 
 
@@ -289,7 +215,14 @@ function awkData_parseID()
 
 
 
-# usage: awkData_listAwkDataIDs [<filterRegex>]
+
+
+
+
+
+
+
+# usage: awkData_listAwkObjNames [<filterRegex>]
 # prints a list of awkDataID names installed on this host to stdout.
 # awkDataIDs are the table names of data in the bg-core configuration and provisioning system. They are installed on a host via
 # assets in packages that follow the bg-ore conventions. An assetType of 'awkDataSchema' will introduce a new awkDataID using
@@ -301,8 +234,8 @@ function awkData_parseID()
 # Params:
 #    <filterRegex> : a regex that matches awkDataID names from the start (^ is automatically prepended)
 # See Also:
-#    awkData_parseID
-function awkData_listAwkDataIDs()
+#    man(7) awkDataSystem
+function awkData_listAwkObjNames()
 {
 	local filterSpec="$1"
 	manifestGet -o '$3' awkDataSchema '.*'
@@ -310,14 +243,14 @@ function awkData_listAwkDataIDs()
 }
 
 
-# usage: awkData_showSchema [<awkDataID>]
-# write out all the known <awkDataID> (in the domData) and each column they support in a tree
-function awkData_showSchema()
+# usage: awkData_tableInfo [<awkDataID>]
+# write out all the known <awkObjName> installed in the host manifest and the column they contain in a two level tree
+function awkData_tableInfo()
 {
 	local awkDataID="$1"
 
 	if [ "$awkDataID" ]; then
-		awk  \
+		gawk  \
 			-v awkDataID="$awkDataID" '
 			@include "bg_awkDataSchema.awk"
 			END {
@@ -325,31 +258,15 @@ function awkData_showSchema()
 			}
 		' /dev/null
 	else
-		local awkObjName; for awkObjName in $(awkData_listAwkDataIDs "$@"); do
-			echo "$awkObjName"
-			local column; for column in $(awkData_getColumns "$awkObjName"); do
-				echo "   $column"
-			done
-		done
+		gawk -i bg_awkDataSchema.awk \
+			-v awkDataIDList="$(awkData_listAwkObjNames)" '
+			BEGIN {
+				for (awkObj in schemas) {
+					print(awkObj)
+					for (i in schemas[awkObj]["colNames"])
+						print("   "schemas[awkObj]["colNames"][i])
+				}
+			}
+		'
 	fi
-}
-
-# usage: awkData_getColumns <awkDataID>
-# return just the columns attrinbute of the schema.
-# Note that if you need any other schema attributes or will call something that does, it is better to use awkData_getSchema
-# which is about the same amount of work as this function but returns all the schema attributes in an array.
-function awkData_getColumns()
-{
-	local awkDataID="$1"
-
-	awk  \
-		-v awkDataID="$awkDataID" '
-		@include "bg_awkDataSchema.awk"
-		END {
-			#printfVars("schemas awkDataID")
-			for (i in schemas[awkDataID]["colNames"])
-				printf("%s ", schemas[awkDataID]["colNames"][i])
-			printf("\n")
-		}
-	' /dev/null
 }

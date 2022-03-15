@@ -48,7 +48,7 @@ function awkData_bcAwkDataID()
 	case ${_bgbcData[lastMode]:-basic} in
 		basic)
 			echo "<tableName>"
-			awkData_listAwkDataIDs
+			awkData_listAwkObjNames
 			if [ "$cur" ]; then
 				echo "\$(doFilesAndDirs)"
 			fi
@@ -59,7 +59,7 @@ function awkData_bcAwkDataID()
 			local scopeList="servers locations"
 			echo "<awkDataID> <me:tbl> <local:tbl> <${scopeList// /|}:...> <<scopeName>:tbl> <pathToCacheFile>"
 			if (( partCount == 0 )); then
-				awkData_listAwkDataIDs
+				awkData_listAwkObjNames
 				if [ "$cur" ]; then
 					echo "me:%3A local:%3A ${scopeList[@]/%/:%3A}"
 					echo "\$(doFilesAndDirs)"
@@ -73,7 +73,7 @@ function awkData_bcAwkDataID()
 				# me: and local:
 				if [[ "$scopeType" =~ ^(me|local)$ ]]; then
 					echo "\$(cur:${cur#$scopeType:})"
-					awkData_listAwkDataIDs "$scopeType:"
+					awkData_listAwkObjNames "$scopeType:"
 
 				# <scopeType>:
 				elif [[ "$scopeType" =~ ^(${scopeList// /|})$ ]]; then
@@ -82,7 +82,7 @@ function awkData_bcAwkDataID()
 							domScopeList -t "$scopeType"
 							;;
 						2)	echo "\$(cur:${cur#$scopeType:$scopeName:})"
-							awkData_listAwkDataIDs "$scopeType:$scopeName:"
+							awkData_listAwkObjNames "$scopeType:$scopeName:"
 							;;
 					esac
 
@@ -91,7 +91,7 @@ function awkData_bcAwkDataID()
 					scopeName="$scopeType"
 					domScopeGetType "$scopeName" scopeType
 					echo "\$(cur:${cur#$scopeName:})"
-					echo "\$(removePrefix:$scopeType:$scopeName:)"; awkData_listAwkDataIDs "$scopeType:$scopeName:"; echo "\$(removePrefix:)"
+					echo "\$(removePrefix:$scopeType:$scopeName:)"; awkData_listAwkObjNames "$scopeType:$scopeName:"; echo "\$(removePrefix:)"
 				fi
 			fi
 			;;

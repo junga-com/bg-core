@@ -37,8 +37,8 @@ myArray[]
 
 ##----------
 ## test
-stringSplit -a myArray -d 
- 'line one
+stringSplit -a myArray -d '
+' 'line one
 line two
 line three'
 myArray[]

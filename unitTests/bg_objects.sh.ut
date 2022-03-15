@@ -36,21 +36,11 @@ function ut__parseObjSyntax() {
 
 function ut_initialState()
 {
-	# expect: shows the classes that ae initially created and their content
+	# expect: shows the classes that are initially created and their content
 	ut setup
 	ut filter '([[]vmtCacheNum[[:space:]]*[]]=).[0-9]*.###\1<redacted>'
-	function showClass() {
-		local class="$1"
-		printf "#\n#\n#------------------ $class --------------------\n"
-		eval local globalArrayVars='"${!'"$class"'*}"'
-		echo "global array vars: $globalArrayVars"
-		printfVars --noObjects $class -l"#" ${class}_vmt "$(strSetSubtract "$globalArrayVars" "$class  ${class}_vmt")"
-	}
 	ut test
-	echo Object ${Object[subClasses]}
-	local class; for class in Object ${Object[subClasses]}; do
-		showClass "$class"
-	done
+	./unitTests/bg_objectsInitialStateTest.sh
 }
 
 function ut_isDerivedFrom()
@@ -367,6 +357,7 @@ function ut_Object_assignNewOp() {
 
 function ut_Object_staticCallSyntax() {
 	ut setup
+	ut filter '^(subClasses[[:space:]]*=).*$###\1<redacted>'
 	local -n obj; ConstructObject Object obj
 	ut test
 	ut expect that the Object class object is printed

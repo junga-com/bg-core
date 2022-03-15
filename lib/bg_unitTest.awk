@@ -6,8 +6,8 @@
 # Params:
 #    -v cmd=getUtIDs|getUtFuncs|getUtParamsForUtFunc  : The default cmd is getUtIDs
 #   getUtIDs
-#     -v fullyQualyfied='1'     : include the utFile in part in the utIDs (but not the pkgName)
-#     -v fullyQualyfied='<pkgName>:' : include both the <pkgName> and <utFile> parts in the utIDs
+#     -v fullyQualyfied='file'  : include the utFile in part in the utIDs (but not the pkgName)
+#     -v fullyQualyfied='pkg'   : include both the <pkgName> and <utFile> parts in the utIDs
 #     -v lineNumFlag='1'        : include the starting and ending line numbers of its utFunc for each returned utID
 #     -v expectCommentsFlag='1' : include the expect comment for each returned utID
 #
@@ -23,10 +23,15 @@ BEGIN {
 }
 
 BEGINFILE {
+	baseFilename=gensub(/(^.*[/])|([.]ut$)/,"","g",FILENAME)
+	pkgName=gensub(/[/]unitTests)?[/][^/]*$/,"","g",FILENAME); pkgName=gensub(/^.*[/]/,"","g",pkgName)
+	if (pkgName~/^([.]|)$/)
+		pkgName=gensub(/^.*[/]/,"","g",ENVIRON["PWD"])
+
 	if (fullyQualyfied)
-		utFilePrefix=gensub(/(^.*unitTests[/])|([.]ut$)/,"","g",FILENAME)":"
-	if (fullyQualyfied~/:$/)
-		utFilePrefix=fullyQualyfied""utFilePrefix
+		utFilePrefix=baseFilename":"
+	if (fullyQualyfied~/pkg/)
+		utFilePrefix=pkgName":"utFilePrefix
 
 	arrayCreate(utFuncs)
 }

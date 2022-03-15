@@ -12,6 +12,10 @@
 #     3 (dirty)   : the awkDataID is dirty so it failed before doing any query work. Set noDirtyCheckFlag to non-empty to suppress
 #                   this and query dirty data
 #     4 (dirty,no data) : the noDirtyCheckFlag was specified but the awkDataID file does not exist so there is no dirty data to query
+#
+# See Also:
+#    man(7) awkDataSystem
+#    man(7) bg_awkDataSchema.awk
 
 BEGIN {
 	if (!noDirtyCheckFlag && schema_isDirty(schema))
