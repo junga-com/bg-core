@@ -1,0 +1,127 @@
+#!/usr/bin/env bg-utRunner
+
+declare -A ut_bgwait=(
+	[bgwaitTestBareBash]="bgwaitTestBareBash"
+	[bgwaitTestPattern1]="bgwaitTestPattern1"
+	[bgwaitTestPattern2]="bgwaitTestPattern2"
+	[bgwaitTestPattern3]="bgwaitTestPattern3"
+	[bgwaitTestPattern4]="bgwaitTestPattern4"
+)
+function ut_bgwait()
+{
+	local cmd="$1"
+	$cmd
+}
+
+
+function childTestFunct()
+{
+	local name="${1%:*}"
+	local count="${1##*:}"
+	sleep $count
+	exit "${count#*.}"
+}
+
+# This is plain bash to test the mechanism used by bgwait
+function bgwaitTestBareBash()
+{
+	declare -A pids=()
+	for i in red:0.5 blue:0.1 green:0.7; do
+		( childTestFunct "$i"; )&
+		pids[$i]=$!
+		echo "STARTED '$i'"
+	done
+
+	while [ ${#pids[@]} -gt 0 ]; do
+		wait -n
+		for i in "${!pids[@]}"; do
+			if ! kill -0 "${pids[$i]}" &>/dev/null; then
+				wait "${pids[$i]}"
+				exitCode="$?"
+				echo "$i ended with exit code $exitCode"
+				echo "FINISHED: '$i'  exitcode='$exitCode'"
+				unset pids[$i]
+			fi
+		done
+	done
+}
+
+# Pattern 1: the simplest pattern but will create too many simultaneous children if there are a lot of tasks
+function bgwaitTestPattern1()
+{
+	local -A pids=()
+	local -A results=()
+	for i in red:0.5 blue:0.1 green:0.7 purple:0.15 hazel:0.75 orange:0.8; do
+		( childTestFunct "$i"; )&
+		pids[$i]=$!
+		echo "STARTED '$i'"
+	done
+	echo "loop done"
+	while bgwait pids results; do
+		echo "FINISHED: '${results[name]}'  exitcode='${results[exitCode]}'"
+	done
+}
+
+# this is a pattern of only calling bgwait in one place.
+function bgwaitTestPattern2()
+{
+	local -A pids=()
+	local -A results=()
+
+	local toSpawn=(red:0.5 blue:0.1 green:0.7 purple:0.15 hazel:0.75 orange:0.8)
+	# loop while we still have more children to spawn or we are waiting for children to finish
+	while [ ${#toSpawn[@]} -gt 0 ] || [ ${#pids[@]} -gt 0 ]; do
+		if [ ${#toSpawn[@]} -gt 0 ]; then
+			( childTestFunct "$toSpawn"; )&
+			pids[$toSpawn]=$!
+			echo "STARTED '$toSpawn'"
+			toSpawn=("${toSpawn[@]:1}")
+		fi
+		# we wait here for a child to end if we have already spawned all the children or if the max number of children are already active
+		if bgwait --maxChildCount=3 --leftToSpawn="${#toSpawn[@]}" "pids" "results"; then
+			echo "FINISHED: '${results[name]}'  exitcode='${results[exitCode]}'"
+		fi
+	done
+	echo "loop done"
+}
+
+# this uses the bgwait function with the callback feature
+function bgwaitTestPattern3()
+{
+	local -A pids=()
+	local -A results=()
+
+	function oneChildDoneFinish()
+	{
+		local -n _resultsOCF="$1"
+		echo "FINISHED: '${_resultsOCF[name]}'  exitcode='${_resultsOCF[exitCode]}'"
+	}
+
+	for i in red:0.5 blue:0.1 green:0.7 purple:0.15 hazel:0.75 orange:0.8; do
+		bgwait --maxChildCount=3 pids results oneChildDoneFinish
+		( childTestFunct "$i"; )&
+		pids[$i]=$!
+		echo "STARTED '$i'"
+	done
+	echo "loop done"
+	while bgwait pids results oneChildDoneFinish; do :; done
+}
+
+# Pattern X: this uses bgwait in the loop to throttle child creation and another after the loop to collect the remaining children
+function bgwaitTestPattern4()
+{
+	local -A pids=()
+	local -A results=()
+	for i in red:0.5 blue:0.1 green:0.7 purple:0.15 hazel:0.75 orange:0.8; do
+		if bgwait --maxChildCount=3 pids results; then
+			echo "FINISHED: '${results[name]}'  exitcode='${results[exitCode]}'"
+		fi
+		( childTestFunct "$i"; )&
+		pids[$i]=$!
+		echo "STARTED '$i'"
+	done
+	echo "loop done"
+	while bgwait pids results; do
+		echo "FINISHED: '${results[name]}'  exitcode='${results[exitCode]}'"
+	done
+}

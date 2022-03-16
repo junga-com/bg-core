@@ -40,7 +40,7 @@ pids+=($!)
 
 bgtracePSTree
 # note that the wait wont  end because the driver background process continues. you need to collect the worker PIDs and wait for them
-bgwait pids
+bgwaitAll pids
 #progress -e "cuiProgTest"
 
 echo done

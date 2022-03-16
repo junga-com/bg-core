@@ -3506,7 +3506,13 @@ function Catch()
 # usage: someCommand "$p1" "$p2" &>$assertOut[.$BASHPID] || assertError -v p1 -v p2
 # assertOut is a redirect destination that can be used with assertError which allow assertError to
 # show the user the output of a command only if the command fails.
-# if you launch multiple sub shells that use assertOut or launch nested bash functions that use it,
+#
+# assertOut is also used as the base name for any file created to comunicate data from a synchronous subshell back up to its parent.
+# The exception throw mechanism uses this feauture.
+#
+# if you launch multiple asynchronous sub shells they will fight for use of this file so each asynchronous child should assign a
+# new temp file. This mechanism can not propagate errors accross the asynchronous boundary.
+#
 # they may conflict. In those cases you can add a '.<string>.$BASHPID' to make them unique. Typically
 # you will not need to
 # The -u option to mktemp makes it not create the file initially to be less intrusive so that simple
@@ -3515,6 +3521,20 @@ function Catch()
 # file anyway
 assertOut="$(command mktemp -u)"
 bgtrap -n "assertOut:$assertOut" 'rm -f '"$assertOut"'*' EXIT
+
+
+# usage: (bgInitNewProc; ...)&
+# This function is used to initialize a new asynchronous child process. There are several features of the bg-core library that require
+# a unique global variable value which this function maintains.
+function bgInitNewProc() {
+	# assertOut is a unique filename for passing information within one synchronous set of sub shells.
+	declare -g assertOut="$(command mktemp -u)"
+	bgtrap -n "assertOut:$assertOut" 'rm -f '"$assertOut"'*' EXIT
+
+	# progressScope maintains the stack of progress calls. Each asynchronous proc needs a unique one. By setting it to "" a new one
+	# will be created on demand if anything calls progress
+	progressScope=""
+}
 
 # usage: assertDefaultFormatter <msg>
 # This formatter removes leading tabs similar to <<-EOS .. so that assertError msgs can be written in the code with decent

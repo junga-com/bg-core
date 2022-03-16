@@ -3,8 +3,8 @@ import bg_config.sh  ;$L1;$L2
 
 #function bgtrap() moved to bg_libCore.sh
 
-# usage: bgwait [-P] <pidMapVar>    <succeedCountVar> <errorCountVar> <resultsByNameVar> <namesByResultsVar> <summaryStrVar>
-# This is similar to the wait bash builtin function except you pass is the name of an associative array (pidMap>
+# usage: bgwaitAll [-P] <pidMapVar>    <succeedCountVar> <errorCountVar> <resultsByNameVar> <namesByResultsVar> <summaryStrVar>
+# This is similar to the wait bash builtin function except you pass in the name of an associative array (pidMap>
 # that has the structure pidMap[procName]=procPID and it optionally returns a number of variables that report
 # on the results.
 # This function returns when all the processes in pidMap are finished
@@ -13,7 +13,7 @@ import bg_config.sh  ;$L1;$L2
 #               typically, after launching a command in the background you set pidMap[<someName>]=$!
 #               after all proccesses are done, pass the name of pidMap into this function to wait and report on
 #               the results
-#    all of the folowing are optional output return variables passes as names. use "" for any you dont want
+#    all of the folowing are optional output return variables passes as names. use "" for any you dont want one but want a later one.
 #    <succeedCountVar>  : the number of processes that exited with code 0
 #    <errorCountVar>    : the number of processes that exited with something other than code 0
 #    <resultsByNameVar> : an associative array like resultsByName[<procName>]=<exitCode>
@@ -28,7 +28,9 @@ import bg_config.sh  ;$L1;$L2
 #   0 : all succeeded
 #   1 : all failed
 #   2 : some succeeded and some failed
-function bgwait()
+# See Also:
+#    man(3) bgwait
+function bgwaitAll()
 {
 	local progressFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
@@ -59,7 +61,7 @@ function bgwait()
 		waitingForListWithPID+=" ${bgw_pidNames[$bgw_pid]}($bgw_pid)"
 	fi;	done
 
-	[ "$progressFlag" ] && progress -s bgwait "waiting for ${#bgw_pidsLeft[@]} to finish : $waitingForList"
+	[ "$progressFlag" ] && progress -s bgwaitAll "waiting for ${#bgw_pidsLeft[@]} to finish : $waitingForList"
 
 	local result=0
 	while [ ${#bgw_pidsLeft[@]} -gt 0 ] && [ ${result:-0} -ne 127 ]; do
@@ -122,9 +124,151 @@ function bgwait()
 		result=3
 	fi
 
-	[ "$progressFlag" ] && progress -e bgwait "done"
+	[ "$progressFlag" ] && progress -e bgwaitAll "done"
 	return $result
 }
+
+
+# usage: bgwait [--maxChildCount=<n>] [--leftToSpawn=<n>] <pidMapVar> <outputVar> [<callbackCmd...>]
+# wait for one child process to end and return that child's information in <outputVar>. You can not control which child because it
+# returns the next one to finish. Its possible that before calling bgwait multiple children have finished. In that case, each time
+# you call bgwait one of the finished children will be returned immediately. If no children have finished, it will wait for one to
+# finish
+#
+# This function requires some cooperation from the caller. For each child the caller spawns, it should add an entry in the pidMap
+# like ...
+#     (bgInitNewProc; doSomething "p1")&
+#     <pidMapVar>[<childName>]="$!".
+# There may be other children active that are not entered in <pidMapVar>. If one of those ends, it will be silently acknowledged
+# and ignored by bgwait. 
+#
+# Each time this function returns true(0), it removes the entry from <pidMapVar> that corresponds to the finished child and returns
+# the name,exitCode, and pid of that finished child in <outputVar>.
+#
+# There are several reasons that bgwait might return false(1). First is if <pidMapVar> is empty since <pidMapVar> contains all of
+# the children being controlled, if its empty there is none left. Second is if the --maxChildCount=<n> and --leftToSpawn=<n> options
+# are used and the max number of children does not yet exist and there are more that should be created. The idea is that bgwait is
+# called in the child creation loop and it lets maxChildCount number of children get created before it starts waiting on them to
+# finish.
+#
+# There are several patterns that this function facilitates. There are unit tests that illustrate these and a few lessor patterns.
+# See ./unitTests/bg_coreProcCntrl.sh.ut
+#
+# Pattern 1:
+# The simplest pattern spawns all the required children in a loop and then loops waiting for them to end. If there many child tasks
+# that will be spawned, this is sub optimal because it creates too many simultaneous child processes.  The next pattern addresses
+# that.
+#
+#    local -A pids childResult
+#    for i in 1 2 3; do
+#       echo "spawning child '$i'"
+#       (doSomthing "$i")&
+#       pids[$i]="$!"
+#    done
+#    while bgwait pids childResult; do
+#       echo "child '${childResult[name]}' finished with exit code ${childResult[exitCode]}"
+#    done
+#
+# Pattern 2:
+# This pattern changes the loop so that the bgwait call is inside. Each loop iteration may spawn a new child or wait for a child to
+# finish or both. The loop quickly spawns the --maxChildCount=3 number of children, but then it waits for one of those to finish
+# before spawning another so that at most --maxChildCount number of children will run at the same time. When there are no more
+# children left to spawn, it will continue to loop until all of the children have finished.
+#
+#    local -A pids childResult
+#    local toSpawn=(red:5 blue:10 green:7 purple:10 hazel:7 orange:8)
+#    # loop while we still have more children to spawn or we are waiting for children to finish
+#    while [ ${#toSpawn[@]} -gt 0 ] || [ ${#pids[@]} -gt 0 ]; do
+#       if [ ${#toSpawn[@]} -gt 0 ]; then
+#          ( doSomething "${toSpawn[0]}")&
+#          pids[$toSpawn]=$!
+#          echo "STARTED '${toSpawn[0]}'"
+#          toSpawn=("${toSpawn[@]:1}")
+#       fi
+#       # we wait here for a child to end if we have already spawned all the children or if the max number of children are already active
+#       if bgwait --maxChildCount=3 --leftToSpawn="${#toSpawn[@]}" "pids" "childResult"; then
+#          echo "FINISHED: '${childResult[name]}'  exitcode='${childResult[exitCode]}'"
+#       fi
+#    done
+#
+# Params:
+#    <maxChildCount>      : the number of simultaneous child processes (aka threads) to allow
+#    <pidMapVar>        : an associative array of <pidMapVar>[<childName>]=<childPID>
+#                         typically, after launching a command in the background the caller sets <pidsVar>[<someName>]=$!
+#                         Each time bgwait returns true(0), the element corresponding to the finished child will be unset from <pidsVar>
+#                         <pidMapVar> will always contain the number of children that have been spawned but have either not finished
+#                         or have finished but are waiting to have their results captured.
+#    <outputVar>        : an associative array that will receive the results of an finished child. If <maxChildCount> was not exceeded
+#                         it will return false(1) immediately and <outputVar> will be empty. If it returns true(0) <outputVar> will
+#                         have these values...
+#                           <outputVar>[name]     : the name of the child that just ended
+#                           <outputVar>[pid]      : the pid of the child that just ended
+#                           <outputVar>[exitCode] : the exit code of the child that just ended
+#    [<callbackCmd...>] : an optional callback function that is called when a child fnishes. The <outputVar> is passed at the end
+#                         The callback command can have arguments. It will be called exactly as passed with the <outputVar> added
+#                         added as the last argument.
+#                         Example: bgwait "3" "pids" "childResults" processOneChildEnd "some text"
+#                         When a child ends -> 'processOneChildEnd "some text" "outputVarBGWN"' will be invoked
+#                         Typically, additional parameters are not needed and only the function name is passed to bgwait
+# Return Value:
+#   true(0)   : a child has finished and its results are in <outputVar>
+#   false(1)  : there are less than <maxChildCount> childs so it returned immediately
+# See Also:
+#    man(3) bgwaitAll
+function bgwait()
+{
+	local maxChildCount=0 leftToSpawn=1
+	while [ $# -gt 0 ]; do case $1 in
+		-n|--maxChildCount*)  bgOptionGetOpt val: maxChildCount "$@" && shift ;;
+		-l|--leftToSpawn*)    bgOptionGetOpt val: leftToSpawn   "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local -n pidsVarBGWN="$1"  ; shift
+	local -n outputVarBGWN="$1"; shift
+	local _callbackFn=("$@")
+
+	# clear the output
+	outputVarBGWN=()
+
+	# these are the conditions for not waiting for a child to finish.
+	#    Either
+	#       1) there are no children left running (or waiting the exit code to be collected)
+	#       or
+	#       2) we have not yet spawned the maximun number of children and there are more to spawn
+	if (( ${#pidsVarBGWN[@]}==0 )) || (( ${#pidsVarBGWN[@]} < maxChildCount && leftToSpawn>0 )); then
+		return 1
+	fi
+
+	# we put this in a loop because its possible that there is a child that we are not monitoring in pids[] that ends.
+	# also, its not clear from the documentation on the -f option to wait that it might return when the status of a child changes
+	# in a way other than it ended.
+	while true; do
+		# wait -n returns whenever a child proc ends (or if its already ended but has not yet been acknowledged with a 'wait $pid')
+		# It only tells us the exit code of the proc, not the pid so we have to iterate the pids to find one that is ended
+		# we might need the -f option too. Then man page is ambiguous but maybe -f causes it to only return when it ends.
+		wait -n  &>/dev/null
+		local waitResult="$?"
+
+		# now see which one ended. There might be more than one zombie child but that is ok because subsequent calls will get the other(s)
+		local pidName; for pidName in "${!pidsVarBGWN[@]}"; do
+			if ! kill -0 "${pidsVarBGWN[$pidName]}" 2>/dev/null; then
+				wait "${pidsVarBGWN[$pidName]}"
+				local exitCode="$?"
+				outputVarBGWN=(
+					[name]="$pidName"
+					[pid]="${pidsVarBGWN[$pidName]}"
+					[exitCode]="$exitCode"
+				)
+				unset pidsVarBGWN[$pidName]
+				[ "$_callbackFn" ] && "${_callbackFn[@]}" "outputVarBGWN"
+				return 0
+			fi
+		done
+		bgtrace "WARNING: bgwait: the builtin wait -n returned but none of the children being monitored (in pids) has ended. This may not be an error"
+		bgtraceVars "   " pids waitResult
+	done
+}
+
 
 #function bgkillTree() moved to bg_libCore.sh
 

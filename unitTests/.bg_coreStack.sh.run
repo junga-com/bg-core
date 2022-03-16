@@ -1145,7 +1145,7 @@ cmd> unitTests/bgStackTest "$1"
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_func
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
-USR1-<redacted><handler>(3): : USR1_HANDLER : oneDown
+USR1-<redacted><handler>(3): : USR1_HANDLER: oneDown
 ================= bottom of stack invoked the stack trace ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1198,7 +1198,7 @@ cmd> unitTests/bgStackTest "$1"
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_DBG
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
-USR1-<redacted><handler>(3): : USR1_HANDLER : aNoopCommand
+USR1-<redacted><handler>(3): : USR1_HANDLER: aNoopCommand
 ================= bottom of stack invoked the stack trace ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1225,7 +1225,7 @@ cmd> unitTests/bgStackTest "$1"
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_func_DBG
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
-USR1-<redacted><handler>(3): : USR1_HANDLER : oneDown off
+USR1-<redacted><handler>(3): : USR1_HANDLER: oneDown off
 bgStackTest(43): : oneDown() : aNoopCommand
 ================= bottom of stack invoked the stack trace ==========================
 bash(<redacted>)---bash(<redacted>)*
@@ -1359,7 +1359,7 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1..func DEBUGGER
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted><redacted>(0): : bash(<redacted>) : $ bgStackTest func_USR1_func_DBG
+pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1_func_DBG
 bgStackTest(139): : $ bgStackTest : c3USR1_func_DBG
 libC3.sh(58): : c3USR1_func_DBG: kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------

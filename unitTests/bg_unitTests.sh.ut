@@ -12,7 +12,7 @@ import bg_unitTest.sh ;$L1;$L2
 
 function produceStdout()
 {
-	false # stick this here to make sure that the test Runner ERR trap does not hit it b/c its not in hte direct ut function
+	false # stick this here to make sure that the test Runner ERR trap does not hit it b/c its not in the direct ut function
 	printf "here is some data\n%s\n" "$*"
 }
 function produceStderr()

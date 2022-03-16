@@ -1,0 +1,111 @@
+
+###############################################################################################################################
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestBareBash start
+## expect: 
+cmd> local cmd="$1"
+cmd> $cmd
+STARTED 'red:0.5'
+STARTED 'blue:0.1'
+STARTED 'green:0.7'
+blue:0.1 ended with exit code 1
+FINISHED: 'blue:0.1'  exitcode='1'
+red:0.5 ended with exit code 5
+FINISHED: 'red:0.5'  exitcode='5'
+green:0.7 ended with exit code 7
+FINISHED: 'green:0.7'  exitcode='7'
+
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestBareBash finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern1 start
+## expect: 
+cmd> local cmd="$1"
+cmd> $cmd
+STARTED 'red:0.5'
+STARTED 'blue:0.1'
+STARTED 'green:0.7'
+STARTED 'purple:0.15'
+STARTED 'hazel:0.75'
+STARTED 'orange:0.8'
+loop done
+FINISHED: 'blue:0.1'  exitcode='1'
+FINISHED: 'purple:0.15'  exitcode='15'
+FINISHED: 'red:0.5'  exitcode='5'
+FINISHED: 'green:0.7'  exitcode='7'
+FINISHED: 'hazel:0.75'  exitcode='75'
+FINISHED: 'orange:0.8'  exitcode='8'
+
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern2 start
+## expect: 
+cmd> local cmd="$1"
+cmd> $cmd
+STARTED 'red:0.5'
+STARTED 'blue:0.1'
+STARTED 'green:0.7'
+FINISHED: 'blue:0.1'  exitcode='1'
+STARTED 'purple:0.15'
+FINISHED: 'purple:0.15'  exitcode='15'
+STARTED 'hazel:0.75'
+FINISHED: 'red:0.5'  exitcode='5'
+STARTED 'orange:0.8'
+FINISHED: 'green:0.7'  exitcode='7'
+FINISHED: 'hazel:0.75'  exitcode='75'
+FINISHED: 'orange:0.8'  exitcode='8'
+loop done
+
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern2 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern3 start
+## expect: 
+cmd> local cmd="$1"
+cmd> $cmd
+STARTED 'red:0.5'
+STARTED 'blue:0.1'
+STARTED 'green:0.7'
+FINISHED: 'blue:0.1'  exitcode='1'
+STARTED 'purple:0.15'
+FINISHED: 'purple:0.15'  exitcode='15'
+STARTED 'hazel:0.75'
+FINISHED: 'red:0.5'  exitcode='5'
+STARTED 'orange:0.8'
+loop done
+FINISHED: 'green:0.7'  exitcode='7'
+FINISHED: 'hazel:0.75'  exitcode='75'
+FINISHED: 'orange:0.8'  exitcode='8'
+
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern3 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern4 start
+## expect: 
+cmd> local cmd="$1"
+cmd> $cmd
+STARTED 'red:0.5'
+STARTED 'blue:0.1'
+STARTED 'green:0.7'
+FINISHED: 'blue:0.1'  exitcode='1'
+STARTED 'purple:0.15'
+FINISHED: 'purple:0.15'  exitcode='15'
+STARTED 'hazel:0.75'
+FINISHED: 'red:0.5'  exitcode='5'
+STARTED 'orange:0.8'
+loop done
+FINISHED: 'green:0.7'  exitcode='7'
+FINISHED: 'hazel:0.75'  exitcode='75'
+FINISHED: 'orange:0.8'  exitcode='8'
+
+## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern4 finished
+###############################################################################################################################
+

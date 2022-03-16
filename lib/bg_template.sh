@@ -691,11 +691,12 @@ function templateExpand()
 	#bgtraceVars sedScript
 
 	# call sed to do the actual expansion
+	local results
 	if [ "$dstFilename" ]; then
 		if [ -e "$dstFilename" ] && [ "$interactiveFlag" ]; then
 			local tmpDir; fsMakeTemp -d tmpDir
 			templateGetContent "${srcTemplateParams[@]}" | sed -e "$sedScript" > "$tmpDir/expandedTemplate"
-			local results=("${PIPESTATUS[@]}")
+			results=("${PIPESTATUS[@]}")
 			if (( ${results[0]:-0}+${results[1]:-0}+${results[2]:-0} == 0 )); then
 				[ "$srcTemplate" ] && fsCopyAttributes "$srcTemplate" "$tmpDir/expandedTemplate"
 				if fsIsDifferent "$tmpDir/expandedTemplate" "$dstFilename"; then
@@ -705,7 +706,7 @@ function templateExpand()
 			fsMakeTemp --release tmpDir
 		else
 			templateGetContent "${srcTemplateParams[@]}" | sed -e "$sedScript" | pipeToFile "$dstFilename"
-			local results=("${PIPESTATUS[@]}")
+			results=("${PIPESTATUS[@]}")
 			pipeToFile --didChange "$dstFilename" && setReturnValue "$changedStatusVar_" "1"
 			if [ "$srcTemplate" ] && (( ${results[0]:-0}+${results[1]:-0}+${results[2]:-0} == 0 )); then
 				fsCopyAttributes "$srcTemplate" "$dstFilename"
@@ -714,7 +715,7 @@ function templateExpand()
 		[ "$dstFilename" ] && [ ${#fileOpts[@]} -gt 0 ] && fsTouch --typeMode=f "${fileOpts[@]}" "$dstFilename"
 	else
 		templateGetContent "${srcTemplateParams[@]}" | sed -e "$sedScript"
-		local results=("${PIPESTATUS[@]}")
+		results=("${PIPESTATUS[@]}")
 	fi
 	[ ${results[0]:-0} -gt 0 ] && assertError -v srcTemplateParams "could not read template contents"
 	[ ${results[1]:-0} -gt 0 ] && assertError -v sedScript -v srcTemplate "sed failed"
