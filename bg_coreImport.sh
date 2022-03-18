@@ -212,29 +212,46 @@ function import()
 
 	### look up the library in the system paths
 
-	# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
-	# searched in non-development mode
-	if [ "$bgSourceOnlyUnchangable" ]; then
-		local includePaths="$scriptFolder:/usr/lib"
+	local foundScriptPath
+
+	local manFile="/var/lib/bg-core/manifest"
+	[ "$bgVinstalledManifest" ] && manFile="$bgVinstalledManifest"
+	foundScriptPath="$(gawk -v scriptName="$scriptName" -v baseName="${scriptName%.sh}" '
+		$2 == "lib.script.bash" && ($3 == baseName || $4~"(^|/)"scriptName"$") {print $4; exit 0;}
+		$2 == "plugin"   && $4~"(^|/)"scriptName"$" {print $4; exit 0;}
+		$2 == "unitTest" && $4~"(^|/)"scriptName"$" {print $4; exit 0;}
+	' "$manFile" )"
+
+	if [ "$foundScriptPath" ]; then
+		: echo "import found in manifest" >> "/tmp/bgtrace.out"
 	else
-		local includePaths="$scriptFolder:${bgLibPath}:/usr/lib"
+		# SECURITY: TODO: refuse to load libraries that are not in the manifest if in productionMode
+		echo "import searching paths '$scriptName'" >> "/tmp/bgtrace.out"
+		# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
+		# searched in non-development mode
+		if [ "$bgSourceOnlyUnchangable" ]; then
+			local includePaths="$scriptFolder:/usr/lib"
+		else
+			local includePaths="$scriptFolder:${bgLibPath}:/usr/lib"
+		fi
+
+		local incPath tryPath
+		local saveIFS=$IFS
+		IFS=":"
+		for incPath in ${includePaths}; do
+			incPath="${incPath%/}"
+			for tryPath in "$incPath${incPath:+/}"{,lib/,creqs/,core/,coreOnDemand/,plugins/}"$scriptName"; do
+				if [ -f "$tryPath" ]; then
+					foundScriptPath="$tryPath"
+					break
+				fi
+			done
+			[ "$foundScriptPath" ] && break
+		done
+		IFS=$saveIFS
 	fi
 
-	local foundScriptPath incPath tryPath
-	local saveIFS=$IFS
-	IFS=":"
-	for incPath in ${includePaths}; do
-		incPath="${incPath%/}"
-		for tryPath in "$incPath${incPath:+/}"{,lib/,creqs/,core/,coreOnDemand/,plugins/}"$scriptName"; do
-			if [ -f "$tryPath" ]; then
-				foundScriptPath="$tryPath"
-				break
-			fi
-		done
-		[ "$foundScriptPath" ] && break
-	done
-	IFS=$saveIFS
-
+	# if we are only asked to get the path, do that and return
 	if [ "$getPathFlag" ]; then
 		if [ "$2" ]; then
 			printf -v "$2" "%s" "$foundScriptPath"

@@ -2297,11 +2297,6 @@ function bgtrap()
 	local sep1=$'\n#<!:'
 	local sep2=$':!>\n'
 
-	# CRITICALTODO: bgtrap: change the algorithm and format for combining handlers to add a header line that is always there including the BASHPID
-	# that added the handler. If the BASHPID does not match the current BASHPID, then we can overwrite the old handler knowing that
-	# bash will restoring it when the current BASHPID exits and that bash's behavior is that teh parent should not be called while
-	# the child is running.
-
 	local scriptMatchRE
 	if [ "$name" ]; then
 		scriptMatchRE="(^|${sep2%$'\n'}|.)${sep1}${name}${sep2}(.*)${sep1}${name}${sep2}(.|${sep1#$'\n'}|$)"

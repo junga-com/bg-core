@@ -252,6 +252,3 @@ function awkData_bcColumnValues()
 			-v filters="${completedTerms[*]}" \
 		-f "bg_awkDataBC.awk"
 }
-
-
-# CRITICALTODO: add .awk files to the code grep. maybe that just entails adding it to the makefile as code files

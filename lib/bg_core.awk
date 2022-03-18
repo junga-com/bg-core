@@ -122,7 +122,7 @@ function queueFilesToScan(fileSpec,where             ,i,pathlist,addCount,insert
 # Params:
 #    varNameN   : the name of a global awk variable to be displayed
 #    optionsStr : a string of optional args that affect how subsequent varNames are printed. Note that options can be included
-#                 among the varNames and effect only varNames from that point on.
+#                 among the varNames and affect only varNames from that point on.
 # Options:
 #    -l<str> : literal. write <str> to the output instead of interpreting it as a global varName
 #    -o<filename> : redirect output to <filename>
@@ -131,7 +131,7 @@ function queueFilesToScan(fileSpec,where             ,i,pathlist,addCount,insert
 # See Also:
 #    printfVars2 : print only one var at a time but works with local and netsted arrays that this function does not work with
 #    (bash)printfVars : similar bash function
-function printfVars(varNameListStr            ,optionsStr,level, varNameList, i,options,outFile) {
+function printfVars(varNameListStr,optionsStr               ,level, varNameList, i,options,outFile) {
 	level=0
 	outFile="/dev/stderr"
 	# TODO: change to use splitOptions() function
@@ -1055,6 +1055,24 @@ function fsExists(file1,     fileStats1,result) {
 	return (result==0)
 }
 
+# usage: fsGetType(f)
+# a word indicating the type of file system object that f is.
+#    ""          : f does not exist
+#    "file"      : normal file
+#    "directory" : directory / folder
+#    "blockdev"  :
+#    "chardev"   :
+#    "socket"    :
+#    "fifo"      : a pipe
+#    "symlink"   :
+#    "door"      :
+#    "unknown"   :
+function fsGetType(file1,     fileStats1,result) {
+	if (!file1) return 0;
+	result=stat(file1, fileStats1)
+	return (result==0) ? fileStats1["type"] : ""
+}
+
 # usage: fsTouch(f)
 # creates a file or folder.
 # Params:
@@ -1114,14 +1132,23 @@ function fsIsNewer(fileSpec, file2                  ,i,fileStats1,fileStats2,pat
 #    outputArray : an array that will receive the results. It will be deleted and then the results added.
 #                  Each entry is a single file or folder name which may or may not exist in the file system but globs that do not
 #                  match any file objects will be removed.
-function fsExpandFiles(pathlist,paths                   ,pathsStr,result,cmd,i) {
+# Options:
+#    -f : force. if no files match, return /dev/null instead of empty
+#    -F : files only
+function fsExpandFiles(pathlist,paths,optionsAryOrStr                   ,pathsStr,result,cmd,i) {
+	splitOptions(optionsAryOrStr, options)
 	cmd="printf %s\\\\0 "pathlist
 	result=(cmd | getline pathsStr)
 	split(substr(pathsStr,1,length(pathsStr)-1),paths,"\0")
 	# if any element in paths still contain wildcard chars, it does not match any files or folders so remove them
-	for (i in paths)
+	for (i in paths) {
 		if (paths[i] ~ /[*?]/)
 			delete paths[i]
+		else if (options[-F] && fsGetType(f)!="file")
+			delete paths[i]
+	}
+	if (length(paths)==0 && options[-f])
+		paths[1]="/dev/null"
 }
 
 # usage: fsIsDifferent(file1, file2)

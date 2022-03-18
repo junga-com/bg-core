@@ -89,6 +89,10 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 	setSecureEnv bgWS $' \t\n'
 
 	### Set the bgProductionMode variable
+	# TODO: now that the manifest is well implemented we should use it to verify system script cmd and libraries.
+	#       if $0 is not in the manifest, we can not set production mode
+	#       add file HASH as 5th column in manifest file -- use to periodically verify files
+	#       modify import to check that lib is in manifest before loading in production mode 
 	# This security only protects scripts that are installed in a hosts system folder via a package management from a trusted repository
 	# that enforces security review of content accepted into the repository. The whole point of this mechanism is to ensure that officially
 	# installed scripts can not be tricked into running in development mode. It can not ensure that a running script is trusted, only that
