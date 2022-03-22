@@ -120,7 +120,7 @@ function templateCntr()
 		find)       templateFind          "$@" || assertError "no template found for '$@'" ;;
 		tree)       templateTree          "$@" ;;
 		list)       templateList          "$@" ;;
-		install)    assertError "not yet implemented"; templateInstall       "$@" ;;
+		install)    assertError "not yet implemented"; ;;#templateInstall       "$@" ;;
 		getVars)
 			if ((verbosity<=1)); then
 				templateListVars      "$@"

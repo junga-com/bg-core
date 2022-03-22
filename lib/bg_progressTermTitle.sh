@@ -70,7 +70,7 @@ function _termTitleReadProgressLoop()
 		local str="$1"; shift
 		local current="$1"; shift
 		local target="$1"; shift
-		stringFromBashToken str current target
+		unescapeTokens str current target
 		if [ "$target" ]; then
 			local divCol msgSection meter meterBarStart meterBarEnd meterDiv meterBar="" marker
 			divCol=$((width*20/100))

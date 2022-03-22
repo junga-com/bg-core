@@ -21,6 +21,21 @@ function manifestGet(assetTypeMatch, assetNameMatch, array                    ,m
 	close(cmd)
 }
 
+function manifestImportLookup(optStrOrArray,scriptName                             ,fullPath,cmd,options,outClause) {
+	# if caller did not pass an optStrOrArray, shift its value over to scriptName
+	if (!optionsIsValid(optStrOrArray) && !scriptName) {
+		scriptName=optStrOrArray
+		optStrOrArray=""
+	}
+	splitOptions(optStrOrArray, options)
+	outClause=""; if ("-o" in options) outClause="-v outStr='"options["-o"]"'"
+	cmd="awk "outClause" -v scriptName='"scriptName"' -i bg_manifest.awk '' "manifestGetFile();
+	cmd | getline fullPath;
+	close(cmd);
+	return fullPath;
+}
+
+
 # usage: templateFind(templateName, "[--pkg=<pkgName>] [--pkgOverride=<pkgName>]")
 # Return the path to the template specified in templateName
 # See man(3sh) templateFind
@@ -113,102 +128,120 @@ function queueFilesToScan(fileSpec,where             ,i,pathlist,addCount,insert
 #################################################################################################################################
 ### Output functions
 
-# usage: printfVars("<varName1>|<opt1> [...<varNameN>|<optN>]"                ,optionsStr)
-# TODO: change to use splitOptions() function
+# usage: printfVars("<varName1>|<opt1> [...<varNameN>|<optN>]")
 # The input is a string of space separated global variable names and optional parameters that start with '-'
 # This prints the listed awk global vars in a reasonable format.
 # Note that you must use printfVars2 to print local function variables. printfVars2 works with global variobles also but the trade
 # off is that printfVars allows a list of variables in one call but printfVars2 requires one call per variable.
 # Params:
 #    varNameN   : the name of a global awk variable to be displayed
-#    optionsStr : a string of optional args that affect how subsequent varNames are printed. Note that options can be included
-#                 among the varNames and affect only varNames from that point on.
 # Options:
+#    -1      : switch to single line mode
+#    +1      : switch to multiple line mode
 #    -l<str> : literal. write <str> to the output instead of interpreting it as a global varName
 #    -o<filename> : redirect output to <filename>
 #    -w<n>   : pad subsequent <varNames> to <n> characters
+#    --level=<level> : indent level. <level>*3 spaces will begin each line of output
 #
 # See Also:
-#    printfVars2 : print only one var at a time but works with local and netsted arrays that this function does not work with
-#    (bash)printfVars : similar bash function
-function printfVars(varNameListStr,optionsStr               ,level, varNameList, i,options,outFile) {
+#    printfVars2 : less convenient but works with local variable that this function does not work with
+function printfVars(varNameListStr,varNameListStr2               ,level, varNameList, i,options,options2,outFile,opt,data,done,varName) {
+	# this allows a separate options param or not
+	varNameListStr=varNameListStr" "varNameListStr2
+	arrayCreate(options)
 	level=0
 	outFile="/dev/stderr"
-	# TODO: change to use splitOptions() function
-	spliti(optionsStr, options)
-	lineEnd="\n"; if ("-1" in options) lineEnd=" "
+	lineEnd="\n";
 	split(varNameListStr, varNameList)
-	for (i in varNameList) {
-		switch (varNameList[i]) {
+	while (length(varNameList[1])>0 && !done) {
+		opt=arrayShift(varNameList)
+		switch (opt) {
+			case "-1": lineEnd=" "; break;
+			case "+1": lineEnd="\n"; break;
+
 			case /^-l/:
-				gsub("%20"," ",varNameList[i])
-				printf("%s ", substr(varNameList[i], 3))
-				if (optionsStr !~ /-1/) printf("\n")
-				break
+				data=(opt=="-l") ? arrayShift(varNameList) : gensub(/^-l/,"","g",opt)
+				gsub("%20"," ",data)
+				printf("%s "lineEnd, data)
+				break;
+
 			case /^-o/:
-				outFile=substr(varNameList[i], 3)
-				optionsStr=varNameList[i]" "optionsStr
-				break
-			case /^-/: optionsStr=optionsStr" "varNameList[i]; break
+				outFile=(opt=="-o") ? arrayShift(varNameList) : gensub(/^-o/,"","g",opt)
+				options["-o"]=outFile
+				break;
+
+			case /^--level=/:
+				level=gensub(/^--level=/,"","g",opt)
+				options["--level"]=level
+				break;
+
+			case "--": done=1; break
+			case /^-/: options[opt]=""; break
+
 			default:
-				if (varNameList[i] in SYMTAB) {
-					printfVars2(level, varNameList[i], SYMTAB[varNameList[i]], optionsStr)
+				varName=opt
+				arrayCopy(options,options2)
+				if (lineEnd!="\n") options2["-1"]=""
+				options2["--recursing"]=""
+				if (varName in SYMTAB) {
+					printfVars2(options2, varName, SYMTAB[varName])
 				}else{
-					printf("%*s%s=<localVar-use-printfVars2()>"lineEnd, level*3, "", varNameList[i]) >> outFile
+					printf("%*s%s=<localVar-use-printfVars2()>"lineEnd, level*3, "", varName) >> outFile
 				}
+				break;
 		}
 	}
-	if (optionsStr ~ /-1/) printf("\n")
+	if (lineEnd != "\n") printf("\n")
 }
 
-# usage: printfVars2(level, varName, varValue, optionsStr)
-# TODO: change to use splitOptions() function
-# This is an alternate form of printfVars that allows descending nested arrays of arrays and printing local variables but only
-# accepts one variable with the name and value passed separately to print instead of a string list.
-# printfVars is implemented with this function.
+# usage: printfVars2(optionsAryOrStr, n1,v1, n2,v2, n3,v3, n4,v4, n5,v5)
+# This is an alternate form of printfVars that allows printing local variables but you
+# need to pass name,value pairs of variables instead of a string list of names.
+# printfVars uses this function to print global variables which is why it can descend nested arrays.
 # Params:
-#    level      : the indentation level. level*3 spaces will be printed before each line
-#    varName    : the name to be displayed as the label for the variable being printed
-#    varValue   : the value to be displayed for the variable being printed
-#    optionsStr : a string of optional args
+#    optionsAryOrStr  : optional arguments. See splitOptions
+#    n<N>  : the names to be displayed as the label for the following v<N> variable being printed
+#    v<N>  : a value to be displayed
+# Options:
+#    --level=<level>  : the indentation level. level*3 spaces will be printed before each line
+#
 # See Also:
 #    printfVars : print multiple vars at a time but only works with globals
 #    (bash)printfVars : similar bash function
-function printfVars2(level, varName, varValue, optionsStr,      i,optToken,options,lineEnd,maxWidth,outFile) {
-	outFile="/dev/stderr"
-	maxWidth=0
-	if (match(varName,/(.*) (.*)$/, options)) {
-		optionsStr=options[1]" "optionsStr
-		varName=options[2]
-	}
-	# TODO: change to use splitOptions() function
-	spliti(optionsStr, options)
-	lineEnd="\n"; if ("-1" in options) lineEnd=" "
-	for (optToken in options) switch (optToken) {
-		case /^-w/:
-			maxWidth=substr(optToken,3)
-			break
-		case /^-o/:
-			outFile=substr(optToken, 3)
-			break
-	}
-	sub("-w[0-9]*","",optionsStr)
+function printfVars2(optionsAryOrStr, n1,v1, n2,v2, n3,v3, n4,v4, n5,v5               ,i,options,options2,level,lineEnd,maxWidth,outFile) {
+	splitOptions(optionsAryOrStr, options)
+	lineEnd="\n"          ; if ("-1" in options) lineEnd=" "
+	maxWidth=0            ; if ("-w" in options) maxWidth=options["-w"]
+	outFile="/dev/stderr" ; if ("-o" in options) outFile=options["-o"]
+	level=0               ; if ("--level" in options) level=options["--level"]
 
-	if (!isarray(varValue)) {
+	if (!isarray(v1)) {
 		if ("--brackets" in options)
-			printf("%*s[%-*s]='%s'"lineEnd, level*3, "", maxWidth,varName, varValue) >> outFile
+			printf("%*s[%-*s]='%s'"lineEnd, level*3, "", maxWidth,n1, v1) >> outFile
 		else
-			printf("%*s%-*s='%s'"lineEnd, level*3, "", maxWidth,varName, varValue) >> outFile
-	} else {
-		printf("%*s%s=<array>"lineEnd, level*3, "", varName) >> outFile
+			printf("%*s%-*s='%s'"lineEnd, level*3, "", maxWidth,n1, v1) >> outFile
+	} else { # isarray(v1)
+		printf("%*s%s=<array>"lineEnd, level*3, "", n1) >> outFile
 
-		maxWidth=0; for (i in varValue) maxWidth=max(maxWidth,length(i))
+		maxWidth=0; for (i in v1) maxWidth=max(maxWidth,length(i))
+		arrayCopy(options,options2)
+		options2["-w"]=maxWidth
+		options2["--brackets"]=maxWidth
+		options2["--level"]=level+1
+		options2["--recursing"]=""
 
-		for (i in varValue) if (!isarray(varValue[i]))
-			printfVars2(level+1, i, varValue[i], "-w"maxWidth" --brackets "optionsStr)
-		for (i in varValue) if (isarray(varValue[i]))
-			printfVars2(level+1, i, varValue[i], "-w"maxWidth" --brackets "optionsStr)
+		for (i in v1) if (!isarray(v1[i]))
+			printfVars2(options2, i, v1[i])
+		for (i in v1) if (isarray(v1[i]))
+			printfVars2(options2, i, v1[i])
 	}
+	if (n2!="") {
+		arrayCopy(options,options2)
+		options2["--recursing"]=""
+		printfVars2(options2, n2,v2, n3,v3, n4,v4, n5,v5)
+	}
+	if (lineEnd!="\n" && !("--recursing" in options))
+		printf("\n") >> outFile
 }
 
 
@@ -254,7 +287,7 @@ function arrayShift(array                      , element, i,startLength) {
 		array[i]=array[i+1];
 	delete array[length(array)]
 	if (startLength-1 != length(array)) {
-		printfVars2(0,"array after shift", array)
+		printfVars2("","array after shift", array)
 		assert("arrayShift: this function is only valid for packed numeric indexed arrays. startLength='"startLength"'   endLength='"length(array)"'")
 	}
 	return element
@@ -269,6 +302,7 @@ function arrayIndexOf(array, element           , i) {
 
 # usage: arrayCopy(source, dest)
 # copy the contents of one array var into another
+# does not truncate dest so if you do not want to merge contents, clear it first
 # Return Value:
 #   <count>  : the number of elements copied including in sub-arrays
 function arrayCopy(source, dest,         i, count)
@@ -276,9 +310,14 @@ function arrayCopy(source, dest,         i, count)
 	delete dest
 	for (i in source) {
 		if (isarray(source[i])) {
-			dest[i][1]=""
+			if (!(i in dest))
+				arrayCreate2(dest, i)
+			else if (!isarray(dest[i]))
+				assert("arrayCopy: destination array already had an element="i" that is a scalar but needs to be an array")
 			count += arrayCopy(source[i], dest[i])
 		} else {
+			if ((i in dest) && isarray(dest[i]))
+				assert("arrayCopy: destination array already had an element="i" that is an array but needs to be a scalar")
 			dest[i] = source[i]
 			count++
 		}
@@ -312,6 +351,16 @@ function arrayCreate2(array, elName) {
 	array[elName][1]=""
 	split("", array[elName])
 }
+
+function arrayClear(array) {
+	split("", array)
+}
+
+function arrayClear2(array,elName) {
+	array[elName][1]=""
+	split("", array[elName])
+}
+
 
 # MAN(3) split
 # usage: spliti(str, array, [delim])
@@ -381,12 +430,19 @@ function bgtraceVars(s) {
 	printfVars("-o"_bgtraceFile" "s)
 	fflush(_bgtraceFile)
 }
-# TODO: change to use splitOptions() function
-function bgtraceVars2(level, varName, varValue, optionsStr                                     ,i) {
-	if (!bgtraceIsActive()) return
-	printfVars2(level, varName, varValue, optionsStr" -o"_bgtraceFile)
+function bgtraceVars2(optionsAryOrStr, n1,v1, n2,v2, n3,v3, n4,v4, n5,v5                             ,options) {
+	if (!bgtraceIsActive())
+		return;
+	# a common mistake is to forget to include the optionsAryOrStr so if it is not empty an does not start with a '-', fix it
+	# by reinvoking ouselves adding an empty optionsAryOrStr and shifting everything over
+	if (!optionsIsValid(optionsAryOrStr))
+		return bgtraceVars2("", optionsAryOrStr, n1,v1, n2,v2, n3,v3, n4,v4, n5,v5)
+	splitOptions(optionsAryOrStr, options);
+	options["-o"]=_bgtraceFile
+	printfVars2(options, n1,v1, n2,v2, n3,v3, n4,v4, n5,v5 )
 	fflush(_bgtraceFile)
 }
+# TODO: give assert the same signature as printfVars2
 function assert(msg                 ,outStr) {
 	_fnName=_FILENAME; if (_fnName=="") _fnName=FILENAME
 	_fnLine=_INDESC;   if (_fnLine=="") _fnLine=FNR
@@ -465,6 +521,18 @@ function strExtract(s, leadingRegEx, trailingRegEx) {
 	sub(leadingRegEx,"",s)
 	sub(trailingRegEx,"",s)
 	return s
+}
+
+
+# usage: optionsIsValid(testVar)
+# returns false if testVar can not be an option var.
+# Since options are optional and by convention appear first in the parameter list, functions can use this to see if the first param
+# is an option and if not, shift the params over one. A common technique is to recall itself adding an "" at the front of the params
+# Valid Options Var:
+#    if test var is an array return true
+#    if it either an empty string or the first non space is a '-'
+function optionsIsValid(testVar) {
+	return isarray(testVar) || (testVar ~ /^([[:space:]]*[-].*|)$/)
 }
 
 # usage: splitOptions(optStrOrArray, optionsOut)
@@ -1144,10 +1212,10 @@ function fsExpandFiles(pathlist,paths,optionsAryOrStr                   ,pathsSt
 	for (i in paths) {
 		if (paths[i] ~ /[*?]/)
 			delete paths[i]
-		else if (options[-F] && fsGetType(f)!="file")
+		else if (options["-F"] && fsGetType(f)!="file")
 			delete paths[i]
 	}
-	if (length(paths)==0 && options[-f])
+	if (length(paths)==0 && options["-f"])
 		paths[1]="/dev/null"
 }
 
@@ -1210,8 +1278,7 @@ function pathGetCommon(p1, p2                                   ,t1,t2,out,finis
 }
 
 
-# usage: pathGetCanonStr -e <path>  [<retVar>]
-# usage: canoPath="$(pathGetCanonStr "path")"
+# usage: pathGetCanonStr(path, useEnvFlag)
 # return the canonical version of <path> without requiring that any part of it exists.
 #
 # Note that starting in Ubuntu 16.04, the realpath core gnu util is much more capable including

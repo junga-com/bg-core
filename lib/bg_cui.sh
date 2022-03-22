@@ -782,12 +782,12 @@ function notifyUser()
 function wrapLines()
 {
 	local cols truncMode startCol
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-t) truncMode="1" ;;
-		-w*) cols="$(bgetopt "$@")" && shift ;;
-		-s*) startCol="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
-
+		-w*)  bgOptionGetOpt val: cols "$@" && shift ;;
+		-s*)  bgOptionGetOpt val: startCol "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local indentFirst="${1}"
 	local indentContt="${2:-   +}"
 	local tabExpansion="   " #TODO: query the terminal to get the actual current value.
@@ -897,13 +897,13 @@ function wheresTheUserAt()
 	echo "none"
 }
 
-	function __testAndReturnApp() {
-		if [ "$1" ] && which "$1" &>/dev/null; then
-			echo "$@";
-			return 0;
-		fi
-		return 1
-	}
+function __testAndReturnApp() {
+	if [ "$1" ] && which "$1" &>/dev/null; then
+		echo "$@";
+		return 0;
+	fi
+	return 1
+}
 
 
 # usage: $(getUserCmpApp) <file1> <file2>

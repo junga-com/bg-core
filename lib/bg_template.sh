@@ -1296,7 +1296,7 @@ function _templateProcessOneLine()
 #               is checked and if there are any differences in the content the check will fail. Apply will replace the contents
 #     -e : use extended template parser which support directives in the template
 DeclareCreqClass cr_templateIsExpanded
-cr_templateIsExpanded::construct() {
+function cr_templateIsExpanded::construct() {
 	contentFlag=""
 	templateParser="templateExpand"
 	fileOpts=()
@@ -1314,7 +1314,7 @@ cr_templateIsExpanded::construct() {
 
 	templateFind -R templateFile "$templateSpec"
 }
-cr_templateIsExpanded::check() {
+function cr_templateIsExpanded::check() {
 	[ ! -e "$destFile" ] && return 1
 	[ ${#fileOpts[@]} -gt 0 ] && { ! fsTouch --checkOnly "${fileOpts[@]}" "$destFile" && return 1; }
 	[ ! "$contentFlag" ] && return 0
@@ -1329,7 +1329,7 @@ cr_templateIsExpanded::check() {
 	$templateParser "$templateFile" "$tempFile"
 	fsIsDifferent  "$tempFile" "$destFile"
 }
-cr_templateIsExpanded::apply() {
+function cr_templateIsExpanded::apply() {
 	if [ ! -e "$destFile" ] || [ "$contentFlag" ]; then
 		if [ "$tempFile" ] && [ -f "$tempFile" ]; then
 			cat "$tempFile" | fsPipeToFile "${fileOpts[@]}" "$destFile"

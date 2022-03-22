@@ -205,7 +205,7 @@ function bgCmdlineParseBC()
 					opt="-${_bcp_opt:$i:1}"
 					canonOpt="${syntaxSpec[canon:$opt]:-$opt}"
 					_clInputValue[$canonOpt]="${_bcp_opt:$((i+1))}"
-					match "${syntaxSpec[$canonOpt]}" "^[^\<]*<([^\>]+).*$" rematch && _clInputValue[${rematch[1]}]="${_clInputValue[$canonOpt]}"
+					match "${syntaxSpec[$canonOpt]}"   '^[^\<]*<([^\>]+).*$' rematch && _clInputValue[${rematch[1]}]="${_clInputValue[$canonOpt]}"
 				fi
 			fi
 
@@ -224,7 +224,7 @@ function bgCmdlineParseBC()
 			else
 				canonOpt="${syntaxSpec[canon:${rematch[1]}]:-${rematch[1]}}"
 				_clInputValue[$canonOpt]="${rematch[2]}"
-				match "${syntaxSpec[$canonOpt]}" "^[^\<]*<([^\>]+).*$" rematch && _clInputValue[${rematch[1]}]="${_clInputValue[$canonOpt]}"
+				match "${syntaxSpec[$canonOpt]}" '^[^\<]*<([^\>]+).*$' rematch && _clInputValue[${rematch[1]}]="${_clInputValue[$canonOpt]}"
 			fi
 
 		# a short or long option by itself and its one that we know requires an argument
@@ -242,7 +242,7 @@ function bgCmdlineParseBC()
 				opt="$_bcp_opt"
 				canonOpt="${syntaxSpec[canon:$opt]:-$opt}"
 				_clInputValue[$canonOpt]="$1"
-				match "${syntaxSpec[$canonOpt]}" "^[^\<]*<([^\>]+).*$" rematch && _clInputValue[${rematch[1]}]="${_clInputValue[$canonOpt]}"
+				match "${syntaxSpec[$canonOpt]}" '^[^\<]*<([^\>]+).*$' rematch && _clInputValue[${rematch[1]}]="${_clInputValue[$canonOpt]}"
 				optWords+=("$1"); shift; ((_bcp_optPos++))
 			fi
 
@@ -287,7 +287,7 @@ function bgCmdlineParseBC()
 	for ((i=1; i<=$#; i++)); do
 		if ((i != posCwords)); then
 			_clInputValue[$i]="${!i}"
-			match "${syntaxSpec[$i]}" "^[^\<]*<([^\>]+).*$" rematch && _clInputValue[${rematch[1]}]="${!i}"
+			match "${syntaxSpec[$i]}" '^[^\<]*<([^\>]+).*$' rematch && _clInputValue[${rematch[1]}]="${!i}"
 		fi
 	done
 }
@@ -376,13 +376,13 @@ function bgCmdlineParse()
 		if { match "$_bcp_opt" "^(-[^-])(.+)$" rematch && [ "${syntaxSpec[${_bcp_opt:0:2}]:-NOARG}" != "NOARG" ]; } || match "$_bcp_opt" "^(--[^=]*)=(.*)$" rematch; then
 			canonOpt="${syntaxSpec[canon:${rematch[1]}]:-${rematch[1]}}"
 			_clInputValue[$canonOpt]="${rematch[2]}"
-			match "${syntaxSpec[$canonOpt]}" "^[^\<]*<([^\>]+).*$" rematch && _clInputValue[${rematch[1]}]="${_clInputValue[$canonOpt]}"
+			match "${syntaxSpec[$canonOpt]}" '^[^\<]*<([^\>]+).*$' rematch && _clInputValue[${rematch[1]}]="${_clInputValue[$canonOpt]}"
 
 		# a short or long option by itself and its one that we know requires an argument
 		elif [ "${syntaxSpec[$_bcp_opt]:-NOARG}" != "NOARG" ]; then
 			canonOpt="${syntaxSpec[canon:$_bcp_opt]:-$_bcp_opt}"
 			_clInputValue[$canonOpt]="$1"
-			match "${syntaxSpec[$canonOpt]}" "^[^\<]*<([^\>]+).*$" rematch && _clInputValue[${rematch[1]}]="$1"
+			match "${syntaxSpec[$canonOpt]}" '^[^\<]*<([^\>]+).*$' rematch && _clInputValue[${rematch[1]}]="$1"
 			shift; ((_bcp_optPos++))
 
 		# a short or long option without an arg, by itself
@@ -398,7 +398,7 @@ function bgCmdlineParse()
 				if [[ "${syntaxSpec["-$shortOpt"]}" =~ ^\< ]]; then
 					canonOpt="${syntaxSpec[canon:-$shortOpt]:--$shortOpt}"
 					_clInputValue[$canonOpt]="${_bcp_opt}"
-					match "${syntaxSpec[$canonOpt]}" "^[^\<]*<([^\>]+).*$" rematch && _clInputValue[${rematch[1]}]="${_bcp_opt}"
+					match "${syntaxSpec[$canonOpt]}" '^[^\<]*<([^\>]+).*$' rematch && _clInputValue[${rematch[1]}]="${_bcp_opt}"
 					_bcp_opt=""
 				else
 					canonOpt="${syntaxSpec[canon:-$shortOpt]:--$shortOpt}"
@@ -412,7 +412,7 @@ function bgCmdlineParse()
 
 	local i; for ((i=1; i<=$#; i++)); do
 		_clInputValue[$i]="${!i}"
-		match "${syntaxSpec[$i]}" "^[^\<]*<([^\>]+).*$" rematch && _clInputValue[${rematch[1]}]="${!i}"
+		match "${syntaxSpec[$i]}" '^[^\<]*<([^\>]+).*$' rematch && _clInputValue[${rematch[1]}]="${!i}"
 	done
 }
 
@@ -672,22 +672,6 @@ function bgMakeUsageSpec() {
 
 #################################################################################################################################
 ### OBSOLETE Cmdline processing functions (legacy)
-
-
-# OBSOLETE: use bgOptionGetOpt instead
-# usage: bgetopt <cmd line ...>
-# usage: myoptionName=$(bgetopt "$@") && shift
-# this is used to remove the next option from the $@ input parameters when the option has a required parameter
-function bgetopt()
-{
-	if [[ "$1" =~ ^-.$ ]]; then
-		echo "$2"
-		return 0
-	else
-		echo "${1:2}"
-		return 1
-	fi
-}
 
 
 # OBSOLETE: use bgCmdlineParseBC or bgCmdlineParse

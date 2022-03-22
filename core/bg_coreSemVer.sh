@@ -118,7 +118,7 @@ function versionIncrement()
 		--major)  mode="major" ;;
 		--minor)  mode="minor" ;;
 		--patch)  mode="patch" ;;
-		--keepDevTag) --keepDevTag="--keepDevTag" ;;
+		--keepDevTag) keepDevTag="--keepDevTag" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local version=$1

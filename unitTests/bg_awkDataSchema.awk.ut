@@ -114,7 +114,7 @@ function ut_schema_restore() {
 
 	ut test
 	echo "awkDataID=$awkDataID" #noecho
-	awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("schemas awkDataID", "-o/dev/stdout")}'
+	awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("-o/dev/stdout schemas awkDataID")}'
 }
 
 declare -A ut_expr_compile=(
@@ -143,7 +143,7 @@ function ut_expr_compile() {
 			PROCINFO["sorted_in"]="@ind_str_asc";
 			arrayCreate(compiledExpr);
 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-			printfVars("compiledExpr", "-o/dev/stdout");
+			printfVars("-o/dev/stdout compiledExpr");
 		}
 	'
 	echo "$awkScript"

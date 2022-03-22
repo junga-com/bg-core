@@ -71,7 +71,7 @@ import bg_ini.sh  ;$L1;$L2
 # <drvName> can be any of the builtin names (off,null,stdout,stderr,file,bgtrace) or the name of a plugin. Two plugin drivers are
 #     included statusline and oneline. To implement a new driver, install a script library named bg_progress<DrvName>.sh
 # <drvParams...> is passed to the driver's constructor (aka 'start' case). Whitespace separates individual arguments that will be
-#     passed to the constructor so any argument the contains whitespace must escape it as described in man(3) stringToBashToken.
+#     passed to the constructor so any argument the contains whitespace must escape it as described in man(3) escapeTokens.
 #
 #
 # Progress Template:
@@ -100,7 +100,7 @@ import bg_ini.sh  ;$L1;$L2
 # Each message is terminated by a linefeed and contains a variable number of whitespace seaparated arguments.
 #    <cmd> [<p1>..<pN>]\n
 #
-# All arguments are escaped according to man(3) stringToBashToken so that the receiver can delimit them on whitespace.
+# All arguments are escaped according to man(3) escapeTokens so that the receiver can delimit them on whitespace.
 #
 # <cmd>
 #     @1  : structured progress message
@@ -472,7 +472,7 @@ declare -gx _progressDefaultDriver
 #   <drvName>      : The name of the driver that will handle progress messages. It can be set to "default" or left unspecified to use the
 #                    default driver
 #    <drvParams...> : parameters sent to the driverFn's 'start' case. These are driver specific. If a parameter contains whitespace
-#                    it must be escaped. See man(3) stringFromBashToken for escaping protocol.
+#                    it must be escaped. See man(3) unescapeTokens for escaping protocol.
 function _progressStartDriver()
 {
 	declare -gAx _progressDriver

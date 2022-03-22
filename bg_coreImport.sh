@@ -216,11 +216,7 @@ function import()
 
 	local manFile="/var/lib/bg-core/manifest"
 	[ "$bgVinstalledManifest" ] && manFile="$bgVinstalledManifest"
-	foundScriptPath="$(gawk -v scriptName="$scriptName" -v baseName="${scriptName%.sh}" '
-		$2 == "lib.script.bash" && ($3 == baseName || $4~"(^|/)"scriptName"$") {print $4; exit 0;}
-		$2 == "plugin"   && $4~"(^|/)"scriptName"$" {print $4; exit 0;}
-		$2 == "unitTest" && $4~"(^|/)"scriptName"$" {print $4; exit 0;}
-	' "$manFile" )"
+	foundScriptPath="$(gawk -v scriptName="$scriptName" -i "bg_manifest.awk" '' "$manFile" )"
 
 	if [ "$foundScriptPath" ]; then
 		: echo "import found in manifest" >> "/tmp/bgtrace.out"
@@ -410,7 +406,7 @@ esac
 import bg_coreBashVars.sh ;$L1;$L2
 
 # string manipulation functions
-import bg_strings.sh ;$L1;$L2
+import bg_coreStrings.sh ;$L1;$L2
 
 # bg_libCore.sh contains the core functions from other libraries that should be present even if the whole library is not.
 # Also, any function that is used in other bg_core* libraries can be moved to this library so that these functions are available

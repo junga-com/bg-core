@@ -292,16 +292,17 @@ function fsIsDifferent()
 function fsGetAge()
 {
 	local units="seconds" seconds precision fromTime
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-S) units="seconds" ;;
 		-M) units="minutes" ;;
 		-H) units="hours" ;;
 		-D) units="days" ;;
-		-L*) units="long"
-			precision="$(bgetopt "$@")" && shift
+		-L*)  bgOptionGetOpt val: precision "$@" && shift
+			units="long"
 			;;
-		-d) fromTime="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
+		-d*)  bgOptionGetOpt val: fromTime "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local path="$1"
 
 	fromTime="${fromTime:-$(date +"%s")}"
@@ -336,9 +337,6 @@ function fsGetAge()
 #   <retVar> : if specified, the result will be set in this variable name instead of returned on stdout
 function fsGetUserCacheFile()
 {
-	# make sure the aaaTouch function is available
-	import bg_authUGO.sh ;$L1;$L2
-
 	local relFilePath="$1"
 
 	# if running a script with sudo, $USER will be root, but really the script is running as the loguser (login user)
@@ -356,7 +354,7 @@ function fsGetUserCacheFile()
 	local fsguc_cachFile="${fsguc_userCacheFolder}/${relFilePath#/}"
 
 	# make sure that the file exists with the typical home folder permissions
-	aaaTouch -p -d "" "$fsguc_cachFile" "owner:$fsguc_aaaUser:writable,group::writable,world:readable"
+	fsTouch -p -u $fsguc_aaaUser --perm=". ... rw- r--" "$fsguc_cachFile"
 
 	returnValue "$fsguc_cachFile" "$2"
 }

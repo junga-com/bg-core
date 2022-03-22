@@ -532,7 +532,7 @@ function iniParamGetAll()
 	{
 		read -r maxNameLen
 		while read -r name value; do
-			strUnescapeFromToken name
+			unescapeTokens name
 			[ "$ipg_templateFlag" ] && templateExpandStr -R value "$value"
 			if [ "$retArray" ]; then
 				mapSet "$retArray" "$name" "$value"

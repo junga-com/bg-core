@@ -140,7 +140,7 @@ function bgwaitAll()
 #     (bgInitNewProc; doSomething "p1")&
 #     <pidMapVar>[<childName>]="$!".
 # There may be other children active that are not entered in <pidMapVar>. If one of those ends, it will be silently acknowledged
-# and ignored by bgwait. 
+# and ignored by bgwait.
 #
 # Each time this function returns true(0), it removes the entry from <pidMapVar> that corresponds to the finished child and returns
 # the name,exitCode, and pid of that finished child in <outputVar>.
@@ -378,7 +378,7 @@ function delayedExec()
 	local deDelay="$1" ; shift
 	local jobSpecFile="/tmp/.${deName}.delayedJobSpec.$UID"
 	(
-		aaaTouch "$jobSpecFile" world:writable
+		fsTouch --perm=". ..- ..- rw-" "$jobSpecFile"
 		local lockID; startLock -u lockID $jobSpecFile
 		local jobSpec="$(cat $jobSpecFile)"
 		if [ "$jobSpec" ]; then

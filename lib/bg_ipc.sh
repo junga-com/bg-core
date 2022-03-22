@@ -145,22 +145,21 @@ function decIPCCount()
 function sshInitOptions()
 {
 	local reuseConnectionMode="" addNewFlag="" knownHostsFile
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-r)  reuseConnectionMode="1" ;;
 		-a)  addNewFlag="1" ;;
-		-k*) knownHostsFile="$(bgetopts "$@")" && shift ;;
-	esac; shift; done
+		-k*)  bgOptionGetOpt val: knownHostsFile "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	local hostFQDN="$1"
 	local optionsStringVar="$2"
 	[ "$optionsStringVar" ] && [ "${!optionsStringVar}" ] && return 0
 	local username; [[ "$hostFQDN" =~ @ ]] && { username="${hostFQDN%@*}"; hostFQDN="${hostFQDN#*@}"; }
 
-	# if the caller did not specify one, use the selected domData's known_hosts file
+	# if the caller did not specify one, use the user's known_host file
 	if [ ! "$knownHostsFile" ]; then
-		domFolderInit -f
-		[ ! -d "$domFolder/ssh/" ] && domTouch "$domFolder/ssh/"
-		knownHostsFile="$domFolder/ssh/known_hosts"
+		knownHostsFile="etc/ssh/known_hosts"
 	fi
 
 	# normally we only talk to hosts that we know (strictHostCheckFlag="yes")
@@ -177,7 +176,7 @@ function sshInitOptions()
 	fi
 
 	local sshConfFile="$HOME/.ssh/cm_socket/sshConf.${username:$USER}.$hostFQDN.$$.$BASHPID"
-	aaaTouch -d "" "$sshConfFile"
+	fsTouch  "$sshConfFile"
 
 	cat <<-EOS > $sshConfFile
 		StrictHostKeyChecking $strictHostCheckFlag
@@ -191,7 +190,7 @@ function sshInitOptions()
 		local usrKeyFile="$HOME/.ssh/readUserKey.${domFolder##*/}"
 		if [ ! -f "$usrKeyFile" ] && [ -f "$domKeyFile" ]; then
 			cp "$domKeyFile" "$usrKeyFile"
-			aaaTouch "$usrKeyFile" owner:$(aaaGetUser):writable,group::none,world:none
+			fsTouch -u $(aaaGetUser) --perm="rw- --- ---" "$usrKeyFile"
 		fi
 		if [ -f "$usrKeyFile" ]; then
 			cat <<-EOS >> $sshConfFile
@@ -574,23 +573,21 @@ function sshCmd()
 	local interactiveShellFlag endFolderSeesions callbackHost doSMBInitOnce doSSHFSInitOnce shareUUID sshOptions
 	local sshDebugCmd useAgentForwarding installRemoteShareSupport persistentFolderMode myRandomPort
 	local remoteSharesStartScript remoteSharesStopScript sshTermFlag tmpKeyFile domMode domAddOpts domOpts
-	while [[ "$1" =~ ^- ]]; do
-		case "$1" in
-			--dom)    domMode="1" ;;
-			--domAdd) domMode="1"; domAddOpts="-a" ;;
-			-d)  sshDebugCmd="echo " ;;
-			-i)  interactiveShellFlag="y" ;;
-			-t)  sshTermFlag="1" ;;
-			-f*) folders+=("${folders[@]}" "$(bgetopt "$@")") && shift ;;
-			-p)  persistentFolderMode="1" ;;
-			-fp) persistentFolderMode="1" ;;
-			-fx) endFolderSeesions="1"; interactiveShellFlag="n" ;;
-			-l*) callbackHost="$(bgetopt "$@")" && shift ;;
-			-A)  useAgentForwarding="1" ;;
-			-I)  installRemoteShareSupport="1" ;;
-			-Ktmp) tmpKeyFile="1" ;;
-		esac
-		shift
+	while [ $# -gt 0 ]; do case $1 in
+		--dom)    domMode="1" ;;
+		--domAdd) domMode="1"; domAddOpts="-a" ;;
+		-d)  sshDebugCmd="echo " ;;
+		-i)  interactiveShellFlag="y" ;;
+		-t)  sshTermFlag="1" ;;
+		-f*) bgOptionGetOpt valArray: folders "$@" && shift ;;
+		-p)  persistentFolderMode="1" ;;
+		-fp) persistentFolderMode="1" ;;
+		-fx) endFolderSeesions="1"; interactiveShellFlag="n" ;;
+		-l*)  bgOptionGetOpt val: callbackHost "$@" && shift ;;
+		-A)  useAgentForwarding="1" ;;
+		-I)  installRemoteShareSupport="1" ;;
+		-Ktmp) tmpKeyFile="1" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local remoteHost="$1"; [ "$1" ] && shift
 	local remoteCommand="$@"

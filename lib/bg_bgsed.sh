@@ -90,7 +90,7 @@ function bgsed()
 		if [ ! -e "$inputFile" ]; then
 			fsTouch $mkdirFlag "${sudoPrompt[@]}" "$inputFile"
 			# # adjust group ownership?
-			# [ ! -f "$inputFile" ] && grep -q "adm:" /etc/group &>/dev/null && which aaaTouch &>/dev/null && aaaTouch -d "" "$inputFile" group:adm:writable
+			# [ ! -f "$inputFile" ] && grep -q "adm:" /etc/group &>/dev/null && which fsTouch &>/dev/null && fsTouch -u adm --perm="... rw. ..." "$inputFile" 
 		fi
 
 		# we need to be able to write to the parent folder as well to use "sed -i ..."

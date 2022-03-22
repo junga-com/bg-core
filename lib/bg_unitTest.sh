@@ -68,7 +68,7 @@
 # array entry in that variable will become a unique testcase that invokes the corresponding testcase function with the arguments
 # defined in that entry's value. Each space separated token in the value will be passed as a separate argument. Arguments with
 # spaces or are empty, or contain other special characters can be escaped using the convention described in
-# `man(3) strEscapeToToken`. A conventient way to do that is with the syntax `$(cmdline "arg 1" "my secound arg" ...)`.
+# `man(3) escapeTokens`. A conventient way to do that is with the syntax `$(cmdline "arg 1" "my secound arg" ...)`.
 #
 # Note that if the array variable is defined, a testcase with empty arguments will no longer be defined automatically but you can
 # create such a testcase by including an array element with an empty value.

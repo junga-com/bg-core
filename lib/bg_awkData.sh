@@ -3,7 +3,7 @@ import bg_objects.sh ;$L1;$L2
 
 DeclareClass AwkData
 
-AwkData::__construct() {
+function AwkData::__construct() {
 	while [ $# -gt 0 ]; do case $1 in
 		--schema*) bgOptionGetOpt val: this[schemaName] "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
@@ -15,6 +15,6 @@ AwkData::__construct() {
 	fi
 }
 
-AwkData::loadSchema() {
+function AwkData::loadSchema() {
 	this[columns]="$(gawk -F= '$1=="columns" {print $2}')"
 }

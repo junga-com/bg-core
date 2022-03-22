@@ -253,7 +253,7 @@ function bgtracef()
 	local indent="${msg%%[^[:space:]]*}"
 	local msg="${msg#$indent}"
 
-	pritnf "${indent}${timerStr}${msg}" "${@:1}" >>  "$_bgtraceFile"
+	printf "${indent}${timerStr}${msg}" "${@:1}" >>  "$_bgtraceFile"
 }
 
 

@@ -8,7 +8,6 @@
 # See man(7) awkDataSystem for the complete description.
 
 
-import bg_strings.sh ;$L1;$L2
 import bg_ini.sh ;$L1;$L2
 
 
@@ -254,7 +253,7 @@ function awkData_tableInfo()
 			-v awkDataID="$awkDataID" '
 			@include "bg_awkDataSchema.awk"
 			END {
-				printfVars2(0,awkDataID"_schema", schemas[awkDataID])
+				printfVars2(awkDataID"_schema", schemas[awkDataID])
 			}
 		' /dev/null
 	else

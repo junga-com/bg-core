@@ -438,7 +438,7 @@ function bgOptionGetOpt()
 				returnValue "$2" "$_oga_varNameVar"
 				return 0
 			# handle  "-o--". when passing through via opt:  -o "" becomes -o-- so now is the time to put it back
-		elif [[ "$1" =~ ^[+-].-- ]]; then
+			elif [[ "$1" =~ ^[+-].-- ]]; then
 				returnValue "" "$_oga_varNameVar"
 				return 1
 			# handle "-o<value>"
@@ -457,7 +457,7 @@ function bgOptionGetOpt()
 				arrayAdd "$_oga_varNameVar" "$2"
 				return 0
 			# handle  "-o--". when passing through via opt:  -o "" becomes -o-- so now is the time to put it back
-		elif [[ "$1" =~ ^[+-].-- ]]; then
+			elif [[ "$1" =~ ^[+-].-- ]]; then
 				arrayAdd "$_oga_varNameVar" ""
 				return 1
 			# handle "-o<value>"
@@ -809,7 +809,7 @@ function oob_printBashCompletionDefault()
 #    -nn    : sudo's -n fails instead of prompting for a password. -nn extends that to also supress the error.
 function bgsudo()
 {
-	local options=() suppressSudoErrorsFlag testFiles testFile defaultAction
+	local options=() suppressSudoErrorsFlag testFiles testFile defaultAction debugPreCmd
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-O*) local _bs_optVar
 			 bgOptionGetOpt val: _bs_optVar "$@" && shift
@@ -826,7 +826,7 @@ function bgsudo()
 		-nn) suppressSudoErrorsFlag="-n"
 			 options+=("-n")
 			 ;;
-		-d)  debug="echo " ;;
+		-d)  debugPreCmd="echo " ;;
 		-r*|--read)   bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-r$testFile") ;;
 		-w*|--write)  bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-w$testFile") ;;
 		-c*|--create) bgOptionGetOpt val: testFile "$@" && shift; testFiles+=("-c$testFile") ;;
@@ -861,10 +861,10 @@ function bgsudo()
 	case ${defaultAction:-escalate} in
 		deescalate)
 			local realUser; bgGetLoginuid realUser
-			$debug sudo $envOpt -u "$realUser" "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
+			$debugPreCmd sudo $envOpt -u "$realUser" "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
 			;;
 		escalate)
-			$debug sudo $envOpt                "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
+			$debugPreCmd sudo $envOpt                "${options[@]}" "$@" 2>"$tmpErrOutFile"; local exitCode=$?
 			;;
 		*) assertLogicError ;;
 	esac
@@ -1238,7 +1238,7 @@ function bgGetLoginuid()
 
 # FUNCMAN_SKIP
 # this is a stub function that will load the bg_cui.sh and the real progress function if its called
-function progress()
+function progress() # ondemandStub
 {
 	if [[ ! "$progressDisplayType" =~ ^(none|null|off)$ ]]; then
 		import -f bg_cuiProgress.sh ;$L1;$L2 || assertError
@@ -1246,7 +1246,7 @@ function progress()
 	fi
 }
 # FUNCMAN_SKIP
-function progressCntr()
+function progressCntr() # ondemandStub
 {
 	if [[ ! "$progressCntrDisplayType" =~ ^(none|null|off)$ ]]; then
 		import -f bg_cuiProgress.sh ;$L1;$L2 || assertError
@@ -4362,7 +4362,7 @@ function fsExpandFiles()
 
 # FUNCMAN_SKIP
 # this is a stub function that will load the bg_coreTimer.sh and the real bgtimerStart if its called
-function bgtimerStart()
+function bgtimerStart() # ondemandStub
 {
 	[ "$1" == "--stub" ] && {
 		(assertError  "could not load bg_coreTimer.sh from libCore stub")
@@ -4421,7 +4421,7 @@ function timeGetAproximateRelativeExpr() {
 
 # FUNCMAN_SKIP
 # this is a stub function that will load the bg_coreDaemon.sh and the real daemonDeclare if its called
-function daemonDeclare()
+function daemonDeclare() # ondemandStub
 {
 	[ "$1" == "--stub" ] && assertError "could not load bg_coreDaemon.sh library from on-demand stub function in bg_coreLibsMisc.sh"
 	import bg_coreDaemon.sh ;$L1;$L2
@@ -4541,7 +4541,7 @@ function DeclareCreqClass()
 # like any other library without needing to load its dependents.
 # Note: that this is needed only because we do not require plugin library files to import bg_plugins.sh. We could add that to all
 # plugins if needed.
-function DeclarePlugin()
+function DeclarePlugin() # ondemandStub
 {
 	((myreccount++>10)) && assertError
 	import bg_plugins.sh  ;$L1;$L2

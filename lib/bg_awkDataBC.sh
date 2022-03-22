@@ -34,12 +34,9 @@ function completeAwkDataQueryTerms() {
 function completeAwkDataID() { awkData_bcAwkDataID "$@"; }
 function awkData_bcAwkDataID()
 {
-	local ldFolder="$ldFolder" domIDOverride
 	while [ $# -gt 0 ]; do case $1 in
-		-C*) bgOptionGetOpt val: domIDOverride "$@" && shift ;;
 		*)   bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
 	done
-	_domMethodPreamble "$domIDOverride"
 
 	local cur="${1:-$cur}"
 
@@ -63,7 +60,7 @@ function awkData_bcAwkDataID()
 				if [ "$cur" ]; then
 					echo "me:%3A local:%3A ${scopeList[@]/%/:%3A}"
 					echo "\$(doFilesAndDirs)"
-					echo "\$(suffix :%3A)"; domScopeList
+					echo "\$(suffix :%3A)";
 				fi
 
 			else
@@ -79,7 +76,6 @@ function awkData_bcAwkDataID()
 				elif [[ "$scopeType" =~ ^(${scopeList// /|})$ ]]; then
 					case $partCount in
 						1)	echo "\$(cur:${cur#$scopeType:}) \$(nextBreakChar :)"
-							domScopeList -t "$scopeType"
 							;;
 						2)	echo "\$(cur:${cur#$scopeType:$scopeName:})"
 							awkData_listAwkObjNames "$scopeType:$scopeName:"
@@ -89,7 +85,6 @@ function awkData_bcAwkDataID()
 				# <scopeName>:
 				else
 					scopeName="$scopeType"
-					domScopeGetType "$scopeName" scopeType
 					echo "\$(cur:${cur#$scopeName:})"
 					echo "\$(removePrefix:$scopeType:$scopeName:)"; awkData_listAwkObjNames "$scopeType:$scopeName:"; echo "\$(removePrefix:)"
 				fi
@@ -104,9 +99,7 @@ function awkData_bcAwkDataID()
 function completeAwkDataColumnList() { awkData_bcColumnList "$@"; }  # ALIAS
 function awkData_bcColumnList()
 {
-	local ldFolder="$ldFolder" domIDOverrideOpt
 	while [ $# -gt 0 ]; do case $1 in
-		-C*) bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
 		*)   bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
 	done
 	local awkDataID="${1:-$awkDataID}"; shift;
@@ -132,7 +125,6 @@ function awkData_bcColumnList()
 #        <>        : alternate not equals to !=
 # cur is the current term being built.
 # Options:
-#    -C <domFolder> : use a different domData to locate <awkDataID>
 #    --filter : filter term mode. builds The attribute being completed in the context of a comparison condition.
 #          Shortcut for -p0, and sets the validOperators any comparison op
 #    --set : 'set' mode, as in 'assignment'. The attribute is being completed in the context of a 'set' statement.
@@ -144,9 +136,8 @@ function awkData_bcColumnList()
 function completeAwkDataAttributeTerm()  { awkData_bcAttributeTerm "$@"; }
 function awkData_bcAttributeTerm()
 {
-	local ldFolder="$ldFolder" domIDOverrideOpt dontDoDefaultCol planMode validOperators
+	local dontDoDefaultCol planMode validOperators
 	while [ $# -gt 0 ]; do case $1 in
-		-C*) bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
 		-x) dontDoDefaultCol="-x" ;;
 		-p*) planMode="$1" ;;
 		--filter)
@@ -180,11 +171,10 @@ function awkData_bcAttributeTerm()
 }
 
 
-# usage: awkData_bcColumnNames [-C <domID>] [-x] [-p<N>] <awkDataID> [ filter1:value1 [ filter1:value2 ... ] ]
+# usage: awkData_bcColumnNames  [-x] [-p<N>] <awkDataID> [ filter1:value1 [ filter1:value2 ... ] ]
 # complete a column name from the <awkDataID> schema. 3 plans are supportted that specificy which subset of column names to
 # return based on the data.
 # Options:
-#    -C <domFolder> : use a different domData to locate <awkDataID>
 #    -p0 : plan0 -- 'filterMode' return only columns that have differing values in the result set left. These are the cols that
 #          can be used to reduce the set further
 #    -p1 : plan1 -- 'simple mode' (default) just return the complete list of columns unconditionally.
@@ -195,9 +185,8 @@ function awkData_bcAttributeTerm()
 function completeAwkDataColumnNames()  { awkData_bcColumnNames "$@"; }
 function awkData_bcColumnNames()
 {
-	local ldFolder="$ldFolder" domIDOverrideOpt dontDoDefaultCol="-x" planMode validOperators
+	local dontDoDefaultCol="-x" planMode validOperators
 	while [ $# -gt 0 ]; do case $1 in
-		-C*) bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
 		-x) dontDoDefaultCol="-x" ;;
 		+x|--completeOnDefualtValues) dontDoDefaultCol="" ;;
 		-p*) planMode="$1" ;;
@@ -227,13 +216,10 @@ function awkData_bcColumnNames()
 # in <colName>.  If <filter>:value terms are spicified, only the unique values found in the result set after applying those
 # filters are returned.
 # Options:
-#    -C <domFolder> : use a different domData to locate <awkDataID>
 function completeAwkObjColumnValues() { awkData_bcColumnValues "$@"; }
 function awkData_bcColumnValues()
 {
-	local ldFolder="$ldFolder" domIDOverrideOpt
 	while [ $# -gt 0 ]; do case $1 in
-		-C*) bgOptionGetOpt opt: domIDOverrideOpt "$@" && shift ;;
 		*)   bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
 	done
 	local awkDataID="${1:-$awkDataID}"; shift;

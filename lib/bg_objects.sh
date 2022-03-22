@@ -1707,11 +1707,11 @@ declare -g eval="evalLocalObjectSyntax "
 function GetOID()
 {
 	local goid_retVar=""
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		# DEPRECIATED: -R is supported for legacy code
-		-R) goid_retVar="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
-
+		-R*)  bgOptionGetOpt val: goid_retVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local objRef="$1"; shift
 
 	# dereferenced without quotes
@@ -2414,9 +2414,10 @@ function Object::restoreFile()
 function Object::saveFile()
 {
 	local fmtType="String"
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-t) fmtType="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
+	while [ $# -gt 0 ]; do case $1 in
+		-t*)  bgOptionGetOpt val: fmtType "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local fileName="$1"; assertNotEmpty fileName
 
 	printf "%s %s %s\n" "<Object>" "v1.0" "${fmtType#to}" > "$fileName"

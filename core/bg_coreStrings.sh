@@ -1,5 +1,5 @@
 
-# Library bg_strings.sh
+# Library bg_coreStrings.sh
 ####################################################################################################################
 ### String Parsing Functions
 # Summary:
@@ -118,7 +118,7 @@ function stringSplit()
 #    2 (failed)  : the <delim> was passed in empty so the matched token is the empty string and nothing
 #                  nothing was consumed from <inputStrVar>. This is an non-zero to make infinite loops less likely
 # See Also:
-#    comment at top of bg_strings.sh
+#    man(7) bg_coreStrings.sh
 #    stringSplit       : use to split a string when the parts are delimeted with the same, single char
 #    stringConsumeNext : use to split a string when the parts are delimeted with different tokens
 #                        i.e. the delimeter needs to be a string and can be different for each part
@@ -255,7 +255,7 @@ function stringConsumeNextAny()
 #    4 : error: unmatched double quote. reached end on input without finding a closing "
 #        the results up to EOS are returned in tokenVarName
 # See Also:
-#    comment at top of bg_strings.sh
+#    man(7) bg_coreStrings.sh
 #    stringSplit       : use to split a string when the parts are delimeted with the same, single char
 #    stringConsumeNext : use to split a string when the parts are delimeted with different tokens
 #                        i.e. the delimeter needs to be a string and can be different for each part
@@ -542,7 +542,7 @@ function parseOneStringPart()
 # TODO: make this function invoke helper functions by protocol to do the actual parsing so that you can extend it by definng a new protocol helper
 #       function
 # See Also:
-#    comment at top of bg_strings.sh
+#    man(7) bg_coreStrings.sh
 #    stringSplit       : use to split a string when the parts are delimeted with the same, single char
 #    stringConsumeNext : use to split a string when the parts are delimeted with different tokens
 #                        i.e. the delimeter needs to be a string and can be different for each part
@@ -652,69 +652,6 @@ function marshalCmdline()
 	arrayToBashTokens params
 	returnValue "${params[*]}" "$retVar"
 }
-
-
-# usage: escapeTokens <var1> [... <varN>]
-# modifies the contents of each of the variable names passed in so that they could then be passed unquoted on a command line and
-# be interpretted as exactly one argument. If the content is empty, it is replaced with '--' and any whitespace characters (space,
-# newline, carrigeReturn, or tab) are replaced with their $nn equivalent where nn is the two digit hex code. (%20, %0A, %0D %09)
-function strEscapeToToken() { stringToBashToken "$@"; }
-function escapeTokens() { stringToBashToken "$@"; }
-function varEscapeContents() { stringToBashToken "$@"; }
-function stringToBashToken()
-{
-	while [ $# -gt 0 ]; do
-		local _adnr_dataVar="$1"; shift
-		assertNotEmpty _adnr_dataVar
-		local _adnr_dataValue="${!_adnr_dataVar}"
-		_adnr_dataValue="${_adnr_dataValue// /%20}"
-		_adnr_dataValue="${_adnr_dataValue//$'\n'/%0A}"
-		_adnr_dataValue="${_adnr_dataValue//$'\r'/%0D}"
-		_adnr_dataValue="${_adnr_dataValue//$'\t'/%09}"
-		_adnr_dataValue="${_adnr_dataValue:---}"
-		printf -v $_adnr_dataVar "%s" "$_adnr_dataValue"
-	done
-}
-
-
-
-# usage: unescapeTokens [-q] <var1> [... <varN>]
-# modifies the contents of each variable passed in to undo what stringToBashToken did and return it to normal strings that could
-# be empty and could contain whitespace
-# Options:
-#    -q : quotes. If the resulting string contains whitespace or is an empty string, surround it with quotes
-function strUnescapeFromToken() { stringFromBashToken "$@"; }
-function unescapeTokens() { stringFromBashToken "$@"; }
-function varUnescapeContents() { stringFromBashToken "$@"; }
-function stringFromBashToken()
-{
-	local quotesFlag
-	if [ "$1" == "-q" ]; then
-		quotesFlag='"'
-		shift
-	fi
-
-	while [ $# -gt 0 ]; do
-		local _adnr_dataVar="$1"; shift
-		assertNotEmpty _adnr_dataVar
-		local _adnr_dataValue="${!_adnr_dataVar}"
-		_adnr_dataValue="${_adnr_dataValue//%20/ }"
-		_adnr_dataValue="${_adnr_dataValue//%0A/$'\n'}"
-		_adnr_dataValue="${_adnr_dataValue//%0a/$'\n'}"
-		_adnr_dataValue="${_adnr_dataValue//%0D/$'\r'}"
-		_adnr_dataValue="${_adnr_dataValue//%0d/$'\r'}"
-		_adnr_dataValue="${_adnr_dataValue//%09/$'\t'}"
-		[ "$_adnr_dataValue" == -- ] && _adnr_dataValue=""
-
-		local Q="$quotesFlag"; [ "$Q" ] && [[ ! "$_adnr_dataValue" =~ [[:space:]]|(^$) ]] && Q=""
-
-		printf -v $_adnr_dataVar "%s%s%s"  "$Q" "$_adnr_dataValue" "$Q"
-	done
-}
-
-
-
-
 
 
 

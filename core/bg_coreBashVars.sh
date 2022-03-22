@@ -302,6 +302,63 @@ function varUnMarshalToGlobal()
 }
 
 
+# usage: escapeTokens <var1> [... <varN>]
+# modifies the contents of each of the variable names passed in so that they could then be passed unquoted on a command line and
+# be interpretted as exactly one argument. If the content is empty, it is replaced with '--' and any whitespace characters (space,
+# newline, carrigeReturn, or tab) are replaced with their $nn equivalent where nn is the two digit hex code. (%20, %0A, %0D %09)
+function stringToBashToken() { escapeTokens "$@"; }
+function varEscapeContents() { escapeTokens "$@"; }
+function escapeTokens()
+{
+	while [ $# -gt 0 ]; do
+		local _adnr_dataVar="$1"; shift
+		assertNotEmpty _adnr_dataVar
+		local _adnr_dataValue="${!_adnr_dataVar}"
+		_adnr_dataValue="${_adnr_dataValue// /%20}"
+		_adnr_dataValue="${_adnr_dataValue//$'\n'/%0A}"
+		_adnr_dataValue="${_adnr_dataValue//$'\r'/%0D}"
+		_adnr_dataValue="${_adnr_dataValue//$'\t'/%09}"
+		_adnr_dataValue="${_adnr_dataValue:---}"
+		printf -v $_adnr_dataVar "%s" "$_adnr_dataValue"
+	done
+}
+
+
+# usage: unescapeTokens [-q] <var1> [... <varN>]
+# modifies the contents of each variable passed in to undo what escapeTokens did and return it to normal strings that could
+# be empty and could contain whitespace
+# Options:
+#    -q : quotes. If the resulting string contains whitespace or is an empty string, surround it with quotes
+function stringFromBashToken() { unescapeTokens "$@"; } # none left
+function varUnescapeContents() { unescapeTokens "$@"; }
+function unescapeTokens()
+{
+	local quotesFlag
+	if [ "$1" == "-q" ]; then
+		quotesFlag='"'
+		shift
+	fi
+
+	while [ $# -gt 0 ]; do
+		local _adnr_dataVar="$1"; shift
+		assertNotEmpty _adnr_dataVar
+		local _adnr_dataValue="${!_adnr_dataVar}"
+		_adnr_dataValue="${_adnr_dataValue//%20/ }"
+		_adnr_dataValue="${_adnr_dataValue//%0A/$'\n'}"
+		_adnr_dataValue="${_adnr_dataValue//%0a/$'\n'}"
+		_adnr_dataValue="${_adnr_dataValue//%0D/$'\r'}"
+		_adnr_dataValue="${_adnr_dataValue//%0d/$'\r'}"
+		_adnr_dataValue="${_adnr_dataValue//%09/$'\t'}"
+		[ "$_adnr_dataValue" == -- ] && _adnr_dataValue=""
+
+		local Q="$quotesFlag"; [ "$Q" ] && [[ ! "$_adnr_dataValue" =~ [[:space:]]|(^$) ]] && Q=""
+
+		printf -v $_adnr_dataVar "%s%s%s"  "$Q" "$_adnr_dataValue" "$Q"
+	done
+}
+
+
+
 # usage: returnValue [<opt>] <value> [<varRef>]
 # usage: returnValue [<opt>] <value> [<varRef>] && return
 # return a value from a function. If <varRef> is provided it is returned by assigning to it otherwise <value> is written to stdout.
@@ -673,9 +730,10 @@ function arrayToBashTokens()
 {
 	local -a aa_keys='("${!'"$1"'[@]}")'
 	local aa_key; for aa_key in "${aa_keys[@]}"; do
-		stringToBashToken "${1}[$aa_key]"
+		escapeTokens "${1}[$aa_key]"
 	done
 }
+
 
 # usage: arrayFromBashTokens <varName>
 # modifies each element in the array to undo what arrayToBashTokens did and return it to normal strings that could be empty and
@@ -685,7 +743,7 @@ function arrayFromBashTokens()
 {
 	local -a aa_keys='("${!'"$1"'[@]}")'
 	local aa_key; for aa_key in "${aa_keys[@]}"; do
-		stringFromBashToken "${1}[$aa_key]"
+		unescapeTokens "${1}[$aa_key]"
 	done
 }
 
@@ -1313,13 +1371,13 @@ function printfTable()
 			echo "_ | ${_ptColList[*]}"
 			local _ptRow; for _ptRow in "${_ptRowList[@]}"; do
 				_ptValue="$_ptRow"
-				strEscapeToToken _ptValue
+				escapeTokens _ptValue
 				echo -n "[$_ptValue] | "
 				for _ptCol in "${_ptColList[@]}"; do
 					_ptValue="<unset>"
 					if arrayExistsAt  "$_ptCol" "$_ptRow"; then
 						arrayGet "$_ptCol" "$_ptRow" _ptValue
-						strEscapeToToken _ptValue
+						escapeTokens _ptValue
 					fi
 					echo -n "$_ptValue "
 				done
@@ -1333,7 +1391,7 @@ function printfTable()
 			echo -n "_ | "
 			local _ptRow; for _ptRow in "${_ptRowList[@]}"; do
 				_ptValue="$_ptRow"
-				strEscapeToToken _ptValue
+				escapeTokens _ptValue
 				echo -n "[$_ptValue] "
 			done
 			echo
@@ -1344,7 +1402,7 @@ function printfTable()
 					_ptValue="<unset>"
 					if arrayExistsAt  "$_ptCol" "$_ptRow"; then
 						arrayGet "$_ptCol" "$_ptRow" _ptValue
-						strEscapeToToken _ptValue
+						escapeTokens _ptValue
 					fi
 					echo -n "$_ptValue "
 				done

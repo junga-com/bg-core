@@ -26,9 +26,9 @@ function bgtimerStart()
 	local timerVar_forkLap="bgtimerGlobalTimer[3]"
 	local timerVar_indent="bgtimerGlobalTimer[4]"
 	local noResetFlag indentFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		--stub) ;;
-		-p*) prec="$(bgetopt "$@")" && shift ;;
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
 		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
 			timerVar_start="$tname[0]"
 			timerVar_lap="$tname[1]"
@@ -43,7 +43,8 @@ function bgtimerStart()
 			;;
 		--no-reset) noResetFlag="--no-reset" ;;
 		-i) indentFlag="-i" ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	[ "$indentFlag" ] && printf -v "$timerVar_indent" "%s" "$indentFlag"
 	[ "$noResetFlag" ] && return
@@ -80,8 +81,8 @@ function bgtimerIsPast()
 	local timerVar_forkLap="bgtimerGlobalTimer[3]"
 	local timerVar_indent="bgtimerGlobalTimer[4]"
 	local prec=3 retVar retForksVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-p) prec="$(bgetopt "$@")" && shift ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
 		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
 			timerVar_start="$tname[0]"
 			timerVar_lap="$tname[1]"
@@ -91,6 +92,9 @@ function bgtimerIsPast()
 			;;
 		-R)  retVar="$2"; shift ;;
 		-F)  retForksVar="$2"; shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	while [[ "$1" =~ ^- ]]; do case $1 in
 	esac; shift; done
 	local timePeriod="$1"
 
@@ -111,8 +115,8 @@ function bgtimerGet()
 	local timerVar_forkLap="bgtimerGlobalTimer[3]"
 	local timerVar_indent="bgtimerGlobalTimer[4]"
 	local prec=3 retVar retForksVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-p) prec="$(bgetopt "$@")" && shift ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
 		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
 			timerVar_start="$tname[0]"
 			timerVar_lap="$tname[1]"
@@ -122,7 +126,8 @@ function bgtimerGet()
 			;;
 		-R)  retVar="$2"; shift ;;
 		-F)  retForksVar="$2"; shift ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	[ "${!timerVar_start}" ] || bgtimerStart
 
@@ -143,8 +148,8 @@ function bgtimerGetNano()
 	local timerVar_forkLap="bgtimerGlobalTimer[3]"
 	local timerVar_indent="bgtimerGlobalTimer[4]"
 	local prec=3 retVar retForksVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-p) prec="$(bgetopt "$@")" && shift ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
 		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
 			timerVar_start="$tname[0]"
 			timerVar_lap="$tname[1]"
@@ -154,7 +159,8 @@ function bgtimerGetNano()
 			;;
 		-R)  retVar="$2"; shift ;;
 		-F)  retForksVar="$2"; shift ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	[ "${!timerVar_start}" ] || bgtimerStart
 
@@ -176,8 +182,8 @@ function bgtimerLapGet()
 	local timerVar_forkLap="bgtimerGlobalTimer[3]"
 	local timerVar_indent="bgtimerGlobalTimer[4]"
 	local prec=3 retVar retForksVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-p) prec="$(bgetopt "$@")" && shift ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
 		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
 			timerVar_start="$tname[0]"
 			timerVar_lap="$tname[1]"
@@ -187,7 +193,8 @@ function bgtimerLapGet()
 			;;
 		-R)  retVar="$2"; shift ;;
 		-F)  retForksVar="$2"; shift ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	[ "${!timerVar_start}" ] || bgtimerStart
 
@@ -212,8 +219,8 @@ function bgtimerLapPrint()
 	local timerVar_forkLap="bgtimerGlobalTimer[3]"
 	local timerVar_indent="bgtimerGlobalTimer[4]"
 	local prec=3 indentFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-p) prec="$(bgetopt "$@")" && shift ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
 		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
 			timerVar_start="$tname[0]"
 			timerVar_lap="$tname[1]"
@@ -222,7 +229,8 @@ function bgtimerLapPrint()
 			timerVar_indent="$tname[4]"
 			;;
 		-i) indentFlag="-i" ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	[ "$indentFlag" ] && printf -v "$timerVar_indent" "%s" "$indentFlag"
 	[ "${!timerVar_start}" ] || bgtimerStart
@@ -254,8 +262,8 @@ function bgtimerPrint()
 	local timerVar_forkLap="bgtimerGlobalTimer[3]"
 	local timerVar_indent="bgtimerGlobalTimer[4]"
 	local prec=3 indentFlag accumulateVar
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-p) prec="$(bgetopt "$@")" && shift ;;
+	while [ $# -gt 0 ]; do case $1 in
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
 		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
 			timerVar_start="$tname[0]"
 			timerVar_lap="$tname[1]"
@@ -265,7 +273,8 @@ function bgtimerPrint()
 			;;
 		-i) indentFlag="-i" ;;
 		--accumulate*) bgOptionGetOpt val: accumulateVar "$@" && shift ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	[ "$indentFlag" ] && printf -v "$timerVar_indent" "%s" "$indentFlag"
 	[ "${!timerVar_start}" ] || bgtimerStart
@@ -393,11 +402,12 @@ function bgtimePeriodConvert()
 function timeExprNormalize()
 {
 	local outputFormat="%Y-%m-%d %H:%M:%S" inputTimezone outputTimezone
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-f*) outputFormat="$(bgetopt "$@")" && shift ;;
-		-Z*) inputTimezone="$(bgetopt "$@")" && shift ;;
-		-z*) outputTimezone="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
+	while [ $# -gt 0 ]; do case $1 in
+		-f*)  bgOptionGetOpt val: outputFormat "$@" && shift ;;
+		-Z*)  bgOptionGetOpt val: inputTimezone "$@" && shift ;;
+		-z*)  bgOptionGetOpt val: outputTimezone "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	local dateTimeExpr="$1"
 	normExpr="$(TZ="${inputTimezone:-$TZ}" date +"%Y-%m-%d %H:%M:%S %z" -d "$dateTimeExpr" 2>/dev/null)"
@@ -452,15 +462,16 @@ function bgTimePeriodFromLabel()
 	local    unitFormOrder=( s m h d )
 
 	local units="seconds" precision fromTime posOrNeg="+"
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		-S) units="seconds" ;;
 		-M) units="minutes" ;;
 		-H) units="hours" ;;
 		-D) units="days" ;;
-		-L*) units="long"
-			precision="$(bgetopt "$@")" && shift
+		-L*)bgOptionGetOpt val: precision "$@" && shift
+			units="long"
 			;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local label="$1"
 
 	if [[ "$label" == ^[+-] ]]; then

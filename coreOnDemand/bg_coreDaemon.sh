@@ -34,10 +34,11 @@
 function daemonDeclare()
 {
 	declare -g daemonName="$(basename $0)"
-	while [[ "$1" =~ ^- ]]; do case $1 in
+	while [ $# -gt 0 ]; do case $1 in
 		--stub) ;;
-        -N) daemonName="$(bgetopt "$@")" && shift ;;
-	esac; shift; done
+		-N*)  bgOptionGetOpt val: daemonName "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	declare -g daemonShortDesc="server daemon for (TODO:)"
 	declare -g daemonDesc="(TODO:) see man ${0##*/}"
@@ -210,12 +211,13 @@ function daemonSignalHandler()
 function daemonCheckForSignal()
 {
 	local consumeCount=""
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-n) consumeCount="$(bgetopt "$@")" && shift
+	while [ $# -gt 0 ]; do case $1 in
+		-n*)  bgOptionGetOpt val: consumeCount "$@" && shift
 			# if its not a number, set it to "" which means infinite == reset the count to 0 no matter what its value is
 			[ "$consumeCount" != "0" ] && [ ${consumeCount:-0} -eq 0 ] && consumeCount=""
 			;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	# create the daemonSIGs array on first use
 	if ! declare -p daemonSIGs &>/dev/null; then
@@ -676,9 +678,10 @@ function daemonCntrUninstallAutoStart()
 function daemonCntrIsRunning()
 {
 	local pidVarName dcir_pidValue dcir_result
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-P*) pidVarName="$(bgetopt "$@")" && shift
-	esac; shift; done
+	while [ $# -gt 0 ]; do case $1 in
+		-P*)  bgOptionGetOpt val: pidVarName "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local daemonName="$1"; [ $# -gt 0 ] && shift
 
 	local daemonPIDFile="/var/run/$daemonName.pid"
@@ -857,15 +860,15 @@ function daemonCntrTailLog()
 function daemonCntrWaitFor()
 {
 	local timeout
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-w*) timeout="$(bgetopt "$@")" && shift
+	while [ $# -gt 0 ]; do case $1 in
+		-w*)  bgOptionGetOpt val: timeout "$@" && shift
 			timeout="${timeout//[.]}"
 			[[ "$timeout" =~ ^[0-9]*$ ]] || timeout=""
 			;;
-	esac; shift; done
-
-	local daemonName="$1"; [ $# -gt 0 ] && shift
-	local targetState="$1"; [ $# -gt 0 ] && shift
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local daemonName="$1"  ; shift
+	local targetState="$1" ; shift
 
 	local daemonPIDFile="/var/run/$daemonName.pid"
 	local daemonPID
