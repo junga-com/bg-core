@@ -125,3 +125,37 @@ function bgwaitTestPattern4()
 		echo "FINISHED: '${results[name]}'  exitcode='${results[exitCode]}'"
 	done
 }
+
+
+# 2022-03 bobg: I made this testcase to debug a problem in unit tests where both the onEnd and onFinal events removed the unittest
+#               EXIT trap by name which resulted in removing any bgmktemp EXIT traps.
+function ut_bgtrap()
+{
+	ut expect USR1 trap to start out empty
+	bgtrap -p USR1
+
+	ut expect USR1 trap to have a foo block
+	bgtrap -n foo '
+		echo "hello world"
+		yoyo=5
+	' USR1
+	bgtrap -p USR1
+
+	ut expect USR1 trap to have two blocks -- foo and bar
+	bgtrap -n bar '
+		# my comment -- here we go
+		call p1 p2
+	' USR1
+	bgtrap -p USR1
+
+	ut expect USR1 trap to have only bar now
+	bgtrap -n foo -r USR1
+	bgtrap -p USR1
+
+	ut expect USR1 trap not to change when we remove foo a second time
+	bgtrap -n foo -r USR1
+	bgtrap -p USR1
+
+	bgtrap --clear USR1
+	bgtrap -p USR1
+}

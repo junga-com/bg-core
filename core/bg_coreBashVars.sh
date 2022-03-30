@@ -63,11 +63,14 @@ function newHeapVar() {
 	done
 	local _retVar="$1"; shift
 
-	if [[ "$_attributes" =~ [aA] ]]; then
+	#if [[ "$_attributes" =~ [aA] ]]; then
+	if [[ "$_attributes" == *[aA]* ]]; then
 		local _initialData="("
 		while [ $# -gt 0 ]; do
-			if [[ "$1" =~ ^\s*\[([^]]*)\]=(.*)$ ]]; then
-				_initialData+="['${BASH_REMATCH[1]}']='${BASH_REMATCH[2]}' "; shift
+			#if [[ "$1" =~ ^\s*\[([^]]*)\]=(.*)$ ]]; then
+			if [[ "$1" == *\[*\]=* ]]; then
+				local _name="${1#\[}"; _name="${_name%%]*}"
+				_initialData+="['$_name']='${1#*=}' "; shift
 			else
 				_initialData+="'$1' "; shift
 			fi
@@ -78,7 +81,8 @@ function newHeapVar() {
 	fi
 
 	_template="heap_${_attributes:-S}_${_template#heap_}"
-	[[ ! "$_template" =~ X ]] && _template+="_XXXXXXXXX"
+	#[[ ! "$_template" =~ X ]] && _template+="_XXXXXXXXX"
+	[[ "$_template" != *X* ]] && _template+="_XXXXXXXXX"
 
 	local _instanceName
 	varGenVarname --template=$_template _instanceName
@@ -97,8 +101,9 @@ function newHeapVar() {
 #     ${<var>+exists}
 function varExists()
 {
-	# foo[idx]
-	if [[ "$*" =~ [][] ]]; then
+	# at least one arg is an array element like foo[idx]
+	#if [[ "$*" =~ [][] ]]; then
+	if [[ "$*" == *[][]* ]]; then
 		local v; for v in "$@"; do
 			# this case works for any input but maybe if there are no names with [], the one declare call in the other case is faster
 			local attribs; varGetAttributes "$v" attribs
@@ -145,18 +150,24 @@ function varGetAttributes()
 {
 	local _gaRetValue
 
-	# this is no faster than the declare method below (even in cases where eval is not needed)
-	#eval _gaRetValue='${'"$1"'@a}'
+	# this function is no slower that doing an eval like...
+	#      eval _gaRetValue='${'"$1"'@a}'
+	# and this function handles nested namerefs and foo[idx] type vars too
 
 	# normal vars
-	if [[ "$1" =~ ^[a-zA-Z0-9_]*$ ]]; then
+	# any code called by the debugger can not use [[ =~ ]] because it clobbers BASH_REMATCH
+	#if [[ "$1" =~ ^[a-zA-Z0-9_]*$ ]]; then
+	if [[ "$1" != *[^a-zA-Z0-9_]* ]]; then
 		local _gaGeclaration="$(declare -p "$1" 2>/dev/null)"
 		_gaRetValue="${_gaGeclaration#declare -}"
 		_gaRetValue="${_gaRetValue%% *}"
 
-		if [[ "$_gaRetValue" =~ n ]]; then
-			if [[ "$_gaGeclaration" =~ -n\ [^=]*=\"([^\"]*)\" ]]; then
-				local _gaRefName="${BASH_REMATCH[1]}"
+		#if [[ "$_gaRetValue" =~ n ]]; then
+		if [[ "$_gaRetValue" == *n* ]]; then
+			#if [[ "$_gaGeclaration" =~ -n\ [^=]*=\"([^\"]*)\" ]]; then
+			if [[ "$_gaGeclaration" == *=* ]]; then
+				local _gaRefName="${_gaGeclaration##*=}"
+				_gaRefName="${_gaRefName//\"}"
 				varGetAttributes "$_gaRefName" "<nameref>$2"
 				return
 			else
@@ -165,20 +176,25 @@ function varGetAttributes()
 		fi
 
 	# foo[idx]
-	elif [[ "$1" =~ [][] ]]; then
+	#elif [[ "$1" =~ [][] ]]; then
+	elif [[ "$1" == *[][]* ]]; then
 		local _gaBaseVar="${1%%\[*}"
 		local _gaBaseAttribs; varGetAttributes "$_gaBaseVar" _gaBaseAttribs
-		if [[ "$_gaBaseAttribs" =~ A ]]; then
+		#if [[ "$_gaBaseAttribs" =~ A ]]; then
+		if [[ "$_gaBaseAttribs" == *A* ]]; then
 			local -n _gaBaseRef="$_gaBaseVar"
 			local _gaIdxPart="${1#$_gaBaseVar\[}"; _gaIdxPart="${_gaIdxPart%]}"
-			if [[ "$_gaIdxPart" =~ ^(@|\*)$ ]] || [ "${_gaBaseRef[${_gaIdxPart:-####empty###Value###}]+exists}" ]; then
+			#if [[ "$_gaIdxPart" =~ ^(@|\*)$ ]] || [ "${_gaBaseRef[${_gaIdxPart:-####empty###Value###}]+exists}" ]; then
+			if [[ "$_gaIdxPart" == [@*] ]] || [ "${_gaBaseRef[${_gaIdxPart:-####empty###Value###}]+exists}" ]; then
 				_gaRetValue="${_gaBaseAttribs//[aA]}"
 				_gaRetValue="${_gaRetValue:--}"
 			fi
-		elif [[ "$_gaBaseAttribs" =~ a ]]; then
+		#elif [[ "$_gaBaseAttribs" =~ a ]]; then
+		elif [[ "$_gaBaseAttribs" == *a* ]]; then
 			local -n _gaBaseRef="$_gaBaseVar"
 			local _gaIdxPart="${1#$_gaBaseVar\[}"; _gaIdxPart="${_gaIdxPart%]}"
-			if [[ "$_gaIdxPart" =~ ^(@|\*)$ ]] || { [[ "$_gaIdxPart" =~ ^[0-9+-][0-9+-]*$ ]] && [ "${_gaBaseRef[$_gaIdxPart]+exists}" ]; }; then
+			#if [[ "$_gaIdxPart" =~ ^(@|\*)$ ]] || { [[ "$_gaIdxPart" =~ ^[0-9+-][0-9+-]*$ ]] && [ "${_gaBaseRef[$_gaIdxPart]+exists}" ]; }; then
+			if [[ "$_gaIdxPart" == [@*] ]] || { [[ "$_gaIdxPart" != *[^0-9+-]* ]] && [[ "$_gaIdxPart" != [-]* ]] && [[ "$_gaIdxPart" != "" ]] && [ "${_gaBaseRef[$_gaIdxPart]+exists}" ]; }; then
 				_gaRetValue="${_gaBaseAttribs//[aA]}"
 				_gaRetValue="${_gaRetValue:--}"
 			fi
@@ -188,7 +204,7 @@ function varGetAttributes()
 	# this strange treatment of $2 is because we want to use recursion to handle nameRefs and we cant come up with a var name that
 	# we, ourselfs dont declare local
 	local _gaRetVar="$2"
-	while [[ "$_gaRetVar" =~ ^\<nameref\> ]]; do
+	while [ "${_gaRetVar:0:9}" == '<nameref>' ]; do
 		_gaRetValue="n$_gaRetValue"
 		_gaRetVar="${_gaRetVar#<nameref>}"
 	done
@@ -1117,7 +1133,7 @@ function varGenVarname()
 #                                 <varName>[idx1]='<value>'
 #                                 ...
 #                                 <varName>[idxN]='<value>'
-#        object ref      : calls the bgtrace -m -s method on the object
+#        object ref      : calls the bgtrace -m -s method on the object (unless --noObjects is specified)
 #        "" or "\n"      : write a blank line. this is used to make vertical whitespace. with -1 you
 #                          can use this to specify where line breaks happen in a list
 #        "  "            : a string only whitespace sets the indent prefix used on all output to follow.
@@ -1128,6 +1144,7 @@ function varGenVarname()
 #   -1  : display vars on one line. this suppresses the \n after each <varSpecN> output
 #   +1  : display vars on multiple lines. this is the default. it undoes the -1 effect so that a \n is output after each <varSpecN>
 #   --prefix=<prefix>  : add this <prefix> to subsequent output lines.
+#   --noObjects: display the underlying object associative array as if it were not an object
 function printfVars()
 {
 	local pv_nameColWidth pv_inlineFieldWidth="0" pv_indexColWidth oneLineMode pv_lineEnding="\n"

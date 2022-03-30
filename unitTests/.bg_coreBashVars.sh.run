@@ -553,3 +553,65 @@ setVar[]
 ## bg_coreBashVars.sh:varOutput:multipleValues finished
 ###############################################################################################################################
 
+
+###############################################################################################################################
+## bg_coreBashVars.sh:varGetAttributes: start
+## expect: 
+
+##----------
+## test
+cmd> local -A bar;      varGetAttributes bar  # returns 'A'
+A
+cmd> local -n goo;      varGetAttributes goo  # 'n@' (unitialized nameref)
+n@
+cmd> goo=bar;           varGetAttributes goo  # 'nA' (nameref to an associative Array)
+nA
+cmd> local -n goo2;
+cmd> goo2=noExists;     varGetAttributes goo2 # 'n'  (nameref to non-existent variable)
+n
+cmd> unset bar;         varGetAttributes goo  # 'n'  (nameref to non-existent variable)
+n-
+cmd> bar=5;             varGetAttributes goo  # 'n-' (nameref to variable with no attrbutes)
+n-
+cmd> local -n goo3=goo; varGetAttributes goo3 # 'nn-' (nameref a nameref to variable with no attrbutes)
+nn-
+cmd> local -i i;        varGetAttributes i
+i
+cmd> local    a1;       varGetAttributes a1
+-
+cmd> local a2=();       varGetAttributes a2
+a
+cmd> local -a a3;       varGetAttributes a3
+a
+cmd> local -arix a4;    varGetAttributes a4
+airx
+cmd> local    A1;       varGetAttributes A1
+-
+cmd> local -A A2;       varGetAttributes A2
+A
+cmd> local -Arix A3;    varGetAttributes A3
+Airx
+cmd> local -x ary=(one two three); varGetAttributes ary[1]
+x
+cmd> varGetAttributes ary[5]
+
+cmd> local -A map=([one]=1 [two]=2 [three]=3)
+cmd> varGetAttributes map[two]
+-
+cmd> varGetAttributes map[5]
+
+cmd> varGetAttributes map[@]
+-
+cmd> varGetAttributes map[*]
+-
+cmd> local -rA map2=([one]=1 [two]=2 [three]=3)
+cmd> varGetAttributes map2
+Ar
+cmd> varGetAttributes map2[two]
+r
+cmd> varGetAttributes map2[5]
+
+
+## bg_coreBashVars.sh:varGetAttributes: finished
+###############################################################################################################################
+

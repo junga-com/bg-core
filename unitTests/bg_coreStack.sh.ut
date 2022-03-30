@@ -91,7 +91,7 @@ function ut_bgStackMarshal()
 	ut setup
 	shopt -s extdebug
 	ut filter '[(][0-9]*[)]:###(<redacted>):'
-	local tmpFile; bgmktemp tmpFile
+	local tmpFile; bgmktemp tmpFile bgmktemp.ut_bgStackMarshal.XXXXXXXXXX
 
 	function a1() { bgStackFreeze --all; bgStackMarshal "$tmpFile"; } ; :
 	function b2() { a1 "$@"; }          ; :

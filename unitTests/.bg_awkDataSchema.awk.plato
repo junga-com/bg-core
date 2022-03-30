@@ -105,7 +105,7 @@ long form = bar|/tmp/tmp.<redacted>/bar.schema|/tmp/tmp.<redacted>/type1.awkData
 ##----------
 ## test
 awkDataID=type1
-cmd> awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("schemas awkDataID", "-o/dev/stdout")}'
+cmd> awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("-o/dev/stdout schemas awkDataID")}'
 schemas=<array>
    type1=<array>
       [_CLASS              ]='schema'
@@ -192,7 +192,7 @@ awkDataID='type1'
 ##----------
 ## test
 awkDataID=/tmp/tmp.<redacted>/bar.schema
-cmd> awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("schemas awkDataID", "-o/dev/stdout")}'
+cmd> awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("-o/dev/stdout schemas awkDataID")}'
 schemas=<array>
    bar=<array>
       [_CLASS              ]='schema'
@@ -279,7 +279,7 @@ awkDataID='bar'
 ##----------
 ## test
 awkDataID=/tmp/tmp.<redacted>/foo.data
-cmd> awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("schemas awkDataID", "-o/dev/stdout")}'
+cmd> awk  -v awkDataID="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {PROCINFO["sorted_in"]="@ind_str_asc";  printfVars("-o/dev/stdout schemas awkDataID")}'
 schemas=<array>
    foo=<array>
       [_CLASS              ]='schema'
@@ -370,7 +370,7 @@ awkDataID='foo'
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -404,7 +404,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -451,7 +451,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -498,7 +498,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -551,7 +551,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -610,7 +610,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -669,7 +669,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -716,7 +716,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -763,7 +763,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -810,7 +810,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -857,7 +857,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -904,7 +904,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 
@@ -951,7 +951,7 @@ compiledExpr=<array>
 ##     | 			PROCINFO["sorted_in"]="@ind_str_asc";
 ##     | 			arrayCreate(compiledExpr);
 ##     | 			expr_compile(filterExpr, compiledExpr, schemas["type1"]);
-##     | 			printfVars("compiledExpr", "-o/dev/stdout");
+##     | 			printfVars("-o/dev/stdout compiledExpr");
 ##     | 		}
 ##     | 	
 

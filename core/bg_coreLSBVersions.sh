@@ -171,6 +171,7 @@ function lsbVersionAtLeast()
 function lsbBashVersionAtLeast()
 {
 	local version="$1"
-	local bashVersion="$(bash --version | head -n1 | grep -o "\b[0-9]\+[.][0-9]\+[.][0-9]\+[^ $]*\b")"
+	#local bashVersion="$(bash --version | head -n1 | grep -o "\b[0-9]\+[.][0-9]\+[.][0-9]\+[^ $]*\b")"
+	local bashVersion="${BASH_VERSION%%(*}"
 	versionGt "$bashVersion" "$version"
 }

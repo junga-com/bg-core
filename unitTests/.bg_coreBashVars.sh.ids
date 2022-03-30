@@ -13,3 +13,4 @@ printfVars_nameRefs:
 printfVars_objects: 
 varOutput:oneValue 
 varOutput:multipleValues 
+varGetAttributes: 

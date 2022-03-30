@@ -109,3 +109,57 @@ FINISHED: 'orange:0.8'  exitcode='8'
 ## bg_coreProcCntrl.sh:bgwait:bgwaitTestPattern4 finished
 ###############################################################################################################################
 
+
+###############################################################################################################################
+## bg_coreProcCntrl.sh:bgtrap: start
+## expect: 
+
+# expect USR1 trap to start out empty
+cmd> bgtrap -p USR1
+
+# expect USR1 trap to have a foo block
+cmd> bgtrap -n foo '
+cmd> bgtrap -p USR1
+trap -- 'BGTRAPEntry 159885 USR1 "$BASH_COMMAND" "$LINENO" "$?"
+#<!:foo:!>
+echo "hello world"
+yoyo=5
+#<!:foo:!>
+BGTRAPExit  159885 USR1' SIGUSR1
+
+# expect USR1 trap to have two blocks -- foo and bar
+cmd> bgtrap -n bar '
+cmd> bgtrap -p USR1
+trap -- 'BGTRAPEntry 159885 USR1 "$BASH_COMMAND" "$LINENO" "$?"
+#<!:foo:!>
+echo "hello world"
+yoyo=5
+#<!:foo:!>
+#<!:bar:!>
+# my comment -- here we go
+call p1 p2
+#<!:bar:!>
+BGTRAPExit  159885 USR1' SIGUSR1
+
+# expect USR1 trap to have only bar now
+cmd> bgtrap -n foo -r USR1
+cmd> bgtrap -p USR1
+trap -- 'BGTRAPEntry 159885 USR1 "$BASH_COMMAND" "$LINENO" "$?"
+#<!:bar:!>
+# my comment -- here we go
+call p1 p2
+#<!:bar:!>
+BGTRAPExit  159885 USR1' SIGUSR1
+
+# expect USR1 trap not to change when we remove foo a second time
+cmd> bgtrap -n foo -r USR1
+cmd> bgtrap -p USR1
+trap -- '
+#<!::!>
+BGTRAPExit  159885 USR1' SIGUSR1
+cmd> bgtrap --clear USR1
+cmd> bgtrap -p USR1
+
+## bg_coreProcCntrl.sh:bgtrap: finished
+###############################################################################################################################
+

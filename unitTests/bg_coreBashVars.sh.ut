@@ -124,3 +124,41 @@ function ut_varOutput() {
 	varOutput -a -SsetVar   "$@"; printfVars setVar
 	varOutput -SsetVar   "$@"; printfVars setVar
 }
+
+
+function ut_varGetAttributes()
+{
+	ut test
+	local -A bar;      varGetAttributes bar  # returns 'A'
+	local -n goo;      varGetAttributes goo  # 'n@' (unitialized nameref)
+	goo=bar;           varGetAttributes goo  # 'nA' (nameref to an associative Array)
+	local -n goo2;
+	goo2=noExists;     varGetAttributes goo2 # 'n'  (nameref to non-existent variable)
+	unset bar;         varGetAttributes goo  # 'n'  (nameref to non-existent variable)
+	bar=5;             varGetAttributes goo  # 'n-' (nameref to variable with no attrbutes)
+	local -n goo3=goo; varGetAttributes goo3 # 'nn-' (nameref a nameref to variable with no attrbutes)
+
+	local -i i;        varGetAttributes i
+
+	local    a1;       varGetAttributes a1
+	local a2=();       varGetAttributes a2
+	local -a a3;       varGetAttributes a3
+	local -arix a4;    varGetAttributes a4
+
+	local    A1;       varGetAttributes A1
+	local -A A2;       varGetAttributes A2
+	local -Arix A3;    varGetAttributes A3
+
+	local -x ary=(one two three); varGetAttributes ary[1]
+	varGetAttributes ary[5]
+
+	local -A map=([one]=1 [two]=2 [three]=3)
+	varGetAttributes map[two]
+	varGetAttributes map[5]
+	varGetAttributes map[@]
+	varGetAttributes map[*]
+	local -rA map2=([one]=1 [two]=2 [three]=3)
+	varGetAttributes map2
+	varGetAttributes map2[two]
+	varGetAttributes map2[5]
+}

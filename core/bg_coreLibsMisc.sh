@@ -2307,7 +2307,7 @@ function bgtrap()
 	# if the script coincidentally contains a sep1 or sep2, escape them from our routines. Everything
 	# uses the escaped version except if we print or return the script in any way, we unescape it
 	# Its not likely this will happen but for completeness of predictablity, we do it.
-	# sep1 by necesity a comment line so escaping will not chage the execution. sep2 may not but we
+	# sep1 by necesity is a comment line so escaping will not change the execution. sep2 may not but we
 	# try to be inconspiculous.
 	script="${script//${sep1}/${sep1/'#'/##}}"; script="${script//${sep2}/${sep2/'>'/'> '}}"
 
@@ -2338,9 +2338,9 @@ function bgtrap()
 		local previousScript;
 		previousScript="$(builtin trap -p "$signal" 2>$assertOut)" || assertError -v signal -f assertOut "'$signal' is not a valid trap signal"
 		local isDefault=""; [ ! "$previousScript" ] && isDefault="1"
-		previousScript="${previousScript#*\'}"
-		previousScript="${previousScript%\'*}"
-		previousScript="${previousScript//"'\''"/\'}"
+		previousScript="${previousScript#*\'}"  # remove ^trap -- '
+		previousScript="${previousScript%\'*}"  # remove '*$
+		previousScript="${previousScript//"'\''"/\'}"  # since the returned script was in single quotes, the ' are escaped '\'''
 
 		# this is the header that we put at the start of every trap handler we set. It servers two purposes.
 		# First it embeds the $BASHPID that set the handler so that we can detect when a trap we read with -p was set in a
@@ -2358,7 +2358,7 @@ function bgtrap()
 		[ ! "$previousScriptPID" ] && [ "$$" == "$BASHPID" ] && previousScriptPID="$$"
 
 		# Add the header if needed and overwrite the previousScript if it does not belong in the current $BASHPID
-		# there are serveral cases where the PIDs dont match but in any of them we init the current handler without any previousScript
+		# there are several cases where the PIDs dont match but in any of them we init the current handler without any previousScript
 		#    (T) previousScriptPID is empty
 		#    (T) previousScriptPID is a script we initialized but in a parent shell BASHPID
 		#    (T) previousScriptPID is a foriegn script and $$!=$BASHPID so we dont know the PID where it was set
@@ -2451,6 +2451,8 @@ function bgtrap()
 						esac
 						#bgtraceVars "" previousScript name delB4 delAfter replacement ""
 						local newScript="${previousScript/${sep1}${name}${sep2}*${sep1}${name}${sep2}/$replacement}"
+					else
+						newScript="${previousScript}"
 					fi
 				else
 					# unamed handlers can be delimitted by SOL/EOL or a half or full separator

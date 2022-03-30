@@ -135,7 +135,7 @@ function fsMakeTemp()
 			caller="${stackFrame[frmSummary]}"
 			trapHandler='
 				# bgmktemp '"${keepFlag}"' '"${passThruOpts[@]}"' '"${fileNameVar}"'
-				# created at: '"$caller"''
+				# created at: '"${caller%%$'\n'*}"''
 		fi
 
 		if [ ! "$keepFlag" ]; then

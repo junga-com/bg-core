@@ -106,7 +106,7 @@ declare -gA _bgbcData
 #    causes the current word being editted to be replaced by <token>
 #    Note that what Bash considers the current word can be a little strange and I have found no way to
 #    make readline/bash change more that what it thinks is the token being edited
-#    Bash's notion of the token does not include the charcters at the cursor or after. Only characters
+#    Bash's notion of the token does not include the characters at the cursor or after. Only characters
 #    behind the cursor can be changed.
 #    The token that is being edited goes back to the first character that is in COMP_WORDBREAKS. Typically
 #    on Ubuntu, that includes ':' and '='. So even though in "<cmd> name:value p2" "name:value" will be

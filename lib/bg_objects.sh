@@ -412,8 +412,11 @@ function Class::__construct()
 	local _cname="$baseClass";
 	this[classHierarchy]="$className"
 	while [ "$_cname" ]; do
-		local existCheck="$_cname[name]"
-		[ ! "${!existCheck+exists}" ] && assertError -v className -v baseClass -v this[classHierarchy] -v _cname "'$className' inherits from '$_cname' which does not exist"
+		if ! varExists "${_cname}[name]"; then
+			# if the class does not yet exist, if a Library exists named for the class, we can load it
+			import -q "${_cname}.sh" ;$L1;$L2 || assertError -v class:"-l${_cname}" "Class '${_cname}' does not exist"
+			varExists "${_cname}[name]" || assertError -v className -v baseClass -v this[classHierarchy] -v _cname "'$className' inherits from '$_cname' which does not exist"
+		fi
 
 		# maintain a map that lets us quickly tell if something 'isA' something else
 		_classIsAMap[$className,$_cname]=1
@@ -664,16 +667,22 @@ function ConstructObject()
 	local _CLASS="$1"; assertNotEmpty _CLASS "className is a required parameter"
 
 	DeclareClassEnd "${_CLASS%%::*}"
-	varExists "${_CLASS%%::*}[name]" || assertError -v "${_CLASS%%::*}" "Class '${_CLASS%%::*}' does not exist"
+	if ! varExists "${_CLASS%%::*}[name]"; then
+		# if the class does not yet exist, if a Library exists named for the class, we can load it
+		import -q "${_CLASS%%::*}.sh" ;$L1;$L2 || assertError -v class:"-l${_CLASS%%::*}" "Class '${_CLASS%%::*}' does not exist"
+		varExists "${_CLASS%%::*}[name]" || assertError -v class:"-l${_CLASS%%::*}" -v library:"-l${_CLASS%%::*}.sh" "Tried to find Class by importing the library with its name, but it did not contain the class declaration"
+	fi
 
 	### support dynamic base class implemented construction
 	if type -t ${_CLASS%%::*}::ConstructObject &>/dev/null; then
 		_CLASS="${1%%::*}"
 		local data; [[ "$1" =~ :: ]] && data="${1#*::}"
+		bgDebuggerPlumbingCode=0
 		if $_CLASS::ConstructObject "$data" "${@:2}"; then
 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 			return 0
 		fi
+		bgDebuggerPlumbingCode=1
 		unset data
 	fi
 
@@ -682,7 +691,8 @@ function ConstructObject()
 
 	# _objRefVar is a variable name passed to us so strip out any unallowed characters for security.
 	# SECURITY: clean _objRefVar by removing all but characters that can be used in a variable name. foo[bar] is a valid name.
-	local _objRefVar="${2//[^a-zA-Z0-9\[\]_]}"; assertNotEmpty _objRefVar "objRefVar is a required parameter as the second argument"
+	# 2022-03 bobg: added '-' and '%' as allowed chars because of fromJSON on a nodejs package.json file
+	local _objRefVar="${2//[^-a-zA-Z0-9%\^\[\]_]}"; assertNotEmpty _objRefVar "objRefVar is a required parameter as the second argument"
 
 	# query the type attributes of _objRefVar. we support _objRefVar being declared in several different ways which affects whether
 	# it will be the object array or it will be a pointer to a new heap object array.
@@ -788,12 +798,17 @@ function ConstructObject()
 
 	# if the class has a postConstruct method, invoke it now. postConstruct allows a base class to do things after the object is
 	# fully constructed into its newTarget class type
-	if [ "${_VMT[_method::postConstruct]}" ]; then
-		unset -n static; local -n static="$_CLASS"
+	# if [ "${_VMT[_method::postConstruct]}" ]; then
+	# 	unset -n static; local -n static="$_CLASS"
+	# 	bgDebuggerPlumbingCode=0
+	# 	${_VMT[_method::postConstruct]}
+	# 	_resultCode="$?"; bgDebuggerPlumbingCode=1
+	# fi
+	local _cname; for _cname in ${class[classHierarchy]}; do
 		bgDebuggerPlumbingCode=0
-		${_VMT[_method::postConstruct]}
+		type -t $_cname::postConstruct &>/dev/null && $_cname::postConstruct "$@"
 		_resultCode="$?"; bgDebuggerPlumbingCode=1
-	fi
+	done
 	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 	true
 }
@@ -951,22 +966,25 @@ function DeleteObject()
 #
 # The <memberOp> is one of a fixed set of tokens that delimits the part before and after it.  Most of the <memberOps> look like
 # method names and are terminated with a space or EOS (aka a <break>). The '=' and '+=' <memberOp> are not terminated by a <break>.
-# If no <memberOp> are present, <memberOp> is denoted as the first <break> in the expression and the default operation will be performed.
+# If no <memberOp> are present, <memberOp> is taken as the first <break> in the expression and the default operation will be performed.
 #
 # The reason that a particular token would be a <objOperator> as opposed to being implemented as a method of the Object class is that
-# a <objOperator> can operate on primitive types whereas Object methods can only operate on objects.
+# a <objOperator> can operate on primitive types whereas Object methods can only operate on objects.This means that the operator
+# will work even when <objRef><memberRef> resolves to simple string variable as well as a subobject.
 #
-# $<objRef> resolves to a specific object. If it is the empty string, it resolves to the NullObjectInstance via the command_not_found_handle function.
+# $<objRef> resolves to a specific object. If it is the empty string, it resolves to the NullObjectInstance via the
+# command_not_found_handle function.
 #     examples...
 #     $myObj                  : refers to the object identified by myObj.
-#                               myRef is a primitive bash variable whose value contains an <objRef> string
-#                               ('_bgclassCall <oid> <class> <flags> |') or empty string.
-#                               myObj can be a bash array if myObj[0] contains an <objRef> string.
+#                               myObj is a primitive bash variable (which could be an array element) whose value contains an
+#                               <objRef> string in the format '_bgclassCall <oid> <class> <flags> |' or empty string.
+#                               myObj can be a bash array if myObj[0] contains an <objRef> string. Bash uses the value at [0] if
+#                               no index is included when an array variable is used (both numeric -a and associative -A arrays).
 #                               $myObj is replaced with its string value before the expression is parsed as a command so it will
 #                               result in a call to _bgclassCall which will interpret and act on the remainder of the expression.
 #     $myObj.child1.child2... : objRefs can be chained together indefinately as along as each child is a member variable of the
-#                               previous <objRef> that contains an <objRef>. The object identified by the last child is the
-#                               object referenced in the expression.
+#                               previous <objRef> that contains an <objRef> which is a string that begins with '_bgclassCall '.
+#                               The object identified by the last child is the object referenced in the expression.
 #
 # <memberRef> is an optional term that changes the target of the expression from the <objRef> object itself to a member element
 # (method or variable) of the <objRef> object.
@@ -977,6 +995,8 @@ function DeleteObject()
 #     $myObj.:myVar           : refers to the member variable 'myVar' in object 'myObj'. .: syntax indicates that the member must be
 #                               a method. A variable by the same name will not be referenced.
 #     $myObj.MyClass::myMethod : override the virtual method call mechanism to call a specific method implementation in MyClass
+#
+# <objOperator> is one of a fixed number of strings. " ",=new,.unset ... (see next section for a complete list)
 #
 # <args> are the optional arguments to the <objOperator> or method or member var access being invoked by the expression.
 #
@@ -1124,7 +1144,10 @@ function __resolveMemberChain()
 	_rsvMemberType=""
 
 	# validate exprIn for illegal characters
-	[[ "$exprIn" =~ [^].:_a-zA-Z0-9[] ]] && { _rsvMemberType="invalidExpression:invalid charcter in expression";  return 101; }
+	# 2022-03 bobg: commented this out because I am reading nodejs package.json files for "bg-dev status" and they have arbitrary
+	#               characters like [-^] in the names. Since in bash they are associative array indexes why not?  Maybe we need an
+	#               option if we need to restrict to valid variable names.
+	#[[ "$exprIn" =~ [^].:_a-zA-Z0-9[] ]] && { _rsvMemberType="invalidExpression:invalid character in expression";  return 101; }
 
 	# parse the member chain expression into parts. By replacing '[' with '.' all the terms are separated by '.' and those that used
 	# the [<term>] syntax will have a trailing ']' so we can still distinguish them
@@ -1172,7 +1195,7 @@ function __resolveMemberChain()
 	### follow the 'middle' chained parts which, by syntax, should all be objects. We already removed the last part so this loop is the chaining mechaism
 	local -n _pthis
 	local nextPart; for nextPart in "${parts[@]}"; do
-		local nextPartSyntax="${_rsvMemberName:+dot}"; [[ "${_rsvMemberName}" =~ []]$ ]] && nextPartSyntax="memberVar"
+		#2022-03 bobg:  seeems not to be used. untested. #local nextPartSyntax="${_rsvMemberName:+dot}"; [[ "${_rsvMemberName}" =~ []]$ ]] && nextPartSyntax="memberVar"
 		nextPart="${nextPart%]}"
 		[ "$nextPart" ] || { _rsvMemberType="invalidExpression:empty member chain part. "; return 101; }
 
@@ -1194,7 +1217,6 @@ function __resolveMemberChain()
 
 		if  [ "${_pthis[$nextPart]+exists}" ]; then
 			_objRefV="${_pthis[$nextPart]}"
-
 		elif  [ "$forceFlag" ]; then
 			ConstructObject Object _pthis[$nextPart]
 			_objRefV="${_pthis[$nextPart]}"
@@ -1204,7 +1226,7 @@ function __resolveMemberChain()
 		fi
 
 		local _oidParts=($_objRefV)
-		[ "${_oidParts[0]}" == "_bgclassCall" ] || { _rsvMemberType="invalidExpression:dereferencing a primitive at $_rsvOID[$nextPart]"; return 1; }
+		[ "${_oidParts[0]}" == "_bgclassCall" ] || { _rsvMemberType="invalidExpression:dereferencing a primitive (forceFlag='$forceFlag' _objRefV='$_objRefV' nextPart='$nextPart') at $_rsvOID[$nextPart]"; return 1; }
 		_rsvOID="${_oidParts[1]}"
 	done
 

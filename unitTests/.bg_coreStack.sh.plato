@@ -942,7 +942,7 @@ frame[]
 ## setup
 ##     | cmd> shopt -s extdebug
 ##     | ut filter '[(][0-9]*[)]:###(<redacted>):'
-##     | cmd> local tmpFile; bgmktemp tmpFile
+##     | cmd> local tmpFile; bgmktemp tmpFile bgmktemp.ut_bgStackMarshal.XXXXXXXXXX
 ##     | cmd> function a1() { bgStackFreeze --all; bgStackMarshal "$tmpFile"; } ; :
 ##     | cmd> function b2() { a1 "$@"; }          ; :
 ##     | cmd> function c3() { b2 "$@"; }          ; :

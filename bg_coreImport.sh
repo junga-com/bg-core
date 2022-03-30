@@ -193,8 +193,9 @@ function _importSetErrorCode() { return 202; }
 function import()
 {
 	declare -gA _importedLibraries
-	local forceFlag quietFlag getPathFlag
+	local forceFlag quietFlag getPathFlag devOnly
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		--devOnly) devOnly="--devOnly"; [ "$bgProductionMode" == "development" ] || assertError "This script can not be imported in production mode" ;;
 		-f) forceFlag="-f" ;;
 		-e) stopOnErrorFlag="-e" ;;
 		-q) quietFlag="-q" ;;
@@ -222,7 +223,7 @@ function import()
 		: echo "import found in manifest" >> "/tmp/bgtrace.out"
 	else
 		# SECURITY: TODO: refuse to load libraries that are not in the manifest if in productionMode
-		echo "import searching paths '$scriptName'" >> "/tmp/bgtrace.out"
+		[ "$devOnly" ] || echo "import searching paths '$scriptName'" >> "/tmp/bgtrace.out"
 		# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
 		# searched in non-development mode
 		if [ "$bgSourceOnlyUnchangable" ]; then
@@ -439,6 +440,8 @@ import bg_coreMisc.sh ;$L1;$L2
 # used when an exception is thrown and debugger. Could be easily made on-demand
 import bg_coreStack.sh ;$L1;$L2
 
+# things like $(getUserCmpApp)...
+import bg_coreCuiUserApps.sh  ;$L1;$L2
 
 # if we are being sourced in a terminal, tell importCntr to record the timestamp used to tell if libraries are newer
 # and also import the bgtrace functions assuming that we are being sourced to debug stuff
