@@ -132,6 +132,7 @@ function importCntr()
 # its not required to source the <library> but its enables several best effort features.
 function _postImportProcessing() {
 	local result="$?"
+	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
 
 	local scriptName="${_importInProgressStack[@]:0:1}"; _importInProgressStack=("${_importInProgressStack[@]:1}")
 
@@ -153,6 +154,7 @@ function _postImportProcessing() {
 	[ ${#_importInProgressStack[@]} -eq 0 ] && L2=""
 	#echo "(post) L1='$L1' L2='$L2'" >>"/tmp/bgtrace.out"
 
+	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 	return $result
 }
 
@@ -192,6 +194,7 @@ function _importSetErrorCode() { return 202; }
 #    findInPaths : this is a much more flexible algorithm for finding various types of installed files
 function import()
 {
+	# (needs debugging b4 we uncomment - code was left set so debugger never stopped) bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
 	declare -gA _importedLibraries
 	local forceFlag quietFlag getPathFlag devOnly
 	while [[ "$1" =~ ^- ]]; do case $1 in
@@ -256,6 +259,7 @@ function import()
 			echo "$foundScriptPath"
 		fi
 		[ "$foundScriptPath" ]
+		# (needs debugging b4 we uncomment - code was left set so debugger never stopped) bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		return
 	fi
 
@@ -286,11 +290,14 @@ function import()
 		_importedLibraries[lib:$scriptName]=$foundScriptPath
 		[ "$stopOnErrorFlag" ] && set -e +E
 		#echo "DOING import return '$foundScriptPath'" >>"/tmp/bgtrace.out"
+		# (needs debugging b4 we uncomment - code was left set so debugger never stopped) bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		return 0
 	fi
 
 
 	### library not found path
+
+	# (needs debugging b4 we uncomment - code was left set so debugger never stopped) bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 
 	# if we are being called early in the initialization process, the real assertError might not be loaded yet so make a simple version
 	type -t assertError &>/dev/null || function assertError() { printf "(early import error reporter): $*\n" >&2; exit; }

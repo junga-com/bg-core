@@ -677,7 +677,7 @@ function ConstructObject()
 	if type -t ${_CLASS%%::*}::ConstructObject &>/dev/null; then
 		_CLASS="${1%%::*}"
 		local data; [[ "$1" =~ :: ]] && data="${1#*::}"
-		bgDebuggerPlumbingCode=0
+		bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 		if $_CLASS::ConstructObject "$data" "${@:2}"; then
 			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 			return 0
@@ -791,21 +791,15 @@ function ConstructObject()
 	# invoke the constructors from Object to this class
 	local _cname; for _cname in ${class[classHierarchy]}; do
 		unset -n static; local -n static="$_cname"
-		bgDebuggerPlumbingCode=0
+		bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 		type -t $_cname::__construct &>/dev/null && $_cname::__construct "$@"
 		_resultCode="$?"; bgDebuggerPlumbingCode=1
 	done
 
 	# if the class has a postConstruct method, invoke it now. postConstruct allows a base class to do things after the object is
 	# fully constructed into its newTarget class type
-	# if [ "${_VMT[_method::postConstruct]}" ]; then
-	# 	unset -n static; local -n static="$_CLASS"
-	# 	bgDebuggerPlumbingCode=0
-	# 	${_VMT[_method::postConstruct]}
-	# 	_resultCode="$?"; bgDebuggerPlumbingCode=1
-	# fi
 	local _cname; for _cname in ${class[classHierarchy]}; do
-		bgDebuggerPlumbingCode=0
+		bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 		type -t $_cname::postConstruct &>/dev/null && $_cname::postConstruct "$@"
 		_resultCode="$?"; bgDebuggerPlumbingCode=1
 	done
@@ -1439,7 +1433,7 @@ function _bgclassCall()
 			local super="_bgclassCall ${_OID} ${_METHOD%%::*} 1 |"
 
 			objOnEnterMethod "$@"
-			bgDebuggerPlumbingCode=0
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			$_METHOD "$@"
 			;;
 
@@ -1483,7 +1477,7 @@ function _bgclassCall()
 				fi
 			done
 
-			bgDebuggerPlumbingCode=0
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			$_METHOD "$@"
 			;;
 
