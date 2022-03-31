@@ -905,7 +905,7 @@ element='one'
 cmd> ConstructObject DataFile datafile "$tmpFile"
 cmd> printfVars datafile
 datafile : <instance> of DataFile
-  filename=/tmp/bgmktemp.<redacted>
+  filename=/tmp/bgmktemp.tmpFile.<redacted>
   data : <instance> of Array
     [0]=one fish
     [1]=two fish

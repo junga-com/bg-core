@@ -70,71 +70,7 @@ one more thing...
 ##     | cmd> echo "some error" >&2
 ##     | stderr> some error
 ** Setup Failed: testcase not finished.  **
-
-###############################################################################################################################
-## bg_unitTests.sh:setupError2: start
-## expect: testcase to stop with an error when a command in setup section returns non-zero
-
-##----------
-## setup
-##     | cmd> echo setting up something something...
-##     | setting up something something...
-##     | cmd> false
-##     | [exitCode 1]
-** Setup Failed: testcase not finished.  **
-
-###############################################################################################################################
-## bg_unitTests.sh:setupError3: start
-## expect: testcase to stop with an error when an assert* function is called in a setup section
-
-##----------
-## setup
-##     | cmd> echo setting up something something...
-##     | setting up something something...
-##     | cmd> assertError "bad setup"
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='ut_setupError3'
-   catch_errorCode='36'
-   catch_errorDescription='
-                           error: ut_setupError3: bad setup'
-** Setup Failed: testcase not finished.  **
-
-###############################################################################################################################
-## bg_unitTests.sh:setupError4: start
-## expect: testcase to stop and fail when exit is called in a setup section
-
-##----------
-## setup
-##     | cmd> echo setting up something something...
-##     | setting up something something...
-##     | cmd> exit
-##     | !!! test case is exiting prematurely code=0
-** Setup Failed: testcase not finished.  **
-
-###############################################################################################################################
-## bg_unitTests.sh:exitInTest: start
-## expect: testcase to finish without error indicating the exit in the output
-
-##----------
-## test
-cmd> exit 2
-!!! test case is exiting prematurely code=0
-
-###############################################################################################################################
-## bg_unitTests.sh:assertInTest: start
-## expect: testcase to finish without error indicating the assertion in the output
-
-##----------
-## test
-cmd> assertError "this is an error"
-** Exception thrown by testcase **
-   catch_errorClass='assertError'
-   catch_errorFn='ut_assertInTest'
-   catch_errorCode='36'
-   catch_errorDescription='
-                           error: ut_assertInTest: this is an error'
-## bg_unitTests.sh:setupError1: finished
+## bg_unitTests.sh:setupError1: ERROR: setup could not complete
 ###############################################################################################################################
 
 

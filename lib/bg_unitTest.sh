@@ -295,8 +295,10 @@ function ut()
 	# if the last command produced stderr output, flush it
 	if [ -s "$errOut" ]; then
 		sync
-		cat "$errOut" | awk '{printf("stderr> %s\n", $0)}'
-		truncate -s0 "$errOut"
+		gawk '{printf("stderr> %s\n", $0)}' "$errOut"
+		truncate -s0 "$errOut"   || assertError
+		exec {errOutFD}>&-       || assertError
+		exec {errOutFD}>$errOut  || assertError
 		[ "$_utRun_section" == "setup" ] && ut setupFailed
 	fi
 
@@ -377,7 +379,7 @@ function ut()
 		[ "$_utRun_section" == "setup" ] && ut setupFailed
 		;;
 
-
+	  # called at the start of the subshell
 	  onStart)
 		local utID="$1"; shift
 		exec {setupOutFD}>$setupOut
@@ -412,6 +414,7 @@ function ut()
 
 		;;
 
+	  # called by the DEBUG trap when it detects that the utFn has just started, before the first line of code
 	  onFirstTimeInsideUTFunc)
 		# set an ERR trap to monitor non-zero exit codes. This has to be set from this event in order to be effective
 		trap -n unitTests '[ "$FUNCNAME" == "$_utRun_funcName" ] && ut onCmdErrCode "$bgBASH_trapStkFrm_exitCode" "$bgBASH_trapStkFrm_lastCMD"' ERR
@@ -423,6 +426,7 @@ function ut()
 		fi
 		;;
 
+	  # called when something produces an error while in a setup section
 	  setupFailed)
 		trap -n unitTests -r '' ERR EXIT
 		builtin trap '' DEBUG
@@ -433,6 +437,7 @@ function ut()
 		exit 222
 		;;
 
+	  # called from the EXIT trap if the testcase does not end gracefully
 	  onExitCaught)
 		trap -n unitTests -r '' ERR EXIT
 		builtin trap '' DEBUG
@@ -448,6 +453,8 @@ function ut()
 		fi
 		;;
 
+	  # called when utFunc throws an assertError (from either a setup or a test section)
+	  # either this or onEnd will be called but not both, however a premature exit will skip both of these
 	  onExceptionCaught)
 		trap -n unitTests -r '' ERR EXIT
 		builtin trap '' DEBUG
@@ -464,8 +471,12 @@ function ut()
 		fi
 		;;
 
+	  # called when the utFunc returns normally
+	  # either this or onExceptionCaught will be called but not both, however a premature exit will skip both of these
 	  onEnd)
 		_ut_flushLineInfo
+		exec >&$stdoutFD
+		_ut_flushSetupFile
 		trap -n unitTests -r '' ERR EXIT
 		_utRun_debugHandlerHack="1"
 		builtin trap '' DEBUG
@@ -473,10 +484,10 @@ function ut()
 		true
 		;;
 
+	  # called after utFunc runs regardless of how it ends.
+	  # NOTE: onFinal will be called from outside the subshell in testcases that exit prematurely
+	  # we know that resources are cleaned up because either onEnd or onExceptionCaught cleaned them up or the subshell exitted
 	  onFinal)
-		_ut_flushLineInfo
-		trap -n unitTests -r '' ERR EXIT
-		builtin trap '' DEBUG
 		if [ "$2" == "OK" ]; then
 			echo "## $1 finished"
 		else
@@ -496,8 +507,12 @@ function _ut_flushSetupFile()
 	# if we are entering test mode and there is collected setup content, flush it
 	if [ -s "$setupOut" ]; then
 		sync
-		awk '{printf("##     | %s\n", $0)}' $setupOut >&$stdoutFD
+		gawk '{printf("##     | %s\n", $0)}' "$setupOut"  >&$stdoutFD
+
+		# since we truncate the file, we need to reopen the file descriptor to reset the write position to 0
 		truncate -s0 "$setupOut"
+		exec {setupOutFD}>&-  || assertError
+		exec {setupOutFD}>$setupOut  || assertError
 	fi
 }
 
@@ -577,9 +592,11 @@ function _ut_debugTrap()
 #
 function utfRunner_execute()
 {
-	local _utRun_debugFlag
+	local _utRun_debugFlag setupOut setupOutFlag errOut errOutFlag
 	while [ $# -gt 0 ]; do case $1 in
-		--debug) _utRun_debugFlag="--debug" ;;
+		--setupOut*) bgOptionGetOpt val: setupOut "$@" && shift; setupOutFlag="1" ;;
+		--errOut*)   bgOptionGetOpt val: errOut   "$@" && shift; errOutFlag="1"   ;;
+		--debug)     _utRun_debugFlag="--debug" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local utFilePath="$1"; shift
@@ -646,8 +663,8 @@ function utfRunner_execute()
 	[ ${_utRun_srcLineStart:-0} -lt ${_utRun_srcLineEnd:-0} ] || { assertError; }
 
 
-	local setupOut; bgmktemp setupOut
-	local errOut;   bgmktemp errOut
+	[ ! "$setupOutFlag" ] && bgmktemp  "setupOut" #"bgmktemp.testcase.setupOut.XXXXXXXXXX"
+	[ ! "$errOutFlag" ]   && bgmktemp  "errOut"   #"bgmktemp.testcase.errOut.XXXXXXXXXX"
 
 	if [ "$_utRun_debugFlag" ]; then
 		type -t debuggerOn &>/dev/null || import bg_debugger.sh ;$L1;$L2
@@ -680,7 +697,7 @@ function utfRunner_execute()
 	local result="$?"
 	case $result in
 		  0) : ;;
-		  1) ut onFinal "$utID" "OK"; result=0 ;;
+		  1) ut onFinal "$utID" "OK"; result=0 ;; # test section exits prematurely
 		222) ut onFinal "$utID" "FAIL" ;;  # setup failure -- writing to stderr, cmd returns!=0, setup asserts or calls exit
 		  *) assertError "Unit test framework logic error. The testcase block ended with an unexpected exit code ($result)."
 	esac
@@ -688,8 +705,11 @@ function utfRunner_execute()
 	[ -s "$setupOut" ] && assertError -f setupOut "Unit test framework error. Content was left in the setupOut temp file after a testcase run"
 	[ -s "$errOut" ]   && assertError -f errOut   "Unit test framework error. Content was left in the errOut temp file after a testcase run"
 
-	bgmktemp --release setupOut
-	bgmktemp --release errOut
+	truncate -s0 "$setupOut"
+	truncate -s0 "$errOut"
+
+	[ ! "$setupOutFlag" ] && bgmktemp --release setupOut
+	[ ! "$errOutFlag" ]   && bgmktemp --release errOut
 }
 
 

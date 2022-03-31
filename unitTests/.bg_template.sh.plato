@@ -153,7 +153,7 @@ cmd> templateExpand -f "$templateFile"
    catch_errorCode='36'
    catch_errorDescription='
                            error: templateEvaluateVarToken: required template var 'name' is not defined
-                               context='/tmp/bgmktemp.<redacted>''
+                               context='/tmp/bgmktemp.templateFile.<redacted>''
 ## bg_template.sh:templateExpandMissingRequired: finished
 ###############################################################################################################################
 

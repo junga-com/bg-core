@@ -59,12 +59,16 @@ five
 
 # expect that sudo fails because it cant create the tmp file but bgsudo succeeds
 cmd> sed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
-stderr> sed: couldn't open temporary file /tmp/bgmktemp.<redacted>/<redacted>: Permission denied
+stderr> sed: couldn't open temporary file /tmp/bgmktemp.tmpDir.<redacted>/<redacted>: Permission denied
 I am grut
 [exitCode 4]
 cmd> bgsed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
 I am grut
 yoyo ma
+
+##----------
+## setup
+##     | cmd> chmod a+w "$tmpDir"
 
 ## bg_bgsed.sh:bgsed: finished
 ###############################################################################################################################

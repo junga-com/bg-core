@@ -2983,10 +2983,8 @@ function assertError()
 
 	# display any file content that was provided
 	local _ae_label; for _ae_label in $_ae_dFilesList; do
-		printf "   %s:\n" "$_ae_label" >&$ae_outFD
-		[ -f "${_ae_dFiles[$_ae_label]}" ] && awk '
-			{printf("   %3s : %s\n", NR, $0)}
-		' "${_ae_dFiles[$_ae_label]}"
+		printf "   %s='%s':\n" "$_ae_label" "${_ae_dFiles[$_ae_label]}" >&$ae_outFD
+		[ -f "${_ae_dFiles[$_ae_label]}" ] && gawk '{printf("   %3s : %s\n", NR, $0)}' "${_ae_dFiles[$_ae_label]}" >&$ae_outFD
 	done
 
 	# the assertDefaultFormatter sets _ae_contextOutput when the source line redirects to 2>$assertOut

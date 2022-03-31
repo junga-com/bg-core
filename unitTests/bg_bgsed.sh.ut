@@ -61,4 +61,6 @@ function ut_bgsed()
 	sed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
 	bgsed -i  -e '$ ayoyo ma'  "$tmpDir/writableFileInReadOnlyFolder"; cat "$tmpDir/writableFileInReadOnlyFolder"
 
+	ut setup
+	chmod a+w "$tmpDir"
 }

@@ -320,8 +320,10 @@ function bgtraceParams()
 		printf "$timerStr" >>$_bgtraceFile
 	fi
 
+	# this is the typical case where the caller did not pass anything in so we glean the function name and arguments
 	if [ $# -eq 0 ]; then
-		printf "starting: %s " "${FUNCNAME[1]}" >>$_bgtraceFile
+		local objInfo; [[ "${FUNCNAME[1]}" =~ :: ]] && objInfo="${_this[_OID]}."
+		printf "starting: %s%s "  "${objInfo}" "${FUNCNAME[1]}" >>$_bgtraceFile
 		local i; for ((i=${BASH_ARGC[1]:-0}; i>0; i--)); do
 			printf "'%s' " "${BASH_ARGV[$((i-1))]}" >>$_bgtraceFile
 		done

@@ -122,7 +122,7 @@ function fsMakeTemp()
 		--will-not-release|--auto) willNotReleaseFlag="--will-not-release" ;;
 		*)  bgOptionsEndLoop --firstParam fileNameVar "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local templateValue="${1:-bgmktemp.XXXXXXXXXX}"
+	local templateValue="${1:-bgmktemp.${fileNameVar}.XXXXXXXXXX}"
 
 	[ "$suffix" ] && passThruOpts+=("--suffix=$suffix")
 	[ "$tmpdir" ] && passThruOpts+=("--tmpdir=$tmpdir")
@@ -177,13 +177,19 @@ function fsMakeTemp()
 			bgtrap -r -n "$fileNameValue"  EXIT || assertError -c -v fileNameVar -v fileNameValue -V "$(trap -p EXIT)" "the trap previously set to remove the temp filecould not be removed."
 
 			# validate the fileNameValue before we start deleting things..
-			[[ "$fileNameValue" =~ (^/tmp/...)|([.]bglocal/) ]] || assertError -v fileNameVar -v fileNameValue "refusing to delete temp filename that does not comply with naming policy"
+			[[ "$fileNameValue" =~ (^/tmp/...)|([.]bglocal/) ]] || assertError -v fileNameVar -v fileNameValue "refusing to delete temp filename ('$fileNameValue') that does not comply with naming policy"
 
 			# and clean up the temp files...
-			# TODO: decide if its safe to add an * to the end of this rm -rf or what we would have to do to safely rm
-			#       other temp files created by adding extensions to the base name. Some bg-lib code already does that
-			#       but maybe they should be refactored to create a temp directory to put multiple files
-			[ ! "$keepFlag" ] && rm -rf "$fileNameValue"
+			if [ ! "$keepFlag" ]; then
+				if [ ! -e "$fileNameValue" ]; then
+					(assertError --continue -v fileNameValue -v trapHandler "a temp file created with bgmktemp was already missing when it was released" &>>$_bgtraceFile)
+				elif [ ${#fileNameValue} -lt 10 ]; then
+					# note that there is also a check above on fileNameValue 
+					(assertError --continue -v fileNameValue -v trapHandler "refusing to delete temp file because the fileNameValue is suspiciously short" &>>$_bgtraceFile)
+				else
+					rm -rf "${fileNameValue:-__NON_EXISTENT_FILE__}"*
+				fi
+			fi
 
 			if [ ! "$assertError_EndingScript" ] && [ "$mode" == "releaseInternal" ] && [ ! "$willNotReleaseFlag" ] && { [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; } && [ "$bgBASH_tryStackAction" != "exitOneShell" ]; then
 				(assertError --continue -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script." &>>$_bgtraceFile)
