@@ -108,7 +108,7 @@ function importCntr()
 			done
 
 			# touch the semaphore to make everything up-to-date
-			[ ! "$_importedLibrariesTimeRefTmpFile" ] && bgmktemp --will-not-release _importedLibrariesTimeRefTmpFile
+			[ ! "$_importedLibrariesTimeRefTmpFile" ] && bgmktemp --will-not-release _importedLibrariesTimeRefTmpFile "importTimeRefFile.$$.XXXX"
 			[ "$_importedLibrariesTimeRefTmpFile" ] && touch "$_importedLibrariesTimeRefTmpFile"
 
 			# now reload the out-of-date libraries.
@@ -337,6 +337,8 @@ done
 # bgLibExecMode records if we are being sourced in a terminal or in a script
 #      script   : normal case of a script file including source /usr/lib/bg_core.sh
 #      terminal : a user typed '$ source /usr/lib/bg_core.sh'
+# See ./bashTests/setEnv.sh to explore the various ways a script can be ran or sourced
+# evaluating "${FUNCNAME[@]: -1}" in a function makes BASH set the top entry to either 'main' or 'source'
 function __getScriptExecType() { bgBASH_scriptType="${FUNCNAME[@]: -1}"; }; __getScriptExecType
 case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 	# normal case of being sourced inside a script
@@ -378,7 +380,8 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 		;;
 
 	# case where a script that sources us is being sourced in a terminal directly by the user
-	# this is the case that "source bg-debugCntr" trips
+	# this is the case that "source bg-debugCntr" trips because some global code in it runs a subshell to source us to use functions
+	# that we do not want to source.
 	source:*)
 		if [ ! "${bgLibExecMode+exists}" ]; then
 			declare -g bgLibExecMode="terminal"
@@ -474,3 +477,5 @@ fi
 # if [ "$bgImportProfilerOn" ]; then
 # 	bgtimerTrace -T ImportProfiler "bg-core finished includes"
 # fi
+
+debuggerTriggerIfNeeded

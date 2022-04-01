@@ -62,7 +62,6 @@
 
 #function bgtraceIsActive()   moved to bg_libCore.sh
 #function bgtraceTurnOn()     moved to bg_libCore.sh
-#function bgtraceGetLogFile() moved to bg_libCore.sh
 
 # this tells bash to record function arguments in the stack data and source file and line number
 # of functions. search for extdebug in man bash
@@ -93,7 +92,6 @@ function bgtraceTurnOff()
 # See Also:
 #   bgtraceIsActive   : (core function) synonom for bgtraceCntr isOn
 #   bgtraceTurnOn     : (core function) synonom for bgtraceCntr on:...
-#   bgtraceGetLogFile : (core function) returns the destination file for bgtrace messages
 function bgtraceCntr()
 {
 	if [ "$1" == "isOn" ]; then

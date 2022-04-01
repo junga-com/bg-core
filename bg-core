@@ -81,6 +81,18 @@ function oob_printBashCompletion()
 				'<setting>') configSettingList ${clInput[-s]:+"-s${clInput[-s]}"} "${clInput[section]}"; echo "\$(emptyIsAnOption)" ;;
 			esac
 			;;
+
+
+		cuiWin:1)
+			echo "<winName>"
+			local cuiWinCntrFilePrefix="/tmp/bgtrace."
+			for i in $(fsExpandFiles -e ${cuiWinCntrFilePrefix}*.cntr); do
+				i="${i%.cntr}"; i="${i#$cuiWinCntrFilePrefix}";
+				echo "$i"
+			done
+			;;
+		cuiWin:2) echo "open close ping gettty tailFile tailCancel tailStatus ident" ;;
+
 	esac
 	exit
 }
@@ -195,6 +207,8 @@ function configCntr()
 	esac
 }
 
+
+
 ###############################################################################
 # Main script
 
@@ -217,6 +231,10 @@ case ${command:-show} in
 	config)        configCntr     "${passThruOpts[@]}" "$@" ;;
 	manifest)      echo "use 'bg-awkData manifest ...' to query the host manifest" ;;
 	compliance)    complianceCntr "${passThruOpts[@]}" "$@" ;;
+	cuiWin)
+		import bg_cuiWin.sh  ;$L1;$L2
+		cuiWinCntr     "${passThruOpts[@]}" "$@"
+		;;
 	show)          echo "coming soon..."  ;;
 	*)  echo "error: unknown command '$command'. "
 		echo "   See man $(basename $0)"

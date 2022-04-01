@@ -81,6 +81,7 @@ if ! bgtraceIsActive; then
 	function bgtimerStartTrace() { :; }
 	function bgtimerTrace()      { :; }
 	function bgtimerLapTrace()   { :; }
+	function debuggerTriggerIfNeeded()   { :; }
 else
 	# this case is logically part of the bg_debugTrace.sh library but it is global init code that is important and have to happen
 	# after the functions in bg_debugTrace.sh are available so if we put this in that library, we would have to put it at the end
@@ -106,15 +107,17 @@ else
 
 	##################################################################################################################
 	### recognize debugger environment var maintianed by bg-debugCntr to activate the debugger when a script runs
-	if [ "$bgDevModeUnsecureAllowed" ] &&  [ "$bgLibExecMode" == "script" ] && [ "${bgDebuggerOn}" ]; then
-		[ ! "$(import --getPath bg_debugger.sh)" ] && assertError "the debugger is not installed. Try installing the bg-dev package"
-		import bg_debugger.sh ;$L1;$L2
-		bgtrace "bgDebuggerOn is on : ${bgDebuggerOn}"
-		case ${bgDebuggerOn#on:} in
-			stopOnLibInit)           debuggerOn stepOver ;;
-			*|stopOnFirstScriptLine) debuggerOn stepToLevel 1 ;;
-		esac
-	fi
+	function debuggerTriggerIfNeeded() {
+		if [ "$bgDevModeUnsecureAllowed" ] &&  [ "$bgLibExecMode" == "script" ] && [ "${bgDebuggerOn}" ]; then
+			[ ! "$(import --getPath bg_debugger.sh)" ] && assertError "the debugger is not installed. Try installing the bg-dev package"
+			import bg_debugger.sh ;$L1;$L2
+			bgtrace "bgDebuggerOn is on : ${bgDebuggerOn}"
+			case ${bgDebuggerOn#on:} in
+				stopOnLibInit)           debuggerOn stepOver ;;
+				*|stopOnFirstScriptLine) debuggerOn stepToLevel 1 ;;
+			esac
+		fi
+	}
 fi
 
 

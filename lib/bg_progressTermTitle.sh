@@ -43,7 +43,7 @@ function progressTypeTermTitleCntr()
 			mkfifo -m 600 "$pipeToProgressHandler"
 			(
 				_termTitleReadProgressLoop
-			) >>"$(bgtraceGetLogFile)" 2>&1 3<$pipeToProgressHandler &
+			) >>"${_bgtraceFile:-/dev/null}" 2>&1 3<$pipeToProgressHandler &
 			_progressDriver["PID"]=$!
 
 			exec {_progressDriver["userFeedbackFD"]}>$pipeToProgressHandler

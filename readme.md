@@ -774,6 +774,11 @@ Config plugins can be used just like Standards but can additionally be ran in ap
 
 Standards, Config, and RBACPermission plugins are the heart of a system of distributed system administration that provides central command and control without requiring that any remote user have unrestricted privilege on a host. This is an important new firewall that limits risk in an organization by allowing compartmentalization to an extent not achieved by other means.
 
+## Commandline User Interface
+TODO: write this section on bg_cui.sh and bg_cuiWin.sh
+Example: open a new terminal with "bg-core cuiWin myWin open" then sourceCore and wrtie to it with various csi codes. Then tailFile
+and feed it data. etc...
+
 
 
 ## bg-core Project Folder Description

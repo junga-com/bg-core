@@ -1479,13 +1479,6 @@ function bgtraceTurnOn()
 	bgtraceCntr "${1:-on}"
 }
 
-# OBSOLETE: I think that now we do not tis because after bg_core.sh is sourced, we can rely on $_bgtraceFile being set so we can '<cmd> >$_bgtraceFile'
-# usage: bgtraceGetLogFile
-# returns the bgtrace logfile or /dev/null if that log file is not set.
-function bgtraceGetLogFile()
-{
-	echo "${_bgtraceFile:-/dev/null}"
-}
 
 
 
@@ -1501,9 +1494,11 @@ function bgtraceGetLogFile()
 #    debuggerIsInBreak  : is the script currently stopped in the debugger.
 function debuggerIsActive()
 {
+	# TODO: thise should ask the driver
 	[ "$bgDevModeUnsecureAllowed" ] || return 35
 	[ "$bgdbtty" ] && [ -t "$bgdbttyFD" ] && return 0
 	[ "$bgdbCntrFile" ] && [ -p  "$bgdbCntrFile"  ] && return 0
+	[ "$bgPipeToAtom" ] && return 0
 	return 1
 }
 
@@ -1939,21 +1934,68 @@ function bgkillTree()
 }
 
 
-# usage: bgExit --complete [<exitCode>]
+# usage: getTerminalPID [<retVar>]
+# usage: [ $$ -eq $(getTerminalPID) ] && echo "this code is running in a sourced function so exit will close the terminal window"
+# return the last pid in the parent chain whose comm (executable name) is "bash". If we are a child that lived past its finished
+# parent script, this will return 0 indicating that there is no terminal parent. Note that we could still be connected to the parent's
+# tty.
+# The motivation of this function was to determine if calling 'exit' would close the user's terminal which is will if $$==terminalPID
+# linke when we are running in a sourced function
+function getTerminalPID()
+{
+	# I removed this check because if a child proc uses this function after its parent script ends, this check fails but its ok.
+	#[ "$(ps --pid $$ -o comm=)" == "bash" ] || assertError "unexpected error: \$\$ is not a bash process"
+
+	local _resultValue="$$"
+	local _parentValue="$(ps --pid $_resultValue -o ppid=)"
+
+	# if the script($$) has ended before us (we would be a child) $$ no longer exists so _parentValue will be empty.
+	if [ ! "$_parentValue" ]; then
+		returnValue "0" "$1"
+	fi
+
+	while [ "$_parentValue" ] && [ "$(ps --pid $_parentValue -o comm=)" == "bash" ]; do
+		_resultValue="$_parentValue"
+		_parentValue="$(ps  --pid $_resultValue -o ppid=)"
+	done
+	while [ "${_resultValue:0:1}" == " " ]; do _resultValue="${_resultValue# }"; done
+	returnValue "$_resultValue" "$1"
+}
+
+# usage: whereAmIRunning [<retVar>]
+# Return Values:
+#    'inTerminal'   : this code is running inside a function sourced into a terminal's bash instance. If you run exit from here,
+#                     you will close the user's terminal window. Note that this literally means that the parant of BASHPID is not
+#                     a bash process. When bash is running inside some other process
+#    'inTopScript'  : in the pid of the script that was launched
+#    'inSubshell'   : in a subshell pid under the script (or detached if the top script ended)
+function whereAmIRunning()
+{
+	local _whereAmIRunningValue
+	local terminalBash; getTerminalPID terminalBash
+	if [ ${BASHPID:-0} -eq ${terminalBash:-0} ]; then
+		_whereAmIRunningValue="inTerminal"
+	elif [ ${BASHPID:-0} -eq $$ ]; then
+		_whereAmIRunningValue="inTopScript"
+	else
+		local _whereAmIRunningValue="inSubshell"
+	fi
+	returnValue "$_whereAmIRunningValue" "$1"
+}
+
+# usage: bgexit --complete [<exitCode>]
 # This is a wraper over the builtin exit function to exit the current process. It has several advantages over the builtin in scripts.
 #
 # It wont accidently exit the users terminal. Sometimes when developing a script library it can be useful to source the library into
-# the ineractive bash shell to run functions directly. This will detect that situation and will use the SIGTERM signal to stop running
-# instead of closing the terminal window.
+# the ineractive bash shell to run functions directly. This will detect that situation and will use the SIGINT signal (cntr-c) to
+# stop running the current function instead of 'exit' which would close the terminal window.
 #
-# It also implements a new --complete option that will exit the script completely even when its called in a subshell. In this situation,
-# it sends SIGTERM to each of its parents up to and including $$
+# It also implements a new --complete option that will exit the script completely. Completely means two things...
+#    1) even when its called in a subshell, the whole script will end. e.g. foo=$(...; exit) would continue on the next line.
+#    2) end child and sibling processes. The entire process group (pgid) of the script be be sent SIGTERM
 #
-# When a script or library function uses the builtin exit directly, it can be hard for the user to determine if the script worked or
-# not and how to fix it if it did not.
-#
-# By defining a function exit() { bgtrace "exiting... "; bgExit "$@"; }, a script can override most calls to the builtin exit function
-# to find places the exit prematurely.
+# It also implements a new --msg=<msg> option which is particularly handy in combination with the --complete option. It turns it
+# into a lightweight assert.
 #
 # Options:
 #    --complete   : exit the script completely, not just the first subshell that bgExit is running in
@@ -1961,7 +2003,10 @@ function bgkillTree()
 #                   bExit --msg="..." if it encounters a problem or detects that its been called recursively.
 # Params:
 #   <exitCode>    : the exit code set that the calling process can check to see how the process ended
-function bgExit()
+# See Also:
+#      man(3) command_not_found_handle
+function bgExit() { bgexit "$@"; }
+function bgexit()
 {
 	local exitCompletelyFlag _msg
 	while [ $# -gt 0 ]; do case $1 in
@@ -1975,27 +2020,43 @@ function bgExit()
 	done
 	local exitCode="$1"
 
+	# 2022-03 bobg: refactored this function completely. The previous version was working reasonably well for a long time but while
+	#               fixing command_not_found_handle, I begun to understand 'kill -TERM -$$' better. I thing this new version is
+	#               more accurate and much easier to understand.
 
-	if [ "$$" != "$BASHPID" ] || [ "${FUNCNAME[@]: -1}" == "main" ]; then
-		if [ "$exitCompletelyFlag" ] && [ "$$" != "$BASHPID" ]; then
-			# pidsToKill will be a list of our parents up to and including $$ which we will send SIGTERM to
-			local pidsToKill=()
-			local pid="$(ps -o ppid= --pid $BASHPID)"
-			while (( pid != 0 )) && (( pid != $$ )); do
-				pidsToKill+=("$pid")
-				pid="$(ps -o ppid= --pid $pid)"
-			done
-			(( pid != 0 )) && pidsToKill+=("$pid") # the loop stops at $$ without adding it
+	# TODO: consider merging this whereAmIRunning logic with the code in bg_importCntr.sh(lines ~300 to ~400)
+	local whereAmIRunning; whereAmIRunning "whereAmIRunning"
+
+	case $whereAmIRunning:${exitCompletelyFlag:---oneShell} in
+		inTerminal:*)
+			# in the terminal, exit will close the users terminal window so we dont want to do that. We must be running in a
+			# sourced function (like bg-debugCntr or when the user 'source /usr/lib/bg_core.sh' to be able to run functions from
+			# the terminal cmdline).
+			# sending SIGINT to the terminal is similar to the user pressing cntr-c so what ever function is being ran, will stop
+			# as if return was executed
+			# TODO: what about spawned children in the --complete case?
 			touch "${assertOut}.bgExit"
-			kill -SIGTERM "${pidsToKill[@]}"
-			kill -SIGINT "${pidsToKill[@]}"
-		fi
-		builtin exit $exitCode
-	else
-		touch "${assertOut}.bgExit"
-		kill -SIGTERM $BASHPID
-		kill -SIGINT "$BASHPID"
-	fi
+			kill -SIGINT "$BASHPID"
+			;;
+		*:--complete)
+			# regardless of whether we are in the inTopScript or inSubshell (inTerminal case is already handled above) we have to
+			# kill the whole process group to get ourselves and any children or siblings.
+			# We also want to set the exitCode so we add a handler to the SIGTERM trap (this only matters for inTopScript since
+			# everthing is ending so only the thing that will see an exit code is the parent of the whole script)
+			# I considered excluding $BASHPID from the pids we send SIGTERM to so that we could 'exit $exitCode' but there seems
+			# to be no automic way to do that so if children are being created radidly sending to the pgid (which must include )
+			# seems to be the only way to be sure to get them all.
+			bgtrap -n bgexit "exit $exitCode" SIGTERM
+			kill -TERM -$$
+			#assertError "logic error: this line should never have been reached"
+			;;
+		*:--oneShell)
+			# regardless of whether we are in the inTopScript or inSubshell (inTerminal case is already handled above) we just want
+			# to end the one shell that we are in so that is what exit is made to do
+			builtin exit $exitCode
+			;;
+		*) assertError "Darn, I missed one case. This is a programming logic error. Someone needs to fix the code"
+	esac
 }
 
 # usage: BGTRAPEntry <BASHPID> <signal> <lastBASH_COMMAND> <lastLineno> <lastExitCode>
@@ -2346,8 +2407,8 @@ function bgtrap()
 		# First it embeds the $BASHPID that set the handler so that we can detect when a trap we read with -p was set in a
 		# parent's subshell. (except for DEBUG and RETURN handlers, trap handlers are only called when the PID that set them get
 		# the signal but trap -p shows the parent's handler even from a child subshell).
-		# Second, it allows the debugger to detect when the DEBUG trap gets called at the start of a trap
-		# handler.
+		# Second, it is the first command that the handler executes which sets up information for the debugger which allows it to
+		# detect the stack properly.  Similarly, BGTRAPExit pops that info off the trap stack
 		local trapHeader='BGTRAPEntry '"$BASHPID"' '"$signal"' "$BASH_COMMAND" "$LINENO" "$?"'
 		local trapFooter='BGTRAPExit  '"$BASHPID"' '"$signal"''
 
@@ -2716,29 +2777,90 @@ function bgTrapUtils()
 ### From bg_coreAssertError.sh
 
 # usage: (not called directly -- called by bash when a non-existent command is invoked)
+# This allows us to process the action when the script tries to execute an unknown command. Search for command_not_found_handle
+# in man(1) bash, but there is not much info there. It seems that there is not much we can do in this function because BASH runs
+# it in its own subshell and does not appear to offer any control over how it behaives next.
+#
+# Terminated Msg:
+# when we kill -TERM -$$ BASH writes two 'Terminated' lines (one for each PID -- there are at least two b/c this handler is in its
+# own PID). I prevented one of them by adding 'builtin trap 'exit 127' SIGTERM ' below but I dont want the library to install a
+# SIGTERM handler. Since these cases are typically debuged during development, we can live with the extraneous 'Terminated' msg(s)
+#
+# Purpose:
+#    There are two purposes of defining this function.
+#       1) detect null object syntax and display a better msg
+#       2) end the script and all of its children - we dont really want to recover from unknown cmd because that
+#          would mean every statement would need to handle that case. What we really want is the option to change the unknown
+#          command and retry it to continue, but BASH does not give us that option. What it should do is capture our stdout and if
+#          its not empty, treat it as the command to execute in place of the unknown cmdline. We could give it a compound statement
+#          that imports a library and then repeat the cmdline (like 'import BG_<something>.sh;$L1;$L2;$cmdline')
+#
+# Actions:
+#    returning and exiting from this function does the same thing
+#    the exit code of this FN will be the one of the offending command in the script
+#    writing to stdout just goes to stdout (we can not communicate back to BASH)
+#    for an unknown reason assertError --critical does not kill the script as it should even though 'kill $$' does work
+#    It seems the best way to terminate is 'kill -TERM -$$' which sends the defaut sig (TERM) to the whose process group (b/c of negative)
+# See Also:
+#    man(3) bgexit
 function command_not_found_handle()
 {
+	# prevent this PID from displaying the 'Terminated' msg
+	builtin trap 'exit 127' SIGTERM
+
 	local cmdName="$1"
 	local cmdline="$*"
-	# if [ "${command_not_found_handle}" == "1" ]; then
-	# 	assertError -e127 --critical -v cmdline "Command not found -- recursion detected"
-	# fi
+	local msg="Command not found. cmdline='$cmdline'"
+
+	# 2021-03 bobg: commented out this recursion check. from git commit - refined command_not_found_handle() to not throw assertError which was unable to end the script with bgExit --complete for some reason not yet undertood
+	# 2022-03 bobg: strange debugger bug - needs recursion check: second time launching, bgStackPrint and getUserCmpApp and others were not loaded which led to here and since this calls bgtraceStack led to inifinite recursion.
+	# 2022-03 bobg: new strategy. if recursion is detected, just print a message and exit which should allow the first call of this
+	#               function to complete even if there are multiple errors along the way.
+	# in addition to this recursion detection, I added protection against calling unknown cmds like type -t <cmd> && <cmd>. That is
+	# not full proof because <cmd> might call something that is unknown.
+	if [ "${command_not_found_handle}" == "1" ]; then
+		msg="!!!error!!!: command_not_found_handle: recursion detected. returning. cmdline='$cmdline'"
+		echo "$msg" >&2
+		type -t bgtrace &>/dev/null && bgtrace "$msg"
+		builtin exit 127
+	fi
 	export command_not_found_handle=1
 
-	# recognize $foo.something... object syntax where the $foo variable is empty
-	if [[ "$cmdName" =~ ^[.[] ]]; then
+	# recognize $foo.something... object syntax where the $foo variable is empty to make a better error msg
+	if [[ "$cmdName" =~ ^[.[] ]] && type -t bgStackFrameGet &>/dev/null; then
 		local -A exprFrame; bgStackFrameGet  command_not_found_handle:+1 exprFrame
-
 		msg="empty object variable referenced. '${exprFrame[cmdSrc]}'  cmdline='$cmdline'"
-#		assertError -e127 --continue  --no-funcname -v "objExpression:exprFrame[cmdSrc]" "empty object variable referenced"
-	else
-		msg="Command not found. cmdline='$cmdline'"
-	#	assertError -e127 --continue --no-funcname --frameOffset=+1 -v cmdline "Command not found"
 	fi
 
-	bgtraceStack
-	bgtrace "$msg"
+	# write msg to stderr and to bgtrace (with a stack)
 	echo "$msg" >&2
+	type -t bgtraceStack &>/dev/null && type -t bgStackPrint &>/dev/null && bgtraceStack
+	type -t bgtrace &>/dev/null && bgtrace "$msg"
+
+	# special case running in the terminal.
+	# we dont use bgexit because we dont want to kill any siblings the user has running the background
+	local terminalPID; type -t getTerminalPID &>/dev/null && getTerminalPID terminalPID
+	if [ "$terminalPID" ]; then
+		if [ $$ == ${terminalPID:-0} ]; then
+			# we send SIGINT to the parent chain up to including terminalPID($$) because 'kill -SIGINT -$$' would also kill any
+			# siblings running in the background of the terminal
+			local parent="$(ps --pid $BASHPID -o ppid=)"; parent="${parent# }"
+			local parentChain="$parent "
+			while [ "$parent" ] && [ ${parent} -ne ${terminalPID:-0} ]; do
+				parent="$(ps --pid $parent -o ppid=)"; parent="${parent# }"
+				parentChain+="$parent "
+				((infloopcount++ > 5)) && exit # sanity check to make sure we dont go wild. Note we are in a subshell of our own
+			done
+			kill -SIGINT $parentChain
+			exit 127
+		fi
+	fi
+
+
+	# -TERM is the defualt signal. The minus in front of $$ indicates the process group of the script which should be all children
+	# except maybe those that deliberately change their process groups (or become a new group leader)
+	kill -TERM -$$
+	builtin exit 127 # should never reach here
 }
 
 
