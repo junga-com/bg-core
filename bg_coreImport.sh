@@ -223,6 +223,7 @@ function import()
 	foundScriptPath="$(gawk -v scriptName="$scriptName" -i "bg_manifest.awk" '' "$manFile" )"
 
 	if [ "$foundScriptPath" ]; then
+		[ ! -f "$foundScriptPath" ] && assertError  -v scriptName -v foundScriptPath "manifest is out of data. <foundScriptPath> does not exist"
 		: echo "import found in manifest" >> "/tmp/bgtrace.out"
 	else
 		# SECURITY: TODO: refuse to load libraries that are not in the manifest if in productionMode

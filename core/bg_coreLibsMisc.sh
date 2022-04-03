@@ -2028,7 +2028,7 @@ function bgexit()
 	local whereAmIRunning; whereAmIRunning "whereAmIRunning"
 
 	case $whereAmIRunning:${exitCompletelyFlag:---oneShell} in
-		inTerminal:*)
+		inTerminal:*)linuxlinux
 			# in the terminal, exit will close the users terminal window so we dont want to do that. We must be running in a
 			# sourced function (like bg-debugCntr or when the user 'source /usr/lib/bg_core.sh' to be able to run functions from
 			# the terminal cmdline).
@@ -2047,8 +2047,12 @@ function bgexit()
 			# to be no automic way to do that so if children are being created radidly sending to the pgid (which must include )
 			# seems to be the only way to be sure to get them all.
 			bgtrap -n bgexit "exit $exitCode" SIGTERM
-			kill -TERM -$$
-			#assertError "logic error: this line should never have been reached"
+			# the process group is not always $$. e.g. when launching a script with 'bgdb' (from bg-debugCntr)
+			# Note that I tested the case where the pgrpid pid is dead and it seem to work fine.
+			local pgrpid="$(ps --pid $$ -o pgid=)"; pgrpid="${pgrpid# }"
+			kill -TERM -$pgrpid 2>/dev/null
+			bgtrace "logic error: bgexit --complete: whereAmIRunning='$whereAmIRunning' \$\$='$$' BASHPID='$BASHPID' pgrpid='$pgrpid' sent 'kill -TERM $pgrpid' but this line after it should not have been reached"
+			builtin exit $exitCode # this is a reasonable fall back in case the kill -TERM did not work for any reason 
 			;;
 		*:--oneShell)
 			# regardless of whether we are in the inTopScript or inSubshell (inTerminal case is already handled above) we just want

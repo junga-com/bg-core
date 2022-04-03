@@ -88,7 +88,7 @@ else
 	# where its kind of hidden from sight.
 
 	# install a cntr-c signal handler to invoke the debugger.
-	[ ! "$bgDebuggerInhibitCntrC" ] && [ "$bgDevModeUnsecureAllowed" ] && [ "$bgLibExecMode" == "script" ] && bgtrap '
+	[ ! "$bgDebuggerInhibitCntrC" ] && [ "$bgDevModeUnsecureAllowed" ] && [ "$bgLibExecMode" == "script" ] && bgtrap -n debugger '
 		if debuggerIsInBreak; then
 			# if we are already stopped in the debugger, interpret cntr-c normally and end the script
 			bgtrace "cntr-c caught in bgtrace mode. Already stopped in debugger so interrupting script."
