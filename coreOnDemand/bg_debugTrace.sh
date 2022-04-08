@@ -123,7 +123,7 @@ function bgtraceCntr()
 				_bgtraceFile="/dev/stderr"
 				;;
 			stdout|file:stdout|on:stdout)
-				_bgtraceFile="/dev/stderr"
+				_bgtraceFile="/dev/stdout"
 				;;
 			on:win*|win*)
 				local win=${bgTracingOn#on:}
@@ -483,6 +483,7 @@ function Object::bgtrace()
 #                          it sees fit. A debugger UI can use this when it dynamically inserts bgtraceBreak commands in the code to
 #                          implement various types of breakPoints.
 # Options:
+#    --skipCount=<n>     : don't break until <n> times the code passes it.
 #    --logicalStart+<n>  : this adjusts where the debugger should stop in the script. By default it will stop at the line of code
 #                          immediately following the bgtraceBreak call. However, if bgtraceBreak is called in another library function
 #                          it might not want to stop inside that function but instead at the line following whatever called it.
@@ -499,10 +500,11 @@ function bgtraceBreak()
 	[ "$bgDevModeUnsecureAllowed" ] || return 35
 
 	# protect against infinite recursion if a user puts a breakpoint in a function that this function indirectly uses
-	[ "$bgtraceBreakRecursionTest" ] && return; local -g bgtraceBreakRecursionTest="1"
+	[ "$bgtraceBreakRecursionTest" ] && return; local bgtraceBreakRecursionTest="1"
 
-	local logicalFrameStart=1 breakContext defaultDbgID
+	local logicalFrameStart=1 breakContext defaultDbgID skipCount
 	while [ $# -gt 0 ]; do case $1 in
+		--skipCount*)    bgOptionGetOpt val: skipCount "$@" && shift ;;
 		--defaultDbgID*) bgOptionGetOpt val: defaultDbgID "$@" && shift ;;
 		--context*) bgOptionGetOpt val: breakContext "$@" && shift ;;
 		--logicalStart*) ((logicalFrameStart= 1 + ${1#--logicalStart?})) ;;
@@ -512,6 +514,21 @@ function bgtraceBreak()
 	# when bgtracing is not active, bgtraceBreak is a noop just like all other bgtrace* functions. This allows the user to temporarily
 	# run the script in production mode in the middle of a debugging session.
 	bgtraceIsActive || return 0
+
+	if [ "$skipCount" ]; then
+		local breakPointID="${BASH_SOURCE[1]##*/}:${BASH_LINENO[0]}"
+
+		declare -gA bgtraceBreak_skipCounts
+
+		if [ ! "${bgtraceBreak_skipCounts[$breakPointID]+exists}" ]; then
+			bgtraceBreak_skipCounts[$breakPointID]=$(( skipCount ))
+			return
+		elif [ ${bgtraceBreak_skipCounts[$breakPointID]:-0} -gt 0 ]; then
+			bgtraceBreak_skipCounts[$breakPointID]=$(( ${bgtraceBreak_skipCounts[$breakPointID]} - 1 ))
+			bgtraceVars -1 bgtraceBreak_skipCounts[$breakPointID]
+			(( ${bgtraceBreak_skipCounts[$breakPointID]:-0} > 0 )) && return
+		fi
+	fi
 
 	# the debugger library is dynamically loaded on demand
 	[ ! "$(import --getPath bg_debugger.sh)" ] && assertError "the debugger is not installed. Try installing the bg-dev package"
@@ -524,7 +541,6 @@ function bgtraceBreak()
 	else
 		debuggerOn --logicalStart+${logicalFrameStart:-1} ${defaultDbgID:+--driver="$defaultDbgID"} stepOver
 	fi
-	unset bgtraceBreakRecursionTest
 }
 
 # usage: bgtraceXTrace [-f <file>] on|off

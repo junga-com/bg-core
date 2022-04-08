@@ -137,7 +137,7 @@
 #    bgMakeUsageSpec : used by bgCmdlineParseBC and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
 #                 about the syntax.
 #    parseForBashCompletion : (OBSOLETE: use bgCmdlineParseBC)
-#    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (amoung other things)
+#    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (among other things)
 #    _bgbc-complete-viaCmdDelegation: documents the bash completion protocol written to stdout by inline BC routines
 function bgBCParse() { bgCmdlineParseBC "$@" ; }
 function bgCmdlineParseBC()
@@ -348,7 +348,7 @@ function bgCmdlineParseBC()
 #    bgMakeUsageSpec : used by bgCmdlineParseBC and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
 #                 about the syntax.
 #    parseForBashCompletion : (OBSOLETE: use bgCmdlineParseBC)
-#    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (amoung other things)
+#    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (among other things)
 #    _bgbc-complete-viaCmdDelegation: documents the bash completion protocol written to stdout by inline BC routines
 function bgCmdlineParse()
 {
@@ -476,7 +476,7 @@ function bgCmdlineParse()
 #    bgMakeUsageSpec : used by bgCmdlineParseBC and bgCmdlineParse. 'compiles' a <cmdlineSyntaxStr> into an associative array with information
 #                 about the syntax.
 #    parseForBashCompletion : (OBSOLETE: use bgCmdlineParseBC)
-#    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (amoung other things)
+#    invokeOutOfBandSystem : provides inline bash completion mechanism for scripts (among other things)
 #    _bgbc-complete-viaCmdDelegation: documents the bash completion protocol written to stdout by inline BC routines
 function bgMakeUsageSpec() {
 	local cmdlineSyntaxStr="$1"

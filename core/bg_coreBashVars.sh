@@ -8,7 +8,7 @@
 # This library also has functions that treat built in bash variables as higher level types like Sest and Maps.
 #
 # See Also:
-#     printfVars  : (core function) detect the types of the variable names passed in and print their names and values in a nice format.
+#     printfVars (moved to its own library)  : (core function) detect the types of the variable names passed in and print their names and values in a nice format.
 #     varExists   : (core function) true if the name refers to an existing bash variable in scope
 #     varIsA      : (core function) true if the name referes to a bash variable of the specified type
 #     returnValue : (core function) return a single value from a function either on stdout or in a retVar if one was passed in
@@ -117,6 +117,23 @@ function varExists()
 		# we throw away all output but its return value will indicate whether it succeeded in finding all the variables
 		declare -p "$@" &>/dev/null
 	fi
+}
+
+# usage: varGetNameRefTarget <varname>
+# return the ultimate name of <varname>. If <varname> is not a nameref (-n var) it will simply return <varname> but if <varname>
+# is a nameref it will return the real variable that it points to. There can be namerefs to namerefs so in that case it keeps
+# going until it either finds a variable name that is not a nameref or an unitialized nameref. if it finds an unitialized nameref
+# it returns the empty string.
+function varGetNameRefTarget()
+{
+	local _gaRetValue="$1" _gaInfiniLoop=10
+	local _gaGeclaration="$(declare -p "$1" 2>/dev/null)"
+	while [ "${_gaGeclaration:0:10}" == "declare -n" ] && [[ "${_gaGeclaration}" == *=* ]] ; do
+		_gaRetValue="${_gaGeclaration#*=\"}"; _gaRetValue="${_gaRetValue%\"}"
+		_gaGeclaration="$(declare -p "$_gaRetValue" 2>/dev/null)"
+		((_gaInfiniLoop-- <= 0)) && assertError
+	done
+	returnValue "$_gaRetValue" "$2"
 }
 
 # usage: varGetAttributes <varName> [<retVar>]
@@ -392,7 +409,7 @@ function unescapeTokens()
 #    returnValue --array "$data" "$2"; return
 # Params:
 #    <value> : this is the value being returned. By default it is treated as a simple string but that can be changed via options.
-#    <varRef> : this is the name of the variable to return the value in. If its empty, <value> is written to stdout
+#    <varRef> : this is the name of the variable to return the value in. If its empty,'-' or '--', <value> is written to stdout
 # Options:
 #    --string : (default) treat <value> as a literal string
 #    --array  : treat <value> as a name of an array variable. If <value> is an associative array then <varRef> must be one too
@@ -406,6 +423,7 @@ function unescapeTokens()
 #   local -n <variable> (for ubuntu 14.04 and beyond, bash supports reference variables)
 function returnValue()
 {
+	# this high-use, low level function deliberately uses a different options pattern which is slightly more efficient
 	local _rv_inType="string" _rv_outType="stdout" quietFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-q)       quietFlag="-q" ;;
@@ -414,12 +432,15 @@ function returnValue()
 		--strset) _rv_inType="strset" ;;
 		*) break ;;
 	esac; shift; done
-	[ "$2" ] && _rv_outType="var"
-	[ "$quietFlag" ] && [ "$_rv_outType" == "stdout" ] && return 0
+
+	[ "$2" ] && [ "${2}" != "-" ] && [ "${2}" != "--" ] && _rv_outType="var"
+
+	[ "${quietFlag}" ] && [ "$_rv_outType" == "stdout" ] && return 0
 
 	case $_rv_inType:$_rv_outType in
 		array:var)     arrayCopy "$1" "$2" ;;
 		array:stdout)
+			# TODO: consider changing this to call pvPrArray directly -- what about objDictionary?
 			printfVars "$1"
 			#local _rv_refName="$1[*]"
 			#printf         "%s\n" "${!_rv_refName}"
@@ -428,6 +449,7 @@ function returnValue()
 		string:stdout) printf         "%s\n" "$1" ;;
 		strset:var)    eval $2'=($1)' ;;
 		strset:stdout) printf         "%s\n" "$1" ;;
+		*) assertLogicError ;;
 	esac
 	true
 }
@@ -458,6 +480,11 @@ function returnValue()
 #                           The <delim> Has no affect with --array or --set forms. The default is the first character of IFS.
 #    -1                   : shortcut to set the delimiter to '\n' so that each <valueN> will be on a separate line.
 #    +1                   : shortcut to set the delimiter to ' ' so that all the <valueN> will be on one line.
+#    -f|--filters=<filters>: filters are a whitespace separated list of <value> that will be excluded from the output even if they
+#                           appear on the cmdline. The motivation for this option comes from Object::getIndexes which often passes
+#                           "${!_this[@]}" intom this function but we typically want to exclude '0' and '_Ref' and any other transient
+#                           system member variables. Since varOutput needs to iterate the <value> list anyway, this saves functions
+#                           like getIndexes from having to iterate and build a separate list from "${!_this[@]}"
 # See Also:
 #    man(3) varSetRef  # obsolete function that this function replaces.
 #    man(3) returnValue # a simpler pattern when th eoutput is a scalar.
@@ -465,7 +492,7 @@ function returnValue()
 function outputValue() { varOutput "$@"; } # ALIAS:
 function varOutput()
 {
-	local _sr_appendFlag _sr_varType="--echo" _sr_varRef _sr_delim=${IFS:0:1}
+	local _sr_appendFlag _sr_varType="--echo" _sr_varRef _sr_delim=${IFS:0:1} _sr_filters
 	while [ $# -gt 0 ]; do case $1 in
 		-1)               _sr_delim=$'\n' ;;
 		+1)               _sr_delim=' ' ;;
@@ -476,9 +503,21 @@ function varOutput()
 		-S*|--set*)       _sr_varType="--set"   ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
 		-e|--echo)        _sr_varType="--echo"  ;;
 		-d*|--delim*)     bgOptionGetOpt val: _sr_delim "$@" && shift ;;
+		-f*|--filters*)    bgOptionGetOpt val: _sr_filters "$@" && shift ;;
 		--) shift; break ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
+
+	# if filters were specified, remove them from the "$@" list. We do it this way because
+	#   1) its much more common not to specify --filters so in that case the only extra work is checking if _sr_filters is not empty
+	#   2) the rest of the code uses "$@" in multiple places so this way we dont have to apply the filter in multiple places
+	if [ "$_sr_filters" ]; then
+		local _sr_tempArgs=("$@")
+		local _sr_i; for ((_sr_i=0; _sr_i<$#; _sr_i++)); do
+			[[ " $_sr_filters " == *\ ${_sr_tempArgs[_sr_i]}\ * ]] && unset _sr_tempArgs[_sr_i]
+		done
+		set -- "${_sr_tempArgs[@]}"
+	fi
 
 	[ ! "$_sr_varRef" ] && [ "$_sr_varType" != "--echo" ] && return 0
 
@@ -684,7 +723,7 @@ function varSetRef()
 		# these use the -n syntax now because they used to use eval. If we need to be compaitble with older bashes, this will have
 		# to change
 		--array:)    local -n _sr_varRef="$sr_varRef"; _sr_varRef=("$@")  ;;
-		--array:-a)  local -n _sr_varRef="$sr_varRef"; _sr_varRef+=("$@") ;;
+		--array:-a)  local -n _sr_varRef="$sr_varRef" || assertError; _sr_varRef+=("$@") ;;
 
 		--string:)   printf -v "$sr_varRef" "%s" "$*" ;;
 		--string:-a) printf -v "$sr_varRef" "%s%s" "${!sr_varRef}" "$*" ;;
@@ -1120,215 +1159,6 @@ function varGenVarname()
 }
 
 
-# usage: printfVars [ <varSpec1> ... <varSpecN> ]
-# print a list of variable specifications to stdout
-# This is used by the bgtraceVars debug command but its also useful for various formatted text output
-# Unlike most function, options can appear anywhere and options with a value can not have a space between opt and value.
-# options only effect the variables after it
-# Params:
-#   <varSpecN> : a variable name to print or an option. It formats differently based on what it is
-#        not a variable  : simply prints the content of <dataN>. prefix it with -l to make make its not interpretted as a var name
-#        simple variable : prints <varName>='<value>'
-#        array variable  : prints <varName>[]
-#                                 <varName>[idx1]='<value>'
-#                                 ...
-#                                 <varName>[idxN]='<value>'
-#        object ref      : calls the bgtrace -m -s method on the object (unless --noObjects is specified)
-#        "" or "\n"      : write a blank line. this is used to make vertical whitespace. with -1 you
-#                          can use this to specify where line breaks happen in a list
-#        "  "            : a string only whitespace sets the indent prefix used on all output to follow.
-#        <option>        : options begin with '-'. see below.
-# Options:
-#   -l<string> : literal string. print <string> without any interpretation
-#   -wN : set the width of the variable name field. this can be used to align a group of variables.
-#   -1  : display vars on one line. this suppresses the \n after each <varSpecN> output
-#   +1  : display vars on multiple lines. this is the default. it undoes the -1 effect so that a \n is output after each <varSpecN>
-#   --prefix=<prefix>  : add this <prefix> to subsequent output lines.
-#   --noObjects: display the underlying object associative array as if it were not an object
-function printfVars()
-{
-	local pv_nameColWidth pv_inlineFieldWidth="0" pv_indexColWidth oneLineMode pv_lineEnding="\n"
-	local pv_prefix pv_noObjectsFlag
-
-	# if the bg_objects.sh library is not loaded, turn off object detection
-	type -t _bgclassCall &>/dev/null || pv_noObjectsFlag="1"
-
-	function _printfVars_printValue()
-	{
-		local name="$1"; shift
-		local value="$*"
-		case ${oneLineMode:-multiline}:${name:+nameExits} in
-			# common processing for all oneline:* -- note the ;;&
-			oneline:*)
-				if [[ "$value" =~ $'\n' ]]; then
-					value="${value//$'\n'*/ \n...}"
-				fi
-				;;&
-			oneline:nameExits)
-				printf "%s=%-*s " "$name" ${pv_inlineFieldWidth:-0} "'${value}'"
-				;;
-			oneline:)
-				printf "%-*s " ${pv_inlineFieldWidth:-0} "${value}"
-				;;
-			multiline:nameExits)
-				local nameColWidth=$(( (${pv_nameColWidth:-0} > ${#name}) ? ${pv_nameColWidth:-0} : ${#name}  ))
-				printf "${pv_prefix}%-*s='%s'${pv_lineEnding}" ${nameColWidth:-0} "$name" "${value}" \
-					| awk '
-						NR>1 {printf("'"${pv_prefix}"'%-*s  ", '"${nameColWidth:-0}"', "")}
-						{print $0}
-					'
-				;;
-			multiline:)
-				printf "${pv_prefix}%-*s${pv_lineEnding}" ${pv_nameColWidth:-0} "${value}" \
-					| awk '
-						NR>1 {printf("'"${pv_prefix}"'  ")}
-						{print $0}
-					'
-				;;
-		esac
-	}
-
-	local pv_term pv_varname pv_tmpRef pv_label
-	for pv_term in "$@"; do
-
-		if [[ "$pv_term" =~ ^--table= ]]; then
-			printfTable ${pv_term#--table=}
-			continue
-		fi
-
-		if [[ "$pv_term" =~ ^--prefix= ]]; then
-			pv_prefix="${pv_term#--prefix=}"
-			continue
-		fi
-		if [[ "$pv_term" =~ ^-w ]]; then
-			if [ "$oneLineMode" ]; then
-				pv_inlineFieldWidth="${pv_term#-w}"
-			else
-				pv_nameColWidth="${pv_term#-w}"
-			fi
-			continue
-		fi
-		if [[ "$pv_term" =~ ^-l ]]; then
-			_printfVars_printValue "" "${pv_term#-l}"
-			continue
-		fi
-		if [ "$pv_term" == "-1" ]; then
-			oneLineMode="oneline"
-			pv_lineEnding=" "
-			continue
-		fi
-		if [ "$pv_term" == "+1" ]; then
-			oneLineMode=""
-			pv_lineEnding="\n"
-			printf "\n"
-			continue
-		fi
-
-		if [ "$pv_term" == "--noObjects" ]; then
-			pv_noObjectsFlag="1"
-			continue
-		fi
-
-		# "" or "\n" means output a newline
-		if [ ! "$pv_term" ] || [ "$pv_term" == "\n" ] ; then
-			printf "\n"
-			continue
-		fi
-
-		# "   "  means set the indent for new lines
-		if [[ "$pv_term" =~ ^[[:space:]]*$ ]]; then
-			pv_prefix="$pv_term"
-			[ "$oneLineMode" ] && printf "$pv_term"
-			continue
-		fi
-
-
-		# "<objRef>.bgtrace [<opts]"  means to call the object's bgtrace method
-		if [[ "$pv_term" =~ [.]bgtrace([\ ]|$) ]]; then
-			local pv_namePart="${pv_term%%.bgtrace*}"
-			printf "${pv_prefix}%s " "$pv_namePart"
-			ObjEval  $pv_term | awk '{print '"${pv_prefix}"'$0}'
-			continue
-		fi
-
-		# this separates myLabel:myVarname taking care not to mistake myArrayVar[lib:bg_lib.sh] for it
-		pv_varname="$pv_term"
-		pv_label="$pv_term"
-		if [[ "$pv_term" =~ ^[^[]*: ]]; then
-			pv_varname="${pv_varname##*:}"
-			pv_label="${pv_label%:*}"
-			if [[ "$pv_varname" =~ ^-l ]]; then
-				_printfVars_printValue "$pv_label" "${pv_varname#-l}"
-				continue
-			fi
-		fi
-
-		# assume its a variable name and get its declaration. Should be "" if its not a var name
-		# if its a referenece (-n) var, get the reference of the var that it points to
-		local pv_type; varGetAttributes "$pv_varname" pv_type
-		# local pv_type="$(declare -p "$pv_varname" 2>/dev/null)"
-		# [[ "$pv_type" =~ -n\ [^=]*=\"(.*)\" ]] && pv_type="$(declare -p "${BASH_REMATCH[1]}" 2>/dev/null)"
-		if [ ! "$pv_type" ]; then
-			{ varIsA array ${pv_varname%%[[]*} || [[ "$pv_varname" =~ [[][@*][]]$ ]]; } && pv_type="-"
-		fi
-
-		# the term is not a variable name
-		if [ ! "$pv_type" ]; then
-			if [ ! "$pv_noObjectsFlag" ]  && [ "${pv_varname:0:12}" == "_bgclassCall"  ]; then
-				Try:
-					$pv_varname.toString --title="Object"
-				Catch: && {
-					_printfVars_printValue "" "<error in '$pv_varname.toString --title=Object' call'>"
-				}
-			elif [ "$pv_label" == "$pv_varname" ]; then
-				# if its a simple token that is not a var name, we used to print it as an empty var because of the bash bug that
-				# uninitialized declared vars would not be detectable as being declared. In circa 5.x, that is fixed so now we
-				# treat it as a literal.
-				_printfVars_printValue "" "${pv_varname}"
-			else
-				# foo:bar where bar is not a variable name
-				_printfVars_printValue "$pv_label" "$pv_varname"
-			fi
-
-		# it its an object reference, invoke its .toString method
-		elif [ ! "$pv_noObjectsFlag" ]  && [[ ! "$pv_varname" =~ [[][@*][]] ]]  && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
-			Try:
-				${!pv_varname}.toString --title="${pv_varname}"
-			Catch: && {
-				# Note that a bug prevents this Catch from getting called when stepping through the debugger. It seems that the
-				# catch resumes after the objEval.
-				# in debugger when the watch window printfVars sees an object reference that has been created with NewObject,
-				# toString failed on that object. added this try/catch but the catch did not execute.
-				_printfVars_printValue "$pv_label" "<error in '${!pv_varname}.toString --title=${pv_varname}' call>"
-			}
-
-		# if its an array, iterate its content
-		elif [[ "$pv_type" =~ [aA] ]]; then
-			pv_nameColWidth="${pv_nameColWidth:-${#pv_label}}"
-			printf "${pv_prefix}%-*s[]${pv_lineEnding}" ${pv_nameColWidth:-0} "$pv_label"
-			eval local indexes='("${!'"$pv_varname"'[@]}")'
-			pv_indexColWidth=0; for index in "${indexes[@]}"; do
-				[ "${pv_lineEnding}" == "\n" ] && [ ${pv_indexColWidth:-0} -lt ${#index} ] && pv_indexColWidth=${#index}
-			done
-			for index in "${indexes[@]}"; do
-				pv_tmpRef="$pv_varname[$index]"
-				printf "${pv_prefix}%-*s[%-*s]='%s'${pv_lineEnding}" ${pv_nameColWidth:-0} "" "${pv_indexColWidth:-0}"  "$index"   "${!pv_tmpRef}" \
-					| awk '
-						NR>1 {printf("'"${pv_prefix}"'%-*s[%-*s] +"), '"${pv_nameColWidth:-0}"', "",  '"${pv_indexColWidth:-0}"', ""}
-						{print $0}
-					'
-			done
-
-		# default case is to treat it as a variable name
-		else
-			_printfVars_printValue "$pv_label" "${!pv_varname}"
-		fi
-		pv_inlineFieldWidth="0"
-	done
-	if [ "$pv_lineEnding" != "\n" ]; then
-		printf "\n"
-	fi
-}
 
 
 # usage: printfTable [--horizontal] <colVar1>[..<colVarN>]
@@ -1400,7 +1230,7 @@ function printfTable()
 				done
 				echo
 			done
-		} | column -e -t | awk 'NR==1 {print gensub(/^_/," ","g"); next}   NR==2 {print gensub(/./,"-","g")} {print $0}'
+		} | column -e -t | gawk 'NR==1 {print gensub(/^_/," ","g"); next}   NR==2 {print gensub(/./,"-","g")} {print $0}'
 
 	else
 		{
@@ -1425,6 +1255,6 @@ function printfTable()
 				done
 				echo
 			done
-		} | column -e -t | awk 'NR==1 {print gensub(/^_/," ","g"); next}   NR==2 {print gensub(/./,"-","g")} {print $0}'
+		} | column -e -t | gawk 'NR==1 {print gensub(/^_/," ","g"); next}   NR==2 {print gensub(/./,"-","g")} {print $0}'
 	fi
 }

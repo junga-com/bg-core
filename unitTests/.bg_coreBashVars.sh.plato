@@ -22,7 +22,7 @@ narray[]
       [2]='three'
 aarray[]
       [two  ]='hello
-      [     ] +world'
+              +world'
       [three]='3'
       [one  ]='1'
 hello world
@@ -54,7 +54,7 @@ var2[]
     [2]='three'
 var3[]
     [two  ]='hello
-    [     ] +world'
+            +world'
     [three]='3'
     [one  ]='1'
 
@@ -79,13 +79,13 @@ cmd> echo printfVars "$@"
 printfVars -w20 string narray aarray
 cmd> printfVars "$@"
 string              ='i am a string'
-narray              []
+narray[]
                     [0]='one'
                     [1]='two'
                     [2]='three'
-aarray              []
+aarray[]
                     [two  ]='hello
-                    [     ] +world'
+                            +world'
                     [three]='3'
                     [one  ]='1'
 
@@ -131,14 +131,16 @@ longStr='now is the time that all good men should come to the aid of their count
 cmd> echo printfVars "$@"
 printfVars -1 string narray aarray
 cmd> printfVars "$@"
-string='i am a string' narray[]       [0]='one' 
-      [1]='two' 
-      [2]='three' 
-aarray[]       [two]='hello
-      [] +world' 
-      [three]='3' 
-      [one]='1' 
-
+string='i am a string' 
+narray[]
+      [0]='one'
+      [1]='two'
+      [2]='three'
+aarray[]
+      [two  ]='hello
+              +world'
+      [three]='3'
+      [one  ]='1'
 
 ## bg_coreBashVars.sh:printfVars:4 finished
 ###############################################################################################################################
@@ -160,14 +162,16 @@ aarray[]       [two]='hello
 cmd> echo printfVars "$@"
 printfVars -1 var1:string var2:narray var3:aarray
 cmd> printfVars "$@"
-var1='i am a string' var2[]     [0]='one' 
-    [1]='two' 
-    [2]='three' 
-var3[]     [two]='hello
-    [] +world' 
-    [three]='3' 
-    [one]='1' 
-
+var1='i am a string' 
+var2[]
+    [0]='one'
+    [1]='two'
+    [2]='three'
+var3[]
+    [two  ]='hello
+            +world'
+    [three]='3'
+    [one  ]='1'
 
 ## bg_coreBashVars.sh:printfVars:5 finished
 ###############################################################################################################################
@@ -189,14 +193,16 @@ var3[]     [two]='hello
 cmd> echo printfVars "$@"
 printfVars -1 -w20 string narray aarray
 cmd> printfVars "$@"
-string='i am a string'      narray[]       [0]='one' 
-      [1]='two' 
-      [2]='three' 
-aarray[]       [two]='hello
-      [] +world' 
-      [three]='3' 
-      [one]='1' 
-
+string='i am a string' 
+narray[]
+      [0]='one'
+      [1]='two'
+      [2]='three'
+aarray[]
+      [two  ]='hello
+              +world'
+      [three]='3'
+      [one  ]='1'
 
 ## bg_coreBashVars.sh:printfVars:6 finished
 ###############################################################################################################################
@@ -297,11 +303,11 @@ narray[]
 narray[2]='three'
 aarray[]
       [two  ]='hello
-      [     ] +world'
+              +world'
       [three]='3'
       [one  ]='1'
 aarray[two]='hello
-             world'
+            +world'
 
 ## bg_coreBashVars.sh:printfVars:10 finished
 ###############################################################################################################################
@@ -335,11 +341,11 @@ nr_narray[]
 nr_narray_2='three'
 nr_aarray[]
          [two  ]='hello
-         [     ] +world'
+                 +world'
          [three]='3'
          [one  ]='1'
 nr_aarray_two='hello
-               world'
+              +world'
 nr_longStr='now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country'
 
 ## bg_coreBashVars.sh:printfVars_nameRefs: finished
@@ -361,7 +367,7 @@ nr_longStr='now is the time that all good men should come to the aid of their co
 ##----------
 ## test
 cmd> printfVars Animal "" Dog "" Cat "" myDog "" myCat
-Animal : <instance> of Class
+Animal= <instance> of Class
   baseClass     =Object
   classHierarchy=Object Animal
   vmtCacheNum   =<redacted>
@@ -371,7 +377,7 @@ Animal : <instance> of Class
   staticMethods =
   name          =Animal
 
-Dog : <instance> of Class
+Dog= <instance> of Class
   baseClass     =Animal
   classHierarchy=Object Animal Dog
   vmtCacheNum   =<redacted>
@@ -380,7 +386,7 @@ Dog : <instance> of Class
   staticMethods =
   name          =Dog
 
-Cat : <instance> of Class
+Cat= <instance> of Class
   baseClass     =Animal
   classHierarchy=Object Animal Cat
   vmtCacheNum   =<redacted>
@@ -389,16 +395,16 @@ Cat : <instance> of Class
   staticMethods =
   name          =Cat
 
-myDog : <instance> of Dog
+myDog= <instance> of Dog
   species=dog
 
-myCat : <instance> of Cat
+myCat= <instance> of Cat
   species=cat
 cmd> printfVars --noObjects myCat
 myCat[]
      [_CLASS ]='Cat'
-     [0      ]='_bgclassCall myCat Cat 0 |'
-     [_Ref   ]='_bgclassCall myCat Cat 0 |'
+     [0      ][]'<objRef to 'myCat'>'
+     [_Ref   ][]'<objRef to 'myCat'>'
      [species]='cat'
      [_OID   ]='myCat'
 
@@ -435,10 +441,10 @@ cmd> varOutput -a -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three'
 cmd> varOutput -a -1 -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three
-        one two three'
+       +one two three'
 cmd> varOutput -a +1 -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three
-        one two three one two three'
+       +one two three one two three'
 cmd> varOutput -RstrVar   "$@"; printfVars strVar
 strVar='one two three'
 cmd> varOutput -1 -RstrVar   "$@"; printfVars strVar
@@ -503,20 +509,20 @@ cmd> varOutput -a -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three'
 cmd> varOutput -a -1 -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three
-        one
-        two
-        three'
+       +one
+       +two
+       +three'
 cmd> varOutput -a +1 -RstrVar   "$@"; printfVars strVar
 strVar='initial value one two three
-        one
-        two
-        three one two three'
+       +one
+       +two
+       +three one two three'
 cmd> varOutput -RstrVar   "$@"; printfVars strVar
 strVar='one two three'
 cmd> varOutput -1 -RstrVar   "$@"; printfVars strVar
 strVar='one
-        two
-        three'
+       +two
+       +three'
 cmd> varOutput +1 -RstrVar   "$@"; printfVars strVar
 strVar='one two three'
 

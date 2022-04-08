@@ -92,7 +92,7 @@ function findInPaths()
 		--debug:*)           debug="1"; preCmd="echo " ;;
 		--return-relative:*) findPrintFmt="%P" ;;
 		-R*|--retVar*)   bgOptionGetOpt val: retVar "$@" && shift; retArgs=(); singleValueFlag="1" ;;
-		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
 
 		# first positional param is the filespec
 		[^-]*:1) fileSpec="$1"; ((posCwords++))
@@ -302,11 +302,11 @@ fi
 #           this function only returns files listed as assets in the hostmanifest file which only admins can write to
 function templateFind()
 {
-	local manifestFile retOpts retVar packageOverride result
-	local -a retOpts=(--echo -d $'\n')
+	local manifestFile retArgs retVar packageOverride result
+	local -a retArgs=(--echo -d $'\n')
 	while [ $# -gt 0 ]; do case $1 in
 		-p*|--pkg*) bgOptionGetOpt val: packageOverride "$@" && shift ;;
-		-R*|--retVar*)   bgOptionGetOpt val: retVar   "$@" && shift; retOpts=(-R "$retVar");  ;;
+		-R*|--retVar*)   bgOptionGetOpt val: retVar   "$@" && shift; retArgs=(-R "$retVar");  ;;
 		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -316,7 +316,7 @@ function templateFind()
 	# so system templates will always be an absoulte path.
 	# Code that takes a template name or path will run it through this function to turn it into a working path.
 	if [[ "$templateName" =~ ^/ ]] && [ -e "$templateName" ]; then
-		varSetRef "${retOpts[@]}" "$templateName"
+		varSetRef "${retArgs[@]}" "$templateName"
 		return
 	fi
 
@@ -339,7 +339,7 @@ function templateFind()
 	# SECURITY: see todo below...
 	# TODO: consider if this function should check the permissions on the found path and refuse to return a path to a non-system file?
 	#       I think that the default should be to check the permissions, but a flag --allow-user-templates would override it
-	[ "$result" ] && varSetRef "${retOpts[@]}" "$result"
+	[ "$result" ] && varSetRef "${retArgs[@]}" "$result"
 }
 
 # usage: templateList [-A|--retArray=<retArray>] <templateSpec>
@@ -350,10 +350,10 @@ function templateFind()
 # Typically, only a prefix is given like "funcman" would match a template "funcman"  and any sub type like "funcman.1.bashCmd"
 function templateList()
 {
-	local manifestFile retOpts retVar name
-	local -a retOpts=(--echo -d $'\n')
+	local manifestFile retArgs retVar name
+	local -a retArgs=(--echo -d $'\n')
 	while [ $# -gt 0 ]; do case $1 in
-		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
 		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -362,7 +362,7 @@ function templateList()
 	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
 	while read -r name; do
-		varSetRef "${retOpts[@]}" "$name"
+		varSetRef "${retArgs[@]}" "$name"
 	done < <(gawk \
 		-v templateSpec="$templateSpec" '
 		@include "bg_template.list.awk"
@@ -375,10 +375,10 @@ function templateList()
 # could also contain additional parts. This function scans all the template names and returns the additional sub types that exist.
 function templateGetSubtypes()
 {
-	local manifestFile retOpts retVar name
-	local -a retOpts=(--echo -d $'\n')
+	local manifestFile retArgs retVar name
+	local -a retArgs=(--echo -d $'\n')
 	while [ $# -gt 0 ]; do case $1 in
-		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
 		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -387,7 +387,7 @@ function templateGetSubtypes()
 	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
 	while read -r name; do
-		varSetRef "${retOpts[@]}" "$name"
+		varSetRef "${retArgs[@]}" "$name"
 	done < <(gawk \
 		-v templateSpec="$templateSpec" \
 		-v outFormat="getSubtypes" '
@@ -402,10 +402,8 @@ function templateGetSubtypes()
 # could also contain additional parts. This function scans all the template names and returns the additional sub types that exist.
 function templateTree()
 {
-	local manifestFile retOpts retVar name
-	local -a retOpts=(--echo -d $'\n')
+	local manifestFile retVar name
 	while [ $# -gt 0 ]; do case $1 in
-		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array ) ;;
 		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done

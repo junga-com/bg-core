@@ -388,62 +388,62 @@ global array vars: Object Object_vmt
 Object[]
       [baseClass     ]=''
       [_CLASS        ]='Class'
-      [0             ]='_bgclassCall Object Class 0 |'
-      [_Ref          ]='_bgclassCall Object Class 0 |'
+      [0             ][]'<objRef to 'Object'>'
+      [_Ref          ][]'<objRef to 'Object'>'
       [classHierarchy]='Object'
       [vmtCacheNum   ]=<redacted>
       [methods       ]='Object::addMethod
-      [              ] +Object::bgtrace
-      [              ] +Object::clear
-      [              ] +Object::clone
-      [              ] +Object::eval
-      [              ] +Object::fromDebControl
-      [              ] +Object::fromFlatINI
-      [              ] +Object::fromINI
-      [              ] +Object::fromString
-      [              ] +Object::get
-      [              ] +Object::getAttributes
-      [              ] +Object::getIndexes
-      [              ] +Object::getMethods
-      [              ] +Object::getSize
-      [              ] +Object::getStaticMethods
-      [              ] +Object::getValues
-      [              ] +Object::hasMethod
-      [              ] +Object::restoreFile
-      [              ] +Object::saveFile
-      [              ] +Object::set
-      [              ] +Object::toDebControl
-      [              ] +Object::toFlatINI
-      [              ] +Object::toString'
+                       +Object::bgtrace
+                       +Object::clear
+                       +Object::clone
+                       +Object::eval
+                       +Object::fromDebControl
+                       +Object::fromFlatINI
+                       +Object::fromINI
+                       +Object::fromString
+                       +Object::get
+                       +Object::getAttributes
+                       +Object::getIndexes
+                       +Object::getMethods
+                       +Object::getSize
+                       +Object::getStaticMethods
+                       +Object::getValues
+                       +Object::hasMethod
+                       +Object::restoreFile
+                       +Object::saveFile
+                       +Object::set
+                       +Object::toDebControl
+                       +Object::toFlatINI
+                       +Object::toString'
       [subClasses    ]='Class NullObject Stack Array Map'
       [staticMethods ]=''
       [name          ]='Object'
       [_OID          ]='Object'
-#     
+#
 Object_vmt[]
-      [_method::fromFlatINI     ]='Object::fromFlatINI'
-      [_method::getValues       ]='Object::getValues'
-      [_method::hasMethod       ]='Object::hasMethod'
-      [_method::getAttributes   ]='Object::getAttributes'
-      [_method::toFlatINI       ]='Object::toFlatINI'
-      [_method::restoreFile     ]='Object::restoreFile'
-      [_method::getSize         ]='Object::getSize'
-      [_method::fromDebControl  ]='Object::fromDebControl'
-      [_method::getMethods      ]='Object::getMethods'
-      [_method::eval            ]='Object::eval'
-      [_method::fromINI         ]='Object::fromINI'
-      [_method::saveFile        ]='Object::saveFile'
-      [_method::getIndexes      ]='Object::getIndexes'
-      [_method::clone           ]='Object::clone'
-      [_method::toString        ]='Object::toString'
-      [_method::addMethod       ]='Object::addMethod'
-      [_method::toDebControl    ]='Object::toDebControl'
-      [_method::fromString      ]='Object::fromString'
-      [_method::set             ]='Object::set'
-      [_method::bgtrace         ]='Object::bgtrace'
-      [_method::get             ]='Object::get'
-      [_method::clear           ]='Object::clear'
-      [_method::getStaticMethods]='Object::getStaticMethods'
+          [_method::fromFlatINI     ]='Object::fromFlatINI'
+          [_method::getValues       ]='Object::getValues'
+          [_method::hasMethod       ]='Object::hasMethod'
+          [_method::getAttributes   ]='Object::getAttributes'
+          [_method::toFlatINI       ]='Object::toFlatINI'
+          [_method::restoreFile     ]='Object::restoreFile'
+          [_method::getSize         ]='Object::getSize'
+          [_method::fromDebControl  ]='Object::fromDebControl'
+          [_method::getMethods      ]='Object::getMethods'
+          [_method::eval            ]='Object::eval'
+          [_method::fromINI         ]='Object::fromINI'
+          [_method::saveFile        ]='Object::saveFile'
+          [_method::getIndexes      ]='Object::getIndexes'
+          [_method::clone           ]='Object::clone'
+          [_method::toString        ]='Object::toString'
+          [_method::addMethod       ]='Object::addMethod'
+          [_method::toDebControl    ]='Object::toDebControl'
+          [_method::fromString      ]='Object::fromString'
+          [_method::set             ]='Object::set'
+          [_method::bgtrace         ]='Object::bgtrace'
+          [_method::get             ]='Object::get'
+          [_method::clear           ]='Object::clear'
+          [_method::getStaticMethods]='Object::getStaticMethods'
 
 #
 #
@@ -452,49 +452,52 @@ global array vars: Class Class_vmt
 Class[]
      [baseClass        ]='Object'
      [_CLASS           ]='Class'
-     [0                ]='_bgclassCall Class Class 0 |'
-     [_Ref             ]='_bgclassCall Class Class 0 |'
+     [0                ][]'<objRef to 'Class'>'
+     [_Ref             ][]'<objRef to 'Class'>'
      [pendingClassCtors]=''
      [classHierarchy   ]='Object Class'
      [vmtCacheNum      ]=<redacted>
      [methods          ]='Class::__construct
-     [                 ] +Class::getClassMethods
-     [                 ] +Class::getClassStaticMethods
-     [                 ] +Class::isDerivedFrom
-     [                 ] +Class::reloadMethods'
-     [staticMethods    ]=''
+                         +Class::getClassMethods
+                         +Class::getClassStaticMethods
+                         +Class::isDerivedFrom
+                         +Class::reloadMethods'
+     [staticMethods    ]='static::Class::assertClassExists
+                         +static::Class::setClass'
      [name             ]='Class'
      [_OID             ]='Class'
-#    
+#
 Class_vmt[]
-     [_method::fromFlatINI          ]='Object::fromFlatINI'
-     [_method::getValues            ]='Object::getValues'
-     [_method::getAttributes        ]='Object::getAttributes'
-     [_method::hasMethod            ]='Object::hasMethod'
-     [_method::toFlatINI            ]='Object::toFlatINI'
-     [_method::restoreFile          ]='Object::restoreFile'
-     [_method::getClassMethods      ]='Class::getClassMethods'
-     [_method::getSize              ]='Object::getSize'
-     [_method::__construct          ]='Class::__construct'
-     [_method::fromDebControl       ]='Object::fromDebControl'
-     [_method::eval                 ]='Object::eval'
-     [_method::getMethods           ]='Object::getMethods'
-     [_method::fromINI              ]='Object::fromINI'
-     [_method::saveFile             ]='Object::saveFile'
-     [_method::getIndexes           ]='Object::getIndexes'
-     [_method::clone                ]='Object::clone'
-     [_method::addMethod            ]='Object::addMethod'
-     [_method::toString             ]='Object::toString'
-     [_method::toDebControl         ]='Object::toDebControl'
-     [_method::fromString           ]='Object::fromString'
-     [_method::bgtrace              ]='Object::bgtrace'
-     [_method::set                  ]='Object::set'
-     [_method::get                  ]='Object::get'
-     [_method::getClassStaticMethods]='Class::getClassStaticMethods'
-     [_method::reloadMethods        ]='Class::reloadMethods'
-     [_method::isDerivedFrom        ]='Class::isDerivedFrom'
-     [_method::clear                ]='Object::clear'
-     [_method::getStaticMethods     ]='Object::getStaticMethods'
+         [_method::fromFlatINI        ]='Object::fromFlatINI'
+         [_method::getValues          ]='Object::getValues'
+         [_method::getAttributes      ]='Object::getAttributes'
+         [_method::hasMethod          ]='Object::hasMethod'
+         [_method::toFlatINI          ]='Object::toFlatINI'
+         [_static::setClass           ]='static::Class::setClass'
+         [_method::restoreFile        ]='Object::restoreFile'
+         [_method::getClassMethods    ]='Class::getClassMethods'
+         [_method::getSize            ]='Object::getSize'
+         [_method::__construct        ]='Class::__construct'
+         [_method::fromDebControl     ]='Object::fromDebControl'
+         [_method::eval               ]='Object::eval'
+         [_method::getMethods         ]='Object::getMethods'
+         [_method::fromINI            ]='Object::fromINI'
+         [_method::saveFile           ]='Object::saveFile'
+         [_method::getIndexes         ]='Object::getIndexes'
+         [_method::clone              ]='Object::clone'
+         [_method::addMethod          ]='Object::addMethod'
+         [_method::toString           ]='Object::toString'
+         [_method::toDebControl       ]='Object::toDebControl'
+         [_static::assertClassExists  ]='static::Class::assertClassExists'
+         [_method::fromString         ]='Object::fromString'
+         [_method::bgtrace            ]='Object::bgtrace'
+         [_method::set                ]='Object::set'
+         [_method::get                ]='Object::get'
+         [_method::getClassStaticMethods]='Class::getClassStaticMethods'
+         [_method::reloadMethods      ]='Class::reloadMethods'
+         [_method::isDerivedFrom      ]='Class::isDerivedFrom'
+         [_method::clear              ]='Object::clear'
+         [_method::getStaticMethods   ]='Object::getStaticMethods'
 
 #
 #
@@ -503,18 +506,18 @@ global array vars: NullObject NullObjectInstance
 NullObject[]
           [baseClass     ]='Object'
           [_CLASS        ]='Class'
-          [0             ]='_bgclassCall NullObject Class 0 |'
-          [_Ref          ]='_bgclassCall NullObject Class 0 |'
+          [0             ][]'<objRef to 'NullObject'>'
+          [_Ref          ][]'<objRef to 'NullObject'>'
           [classHierarchy]='Object NullObject'
           [name          ]='NullObject'
           [_OID          ]='NullObject'
-#         
+#
 NullObject_vmt[]
 NullObjectInstance[]
-          [_CLASS]='NullObject'
-          [_Ref  ]='assertError Null Object reference called <NULL>'
-          [0     ]='assertError Null Object reference called <NULL>'
-          [_OID  ]='NullObjectInstance'
+                  [_CLASS]='NullObject'
+                  [_Ref  ]='assertError Null Object reference called <NULL>'
+                  [0     ]='assertError Null Object reference called <NULL>'
+                  [_OID  ]='NullObjectInstance'
 #
 #
 #------------------ Stack --------------------
@@ -522,12 +525,12 @@ global array vars: Stack
 Stack[]
      [baseClass     ]='Object'
      [_CLASS        ]='Class'
-     [0             ]='_bgclassCall Stack Class 0 |'
-     [_Ref          ]='_bgclassCall Stack Class 0 |'
+     [0             ][]'<objRef to 'Stack'>'
+     [_Ref          ][]'<objRef to 'Stack'>'
      [classHierarchy]='Object Stack'
      [name          ]='Stack'
      [_OID          ]='Stack'
-#    
+#
 Stack_vmt[]
 
 #
@@ -537,14 +540,14 @@ global array vars: Array
 Array[]
      [baseClass     ]='Object'
      [_CLASS        ]='Class'
-     [0             ]='_bgclassCall Array Class 0 |'
-     [_Ref          ]='_bgclassCall Array Class 0 |'
+     [0             ][]'<objRef to 'Array'>'
+     [_Ref          ][]'<objRef to 'Array'>'
      [oidAttributes ]='a'
      [classHierarchy]='Object Array'
      [defaultIndex  ]='off'
      [name          ]='Array'
      [_OID          ]='Array'
-#    
+#
 Array_vmt[]
 
 #
@@ -554,13 +557,13 @@ global array vars: Map
 Map[]
    [baseClass     ]='Object'
    [_CLASS        ]='Class'
-   [0             ]='_bgclassCall Map Class 0 |'
-   [_Ref          ]='_bgclassCall Map Class 0 |'
+   [0             ][]'<objRef to 'Map'>'
+   [_Ref          ][]'<objRef to 'Map'>'
    [classHierarchy]='Object Map'
    [defaultIndex  ]='off'
    [name          ]='Map'
    [_OID          ]='Map'
-#  
+#
 Map_vmt[]
 
 
@@ -636,35 +639,35 @@ pet
 ##----------
 ## test
 cmd> local pet; ConstructObject Animal pet
-cmd> local petOID="$(GetOID "$pet")"
+cmd> local petOID="$(GetOID "$pet" -)"
 cmd> eval 'local petOIDVars="${!'"$petOID"'*}"'
 cmd> echo "global vars for this object = ${petOIDVars}"
 global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet $petOIDVars
 pet='_bgclassCall heap_A_<redacted> Animal 0 |'
 heap_A_<redacted>[]
-                [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
+                [0       ][]'<objRef to 'heap_A_<redacted>'>'
                 [legCount]='unk'
                 [species ]='unk'
                 [family  ]='unk'
 heap_A_<redacted>_sys[]
-                [_CLASS]='Animal'
-                [0     ]='_bgclassCall heap_A_<redacted> Animal 0 |'
-                [_Ref  ]='_bgclassCall heap_A_<redacted> Animal 0 |'
-                [_OID  ]='heap_A_<redacted>'
+                    [_CLASS]='Animal'
+                    [0     ][]'<objRef to 'heap_A_<redacted>'>'
+                    [_Ref  ][]'<objRef to 'heap_A_<redacted>'>'
+                    [_OID  ][]'<objRef to 'heap_A_<redacted>'>'
 
 ##----------
 ## test
 cmd> local -A pet2; ConstructObject Animal pet2
-cmd> local pet2OID="$(GetOID "$pet2")"
+cmd> local pet2OID="$(GetOID "$pet2" -)"
 cmd> eval 'local pet2OIDVars="${!'"$pet2OID"'*}"'
 cmd> echo "vars for this object = ${pet2OIDVars}"
 vars for this object = pet2 pet2OID
 cmd> printfVars --noObjects $pet2OIDVars
 pet2[]
     [_CLASS  ]='Animal'
-    [0       ]='_bgclassCall pet2 Animal 0 |'
-    [_Ref    ]='_bgclassCall pet2 Animal 0 |'
+    [0       ][]'<objRef to 'pet2'>'
+    [_Ref    ][]'<objRef to 'pet2'>'
     [legCount]='unk'
     [species ]='unk'
     [family  ]='unk'
@@ -674,26 +677,22 @@ pet2OID='pet2'
 ##----------
 ## test
 cmd> local -n pet3; ConstructObject Animal pet3
-cmd> local pet3OID="$(GetOID "$pet3")"
+cmd> local pet3OID="$(GetOID "$pet3" -)"
 cmd> eval 'local pet3OIDVars="${!'"$pet3OID"'*}"'
 cmd> echo "global vars for this object = ${pet3OIDVars}"
 global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet3 $pet3OIDVars
 pet3[]
-    [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
+    [0       ][]'<objRef to 'pet3'>'
     [legCount]='unk'
     [species ]='unk'
     [family  ]='unk'
-heap_A_<redacted>[]
-    [0       ]='_bgclassCall heap_A_<redacted> Animal 0 |'
-    [legCount]='unk'
-    [species ]='unk'
-    [family  ]='unk'
+heap_A_<redacted>[]'<objRef to 'pet3'>'
 heap_A_<redacted>_sys[]
-    [_CLASS]='Animal'
-    [0     ]='_bgclassCall heap_A_<redacted> Animal 0 |'
-    [_Ref  ]='_bgclassCall heap_A_<redacted> Animal 0 |'
-    [_OID  ]='heap_A_<redacted>'
+                    [_CLASS]='Animal'
+                    [0     ][]'<objRef to 'pet3'>'
+                    [_Ref  ][]'<objRef to 'pet3'>'
+                    [_OID  ][]'<objRef to 'pet3'>'
 
 ## bg_objects.sh:ConstructObject: finished
 ###############################################################################################################################
@@ -752,10 +751,10 @@ cmd> $a2.getOID
 heap_a_<redacted>
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
-a2 : <instance> of Array
+a2= <instance> of Array
 cmd> a2OID=(one two three)
 cmd> printfVars a2
-a2 : <instance> of Array
+a2= <instance> of Array
   [0]=one
   [1]=two
   [2]=three
@@ -790,20 +789,20 @@ heap_A_<redacted>
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
 heap_A_<redacted>_sys[]
-                [_CLASS]='Map'
-                [0     ]='_bgclassCall heap_A_<redacted> Map 0 |'
-                [_Ref  ]='_bgclassCall heap_A_<redacted> Map 0 |'
-                [_OID  ]='heap_A_<redacted>'
+                    [_CLASS]='Map'
+                    [0     ][]'<objRef to 'heap_A_<redacted>'>'
+                    [_Ref  ][]'<objRef to 'heap_A_<redacted>'>'
+                    [_OID  ][]'<objRef to 'heap_A_<redacted>'>'
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
-a2 : <instance> of Map
+a2= <instance> of Map
 cmd> a2OID=([one]=1 [two]=2 [three]=3)
 cmd> $a2.getIndexes
 two
 three
 one
 cmd> printfVars a2
-a2 : <instance> of Map
+a2= <instance> of Map
   two  =2
   three=3
   one  =1
@@ -813,10 +812,10 @@ heap_A_<redacted>[]
                 [three]='3'
                 [one  ]='1'
 heap_A_<redacted>_sys[]
-                [_CLASS]='Map'
-                [0     ]='_bgclassCall heap_A_<redacted> Map 0 |'
-                [_Ref  ]='_bgclassCall heap_A_<redacted> Map 0 |'
-                [_OID  ]='heap_A_<redacted>'
+                    [_CLASS]='Map'
+                    [0     ][]'<objRef to 'heap_A_<redacted>'>'
+                    [_Ref  ][]'<objRef to 'heap_A_<redacted>'>'
+                    [_OID  ][]'<objRef to 'heap_A_<redacted>'>'
 cmd> $a2.getSize
 3
 
@@ -832,7 +831,7 @@ cmd> $a2.getSize
 ## test
 cmd> local -n a1; ConstructObject Stack a1
 cmd> printfVars a1
-a1 : <instance> of Stack
+a1= <instance> of Stack
   length=0
 cmd> $a1.push one
 cmd> $a1.push two
@@ -840,7 +839,7 @@ cmd> $a1.push three
 cmd> $a1.getSize
 3
 cmd> printfVars a1
-a1 : <instance> of Stack
+a1= <instance> of Stack
   length=3
   e2    =three
   e0    =one
@@ -859,7 +858,7 @@ element='one'
 ## test
 cmd> local a2; ConstructObject Stack a2
 cmd> printfVars a2
-a2 : <instance> of Stack
+a2= <instance> of Stack
   length=0
 cmd> $a2.push one
 cmd> $a2.push two
@@ -867,7 +866,7 @@ cmd> $a2.push three
 cmd> $a2.getSize
 3
 cmd> printfVars a2
-a2 : <instance> of Stack
+a2= <instance> of Stack
   length=3
   e2    =three
   e0    =one
@@ -904,9 +903,9 @@ element='one'
 ## test
 cmd> ConstructObject DataFile datafile "$tmpFile"
 cmd> printfVars datafile
-datafile : <instance> of DataFile
+datafile= <instance> of DataFile
   filename=/tmp/bgmktemp.tmpFile.<redacted>
-  data : <instance> of Array
+  data= <instance> of Array
     [0]=one fish
     [1]=two fish
     [2]=red fish
@@ -930,13 +929,13 @@ cmd> obj[foo]="hello"
 
 # expect that foo is present
 cmd> printfVars obj
-obj : <instance> of Object
+obj= <instance> of Object
   foo=hello
 cmd> $obj.foo.unset
 
 # expect that foo is not present
 cmd> printfVars obj
-obj : <instance> of Object
+obj= <instance> of Object
 
 ## bg_objects.sh:Object_unset: finished
 ###############################################################################################################################
@@ -1092,7 +1091,7 @@ cmd> $obj.dontExist.getRef
 ## test
 cmd> $obj.toString
 foo=5
-array : <instance> of Array
+array= <instance> of Array
 cmd> $obj.foo.toString
 5
 cmd> $obj.foo.toString --title
@@ -1124,10 +1123,10 @@ cmd> $obj.::dontExist.toString
    catch_errorFn='ut_Object_toString'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: ut_Object_toString: The class 'Object' does not contain a static method 'dontExist.toString'
-                               objectExpression='$obj.::dontExist.toString'
-                               class='Object'
-                               staticMethod='dontExist.toString''
+                          +error: ut_Object_toString: The class 'Object' does not contain a static method 'dontExist.toString'
+                          +    objectExpression='$obj.::dontExist.toString'
+                          +    class='Object'
+                          +    staticMethod='dontExist.toString''
 ## bg_objects.sh:Object_toString: finished
 ###############################################################################################################################
 
@@ -1144,8 +1143,8 @@ cmd> $obj.::dontExist.toString
 ## test
 cmd> $obj.foo=new Array
 cmd> printfVars obj
-obj : <instance> of Object
-  foo : <instance> of Array
+obj= <instance> of Object
+  foo= <instance> of Array
 
 ## bg_objects.sh:Object_assignNewOp: finished
 ###############################################################################################################################
@@ -1219,10 +1218,10 @@ bar=hello world
 # expect that object members can be created on demand
 cmd> $obj.foo[one].two="yoyo"
 cmd> printfVars obj
-obj : <instance> of Object
-  foo : <instance> of Map
+obj= <instance> of Object
+  foo= <instance> of Map
     bar=hello world
-    one : <instance> of Object
+    one= <instance> of Object
       two=yoyo
 
 ## bg_objects.sh:Object_chainCallSyntax: finished
@@ -1324,20 +1323,20 @@ cmd> $obj.::doit
    catch_errorFn='ut_Object_memberVarReadAccess'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: ut_Object_memberVarReadAccess: The class 'Object' does not contain a static method 'doit'
-                               objectExpression='$obj.::doit'
-                               class='Object'
-                               staticMethod='doit''
+                          +error: ut_Object_memberVarReadAccess: The class 'Object' does not contain a static method 'doit'
+                          +    objectExpression='$obj.::doit'
+                          +    class='Object'
+                          +    staticMethod='doit''
 ** caught expected exception
    catch_errorClass='assertObjExpressionError'
    catch_errorFn='ut_Object_memberVarReadAccess'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: ut_Object_memberVarReadAccess: object method not found
-                               objectExpression='$obj.doit p1 p2 p3'
-                               class='Object'
-                               methodName='doit'
-                               objectExpression='.doit p1 p2 p3''
+                          +error: ut_Object_memberVarReadAccess: object method not found
+                          +    objectExpression='$obj.doit p1 p2 p3'
+                          +    class='Object'
+                          +    methodName='doit'
+                          +    objectExpression='.doit p1 p2 p3''
 
 ## bg_objects.sh:Object_memberVarReadAccess: finished
 ###############################################################################################################################
@@ -1359,11 +1358,11 @@ cmd> $obj.:foo
    catch_errorFn='ut_expressionErrors'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: ut_expressionErrors: object method not found
-                               objectExpression='$obj.:foo'
-                               class='Object'
-                               methodName='foo'
-                               objectExpression='.:foo''
+                          +error: ut_expressionErrors: object method not found
+                          +    objectExpression='$obj.:foo'
+                          +    class='Object'
+                          +    methodName='foo'
+                          +    objectExpression='.:foo''
 ## bg_objects.sh:expressionErrors: finished
 ###############################################################################################################################
 

@@ -7,14 +7,14 @@ function nextToken() {
 }
 function atEOF() {return jtokenCur > jtokensCount}
 
-function addFlattenValue(jpath, value, valType) {
+function addFlattenValue(jpath, value, valType, relName) {
 	if (valType!~"(tArray)|(tObject)") {
 		flatData[jpath]=value
 		flatDataInd[flatDataCount++]=jpath
 		if (! noJpathOutOpt)
 			printf("%-24s %s\n", jpath, value)
 	}
-	valueHook(jpath, value, valType)
+	valueHook(jpath, value, valType, relName)
 }
 
 #function assert(message) {assertHit=1; printf("error: %s\n", message); exit 100}
@@ -60,21 +60,24 @@ function expectToken(type,       value, aCount, baseJPath) {
 			baseJPath=jpath
 			aCount=0
 			expectToken(tListStart)
+			eventHook("startList", baseJPath)
 			while (token()!=tListEnd) {
 				jpath=baseJPath"["aCount++"]"
 				value=expectToken(tValue)
-				addFlattenValue(jpath, value, valType)
+				addFlattenValue(jpath, value, valType, "<arrayEl>")
 				if (token()==tListSep)
 					nextToken()
 			}
 			jpath=baseJPath
 			expectToken(tListEnd)
+			eventHook("endList", baseJPath)
 			valType="tArray"
 			return
 
 		case "tObject" :
 			baseJPath=jpath
 			expectToken(tObjStart)
+			eventHook("startObject", baseJPath)
 			while (token()!=tObjEnd) {
 				name=expectToken(tString)
 				# if the name contains '.' it will look like multiple objects in the jpath so we must escape them
@@ -85,18 +88,19 @@ function expectToken(type,       value, aCount, baseJPath) {
 				jpath=baseJPath"."name
 				expectToken(tPairSep)
 				value=expectToken(tValue)
-				addFlattenValue(jpath, value, valType)
+				addFlattenValue(jpath, value, valType, name)
 				if (token()==tListSep)
 					nextToken()
 			}
 			expectToken(tObjEnd)
+			eventHook("endObject", baseJPath)
 			jpath=baseJPath
 			valType="tObject"
 			return
 
 		case "tValue" :
 			switch (token()) {
-				case /^["]/     : return expectToken(tString); break
+				case /^["]/    : return expectToken(tString); break
 				case "["       : return expectToken(tArray); break
 				case "{"       : return expectToken(tObject); break
 				case /[]},:]/  : assertExpected(tValue,token()); break
@@ -146,10 +150,10 @@ END {
 	topCount=1
 	flatDataCount=0
 
-	for (topName in topNames) {
-		jpath=topNames[topName]
+	for (i in topNames) {
+		topName=jpath=topNames[i]
 		value=expectToken(tValue)
-		addFlattenValue(jpath, value, valType)
+		addFlattenValue(jpath, value, valType, topName)
 	}
 
 
@@ -157,8 +161,9 @@ END {
 	# until the stream is empty or jsonValuesReadCount has been read
 	jpath="top"
 	while (jsonValuesReadCount-- > 0 && ! atEOF()) {
+		topName=jpath
 		value=expectToken(tValue)
-		addFlattenValue(jpath, value, valType)
+		addFlattenValue(jpath, value, valType, topName)
 		jpath="top"topCount++
 	}
 }

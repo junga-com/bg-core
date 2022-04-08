@@ -1450,7 +1450,8 @@ function bgtraceIsActive()
 	[ ! "$bgTracingOn$bgTracingOnState" ] && return 1
 
 	# when bgtrace is called in a debug trap, import would clear L1 before it can run when stepping over an import if we let it get
-	# called here.
+	# called here. This construct makes it so that import will only be called if bg_debugTrace.sh is not loaded instead of having
+	# import set L1 and L2 to empty
 	[ ! "${_importedLibraries[lib:bg_debugTrace.sh]+exists}" ] && { import bg_debugTrace.sh ;$L1;$L2; }
 
 	# if its not realized, call bgtraceCntr to make _bgtraceFile reflect bgTracingOn
@@ -2052,7 +2053,7 @@ function bgexit()
 			local pgrpid="$(ps --pid $$ -o pgid=)"; pgrpid="${pgrpid# }"
 			kill -TERM -$pgrpid 2>/dev/null
 			bgtrace "logic error: bgexit --complete: whereAmIRunning='$whereAmIRunning' \$\$='$$' BASHPID='$BASHPID' pgrpid='$pgrpid' sent 'kill -TERM $pgrpid' but this line after it should not have been reached"
-			builtin exit $exitCode # this is a reasonable fall back in case the kill -TERM did not work for any reason 
+			builtin exit $exitCode # this is a reasonable fall back in case the kill -TERM did not work for any reason
 			;;
 		*:--oneShell)
 			# regardless of whether we are in the inTopScript or inSubshell (inTerminal case is already handled above) we just want
@@ -2062,6 +2063,23 @@ function bgexit()
 		*) assertError "Darn, I missed one case. This is a programming logic error. Someone needs to fix the code"
 	esac
 }
+
+
+# usage: bgread <pos1var> [...<posNvar>] <<<"<stringToParse>"
+# This is a wrapper over the 'builtin read' function that adds a few features
+#    * -r is the default. (do not allow backslashes to escape any characters)
+#    * you can pass the empty string "" as any <posNvar> to effectively through away the data in that position
+function bgread()
+{
+	local _bgr_vars=("$@")
+	local _bgr_i _bgr_scrapIt
+	for _bgr_i in "${!_bgr_vars[@]}"; do
+		[ "${_bgr_vars[$_bgr_i]}" == "" ] && _bgr_vars[$_bgr_i]="_bgr_scrapIt"
+	done
+	builtin read -r "${_bgr_vars[@]}"
+}
+
+
 
 # usage: BGTRAPEntry <BASHPID> <signal> <lastBASH_COMMAND> <lastLineno> <lastExitCode>
 # Params:
@@ -2863,8 +2881,9 @@ function command_not_found_handle()
 
 	# -TERM is the defualt signal. The minus in front of $$ indicates the process group of the script which should be all children
 	# except maybe those that deliberately change their process groups (or become a new group leader)
-	kill -TERM -$$
-	builtin exit 127 # should never reach here
+	local pgrpid="$(ps --pid $$ -o pgid=)"; pgrpid="${pgrpid# }"
+	kill -TERM -$pgrpid 2>/dev/null
+	builtin exit 127 # this is a reasonable fall back in case the kill -TERM did not work for any reason
 }
 
 

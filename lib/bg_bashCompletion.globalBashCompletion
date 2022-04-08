@@ -147,7 +147,7 @@ declare -gA _bgbcData
 #    comment tokens so that they are more likely to appear before real suggestions.
 #
 # .SH $(comment <token>) Directive:
-#    Display <token> amoung the suggestions but in a way that it can not be choosen and the user can
+#    Display <token> among the suggestions but in a way that it can not be choosen and the user can
 #    tell that it is not a suggestion but rather information about the completion being preformed.
 #    Typically this is used to indicate the cmd syntax by including the name of the parameter being
 #    completed.

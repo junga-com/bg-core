@@ -113,7 +113,7 @@
 #     <bashVar>=$($<objRef>.<varName>)           eg. foo="$($dog.name)"
 #     Note that the OO syntax starts with a "$" which sets it apart from typical bash statements
 # From outside the Class methods the object's associative array can be retrieved and then accessed efficiently ...
-#     local -n <oidRef>; GetOID "$<objRef>"      eg. local -n dogOID; GetOID "$dog"
+#     local -n <oidRef>; GetOID "$<objRef>" <oidRef> eg. local -n dogOID; GetOID "$dog" dogOID
 #     <oidRef>[<varName>]="..."                  eg. dogOID[name]="spot"
 #     <bashVar>="${<oidRef>[<varName>]}"         eg. foo="${dogOID[name]}"
 #     Note that <oidRef> also works with the OO syntax...
@@ -217,6 +217,7 @@
 # This brings a new class into existance by creating a global associative array named "<className>" which, itself is a valid object
 # instance.  The optional <atribNameN:valN>'s' will initialize values in that array.
 #
+# Class Member Functions:
 # The Member functions (aka Methods) of the class are named <className>::* and can be defined before or after the class is Declared.
 # The first time an instance of <className> is created, the <className> array will be updated with a list of functions in the bash
 # environment at that time whose name starts with <className>::*. Also, any functions whose name starts with 'static::<className>::*'
@@ -227,18 +228,24 @@
 # Its important for the script author to define the <className>::* functions in the script before any global code in the same script
 # file that creates an instance of that <className> so that those member functions will be found when the VMT is initially built.
 #
+# 'DeclareClassEnd <className>' is called whenever an instance of <className> is constructed or whenever DeclareClass is called
+# where <className> is the <baseClass> or in the hierarchy of <baseClass>.  DeclareClassEnd scans the bash environment for matching
+# functions to record a static or non-static member functions of <className>. It is idempotent so it returns immediately if its
+# already been called and the import environment has not changed.
+#
 # Static Construction:
 # A static::<className>::__construct() method can be defined that will be called when the Class <className> object array is constructed.
-# Static member variables can be initialized in the 'static' variable that is a nameRef to that oject array. Unlike normal constructors,
-# this static constructor is not inherited so it is not called when class that extends <className> is Declared. All class objects
-# are of class 'Class' but they can each have their own static constuctor that initiallizes their static members differently.
+# The static constructor can access the 'static[]' variable which is a nameref to the class's object array.
+# Unlike object constructors, this static constructor is not inherited so it is not called when class that extends <className> is
+# Declared. All class objects are of class 'Class' but they can each have their own static constuctor that initiallizes their static
+# members differently if needed.
 #
 # Static Member Functions:
 # Other static member functions (besides static::<className>::__construct()) are inherited. This means that a static member can be
 # called from $<className>::<methodName> or from $<derivedClass>::<methodName> or from $<instanceOf_className>::<methodName>. If
-# <methodName> is defined as both static::<className>::<methodName> and static::<derivedClass>::<methodName>, static::<derivedClass>::<methodName>
-# will be called when called from $<derivedClass>::<methodName>, but static::<className>::<methodName> will be called when called
-# from $<className>::<methodName>.
+# <methodName> is defined as both static::<className>::<methodName> and static::<derivedClass>::<methodName>,
+# static::<derivedClass>::<methodName> will be called when called from $<derivedClass>::<methodName>, but
+# static::<className>::<methodName> will be called when called from $<className>::<methodName>.
 #
 # In the body of static methods, the variable 'static' points to the class's object and 'this' is undefined (or NullObjectInstance)
 #
@@ -249,9 +256,14 @@
 # Outside of its methods its refered to as <className>
 #     example: "<className>[<attribName>]="<val>", foo="${<className>[<attribName>]}"
 #
-# Attributes:
-# A class author can add whatever attributes they want and then use them in various ways. The object system also recognizes some
-# attributes that affect the core behavior.
+# Class Attributes:
+# The DeclareClass function accepts a extended debian control file formatted string as its last parameter. This is a whitespace
+# separated list of terms in the form "<name>:<value>". These names will be set in the class's object array as class static member
+# variables. These class static member variables can also be added in the static::<className>() function.
+# A class author can add whatever attributes they want and then use them in various ways.
+#
+# Well Known System Static Memeber Variables:
+# The object system recognizes some static attributes that affect the core behavior.
 #    defaultIndex:on|off   : default is on. If defaultIndex:off is set in a class, when objects of that class are constructed, the
 #          default index [0] will not be set with that object's ObjRef string. This is useful for BashArray or any object that uses
 #          <obj>[0] as a logical member variable.  The consequence is that object's array references can not be used for object
@@ -260,8 +272,12 @@
 #          object's member variables. If this is 'a', the member variables of such an object can only be numbers or system variables
 #          stored in a separate _sys array. It forces the creation of a separate _sys array even when <objRef> passed to
 #          ConstructObject is an array variable.
-#    memberVars: a whitespace separated string of member variable names. member variables of an object instance are dynamic and
-#          declaring them here is optional.
+#    memberVars: Within the extended debian control file formatted string passed to DeclareClass, the attribute memberVars introduces
+#          sublist of prototype variable names with optional default value assignment. This list uses '=' instead of ':' to separate
+#          <name> and <value>. Member variables of an object instance are dynamic and declaring them here is optional. The variables
+#          specified here will be placed in an associative array named ${className}_prototype. When an object instance is created,
+#         the contents of the _prototype of each class in the hierarchy will be copied to the instance OID array just before the
+#          corresponding class _construct function is called.
 # Params:
 #    <className>       : the name of the new class. By convention it should be capitalized
 #    <baseClassName>   : (default=Object) the name of the class that the new class derives from.
@@ -332,6 +348,7 @@ function DeclareClassEnd()
 {
 	local className="$1"; shift
 
+	# make it idempotent so that we can call is on ConstructObject unconditionally. protect against doing the work more than once.
 	varExists ${className}_initData || return 0
 
 	local -n delayedData="${className}_initData"
@@ -358,6 +375,77 @@ function FlushPendingClassConstructions()
 	done
 }
 
+# usage: static::Class::setClass <objRef> <newClass>
+# This function is meant to be used by things like restoration functions that might not know the actuall class of a restored object
+# until at least some members have be restored. The idea is that the algorithm can make a new instance of Object to restore attributes
+# to and then as some point when it reads the _CLASS attribute it can call this function to fixup the instance to have the calls
+# indicated by _CLASS.
+#
+# References:
+# <objRef>s contain a class variable too. The class in the <objRef> is like a typed pointer is strongly typed languages. <objRef>
+# to the object instance that are created before this method is called to set the correct class will be typed as 'Object'.  Care
+# should be taken to fixup those <objRef> if that is important
+function static::Class::setClass()
+{
+	# for static Object/Class functions <objRef> can be passed with or without quotes
+	if [ "$1" == "_bgclassCall" ]; then
+		local _OID="$2"
+		shift 5
+	else
+		local parts=($1)
+		local _OID="${parts[1]}"
+		shift 1
+	fi
+	local newClassName="$1"; shift
+	static::Class::assertClassExists "$newClassName"
+
+	local _OID_sys; varExists "${_OID}_sys" && _OID_sys="${_OID}_sys" || _OID_sys="${_OID}"
+	local -n this="$_OID"
+	local -n _this="$_OID_sys"
+	local -n oldStatic="${_this[_CLASS]}"
+
+	# starting the change
+	local _CLASS="$newClassName"
+	local -n class="$_CLASS"
+
+	$class.isDerivedFrom "${oldStatic[name]}" || assertError -v this -v originalClass:oldStatic[name] -v newClass:newClassName "Can not set class to one that is not a descendant to the original class"
+	_this[_CLASS]="$_CLASS"
+	_this[_Ref]="_bgclassCall ${_OID} $_CLASS 0 |"
+
+	_this[0]="${_this[_Ref]}"
+	if [ "${class[defaultIndex]:-on}" == "on" ]; then
+		this[0]="${_this[_Ref]}"
+	else
+		unset this[0]
+	fi
+	_classUpdateVMT "${_this[_CLASS]}"
+
+	[ "${_this[_VMT]+exits}" ] && assertError -v _this -v originalClass:oldStatic[name]  -v newClass:newClassName "Can not set the Class on an object instance that has a _VMT member which happens when methods are dynamicly added to an Object instance"
+
+	# invoke the _onClassSet methods that exist for any Class in this hierarchy
+	local -n static="$_CLASS"
+	local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
+	local _cname; for _cname in ${class[classHierarchy]}; do
+		type -t $_cname::_onClassSet &>/dev/null && $_cname::_onClassSet "$@"
+	done
+}
+
+# usage: static::Class::assertClassExists <className>
+# if <className> does not exist and can not be made to exist, assert an error.
+# If <className> does not initially exist, an attempt is made to load a library named '<className>.sh'. If after that attempt,
+# the class still does not exist, an exception is thrown (aka assertError)
+function static::Class::assertClassExists()
+{
+	local className="$1"
+	if ! varIsA mapArray "$className" ; then
+		import -q "${className}.sh" ;$L1;$L2 || assertError -v className "Class does not exist"
+		! varIsA mapArray "$className" &&  assertError -v className "Class does not exist. Sourced the library '${className}.sh' successfuly but it still does not exist"
+	fi
+	DeclareClassEnd "$className"
+}
+
+# TODO: add static::Class:exists function
+
 # usage: DeclareClass <className> [<baseClassName> [<atribName1:val1> .. <atribNameN:valN>]]
 # This is the constructor for objects of type Class. When DeclareClass is used to bring a new class into existence it creates the
 # global <className> associative array and then uses this function to fill in its contents.
@@ -374,11 +462,15 @@ function Class::__construct()
 	# TODO: this makes DeclareClass and plugins_register very similar. They should merge when 10.04 support is completely dropped
 	[ $# -gt 0 ] && parseDebControlFile this "$@"
 
+	# fixup the <memberVars> attribute if set.
 	# the DeclareClass statements can define member variables in the debconf control file syntax argument. The memberVars attribute
-	# can contain multiple lines. Each non-empty, un-commented line can be one of two syntaxes.
-	#    1) <varname>[<whitespace><varname>]*
-	#    2) <varname>=<value>
+	# can contain a list of <varname>[=<value>] terms. If <value> constains whitespace, it must be quoted with either single or
+	# double quotes.
+	# DeclareClass <className> "
+	# 	memberVars: foo bar=5 hoops='this and that'
+	# "
 	# where <value> can be quoted or not with single or double quotes
+	# TODO: write a unitTest for this and better document the syntax
 	if [ "${this[memberVars]:+exists}" ]; then
 		local varRE="[a-zA-Z_][a-zA-Z_0-9]*"
 		local sqValRE="'([^']*)'"
@@ -388,8 +480,10 @@ function Class::__construct()
 
 		local memberVarsText="${this[memberVars]}"
 
-		$_this[prototype]=new Map
-		local -n prototype; GetOID "${this[prototype]}" prototype
+		# we don't yet know if we will create this _prototype global but creating the -n ref to it wont create it
+		# in the loop, if we need it, we will do 'declare -gA "${className}_prototype"' which wont overwrite it but will make it
+		# exist if its not already
+		local -n prototype="${className}_prototype";
 
 		while [[ ! "$memberVarsText" =~ ^[[:space:]]*$ ]]; do
 			[[ "$memberVarsText" =~ $memVarRE ]] || assertError -v className:this[name] -v errorText:memberVarsText "invalid memberVars syntax in a DeclareClass statement"
@@ -399,6 +493,9 @@ function Class::__construct()
 			varName="${rematch[2]:-${rematch[1]}}"
 			varValue="${rematch[6]:-${rematch[5]:-${rematch[4]}}}"
 
+			# the declare -gA does not have an '=()' so it wont modify it if it already exists. we only want to create the global
+			# if there is something to put in it so we use this pattern for -n prototype.
+			declare -gA "${className}_prototype"
 			prototype[$varName]="$varValue"
 		done
 	fi
@@ -412,11 +509,7 @@ function Class::__construct()
 	local _cname="$baseClass";
 	this[classHierarchy]="$className"
 	while [ "$_cname" ]; do
-		if ! varExists "${_cname}[name]"; then
-			# if the class does not yet exist, if a Library exists named for the class, we can load it
-			import -q "${_cname}.sh" ;$L1;$L2 || assertError -v class:"-l${_cname}" "Class '${_cname}' does not exist"
-			varExists "${_cname}[name]" || assertError -v className -v baseClass -v this[classHierarchy] -v _cname "'$className' inherits from '$_cname' which does not exist"
-		fi
+		static::Class::assertClassExists "$_cname"
 
 		# maintain a map that lets us quickly tell if something 'isA' something else
 		_classIsAMap[$className,$_cname]=1
@@ -637,14 +730,14 @@ function NewObject()
 #     Nested Calls
 #         $objRef.<memberObjectName>[.<memberObjectName>]<anySyntax>
 #     Convert a ObjRef to object's associative array implementation variable (works regardless of whether objRef is already an associative array ref)
-#         local -n objAry=$($objRef.getOID)
+#         local -n objAry; $objRef.getOID objAry || assertError
 #
 # Direct Array Reference:
 # The $<objRef>... syntax is convenient but inefficient compared to native bash variable manipulation. Since <objRef> is a string
 # variable, you can pass it to bash functions and store it in other bash array elements.  Then when you want to work with it, you
 # can dereference it into a bassh associative array with the local -n feature.
 #
-#    local -n myObj=$($myObjRef.getOID)
+#    local -n myObj; GetOID $myObjRef myObj
 #    Member Assignment
 #        myObj[<memberVariableName>]="something"
 #    Member Access
@@ -667,11 +760,7 @@ function ConstructObject()
 	local _CLASS="$1"; assertNotEmpty _CLASS "className is a required parameter"
 
 	DeclareClassEnd "${_CLASS%%::*}"
-	if ! varExists "${_CLASS%%::*}[name]"; then
-		# if the class does not yet exist, if a Library exists named for the class, we can load it
-		import -q "${_CLASS%%::*}.sh" ;$L1;$L2 || assertError -v class:"-l${_CLASS%%::*}" "Class '${_CLASS%%::*}' does not exist"
-		varExists "${_CLASS%%::*}[name]" || assertError -v class:"-l${_CLASS%%::*}" -v library:"-l${_CLASS%%::*}.sh" "Tried to find Class by importing the library with its name, but it did not contain the class declaration"
-	fi
+	static::Class::assertClassExists "${_CLASS%%::*}"
 
 	### support dynamic base class implemented construction
 	if type -t ${_CLASS%%::*}::ConstructObject &>/dev/null; then
@@ -777,23 +866,26 @@ function ConstructObject()
 	# if more methods are known
 	_classUpdateVMT "${_this[_CLASS]}"
 
-	# each object can point to its own VMT if had dynamic methods added, but the typical case is that it uses it's classes VMT
+	# each object can point to its own VMT if it had dynamic methods added, but the typical case is that it uses it's classes VMT
 	local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
 
-	# if the Class has a prototype, use it to initialize our new object
-	if [ "${newTarget[prototype]}" ]; then
-		local -n prototype; GetOID "${newTarget[prototype]}" prototype
-		local _memberVarName; for _memberVarName in "${!prototype[@]}"; do
-			this[$_memberVarName]="${prototype[$_memberVarName]}"
-		done
-	fi
 
 	# invoke the constructors from Object to this class
 	local _cname; for _cname in ${class[classHierarchy]}; do
 		unset -n static; local -n static="$_cname"
+
+		# init members from the _prototype if it exists
+		if varExists ${_cname}_prototype; then
+			local -n prototype="${_cname}_prototype";
+			local _memberVarName; for _memberVarName in "${!prototype[@]}"; do
+				this[$_memberVarName]="${prototype[$_memberVarName]}"
+			done
+		fi
+
+		# call $_cname::__construct() if it exists
 		bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 		type -t $_cname::__construct &>/dev/null && $_cname::__construct "$@"
-		_resultCode="$?"; bgDebuggerPlumbingCode=1
+		bgDebuggerPlumbingCode=1
 	done
 
 	# if the class has a postConstruct method, invoke it now. postConstruct allows a base class to do things after the object is
@@ -801,7 +893,7 @@ function ConstructObject()
 	local _cname; for _cname in ${class[classHierarchy]}; do
 		bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 		type -t $_cname::postConstruct &>/dev/null && $_cname::postConstruct "$@"
-		_resultCode="$?"; bgDebuggerPlumbingCode=1
+		bgDebuggerPlumbingCode=1
 	done
 	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 	true
@@ -1162,7 +1254,7 @@ function __resolveMemberChain()
 		if [[ "$attributes" =~ [aA] ]]; then
 			:
 		elif [ "${!_rsvOID:0:12}" == "_bgclassCall" ]; then
-			GetOID "${!_rsvOID}" $_rsvOID
+			GetOID "${!_rsvOID}" $_rsvOID || assertError
 		else
 			[ ${#parts[@]} -gt 0 ] && { _rsvMemberType="invalidExpression:the first term is not a valid object or assignment left hand side. "; return 101; }
 			_rsvMemberName="$_rsvOID"
@@ -1255,6 +1347,7 @@ function __resolveMemberChain()
 		else
 			local -n _pThisSys; { [ "$_oidType" == A ] && [ "${_pthis[_CLASS]+exists}" ]; } && _pThisSys="$_rsvOID" || _pThisSys="${_rsvOID}_sys"
 			local -n _VMT="${_pThisSys[_VMT]:-${_pThisSys[_CLASS]}_vmt}"
+			varIsA A _VMT || assertError
 			[ "${_VMT[_method::$_rsvMemberName]+exists}" ] && _methodExists="exists"
 		fi
 
@@ -1291,7 +1384,6 @@ function __resolveMemberChain()
 #    _*       : there are a number of other local vars that are unintentionally passed to the method
 #    _hierarchLevel
 #    _memberExpression
-#    _resultCode
 #
 # Object Syntax:
 # See man(5) bgBashObjectsSyntax which is created by comments above the _parseObjSyntax function
@@ -1422,7 +1514,7 @@ function _bgclassCall()
 				local _memberVarName; for _memberVarName in "${!this[@]}"; do
 					[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
 					if IsAnObjRef "${this[$_memberVarName]}"; then
-						declare -n $_memberVarName; GetOID "${this[$_memberVarName]}" "$_memberVarName"
+						declare -n $_memberVarName; GetOID ${this[$_memberVarName]} "$_memberVarName"
 					else
 						declare -n $_memberVarName="this[$_memberVarName]"
 					fi
@@ -1471,7 +1563,7 @@ function _bgclassCall()
 			local _memberVarName; for _memberVarName in "${!static[@]}"; do
 				[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
 				if IsAnObjRef "${static[$_memberVarName]}"; then
-					declare -n $_memberVarName; GetOID "${static[$_memberVarName]}" "$_memberVarName"
+					declare -n $_memberVarName; GetOID ${static[$_memberVarName]} "$_memberVarName"
 				else
 					declare -n $_memberVarName="static[$_memberVarName]"
 				fi
@@ -1622,7 +1714,7 @@ function _bgclassCall()
 		*) assertObjExpressionError -v _memberOp -v _rsvMemberType "case block for object syntax operators by target type is missing this case"
 	esac
 
-	_resultCode="$?"
+	local _resultCode="$?"
 	#declare -g msCP4; msLap="10#${EPOCHREALTIME#*.}"; (( msCP4+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 	#declare -g msTotal; msLap="10#${EPOCHREALTIME#*.}"; (( msTotal+=((msLap>msStart) ? (msLap-msStart) : 0)   ))
 
@@ -1703,13 +1795,31 @@ function evalLocalObjectSyntax()
 }
 declare -g eval="evalLocalObjectSyntax "
 
-# usage: GetOID <objRef> [<retVar>]
-# usage: local -n obj=$(GetOID <objRef>)
-# usage: local -n obj; GetOID obj
+# usage: GetOID <objRef> <retVar>
+# usage: echo $(GetOID <objRef> -)
+# usage: local -n obj; GetOID <objRef> obj || assertError
 # This returns the name of the underlying array name embedded in an objRef. The result is similar to $objRef.getOID except this is
 # more efficient because it simply parses the <objRef> instead of invoking a method call.
 #
-# An <objRef> is a string that points to an object instance such as what is returned by ConstructObject.
+# The most efficient way to call this function is to not surround <objRef> in quotes.
+#    local -n obj; GetOID $objRef obj
+#
+# Note that two arguments are always required so this function call signature breaks the common pattern a little. Normally you would
+# be able to invoke the function without a <retVar> to indicate that it should print the result to stdout but because the most efficient
+# way to call this function is to not surround <objRef> in quotes and it is possible that an <objRef> is empty, it would be ambiguous
+# if the function sees that only one argument was passed whether an invalid <objRef> was passed in intended to write to stdout
+# or whether an empty <objRef> was passed in with a <retVar>. To resolve this, it is mandatory that a <retVar> is provided and the
+# value '-' will be taken to mean that the output should be written to stdout.
+#
+# An <objRef> is a string that points to an object instance such as what is returned by ConstructObject. A common scenario is that
+# one object has objRefs to other objects -- particularly because native bash does not support nested arrays.  To access a member
+# variable that is an objRef, you can use object syntax like  $this.myMemberObj.... which is fine if you only have one or two
+# accesses to do. But if you will be accessing multiple member variables of that object it is much more efficient to get a native
+# bash -n nameref to it.
+#
+# Note that in an object method, namerefs to the object's immediate members are automatically setup as if the following line was
+# done...
+#     local -n myMemberObj; GetOID ${this[myMemberObj]} myMemberObj
 #
 # This function is typically used to make a local array reference to the underlying array. An array reference can be used for
 # anything that an objRef can but in addition, the member variables can be accessed directly as bash array elements
@@ -1718,48 +1828,107 @@ declare -g eval="evalLocalObjectSyntax "
 #   <objRef> : the string that refers to an object. For simple bash variables that refer to objects, this is their value.
 #              for bash arrays that refer to objects, it  the value of the [0] element. In either case, you call this
 #              function like
-#                  GetOID $myObj   (or GetOID "$myObj"  -- the double quotes are optional)
+#                  GetOID $myObj  -- quoting $myObj will work but its prefered to not
 #   <retVar> : return the OID in this var instead of on stdout
 function GetOID()
 {
-	local goid_retVar=""
-	while [ $# -gt 0 ]; do case $1 in
-		# DEPRECIATED: -R is supported for legacy code
-		-R*)  bgOptionGetOpt val: goid_retVar "$@" && shift ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-	done
-	local objRef="$1"; shift
+	[ "${1:0:1}" == "-" ] && assertError "GetOID does not accept any options. -R <retVar> is no longer supported. The new calling convention is GetOID $someRef myRetVar|-"
 
-	# dereferenced without quotes
-	if [ "$objRef" == "_bgclassCall" ]; then
-		objRef="_bgclassCall $1 $2 $3 $4"; shift 4
-	fi
+	# if the caller passes objRef without quotes, bash will have parsed the components for us
+	# this is the most efficient way to be called
+	if [ "$1" == "_bgclassCall" ]; then
+		# note that a valid objRef must always expand to 5 tokens --
+		#   $1           $2    $3          $4              $5    $6
+		#  '_bgclassCall <oid> <className> <hierarchLevel> |     <retVar>'
+		returnValue "$2" "$6"
+		return 0
 
-	# see if there is a <retVar> (it can also be passed in the -R <retVar> option)
-	[ ! "$goid_retVar" ] && { goid_retVar="$1"; shift; }
-
-	local oidVal
-	if [ "${objRef}"  == "" ]; then
-		oidVal="NullObjectInstance"
-
-	# this is the normal case
-	elif [ "${objRef:0:12}"  == "_bgclassCall" ]; then
-		oidVal="${objRef#_bgclassCall }"
+	# this is the case where the user put quotes around <objRef> and its valid. ${1:0:12} means param $1, chars 0-12
+	elif [ "${1:0:12}" == "_bgclassCall" ]; then
+		local oidVal
+		oidVal="${1#_bgclassCall }"
 		oidVal="${oidVal%% *}"
+		returnValue "$oidVal" "$2"
 
-	# this is when objRef is a variable that points to an objRef
-	elif [[ "${!objRef}"  =~ ^_bgclassCall ]]; then
-		oidVal="${!objRef}"
-		oidVal="${oidVal#_bgclassCall }"
-		oidVal="${oidVal%% *}"
+	# this is the case where the user passed in the variable name that holds the <objRef>. ${!1:0:12} means param ${!1} (the var whose name is in $1), chars 0-12
+	elif [[ "$1" =~ ^[_a-zA-Z][0-9_a-zA-Z]*$ ]]; then
+		GetOID ${!1} "$2"
+		return
 
-	# unknown
+	# this is the case where <objRef> is empty and its not surrounded in quotes so <retVar> will be in $1
+	elif [ $#  == 1 ]; then
+		returnValue "NullObjectInstance" "$1"
+
+	# this is the case where <objRef> is empty and its surrounded in quotes
+	elif [ "$1"  == "" ]; then
+		returnValue "NullObjectInstance" "$2"
+
+	# its not a valid <objRef>
 	else
-		assertError "unknown object ref '$objRef'"
+		return 1
+	fi
+}
+
+# usage: SetupObjContext <objRef> <_OIDRef> <thisRef> <_thisRef> <_vmtRef> <staticRef>
+function SetupObjContext()
+{
+	if [ "$1" == "_bgclassCall" ]; then
+		local _soc_oid="$2"
+		local _soc_class="$3"
+		local _soc_hierarchLevel="$4"
+		shift 5
+	else
+		local _soc_parts=($1)
+		local _soc_oid="${parts[1]}"
+		local _soc_class="${parts[2]}"
+		local _soc_hierarchLevel="${parts[3]}"
+		shift 1
 	fi
 
-	returnValue "$oidVal" "$goid_retVar"
+	# <_OIDVar> <thisRef> <_thisRef> <_vmtRef> <staticRef>
+	# $1        $2        $3         $4        $5
+
+	# <_OIDVar>
+	if [ "$1" ]; then
+		returnValue "$_soc_oid" "$1"
+	fi
+
+	# <thisRef>
+	if [ "$2" ]; then
+		returnValue "$_soc_oid" "$2"
+		local -n this="$_soc_oid"
+	fi
+
+	# <_thisRef>
+	if [ "$3" ]; then
+		if varExists "${_soc_oid}_sys"; then
+			returnValue "${_soc_oid}_sys" "$3"
+			local _this="${_soc_oid}_sys"
+		else
+			returnValue "${_soc_oid}"     "$3"
+			local _this="${_soc_oid}"
+		fi
+	fi
+
+	# <_vmtRef>
+	if [ "$4" ]; then
+		# The _soc_hierarchLevel from the <objRef> indicates that <objRef> is a 'super...' call so use the baseClass's VMT
+		if [ ${_soc_hierarchLevel:-0} -eq 0 ]; then
+			# the default VMT is the classe's VMT but an object will have its own if methods are added or removed
+			returnValue "${_this[_VMT]:-${_this[_CLASS]}_vmt}"     "$4"
+		else
+			local -n refClass="$_soc_class"
+			returnValue "${refClass[baseClass]}_vmt"               "$4"
+		fi
+	fi
+
+
+	# <staticRef>
+	if [ "$5" ]; then
+		returnValue "${_soc_class}"     "$5"
+	fi
 }
+
 
 # usage: IsAnObjRef <objRef>
 # returns true if <objRef> is a variable whose content matches "^_bgclassCall .*"
@@ -1768,24 +1937,37 @@ function GetOID()
 #   <objRef> : the string to be tested
 function IsAnObjRef()
 {
-	local objRef="$*"
-	[ "${objRef:0:12}"  == "_bgclassCall" ]
+	# this test supports <objectRef> being passed inside quotes or not. Even though normally in bash its important to put arguments
+	# in quotes, passing an <objRef> to some functions like GetOID support passing without quotes for efficiency so we try to be
+	# consistent by supporting it here (even though it does not matter in this function)
+	[ "${1:0:12}"  == "_bgclassCall" ]
 }
 
 # usage: returnObject <objRef> [<retVar>]
 # This is similar to 'returnValue' but does extra processing for objects.
 # If <retVar> is not provided, it uses printfVars to write the object to stdout instead of echo which would write the <objRef>
-# If <retVar> is a unitialized nameRef, it is assigned the object's OID
+# If <retVar> is an unitialized nameRef, it is assigned the object's OID
 function returnObject()
 {
-	local obj="$1"
-	local retVar="$2"
-	if [ ! "$retVar" ]; then
-		printfVars "$obj"
-	elif [[ "$(declare -p "$retVar" 2>/dev/null)" =~ ^declare\ -n[^=]*$ ]]; then
-		GetOID "$obj" "$retVar"
+	local _ro_objRef _ro_oid
+	if [ "$1" == "_bgclassCall" ]; then
+		_ro_oid="$2"
+		_ro_objRef="$1 $2 $3 $4 $5"; shift 5
 	else
-		returnValue "$obj" "$retVar"
+		_ro_objRef="$1"; shift
+	fi
+	local retVar="$1"
+
+	if [ ! "$retVar" ] || [ "$retVar" == '-' ] || [ "$retVar" == '--' ]; then
+		printfVars "$_ro_objRef"
+	elif [[ "$(declare -p "$retVar" 2>/dev/null)" =~ ^declare\ -n[^=]*$ ]]; then
+		if [ "$_ro_oid" ]; then
+			returnValue "$_ro_oid" "$retVar"
+		else
+			GetOID $_ro_objRef "$retVar" || assertError
+		fi
+	else
+		returnValue "$_ro_objRef" "$retVar"
 	fi
 }
 
@@ -1988,6 +2170,7 @@ function Object::clone()
 	local newRefVar="$1"
 	local newOID
 	genRandomIDRef newOID 9 "[:alnum:]"
+	# TODO: i suspect we can do this better, without eval
 	[ "$newRefVar" ] && eval $newRefVar=\${_this[_Ref]/${_this[_OID]}/$newOID}
 
 	# declStr is the complete bash serialized state of $this
@@ -2064,49 +2247,91 @@ function Object::addMethod()
 }
 
 
-# usage: $obj.getAttributes [<outputValueOptions>]
-# return a list of the attribute names that is the union of names currently in the object's array at his moment and the names in
-# the Class's prototype member. Attributes are dynamic and can be added and removed over the object's lifetime. Even if an attribute
-# is removed from the object's array, if it is in the Class's protocol member it will be returned by this function.
-# The Class prototype member contains the default values for the initial member variables .
+# usage: $obj.getAttributes [<outputValueOptions>|-A|-S|-R... <retVar>]
+# return a list of the attribute names in the object instance at this time. Attributes are dynamic and can be added and removed over
+# the object's lifetime. System variables are not included in the list unless --sys or --all options are specified.
+#
+# Prototype:
+# If the object class or any base class has a _prototype, the veriables in the _prototype are copied to the object instance when it
+# is created. If the user subsequently removes one of the those variables, currently this function will not return that variable
+# name. At this time (circa 2022-03) I believe that we should not fill in missing pieces from the prototypes because it significantly
+# complicates this function and in bash, strong typing goes against the design principle that scripts should access the OID array
+# directly whenever possible.
+#
+# Transient System Attributes:
+# The [0] and [_Ref] attributes are considered transient state and are not included even when --sys or --all are specified.
+# The rationale is that since they only contain objRefs to itself, they contain no unique state and could be recreated at any time
+# from the [_CLASS] and [_OID] attributes.
+#
 # Options:
 #    <outputValueOptions>  : see man(3) outputValue for supported options
-function Object::getAttributes() { Object::getIndexes "$@"; }  # alias
-function Object::getIndexes()
+#    --sys   : return only system vars instead of real object member variables. (Note that '0' and '_Ref' are never returned)
+#    --all   : return both system and real object member variables
+function Object::getIndexes() { Object::getAttributes "$@"; }  # alias
+function Object::getAttributes()
 {
-	local retOpts
+	local retOpts mode="real"
 	while [ $# -gt 0 ]; do case $1 in
+		--sys) mode="sys"  ;;
+		--all) mode="both" ;;
 		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ] && [ ! "${static[protocol]}" ]; then
-		outputValue -1 "${retOpts[@]}" "${!this[@]}"
+	# re: ${_CLASS}_prototype, I considered listing from the prototype's also but since we copy the prototype members on construction,
+	# they will already be in the this[] array unless they were removed and there is no efficient way to deal with enforcing the
+	# member if the user decides to remove it. You could make the case that if a user deliberately removes it from this[] then it
+	# should be gone. in bash, _prototype is a convenience as opposed to a strong typing system
+
+	local realAttrib0FilterOpt; [ "${static[defaultIndex]:-on}" == "on" ] && realAttrib0FilterOpt="--filters=0"
+
+	# in this case 'this[]' has no system vars. The Array class is like this
+	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ]; then
+		case $mode in
+			real) 	outputValue -1 "${retOpts[@]}" "${!this[@]}" ;;
+			sys)  	outputValue -1 --filters="0 _Ref"          "${retOpts[@]}" "${!_this[@]}" ;;
+			both) 	outputValue -1                             "${retOpts[@]}" "${!this[@]}"
+					outputValue -1 --append --filters="0 _Ref" "${retOpts[@]}" "${!_this[@]}"
+					;;
+		esac
+
+	# in this case 'this[]' contains just one the system var -- [0]
+	elif [ "$_OID_sys" != "$_OID" ]; then
+		case $mode in
+			real) 	outputValue -1 --filters=0                 "${retOpts[@]}" "${!this[@]}" ;;
+			sys)  	outputValue -1 --filters="0 _Ref"          "${retOpts[@]}" "${!_this[@]}" ;;
+			both) 	outputValue -1 --filters=0                 "${retOpts[@]}" "${!this[@]}"
+					outputValue -1 --append --filters="0 _Ref" "${retOpts[@]}" "${!_this[@]}"
+					;;
+		esac
+
+	# in the case there is no separate _this[] so 'this[]' has system vars mixed in with the user member vars
 	else
 		local -A _retValue=()
 
-		if [ "${static[protocol]}" ]; then
-			local -n prototype; GetOID "${static[protocol]}" protocol
-			local _varName; for _varName in "${!prototype[@]}"; do
-				_retValue[$_varName]=1
+		# if [0] exists but is not a system var, record it here because the main loop below excludes it
+		[ "$mode" != "sys" ] && [ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && _retValue["0"]=1
+
+		if [ "$mode" == "both" ]; then
+			varOutput -S _retValue --append --filters="0 _Ref" "${!this[@]}"
+		else
+			local _varName; for _varName in "${!this[@]}"; do
+				{ [ "$_varName" == "0" ] || [ "$_varName" == "_Ref" ]; } && continue
+				case $mode in
+					real)  [ "${_varName:0:1}" != "_" ] && _retValue[$_varName]=1 ;;
+					sys)   [ "${_varName:0:1}" == "_" ] && _retValue[$_varName]=1 ;;
+				esac
 			done
 		fi
-
-		[ "${static[defaultIndex]:-on}" != "on" ] && [ "${this[0]+exists}" ] && _retValue["0"]=1
-
-		local _varName; for _varName in "${!this[@]}"; do
-			if [[ ! "$_varName" =~ ^((_)|(0$)) ]]; then
-				_retValue[$_varName]=1
-			fi
-		done
 
 		outputValue -1 "${retOpts[@]}" "${!_retValue[@]}"
 	fi
 }
 
 
-# usage: $obj.getAttributes [<outputValueOptions>]
-# return a list of the values in the object's array.
+# usage: $obj.getValues [<outputValueOptions>]
+# return a list of the values in the object's array. This does not include the values of any system vars. Unlike getAttributes,
+# this function does not support the --sys and --all but they could be added if needed.
 # Options:
 #    <outputValueOptions>  : see man(3) outputValue for supported options
 function Object::getValues()
@@ -2117,8 +2342,14 @@ function Object::getValues()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ] && [ ! "${static[protocol]}" ]; then
+	# in this case 'this[]' has no system vars. The Array class is like this
+	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ]; then
 		outputValue -1 "${retOpts[@]}" "${this[@]}"
+
+	# in all other cases we need to use Object::getAttributes so that "0" and other system vars are filtered out.
+	# In the case of a separate _this array and defaultIndex is off, only the "0" sys var is present, but there seems to be no
+	# more efficient was of removing that one element's value from the output. using outputValue --filters="${this[0]}" is close
+	# but it would remove any other attribute that had an objRef to itself. That seems rare but not worth the optimization.
 	else
 		local _retValue=()
 		local _attributeNames=(); Object::getAttributes -A _attributeNames
@@ -2133,7 +2364,7 @@ function Object::getValues()
 
 function Object::getSize()
 {
-	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ] && [ ! "${static[protocol]}" ]; then
+	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ]; then
 		returnValue "${#this[@]}" $1
 	else
 		local _attributeNames=()
@@ -2265,23 +2496,44 @@ function Primitive::toString() {
 }
 
 # usage: $obj.toString
-# Write the object's attributes to stdout
+# Write the object's attributes to stdout. toString is meant to be a human readable organized format that is not neccesarily
+# machine friendly. It may gloss over some details for readability and therefore would not be suitable for persistance or IPC
 # See Also:
-#    toJSON
-#    toDebControl
+#    man(3) Object::toJSON
+#    man(3) Object::toDebControl
 function Object::toString()
 {
-	local titleName
+	local titleName mode rawMode
 	while [ $# -gt 0 ]; do case $1 in
 		--title*) bgOptionGetOpt val: titleName "$@" && shift ;;
+		--sys) mode="--sys"  ;;
+		--all) mode="--all" ;;
+		--raw) rawMode="--raw" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	local indexes=$($_this.getIndexes)
+	# the pattern allows objDictionary to be shared among this and any recursive call that it spawns
+	if ! varExists objDictionary; then
+		local -A objDictionary=()
+	fi
+	objDictionary[$_OID]="seen"
+
+	if [ "$rawMode" ]; then
+		printfVars --rawObjects this
+		return 0
+	fi
+
+	local indexes; $_this.getIndexes $mode -A indexes
 
 	local labelWidth=0
-	local attrib; for attrib in $indexes; do
-		[ "${this[$attrib]:0:12}" == "_bgclassCall" ] && continue
+	local attrib; for attrib in "${indexes[@]}"; do
+		# I dont remember why we exclude object attribute names from the labelWidth. It might be obsolete because we format the
+		# first line of objects differently now
+		if [ "${attrib:0:1}" == "_" ]; then
+			[ "${_this[$attrib]:0:12}" == "_bgclassCall" ] && continue
+		else
+			[ "${this[$attrib]:0:12}" == "_bgclassCall" ] && continue
+		fi
 		((labelWidth=(labelWidth<${#attrib}) ?${#attrib} :labelWidth ))
 	done
 
@@ -2289,29 +2541,43 @@ function Object::toString()
 
 	local indent="" indentWidth=labelWidth
 	if [ "$titleName" ]; then
-		printf "%s : <instance> of %s\n" "${titleName}" "${_this[_CLASS]}"
+		printf "%s= <instance> of %s\n" "${titleName}" "${_this[_CLASS]}"
 		indent="  "
 		((indentWidth+=2))
 	fi
 
+	# objects with numeric arrays get [] around there membervar names
+	local lDecor rDecor
 	if [[ ${static[oidAttributes]:-A} =~ a ]]; then
-		local fmtString="${indent}[%${labelWidth}s]=%s\n"
-	else
-		local fmtString="${indent}%-${labelWidth}s=%s\n"
+		lDecor="["
+		rDecor="]"
 	fi
 
 	local toString_fmtExtraLines='{if (NR>1) printf("%-*s+ ", '"$indentWidth"', ""); print $0}'
 
-	local attrib; for attrib in $indexes; do
-		local value="${this[$attrib]}"
-		if [ "${value:0:12}" == "_bgclassCall" ]; then
-			local parts=($value)
-			printf "${indent}%s : <instance> of %s\n" "$attrib" "${parts[2]}" | awk "$toString_fmtExtraLines"
-			${this[$attrib]}.toString | awk '{print "'"$indent"'  " $0}'
+	local attrib; for attrib in "${indexes[@]}"; do
+		if [ "${attrib:0:1}" == "_" ]; then
+			local value="${_this[$attrib]}"
 		else
-			printf "$fmtString" "$attrib" "$value" | awk "$toString_fmtExtraLines"
+			local value="${this[$attrib]}"
+		fi
+		if [ "${value:0:12}" == "_bgclassCall" ]; then
+			local refOID refClass scrap; read -r scrap refOID refClass scrap <<<"${value}"
+			if [ ! "${objDictionary[$refOID]+hasBeenSeen}" ]; then
+				printf "${indent}"
+				Try:
+					$value.toString $mode --title="${lDecor}${attrib}${rDecor}" | awk '{if (NR>1) printf("'"$indent"'"); print $0}'
+				Catch: && {
+					printf "%-${labelWidth}s=<error calling '$value.toString $mode'\n" "${lDecor}${attrib}${rDecor}"
+				}
+			else
+				printf "${indent}%-${labelWidth}s=<Reference to already printed %s object>\n" "${lDecor}${attrib}${rDecor}" "${refClass}" | awk "$toString_fmtExtraLines"
+			fi
+		else
+			printf "${indent}%-${labelWidth}s=%s\n" "${lDecor}${attrib}${rDecor}" "$value" | awk "$toString_fmtExtraLines"
 		fi
 	done
+	true
 }
 
 

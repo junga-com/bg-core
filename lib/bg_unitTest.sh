@@ -297,8 +297,8 @@ function ut()
 		sync
 		gawk '{printf("stderr> %s\n", $0)}' "$errOut"
 		truncate -s0 "$errOut"   || assertError
-		exec {errOutFD}>&-       || assertError
-		exec {errOutFD}>$errOut  || assertError
+		[ "$errOutFD" ] && exec {errOutFD}>&-
+		exec {errOutFD}>$errOut  || assertError -v errOutFD -v errOut
 		[ "$_utRun_section" == "setup" ] && ut setupFailed
 	fi
 
@@ -621,8 +621,10 @@ function utfRunner_execute()
 		varIsA array "$utFunc"                   || assertError -v utFileID -v utFunc -v utParams "the unit test file does not define an array variable with the same name as the function to hold the utParams."
 		local -n inputArray="$utFunc"
 		[ "${inputArray[$utParams]+exists}" ]    || assertError -v utFileID -v utFunc -v utParams "utParams is not a key the in the array variable with the same name as the function. It should be a key whose value is the parameter string to invoke the test function with"
-		# for each utParams passed in, run the testcase function
-		utUnEsc params ${inputArray[$utParams]}
+		# we need to use read -a <var>... instread of ($<list>) because the latter will expand any paramters that happen to expand
+		# to a existing filename. bg_ini.sh:ini_validChars:question failed when there was a file '1' in the PWD because ? matches 1
+		local -a args; read -r -a args <<<"${inputArray[$utParams]}"
+		utUnEsc params "${args[@]}"
 	fi
 
 	# these are the state variables of the unit test run. the ut function and trap handlers and all their helper functions

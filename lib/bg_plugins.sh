@@ -95,7 +95,7 @@ function DeclarePluginType()
 	# make a mutableCols Map member var so that setAttribute can easily check
 	local mutableColsString="${static[mutableCols]}"
 	$static[mutableCols]=new Map
-	local -n mutableCols="$(GetOID "${static[mutableCols]}")"
+	local -n mutableCols; GetOID "${static[mutableCols]}" mutableCols || assertError
 	for attribName in $mutableColsString; do
 		mutableCols[$attribName]="1"
 	done
@@ -274,7 +274,7 @@ function static::Plugin::get()
 
 		_pluginLoadContainingLibrary "$pluginKey" "$_pg_filename"
 
-		local -n _pg_plugin; GetOID "${loadedPlugins[$pluginKey]}" _pg_plugin
+		local -n _pg_plugin; GetOID "${loadedPlugins[$pluginKey]}" _pg_plugin || assertError
 		[ "${_pg_plugin[package]}" == "$_pg_pkg" ] || assertLogicError
 	fi
 
@@ -338,7 +338,8 @@ function static::Plugin::loadAllOfType()
 # This is invoked by the "bg-dev asset plugin.<pluginType> <newAssetName>" command to add a new asset to the current project folder
 # of this plugin type.  This default implementation assumes that there is a system template named newAsset.plugin.<pluginType> which it
 # expands to make a new asset file at <projectRoot>/plugins/<newAssetName>.<pluginType>.  A particular <pluginType> may override
-# this static function to perform different actions if needed.
+# this static function to perform different actions if needed. Calling static::PackageAsset::addAssetToManifest is optional but
+# is recommended so that the asset is seen right away without the user having to do a vinstall
 function static::Plugin::addNewAsset()
 {
 	local subType="$1"; shift
@@ -356,6 +357,9 @@ function static::Plugin::addNewAsset()
 
 	templateExpand "$templateFile" "$destFile"
 	echo "A new asset has been added at '$destFile' with default values. Edit that file to customize it."
+
+	! type -t static::PackageAsset::addAssetToManifest &>/dev/null && { import PackageAsset.PluginType ;$L1;$L2; }
+	static::PackageAsset::addAssetToManifest "plugin" "$newAssetName" "$destFile"
 }
 
 # usage: $Plugin::_dumpAttributes [--pkgName=<pkgName>] [--manifest=<file>] [<pluginKeySpec>]
@@ -520,7 +524,7 @@ function Plugin::__construct()
 function Plugin::postConstruct()
 {
 	# now set the attributes provided by the plugin author in the plugin DeclarePlugin block
-	local -n ctorParams="$(GetOID "${this[_contructionParams]}")"
+	local -n ctorParams; GetOID "${this[_contructionParams]}" "ctorParams" || assertError
 	[ ${#ctorParams[@]} -gt 0 ] && parseDebControlFile this "${ctorParams[@]}"
 
 	# regardless of what the author provided in the attribute inputs, we have to make sure that these attributes are set
@@ -533,7 +537,7 @@ function Plugin::postConstruct()
 	# normalize tags attribute (if it exists)
 	this[tags]="${this[tags]//[,:]/ }"
 
-	local -n mutableCols="$(GetOID "${newTarget[mutableCols]}")"
+	local -n mutableCols; GetOID "${newTarget[mutableCols]}" "mutableCols" || assertError
 	for attribName in "${!mutableCols[@]}"; do
 		configGet -R this[$attribName] "${this[pluginKey]}" "$attribName" "${this[$attribName]}"
 	done

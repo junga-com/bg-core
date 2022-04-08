@@ -96,21 +96,21 @@ function ut_ConstructObject()
 
 	ut test
 	local pet; ConstructObject Animal pet
-	local petOID="$(GetOID "$pet")"
+	local petOID="$(GetOID "$pet" -)"
 	eval 'local petOIDVars="${!'"$petOID"'*}"'
 	echo "global vars for this object = ${petOIDVars}"
 	printfVars --noObjects pet $petOIDVars
 
 	ut test
 	local -A pet2; ConstructObject Animal pet2
-	local pet2OID="$(GetOID "$pet2")"
+	local pet2OID="$(GetOID "$pet2" -)"
 	eval 'local pet2OIDVars="${!'"$pet2OID"'*}"'
 	echo "vars for this object = ${pet2OIDVars}"
 	printfVars --noObjects $pet2OIDVars
 
 	ut test
 	local -n pet3; ConstructObject Animal pet3
-	local pet3OID="$(GetOID "$pet3")"
+	local pet3OID="$(GetOID "$pet3" -)"
 	eval 'local pet3OIDVars="${!'"$pet3OID"'*}"'
 	echo "global vars for this object = ${pet3OIDVars}"
 	printfVars --noObjects pet3 $pet3OIDVars

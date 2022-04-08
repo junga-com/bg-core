@@ -1,0 +1,120 @@
+
+###############################################################################################################################
+## bg_json.sh:Object_toJSON: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n foo; ConstructObject TestClass foo
+
+##----------
+## test
+cmd> $foo.toJSON
+{
+   "pmemB": "5",
+   "pmemA": "hello",
+   "memberTwo": "14",
+   "memberOne": "this and that",
+   "words": [
+      "zero",
+      "one",
+      "two",
+      {}
+   ],
+   "numbers": {
+      "two": "2",
+      "obj": {},
+      "zero": "0",
+      "one": "1"
+   }
+}
+
+##----------
+## test
+cmd> $foo.toJSON --all
+{
+   "pmemB": "5",
+   "pmemA": "hello",
+   "memberTwo": "14",
+   "memberOne": "this and that",
+   "words": [
+      "zero",
+      "one",
+      "two",
+      {
+         "_CLASS": "Object",
+         "_OID": "sessionOID_2"
+      },
+      "Array",
+      "sessionOID_1"
+   ],
+   "numbers": {
+      "two": "2",
+      "obj": {
+         "_CLASS": "Object",
+         "_OID": "sessionOID_4"
+      },
+      "zero": "0",
+      "one": "1",
+      "_CLASS": "Map",
+      "_OID": "sessionOID_3"
+   },
+   "_CLASS": "TestClass",
+   "_OID": "sessionOID_0"
+}
+
+## bg_json.sh:Object_toJSON: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_json.sh:ConstructObjectFromJson: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local jsonFile; bgmktemp --auto jsonFile
+##     | cmd> cat > "$jsonFile" <<-EOS
+##     | cmd> cat "$jsonFile"
+##     | {
+##     |    "pmemB": "5",
+##     |    "pmemA": "hello",
+##     |    "memberTwo": "14",
+##     |    "memberOne": "this and that",
+##     |    "words": [
+##     |       "zero",
+##     |       "one",
+##     |       "two",
+##     |       {}
+##     |    ]
+##     |    "numbers": {
+##     |       "two": "2",
+##     |       "obj": {}
+##     |       "zero": "0",
+##     |       "one": "1"
+##     |    }
+##     | }
+
+##----------
+## test
+cmd> local obj; ConstructObjectFromJson obj "$jsonFile"
+cmd> printfVars  obj
+obj= <instance> of Object
+  pmemB    =5
+  pmemA    =hello
+  memberTwo=14
+  memberOne=this and that
+  words= <instance> of Array
+    [0]=zero
+    [1]=one
+    [2]=two
+    [3]= <instance> of Object
+  numbers= <instance> of Object
+    two =2
+    obj= <instance> of Object
+    zero=0
+    one =1
+
+## bg_json.sh:ConstructObjectFromJson: finished
+###############################################################################################################################
+

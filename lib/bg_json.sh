@@ -82,6 +82,11 @@ function jsonAwk()
 			function valueHook(jpath, value, valType) {}
 		'
 	fi
+	if [[ ! "$script" =~ function[[:space:]]*eventHook ]]; then
+		script+='
+			function eventHook(event, p1,p2,p3,p4,p5) {}
+		'
+	fi
 
 	gawk -i bg_json.awk \
 		-v jsonValuesReadCount="$jsonValuesReadCount" \
@@ -144,25 +149,195 @@ function Object::fromJSON()
 #      might do it all
 
 # usage: $obj.toJSON
-#
+# Options:
+#    --sys : inlude system members in the output. System members are any whose index name in 'this' starts with an '_' and also
+#            all the indexes in '_this' if _this is a separate bash array
+#    --indent=<padStr> : <padStr> is a string of (typically) padding (spaces or tabs) that will be written at the start of each line
+#    --sep=<separator> : a separator character (or string) that will be written after the output. Typically it empty '' or ','
+# See Also:
+#    man(3) Object::toString
 function Object::toJSON()
 {
-	local indent
+	((recurseCount++ >10)) && assertError
+	local indent recordSep mode
 	while [ $# -gt 0 ]; do case $1 in
-		--indent*)  bgOptionGetOpt val: indent "$@" && shift ;;
+		--sys)     mode="--sys"  ;;
+		--all)     mode="--all"  ;;
+		--indent*) bgOptionGetOpt val: indent           "$@" && shift ;;
+		--sep*)    bgOptionGetOpt val: recordSep        "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	printf "${indent}{\n"
+	# the pattern allows objDictionary to be shared among this and any recursive call that it spawns
+	if ! varExists objDictionary; then
+		local -A objDictionary=()
+	fi
+
+	# record that this object is being written to the json txt
+	objDictionary[${_this[_OID]}]="sessionOID_${#objDictionary[@]}"
+
+	# if the this array for this object is numeric then we write it as a JSON list [ <varlue> .. ,<varlue>] with no labels
+	if [[ "${static[oidAttributes]}" == *a* ]]; then
+		local tOpen='['
+		local tClose=']'
+		local labelsOn=""
+	else
+		local tOpen='{'
+		local tClose='}'
+		local labelsOn="yes"
+	fi
+
+	# the general indent strategy is that the inside of the object (i.e. its attribute list) is indented WRT the open and close.
+	# so we print the open before we increase the indent and at the end decrease the indent before we print the close.
+	# This also works fine for nested objects where the current output position is after the object's name '"myobj": {'
+	printf "%s" "$tOpen"
 	indent+="   "
 
-	local count="${#this[@]}"
+	# use getIndexes to get the memberNames. Its temping to try to use "${!this[@]}" and "${!_this[@]}" but its too complicated to
+	# repeat all the edge cases and getAttributes is pretty well optimized so that when possible it just returns those constructs
+	local memberNames; $_this.getIndexes $mode -A memberNames
+	local totalMemberCount="${#memberNames[@]}"
+	local writtenCount="$totalMemberCount"
 	local sep=","
-	for name in "${!this[@]}"; do
-		((count-- == )) && sep=""
-		printf "${indent}"'"%s": "%s"%s\n' "$name" "${this[$name]}"
+
+	# this is so that an empty Object can show on one line like "{}"
+	((totalMemberCount>1)) && printf "\n"
+
+	local name value
+	for name in "${memberNames[@]}"; do
+		((--writtenCount == 0 )) && sep=""
+
+		case ${name} in
+			_*) value="${_this[$name]}" ;;
+			*)  value="${this[$name]}"  ;;
+		esac
+
+		# print the start of the line, upt to the <value>
+		printf "${indent}"
+		[ "$labelsOn" ] && printf '"%s": ' "$name"
+
+		# if its an objRef, get its _OID
+		local refOID; IsAnObjRef $value && { GetOID "${value}" refOID || assertError; }
+
+		# special case _OID so that we change its value to the sessionOID
+		if [ "$name" == "_OID" ]; then
+			printf '"%s"%s\n'  "${objDictionary[${_this[_OID]}]}" "$sep"
+
+		# if its an object and not already in objDictionary[] which means we have not yet written out this object
+		elif [ "$refOID" ] && [ ! "${objDictionary[$refOID]+exists}" ]; then
+			$value.toJSON $mode --indent="$indent" --sep="$sep"
+
+		# if its an object we have already seen
+		elif [ "$refOID" ]; then
+			printf '"%s"%s\n'  "${value//$refOID/${objDictionary[$refOID]}}" "$sep"
+
+		# all other cases just write the <anem> and <value>
+		else
+			printf '"%s"%s\n'  "$value" "$sep"
+		fi
 	done
 
 	indent="${indent%"   "}"
-	printf "${indent}}\n"
+	((totalMemberCount>1)) || indent=""
+	printf "${indent}%s%s\n" "$tClose" "$recordSep"
+}
+
+
+# usage: ConstructObjectFromJson <objRefVar> <jsonText>
+function ConstructObjectFromJson()
+{
+	local file="-"
+	while [ $# -gt 0 ]; do case $1 in
+		-f*|--file*)  bgOptionGetOpt val: file "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local objRefVar="$1"; shift
+	local file="${1:-$jsonFile}"
+
+	local -n scope; ConstructObject Object "scope"
+	local scopeOID; GetOID $scope scopeOID
+
+	local currentStack="$scope"
+	local -n current="$scopeOID"
+	local -A objDictionary
+
+	local relName valType jpath value className
+	while read -r  valType relName jpath value ; do
+#bgtraceVars -1 --noObjects valType relName jpath value
+#bgtraceBreak --skipCount=9
+		case $valType in
+
+			startObject) className="Object" ;;&
+			startList)   className="Array"  ;;&
+			startObject|startList)
+				currentStack=(""  "${currentStack[@]}")
+				ConstructObject "$className" currentStack[0]
+				if [ "$relName" == "<arrayEl>" ]; then
+					current+=("$currentStack")
+				else
+					current[$relName]="$currentStack"
+				fi
+
+				unset -n current; local -n current; GetOID $currentStack current || assertError
+#printf "\n!!!     >PUSH current is now = '%s'\n" "$currentStack"
+#printfVars --noObjects currentStack scope  current; printfVars  scope
+#exit
+				;;
+
+			endObject|endList)
+				currentStack=("${currentStack[@]:1}")
+				unset -n current; local -n current; GetOID $currentStack current || assertError
+				className=""
+#printf "\n!!!     <POP:  current is now = '%s'\n" "$currentStack"
+#printfVars --noObjects currentStack scope  current; printfVars  scope
+#exit
+				;;
+			tObject) ;;
+			tArray)  ;;
+
+			*)	if [[ "$value" =~ _bgclassCall.*sessionOID_[0-9]+ ]]; then
+					:
+				fi
+				case $relName in
+					# we don't restore 0, _OID, nor _Ref although we use them to update the dictionary with the sessionOID_<n> and new _OID
+					0) ;;
+					_OID) local sessionOID="$value"  ;;&
+					_Ref) local partsIn=($value); local sessionOID="${partsIn[1]}" ;;&
+					_Ref|_OID)
+						local partsOut=($currentStack)
+						objDictionary["${sessionOID}"]="${partsOut[1]}"
+						objDictionary["${partsOut[1]}"]="${sessionOID}"
+						;;
+					_CLASS)
+						static::Class::setClass $current "$value"
+						;;
+
+					_*)	# SetupObjContext <objRef> <_OIDRef> <thisRef> <_thisRef> <_vmtRef> <staticRef>
+						local -n  current_sys; SetupObjContext $current "" "" current_sys
+						current_sys[$relName]="$value"
+						;;
+
+					'<arrayEl>') current+=("$value") ;;
+					*) current[$relName]="$value" ;;
+				esac
+				;;
+		esac
+	done < <(jsonAwk -n '
+		function eventHook(event, p1,p2,p3,p4,p5                               ,relName) {
+			relName=(p1 ~ /[[].*[]]/) \
+				? "<arrayEl>" \
+				: gensub(/^.*[.]/,"","g",p1)
+
+			if (p1 ~ /[[].*[]]/)
+				relName="<arrayEl>"
+			else
+				relName=gensub(/^.*[.]/,"","g",p1)
+			printf("%-13s %-13s %-24s %s\n", event, relName, p1, "--")
+		}
+		function valueHook(jpath, value, valType, relName) {
+			printf("%-13s %-13s %-24s %s\n", valType, relName, jpath, value)
+		}
+	' "$file" )
+
+	returnObject ${scope[top]} "$objRefVar"
 }

@@ -1,0 +1,72 @@
+#!/usr/bin/env bg-utRunner
+
+import bg_objects.sh  ;$L1;$L2
+import bg_json.sh  ;$L1;$L2
+
+DeclareClass TestClass '
+	memberVars:
+	 pmemA="hello"
+	 pmemB=5
+'
+function TestClass::__construct()
+{
+	this[memberOne]="this and that"
+	this[memberTwo]="14"
+	$this[numbers]=new Map
+	local -n numbers; GetOID ${this[numbers]} numbers || assertError
+	numbers[zero]=0
+	numbers[one]=1
+	numbers[two]=2
+	$this.numbers[obj]=new Object
+bgtraceVars numbers
+
+	$this[words]=new Array "zero" "one" "two"
+	$this.words[3]=new Object
+#	local -n words; GetOID ${this[words]} words || assertError
+#	words=(zero one two)
+}
+
+function ut_Object_toJSON()
+{
+	ut setup
+	local -n foo; ConstructObject TestClass foo
+
+	ut test
+	$foo.toJSON
+
+	ut test
+	$foo.toJSON --all
+}
+
+
+function ut_ConstructObjectFromJson()
+{
+	ut setup
+	local jsonFile; bgmktemp --auto jsonFile
+	cat > "$jsonFile" <<-EOS
+	{
+	   "pmemB": "5",
+	   "pmemA": "hello",
+	   "memberTwo": "14",
+	   "memberOne": "this and that",
+	   "words": [
+	      "zero",
+	      "one",
+	      "two",
+	      {}
+	   ]
+	   "numbers": {
+	      "two": "2",
+	      "obj": {}
+	      "zero": "0",
+	      "one": "1"
+	   }
+	}
+	EOS
+	cat "$jsonFile"
+
+	ut test
+	local obj; ConstructObjectFromJson obj "$jsonFile"
+	#printfVars --noObjects obj
+	printfVars  obj
+}

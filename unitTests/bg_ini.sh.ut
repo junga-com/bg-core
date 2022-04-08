@@ -347,6 +347,7 @@ function ut_ini_validChars()
 	ut noecho
 	ut noexitcodes
 	local testChar="$1"
+	bgtraceVars testChar
 	local iniFile; bgmktemp --auto iniFile
 	cat >"$iniFile" <<-EOS
 		[ readDataTest ]

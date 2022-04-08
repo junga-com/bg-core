@@ -103,7 +103,7 @@ one more thing...
    catch_errorFn='ut_setupError3'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: ut_setupError3: bad setup'
+                          +error: ut_setupError3: bad setup'
 ** Setup Failed: testcase not finished.  **
 ## bg_unitTests.sh:setupError3: ERROR: setup could not complete
 ###############################################################################################################################
@@ -148,7 +148,7 @@ cmd> assertError "this is an error"
    catch_errorFn='ut_assertInTest'
    catch_errorCode='36'
    catch_errorDescription='
-                           error: ut_assertInTest: this is an error'
+                          +error: ut_assertInTest: this is an error'
 ## bg_unitTests.sh:assertInTest: finished
 ###############################################################################################################################
 
