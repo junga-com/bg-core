@@ -676,6 +676,13 @@ function utfRunner_execute()
 	fi
 
 	(
+		# redefine the command_not_found_handle so that it does not kill the process group which would kill the unit test.
+		# alternatively, we could change the pgid here to make the testcase process it own group leader.
+		function command_not_found_handle() {
+			echo "Command not found. cmdline='$*'" >&2
+			exit 127
+		}
+
 		# require an extra config to keep tracing on for tests because they can have many exceptions printing stack traces
 		# when ran directly, bgTracingTestRunner is set to on so this only affects running from bg-dev tests ...
 		# see bg-debugCntr trace tests:on|off

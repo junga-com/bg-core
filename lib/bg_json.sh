@@ -1,5 +1,43 @@
 #!/bin/bash
 
+# usage: jsonEscape <varname1> [...<varnameN>}
+function jsonEscape()
+{
+	while [ $# -gt 0 ]; do
+		[ ! "$1" ] && { shift; continue; }
+		local _je_value="${!1}"
+		_je_value="${_je_value//$'\\'/\\\\}" # reverse solidus
+		_je_value="${_je_value//$'"'/\\\"}"  # quotation mark
+		_je_value="${_je_value//$'/'/\\/}"   # solidus
+		_je_value="${_je_value//$'\b'/\\b}"  # backspace
+		_je_value="${_je_value//$'\f'/\\f}"  # formfeed
+		_je_value="${_je_value//$'\n'/\\n}"  # linefeed
+		_je_value="${_je_value//$'\r'/\\r}"  # carriage return
+		_je_value="${_je_value//$'\t'/\\t}"  # horizontal tab
+		printf -v $1 "%s" "$_je_value"
+		shift
+	done
+}
+
+
+# usage: jsonUnescape <varname1> [...<varnameN>}
+function jsonUnescape()
+{
+	while [ $# -gt 0 ]; do
+		[ ! "$1" ] && { shift; continue; }
+		local _je_value="${!1}"
+		_je_value="${_je_value//\\\"/$'"'}"  # quotation mark
+		_je_value="${_je_value//\\\//$'/'}"   # solidus
+		_je_value="${_je_value//\\b/$'\b'}"  # backspace
+		_je_value="${_je_value//\\f/$'\f'}"  # formfeed
+		_je_value="${_je_value//\\n/$'\n'}"  # linefeed
+		_je_value="${_je_value//\\r/$'\r'}"  # carriage return
+		_je_value="${_je_value//\\t/$'\t'}"  # horizontal tab
+		_je_value="${_je_value//\\\\/$'\\'}" # reverse solidus
+		printf -v $1 "%s" "$_je_value"
+		shift
+	done
+}
 
 # usage: jsonAwk [-T <topVarName>] [-C <countToRead>] [<script> [<file1>...<fileN>]]
 # parses the json formatted input. By default it prints a line with (<jpath> <val>) for each primitive value
@@ -16,7 +54,7 @@
 #
 #    # instead of printing a line, do something else for each value encountered.
 #    jsonAwk -n '
-#       function valueHook(jpath,val,valType) {
+#       function valueHook(jpath,val,valType,relName) {
 #          # called for each value encountered.
 #       }
 #       END {
@@ -43,7 +81,7 @@
 #         *) addFlattenValue() maintains the flatData[<jpath>] and flatDataInd[] arrays.
 #         *) if the type is a primitive (not Array or Object) it prints a line with "jpath val"
 #         *) flatDataInd[] is the list of jpaths in the order that they were encountered.
-#         *) addFlattenValue() also calls the valueHook(jpath, val,valType) that can be provided in the
+#         *) addFlattenValue() also calls the valueHook(jpath, val,valType,relName) that can be provided in the
 #            script passed into this function.
 # Params:
 #    <script> : an awk script to do custom processing. if the script does not include the function 'valueHook', one will be added
@@ -79,7 +117,7 @@ function jsonAwk()
 	# prints "<jpath> <value>\n" for each primitive value.
 	if [[ ! "$script" =~ function[[:space:]]*valueHook ]]; then
 		script+='
-			function valueHook(jpath, value, valType) {}
+			function valueHook(jpath, value, valType, relName) {}
 		'
 	fi
 	if [[ ! "$script" =~ function[[:space:]]*eventHook ]]; then
@@ -137,6 +175,7 @@ function Object::fromJSON()
 
 	local name value
 	while read -r name value; do
+		jsonUnescape value
 		#bgtraceVars -1 name value
 		$this.${name#this.}="$value"
 	done < <(
@@ -181,10 +220,12 @@ function Object::toJSON()
 		local tOpen='['
 		local tClose=']'
 		local labelsOn=""
+		local myMode=""
 	else
 		local tOpen='{'
 		local tClose='}'
 		local labelsOn="yes"
+		local myMode="$mode"
 	fi
 
 	# the general indent strategy is that the inside of the object (i.e. its attribute list) is indented WRT the open and close.
@@ -195,7 +236,7 @@ function Object::toJSON()
 
 	# use getIndexes to get the memberNames. Its temping to try to use "${!this[@]}" and "${!_this[@]}" but its too complicated to
 	# repeat all the edge cases and getAttributes is pretty well optimized so that when possible it just returns those constructs
-	local memberNames; $_this.getIndexes $mode -A memberNames
+	local memberNames; $_this.getIndexes $myMode -A memberNames
 	local totalMemberCount="${#memberNames[@]}"
 	local writtenCount="$totalMemberCount"
 	local sep=","
@@ -212,12 +253,15 @@ function Object::toJSON()
 			*)  value="${this[$name]}"  ;;
 		esac
 
+		# JSON requires some characters to be escaped. see https://www.json.org/json-en.html
+		jsonEscape value
+
 		# print the start of the line, upt to the <value>
 		printf "${indent}"
 		[ "$labelsOn" ] && printf '"%s": ' "$name"
 
 		# if its an objRef, get its _OID
-		local refOID; IsAnObjRef $value && { GetOID "${value}" refOID || assertError; }
+		local refOID=""; IsAnObjRef $value && { GetOID "${value}" refOID || assertError; }
 
 		# special case _OID so that we change its value to the sessionOID
 		if [ "$name" == "_OID" ]; then
@@ -231,7 +275,7 @@ function Object::toJSON()
 		elif [ "$refOID" ]; then
 			printf '"%s"%s\n'  "${value//$refOID/${objDictionary[$refOID]}}" "$sep"
 
-		# all other cases just write the <anem> and <value>
+		# all other cases just write the <name> and <value>
 		else
 			printf '"%s"%s\n'  "$value" "$sep"
 		fi
@@ -240,6 +284,7 @@ function Object::toJSON()
 	indent="${indent%"   "}"
 	((totalMemberCount>1)) || indent=""
 	printf "${indent}%s%s\n" "$tClose" "$recordSep"
+	((recurseCount--))
 }
 
 
@@ -252,7 +297,7 @@ function ConstructObjectFromJson()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local objRefVar="$1"; shift
-	local file="${1:-$jsonFile}"
+	local file="${1:-$file}"
 
 	local -n scope; ConstructObject Object "scope"
 	local scopeOID; GetOID $scope scopeOID
@@ -263,8 +308,16 @@ function ConstructObjectFromJson()
 
 	local relName valType jpath value className
 	while read -r  valType relName jpath value ; do
-#bgtraceVars -1 --noObjects valType relName jpath value
-#bgtraceBreak --skipCount=9
+		[ "$valType" == "!ERROR" ] && assertError -v objRefVar -v file "jsonAwk returned an error reading restoration file"
+
+		# the space==%20 escaping is not a json standard -- its because read will loose the leading spaces of value. Since value
+		# is the last value, it concatenates the remaining input to the EOL but any leading spaces just becaome the separator between
+		# it and the previos variable (jpath)
+		value="${value//%20/ }"
+
+		# now escape according to the json standard
+		jsonUnescape value
+
 		case $valType in
 
 			startObject) className="Object" ;;&
@@ -279,18 +332,12 @@ function ConstructObjectFromJson()
 				fi
 
 				unset -n current; local -n current; GetOID $currentStack current || assertError
-#printf "\n!!!     >PUSH current is now = '%s'\n" "$currentStack"
-#printfVars --noObjects currentStack scope  current; printfVars  scope
-#exit
 				;;
 
 			endObject|endList)
 				currentStack=("${currentStack[@]:1}")
 				unset -n current; local -n current; GetOID $currentStack current || assertError
 				className=""
-#printf "\n!!!     <POP:  current is now = '%s'\n" "$currentStack"
-#printfVars --noObjects currentStack scope  current; printfVars  scope
-#exit
 				;;
 			tObject) ;;
 			tArray)  ;;
@@ -335,9 +382,9 @@ function ConstructObjectFromJson()
 			printf("%-13s %-13s %-24s %s\n", event, relName, p1, "--")
 		}
 		function valueHook(jpath, value, valType, relName) {
-			printf("%-13s %-13s %-24s %s\n", valType, relName, jpath, value)
+			printf("%-13s %-13s %-24s %s\n", valType, relName, jpath, gensub(/[ ]/,"%20","g",value))
 		}
-	' "$file" )
+	' "$file" || echo "!ERROR" )
 
 	returnObject ${scope[top]} "$objRefVar"
 }

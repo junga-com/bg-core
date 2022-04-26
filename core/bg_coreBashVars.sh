@@ -211,7 +211,8 @@ function varGetAttributes()
 			local -n _gaBaseRef="$_gaBaseVar"
 			local _gaIdxPart="${1#$_gaBaseVar\[}"; _gaIdxPart="${_gaIdxPart%]}"
 			#if [[ "$_gaIdxPart" =~ ^(@|\*)$ ]] || { [[ "$_gaIdxPart" =~ ^[0-9+-][0-9+-]*$ ]] && [ "${_gaBaseRef[$_gaIdxPart]+exists}" ]; }; then
-			if [[ "$_gaIdxPart" == [@*] ]] || { [[ "$_gaIdxPart" != *[^0-9+-]* ]] && [[ "$_gaIdxPart" != [-]* ]] && [[ "$_gaIdxPart" != "" ]] && [ "${_gaBaseRef[$_gaIdxPart]+exists}" ]; }; then
+			# 2022-04 bobg: removed the '&& [[ "$_gaIdxPart" != [-]* ]]' condition because foo[-1] is legal
+			if [[ "$_gaIdxPart" == [@*] ]] || { [[ "$_gaIdxPart" != *[^0-9+-]* ]]  && [[ "$_gaIdxPart" != "" ]] && [ "${_gaBaseRef[$_gaIdxPart]+exists}" ]; }; then
 				_gaRetValue="${_gaBaseAttribs//[aA]}"
 				_gaRetValue="${_gaRetValue:--}"
 			fi
@@ -230,8 +231,7 @@ function varGetAttributes()
 
 # usage: varIsA <type1> [.. <typeN>] <varName>
 # returns true(0) if the var specified on the cmd line exits as a variable with the specified attributes
-# Note that in older bash, if a variable is declared without assignment, (like local -A foo) this function
-# will report false until something is assigned to it.
+# Note that this function is much slower than the varIsAMapArray, varIsANumArray, and varIsAnyArray
 # Types:
 #    anyOfThese=<attribs> : example anyOfThese=Aa to test if <varName> is either an associative or numeric array
 #    allOfThese=<attribs> : example allOfThese=rx to test if <varName> is both readonly and exported
@@ -239,7 +239,10 @@ function varGetAttributes()
 #    mapArray  : alias to test if attribute 'A' is present
 #    numArray  : alias to test if attribute 'a' is present
 #    array     : alias to test if either attribute 'A' or 'a' is present
-function varIsAMapArray() { varIsA mapArray "$@"; }
+# See Also:
+#    man(3) varIsAMapArray
+#    man(3) varIsANumArray
+#    man(3) varIsAnyArray
 function varIsA()
 {
 	local anyAttribs mustAttribs
@@ -280,6 +283,34 @@ function varIsA()
 		[[ "$vima_typeDef" =~ declare\ -[^\ ]*${mustAttribs:$i:1} ]] || return 1
 	done
 	return 0
+}
+
+
+# usage: varIsAMapArray <varName>
+# returns true(0) if the <varName> exits with the -A attribute
+function varIsAMapArray()
+{
+	[ "$1" ] || return 1
+	local -n _via_varName="$1"
+	[[ "${_via_varName@a}" =~ A ]]
+}
+
+# usage: varIsANumArray <varName>
+# returns true(0) if the <varName> exits with the -a attribute
+function varIsANumArray()
+{
+	[ "$1" ] || return 1
+	local -n _via_varName="$1"
+	[[ "${_via_varName@a}" =~ a ]]
+}
+
+# usage: varIsAnyArray <varName>
+# returns true(0) if the <varName> exits with either the -a or -A attribute
+function varIsAnyArray()
+{
+	[ "$1" ] || return 1
+	local -n _via_varName="$1"
+	[[ "${_via_varName@a}" =~ [Aa] ]]
 }
 
 # usage: varMarshal <varName> [<retVar>]

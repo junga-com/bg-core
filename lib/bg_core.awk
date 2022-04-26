@@ -670,7 +670,7 @@ function parserStartQuotingTokenizer(line, parser,optionsAryOrStr               
 	# something that we have not yet considered and copied. As we join quouted string tokens, idxIn will get ahead of idxOut. We are
 	# done when idxIn goes past the original length. idxOut at the end will be the new length of the token array
 	idxOut=0 # this will be the last token in the output
-	idxIn=1  # this will be the next token to test. This advance faster than idxOut as we concatonate tokens
+	idxIn=1  # this will be the next token to test. This advance faster than idxOut as we concatenate tokens
 	state="unquoted"
 	while (idxIn<=parser["len"]) {
 		#if (parser["seps"][idx-1]) warning("parser regex error. There should be no tokens not matched by an alternation term. unmatche token='"parser["seps"][idx-1]"'")
@@ -732,7 +732,7 @@ function parserStartQuotingTokenizer(line, parser,optionsAryOrStr               
 				parser["tokens"][++idxOut]=parser["tokens"][idxIn++]
 			break
 
-			# inside any of the string types, we concatonate the current idxIn token into the current idxOut token
+			# inside any of the string types, we concatenate the current idxIn token into the current idxOut token
 			default:
 				parser["tokens"][idxOut]=parser["tokens"][idxOut]""parser["tokens"][idxIn++]
 			break

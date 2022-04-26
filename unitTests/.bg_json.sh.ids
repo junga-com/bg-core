@@ -1,2 +1,7 @@
-Object_toJSON: 
-ConstructObjectFromJson: 
+Object_toJSON:all 
+Object_toJSON:real 
+ConstructObjectFromJson:plain 
+ConstructObjectFromJson:withSys 
+jsonEscape:100 
+jsonEscape:110 
+jsonEscape:120 

@@ -200,6 +200,7 @@ import bg_ini.sh  ;$L1;$L2
 #     progressFSync : if set to any non-empty string, this causes 'sync' command to be invoked before and after each progress
 #                     message is written. This can adversely impact performance but can lead to a better output if the progress
 #                     output destination is shared with other processes.
+# BGENV: progressDisplayType: statusline|oneline|stderr|stdout|null|off|<plugableDriverName>: overrride a script's default progress type 
 function progress()
 {
 	# 2016-06 bobg. by short circuiting this the off case at the top of this function, running 350 unit

@@ -54,8 +54,8 @@ function cuiSetTitle()
 # clip or wrap the output so if there is no terminal. the dimensions should be large so that outp is not clipped nor wrapped.
 # if that is not the case, the caller can check the return value
 # Options:
-#    --tty=<tty>  : instead of using the tty identified by stdin, use this one
-#    -q) quiet. if there is no tty, return -1,-1 instead of asserting an error
+#    --tty=<tty>  : example: /dev/tty or /dev/pts/2. instead of using the tty identified by stdin, use this one
+#    -q) quiet. if there is no tty, return 999999,999999 instead of asserting an error
 function CSIgetScreenDimension() { cuiGetScreenDimension "$@"; }
 function cuiGetTerminalDimension() { cuiGetScreenDimension "$@"; }
 function cuiGetScreenDimension()

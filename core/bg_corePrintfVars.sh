@@ -1,4 +1,42 @@
 
+# Library
+# Provides the printfVars function which is a generic bash variable examination functions. Many interpreted languages have functions
+# that allow the programmer to simply list a series of variable names to show. This is that function in bash.
+#
+# This library also contains helper functions used by printfVars. They all begin with pv*. Some of them, particularly pvPrArray
+# may be usefull in other contexts.
+#
+# Indentation:
+# This is documented to help people who wish to make changes or extend printfVars.
+# This is the model that is used for indentation. Note that by default, objects are displayed with Object::toString
+# which has a similar but independent indentation model
+#      <------------------------ pv_maxLineLen -------------------------------------------------------------->
+#      <--prefix--><-- labelWidth -> < value first line ... clipped at pv_maxLineLen                         >
+#     |<--------- continue width --> +<-- subsequent value lines...                                          >
+#     |            foo              ='42'
+#     |            myMultiLineText  ='blue'(\n)
+#     |                              +'red'
+#     |            myArray          []
+#      <--prefix +=labelWidth -----> <--lW--> < value first line ... clipped at pv_maxLineLen
+#     |<--------- continue width ----------->
+#     |                             [one    ]='this and that'
+#     |                             [three  ]='otherStuff'
+#     |                             [myarray][]
+#      <--prefix +=labelWidth --------------> <--lW--> < value first line ... clipped at pv_maxLineLen
+#     |<--------- continue width -------------------->
+#     |                                    [0]="zero"
+#     |                                    [1]="one"
+#     |                                    [2]="two"
+# Note: labelWidth does not have to be large enough to align the entries.
+#       Setting it to 0 will bring all the values tight against the labels
+# Note: pv_prefix is a padded string whereas pv_labelWidth is an interger length
+#
+# Each time pvPrArray is called, it prints the label of the array using the existing pv_prefix and pv_labelWidth
+# and then adds pv_labelWidth number of spaces to pv_prefix and calculates a new pv_labelWidth for its indexes
+# and prints each element of the array as an attribute (name/value pair)
+#
+
+
 # usage: pvCalcLocalIndent <labelLength> <retVar>
 # given the <labelLength> passed in and the global pv_labelWidth, calculate how big the indent should be for subsequent lines
 # The returned value is clipped between 2 and 30
@@ -167,7 +205,7 @@ function pvPrArray()
 	# iterate over the indexes, printing each attribute.
 	# Note that we never have to recurse into printfVars because array elements can only be strings. possibly containing an <objRef>
 	for pvl_index in "${!pvl_array[@]}"; do
-		if [ ! "$pv_noNestFlag" ] && [ "${pvl_array[$pvl_index]:0:5}" == "heap_" ]; then
+		if [ ! "$pv_noNestFlag" ] && [[ "${pvl_array[$pvl_index]}" == heap_*[aA]*_* ]]; then
 			pvPrArray "$pvl_index" "${pvl_array[$pvl_index]}"
 		elif [ ! "$pv_noNestFlag" ] && [ "${pvl_array[$pvl_index]:0:12}" == "_bgclassCall" ]; then
 			local pvl_elementValue; bgread "" pvl_elementValue "" <<<"${pvl_array[$pvl_index]}"
@@ -181,65 +219,58 @@ function pvPrArray()
 
 # usage: printfVars [ <varSpec1> ... <varSpecN> ]
 # print a list of variable information to stdout
+# Provides the printfVars function which is a generic bash variable examination functions. Many interpreted languages have functions
+# that allow the programmer to simply list a series of variable names to show. This is that function in bash.
+#
 # This is used by the bgtraceVars debug command but its also useful for various formatted text output
 # Unlike most function, options can appear anywhere and options with a value can not have a space between opt and value.
 # options only effect the variables after it
 #
-# Indentation:
-# this is the model that is used for indentation. Note that by default, objects are displayed with Object::toString
-# which has a similar but independent indentation model
-#      <------------------------ pv_maxLineLen -------------------------------------------------------------->
-#      <--prefix--><-- labelWidth -> < value first line ... clipped at pv_maxLineLen                         >
-#     |<--------- continue width --> +<-- subsequent value lines...                                          >
-#     |            foo              ='42'
-#     |            myMultiLineText  ='blue'(\n)
-#     |                              +'red'
-#     |            myArray          []
-#      <--prefix +=labelWidth -----> <--lW--> < value first line ... clipped at pv_maxLineLen
-#     |<--------- continue width ----------->
-#     |                             [one    ]='this and that'
-#     |                             [three  ]='otherStuff'
-#     |                             [myarray][]
-#      <--prefix +=labelWidth --------------> <--lW--> < value first line ... clipped at pv_maxLineLen
-#     |<--------- continue width -------------------->
-#     |                                    [0]="zero"
-#     |                                    [1]="one"
-#     |                                    [2]="two"
-# Note: labelWidth does not have to be large enough to align the entries.
-#       Setting it to 0 will bring all the values tight against the labels
-# Note: pv_prefix is a padded string whereas pv_labelWidth is an interger length
+# Variable Interpretation:
+# Variables name are examined to see how best to display them.
+# Bash Variable Attributes Examination...
+# varGetAttributes is called on the variable name to get <attrib> which is a string of attribute letters that are set on the variable
+# or '-' if its a variable but has no attributes set.
+#    <attrib>==""   (not a variable) : prints as a literal as if it were prefixed with -l
+#    <attrib>=~[aA] (array variable) : prints as <varName>[] and then each element is treated as a new variable name and printed with an additional
+#                      indent. In bash array elements can not be arrays or namerefs but if their content matches a heap array variable
+#                      name or an <objRef> as described below, they are interpreted as such.
+#    <anything else>(simple variable) : prints as <varName>='<value>'
+# Content Examination...
+#    begins with '_bgclassCall...' it is treated as an <objRef> and its toString method is invoked.
+#    begins with 'heap_*[aA]_*' it is treated as an array. Note that this test is really only useful for array elements which can
+#         not be arrays but this convention allows nested arrays in bash.
 #
-# Each time pvPrArray is called, it prints the label of the array using the existing pv_prefix and pv_labelWidth
-# and then adds pv_labelWidth number of spaces to pv_prefix and calculates a new pv_labelWidth for its indexes
-# and prints each element of the array as an attribute (name/value pair)
 #
 # Params:
-#   <varSpecN> : a variable name to print or an option. It formats differently based on what it is
-#        not a variable  : simply prints the content of <dataN>. prefix it with -l to make make its not interpretted as a var name
-#        simple variable : prints <varName>='<value>'
-#        array variable  : prints <varName>[]
-#                                 <varName>[idx1]='<value>'
-#                                 ...
-#                                 <varName>[idxN]='<value>'
-#        object ref      : calls the bgtrace -m -s method on the object (unless --noObjects is specified)
-#        "" or "\n"      : write a blank line. this is used to make vertical whitespace. with -1 you
-#                          can use this to specify where line breaks happen in a list
-#        "  "            : a string only whitespace sets the indent prefix used on all output to follow.
-#        <option>        : options begin with '-'. see below.
+# <varSpecN> : all arguments can be an option or a variable name or another word. Note that this is unlike most functions where
+# options to the function itself must appear first. All options begin with a '-' and are described in the Options section below.
+# The cmdline can be thought of as a script the executes in the order given. Each options or directive only affects the variable
+# that come after it.
+# Special Words...
+#    "" or "\n"      : write a blank line. this is used to make vertical whitespace. with -1 you
+#                      can use this to specify where line breaks happen in a list
+#    "  "            : a string only whitespace sets the indent prefix used on all output to follow. It shorthand for --prefix="  "
+# Any <varSpecN> that does not match an option or one of the special words is interpreted as a variable name.
+#
 # Options:
 # Unlike most function, options can appear anywhere and options with a value can not have a space between opt and value.
 # options only effect the variables after it
 #   -l<string> : literal string. print <string> without any interpretation
-#   -wN : set width. This works differently base on the prevailing line mode (multiline ro oneline)
-#         multiline: set the prefered minWidth of lables. This can be used to align the '=' sign of output. Note that this function
+#   -wN : set width. This works differently based on the prevailing line mode (multiline or oneline)
+#         multiline: set the prefered minWidth of labels. This can be used to align the '=' sign of output. Note that this function
 #                    operates in one pass of the command line arguments so it does not automatically set this
 #         oneline:   set the minimum width of just the next field to be printed.
-#   -1  : display vars on one line. this suppresses the \n after each <varSpecN> output
-#   +1  : display vars on multiple lines. this is the default. it undoes the -1 effect so that a \n is output after each <varSpecN>
-#   --prefix=<prefix>  : add this <prefix> to subsequent output lines.
+#   -1  : display vars on one line. array/object variables can not be displayed in a single line so the first array encountered
+#         will reset to multiline mode as if a +1 was specified
+#   +1  : display vars on multiple lines. this is the default. it undoes the -1 effect
+#   --prefix=<prefix>  : add this <prefix> to the start of all subsequent output lines up to another --prefix is seen.
 #   --noObjects : display the underlying object associative array as if it were not an object
-#   --rawObjects: this is similar to --noObjects except that it follows the objRefs to display all the arrays that make up the
-#                 top object and decendents recursively
+#   --noNest: this is similar to --noObjects except that also prevents following member variable which are objects or heap arrays.
+#          so that only the elements of arrays specified on the cmdline will be shown
+#   --plain : do not look into the value to follow <objRef> and heap vars
+#   --maxLineLen=<n> : in multilineMode clip all output lines to at most <n> characters. Does not affect oneLineMode output.
+#   --table=<var> : use the printfTable function to output <var>
 function printfVars()
 {
 	local pv_prefix                # This string is the start of every line printed. Moves the *entire* output over. set with --prefix or "    "
@@ -249,9 +280,9 @@ function printfVars()
 	local pv_inlineMaxWidth        # maximum field len of "<name>='<value>'" fields in pv_onelineMode
 	local pv_oneLineMode           # single valued items are printed on one line. Does not affect arrays and objects but a bug messes up the first line
 	local pv_atLineStart=1         # in multiline mode each iteration ends with the cursor at the start of a new line but in oneLineMode after something is written its not at the start
-	local pv_noNestFlag            # --noNest, don not recurse into any arrays or objects
+	local pv_noNestFlag            # --noNest, don't not recurse into any arrays or objects
+	local pv_plainFlag             # --plain, dont look into the value to follow <objRef> and heap vars
 	local pv_noObjectsFlag         # --noObjects. when set, this function simply pirnt the value of <objRef>s instead of calling their Object::toString method
-	local pv_rawObjectsFlag        # --rawObjects. similar to noObjects but will dereference the _OID array name in the <objRef> and display them as arrays. This also does ot depend on bg_objects.sh
 	local pv_objOpts=()            # options to pass through to Object::toString
 
 	# if the bg_objects.sh library is not loaded, turn off object detection
@@ -264,7 +295,7 @@ function printfVars()
 
 	if [ -t 1 ] && type -t import &>/dev/null; then
 		import -q bg_cui.sh ;$L1;$L2 && {
-			cuiGetTerminalDimension "" pv_maxLineLen
+			cuiGetTerminalDimension -q "" pv_maxLineLen
 		}
 	fi
 
@@ -278,8 +309,8 @@ function printfVars()
 			-1)           	pv_oneLineMode="oneline";                            continue ;;
 			+1)           	pvEndOneLineMode;                                    continue ;;
 			--noNest)       pv_noNestFlag="--noNest";                            continue ;;
+			--plain)        pv_plainFlag="--plain";                              continue ;;
 			--noObjects)  	pv_noObjectsFlag="--noObjects";                      continue ;;
-			--rawObjects) 	pv_rawObjectsFlag="--rawObjects";                    continue ;;
 			:empty:)      	printf "\n"; pv_atLineStart="1";                     continue ;;
 			'\n')         	printf "\n"; pv_atLineStart="1";                     continue ;;
 			-w*)          	if [ "$pv_oneLineMode" ]; then
@@ -321,7 +352,6 @@ function printfVars()
 		# will include one or more n's (one fore each indirection) followed by the attribtues of the target variable
 		local pv_type; varGetAttributes "$pv_varname" pv_type
 
-
 		# case where the term is not a variable name
 		if [ ! "$pv_type" ]; then
 			# foo:bar where bar is not a variable name
@@ -342,8 +372,18 @@ function printfVars()
 			}
 
 		# if its an array, iterate its content
-		elif [[ "$pv_type" =~ [aA] ]]; then
+		elif [[ "$pv_type" == *[aA]* ]]; then
 			pvPrArray "$pv_label" "$pv_varname"
+
+		# if its a string var that contains an <objRef> and we are not doing objects (--noObjects) do it as an array
+		elif [ ! "$pv_plainFlag" ] &&  [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
+			local pv_oid; bgread "" pv_oid "" <<<"${!pv_varname}"
+			pvPrArray "$pv_label" "$pv_oid"
+
+		# if its a string var that contains a heap var array
+		elif [ ! "$pv_plainFlag" ] && [[ "${!pv_varname}" == heap_*[aA]*_* ]]; then
+			pvPrAttribute "$pv_label" "${!pv_varname}"
+			pvPrArray "$pv_label" "${!pv_varname}"
 
 		# default case is to treat it as a variable name. we already handled the case where pv_varname is not a variable (pv_type="")
 		else

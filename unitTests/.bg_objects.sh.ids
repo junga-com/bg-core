@@ -16,7 +16,12 @@ _parseObjSyntax:pOfAssignOp2
 _parseObjSyntax:pOfAssignOp3 
 _parseObjSyntax:pOfAssignOp4 
 _parseObjSyntax:pOfAssignOp5 
+_parseObjSyntax:pOfStatic0 
+_parseObjSyntax:pOfStatic1 
+_parseObjSyntax:pMemVarSyntax1 
+_parseObjSyntax:pMemVarSyntax2 
 initialState: 
+methodCall: 
 isDerivedFrom: 
 getClassMethods: 
 ConstructObject: 

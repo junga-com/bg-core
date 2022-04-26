@@ -1,4 +1,9 @@
 
+bgObjectsBuiltinIsInstalled=""
+[ ! "$BASH_LOADABLES_PATH" ] && BASH_LOADABLES_PATH="/usr/lib:"
+enable -f bgObjects.so bgObjects 2>/dev/null && bgObjectsBuiltinIsInstalled="yes"
+type -t bgtraceVars &>/dev/null && bgtraceVars bgObjectsBuiltinIsInstalled
+
 # Library
 # This library implements an object oriented syntax for bash scripts. In classic bash, its hard to write a function that works
 # with an array that the caller picks when the function is called (passing an array to a function). Also its not possible to have
@@ -301,6 +306,7 @@ function DeclareClass()
 
 	[ "$baseClass" == "Class" ] && assertError "
 		The special class 'Class' can not be sub classed. You can, however extend a Class Object...
+		  * define a static::<className>::__construct() { :; } function that will be called after the Class object is constructed
 		  * add attributes to a particular Class when its declared. see man DeclareClass
 		  * declare methods for use by all Class's like 'function Class::mymethod() { ...; }'
 		  * add member vars and methods dynamically to the class object after the class has been declared
@@ -318,7 +324,7 @@ function DeclareClass()
 	fi
 
 	# if a class is used as a base class, we realize its construction so that its static behavior is avaiable
-	# TODO: this seems not to be needed. when the delay mechanism was first created there wa a use case in the plugin library but now
+	# TODO: this seems not to be needed. when the delay mechanism was first created there was a use case in the plugin library but now
 	#       the import mechanism uses FlushPendingClassConstructions to construct classes at the end of each library.
 	#DeclareClassEnd "$baseClass"
 
@@ -480,8 +486,8 @@ function Class::__construct()
 
 		local memberVarsText="${this[memberVars]}"
 
-		# we don't yet know if we will create this _prototype global but creating the -n ref to it wont create it
-		# in the loop, if we need it, we will do 'declare -gA "${className}_prototype"' which wont overwrite it but will make it
+		# we don't yet know if we will create this _prototype global but creating the -n ref to it wont create it.
+		# In the loop, if we need it, we will do 'declare -gA "${className}_prototype"' which wont overwrite it but will make it
 		# exist if its not already
 		local -n prototype="${className}_prototype";
 
@@ -871,6 +877,7 @@ function ConstructObject()
 
 
 	# invoke the constructors from Object to this class
+	local -n static
 	local _cname; for _cname in ${class[classHierarchy]}; do
 		unset -n static; local -n static="$_cname"
 
@@ -917,6 +924,12 @@ function ConstructObject()
 # usage: _classUpdateVMT [-f|--force] <className>
 function _classUpdateVMT()
 {
+	if  [ "$bgObjectsBuiltinIsInstalled" ]; then
+		builtin bgObjects _classUpdateVMT "$@"
+		[[ "$_rsvMemberType" =~ ^invalidExpression ]] && assertObjExpressionError -v expression:_memberExpression -v errorType:_rsvMemberType -v _OID -v memberExpr:_chainedObjOrMember  "invalid object expression. The <memberExpr> can not be interpretted relative to the <oid>"
+		return 0
+	fi
+
 	local forceFlag
 	while [ $# -gt 0 ]; do case $1 in
 		-f|--force)   forceFlag="-f" ;;
@@ -959,7 +972,7 @@ function _classUpdateVMT()
 
 		# add the methods of this class
 		_classScanForClassMethods "$className" class[methods]
-		local _mname; for _mname in ${class[methods]} ${class[addedMethods]}; do
+		local _mname; for _mname in ${class[methods]}; do
 			vmt[_method::${_mname#*::}]="$_mname"
 		done
 
@@ -1027,7 +1040,7 @@ function DeleteObject()
 
 
 # man(5) bgBashObjectsSyntax
-# This is the bash object oriented syntax implemented by the _parseObjSyntax function in the bg_objects.sh library.
+# This is the bash object oriented syntax implemented by the _bgclassCallSetup function in the bg_objects.sh library.
 # Note that often the object syntax is used to create a -n nameRef variable to an object's underlying bash array and then the member
 # variables of that object can be accessed and set with the native bash array syntax. Also, inside a class method, the object's
 # member variables that exist at the time the method is entered are available as local nameRef variables which also allows the use
@@ -1130,28 +1143,13 @@ function DeleteObject()
 #
 
 
-# usage: _parseObjSyntax <chainedObjOrMemberVar> <memberOpVar> <argsVar> <expression...>
+# usage: __parseObjSyntax <chainedObjOrMemberVar> <memberOpVar> <argsVar> <expression...>
 # _bgclassCall uses this function to parse the object syntax that is passed to it. See man(5) bgBashObjectsSyntax
 # This function separates the expression into 3 parts. It uses the <objOperator> to divide the expression into parts.
 # Params:
 #    <chainedObjOrMemberVar>  : output. The part of the expression before the <objOperator>
 #    <memberOpVar>            : output. One of the fixed set of expression operators found in the expression.
 #    <argsVar>                : output. The part of the expression after the <objOperator>
-function _parseObjSyntax() {
-	local chainedObjOrMemberVar="$1"; shift
-	local memberOpVar="$1"; shift
-	local argsVVar="$1"; shift
-
-	[ "$chainedObjOrMemberVar" != "_chainedObjOrMember" ] && local _chainedObjOrMember
-	[ "$memberOpVar" != "_memberOp" ] && local _memberOp
-	[ "$argsVVar" != "_argsV" ] && local _argsV
-
-	__parseObjSyntax "$@"
-
-	[ "$chainedObjOrMemberVar" != "_chainedObjOrMember" ] && returnValue "$_chainedObjOrMember" $chainedObjOrMemberVar
-	[ "$memberOpVar" != "_memberOp" ] && returnValue "$_memberOp" $memberOpVar
-	[ "$argsVVar" != "_argsV" ] && varSetRef --array "$argsVVar" "${_argsV[@]}"
-}
 function __parseObjSyntax() {
 	# Operates on these variables from the calling scope
 	# _chainedObjOrMember
@@ -1183,38 +1181,6 @@ function __parseObjSyntax() {
 	_memberOp="${_memberOp% }"  # we capture the empty operator as a " " in the regex but return it as ""
 }
 
-# usage: _resolveMemberChain "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName
-#
-# null:noGlobal
-# null:chain
-# null:method
-# null:memberVar
-# null:either
-function _resolveMemberChain()
-{
-	local forceFlag
-	while [ $# -gt 0 ]; do case $1 in
-		-f|--force) forceFlag="-f" ;;
-		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-	done
-	local oidIn="$1"
-	local exprIn="$2"
-	local finalOIDVar="$3"
-	local finalTypeVar="$4"
-	local finalMemberVar="$5"
-
-	[ "$finalOIDVar"    != "_rsvOID" ]        && local _rsvOID
-	[ "$finalTypeVar"   != "_rsvMemberType" ] && local _rsvMemberType
-	[ "$finalMemberVar" != "_rsvMemberName" ] && local _rsvMemberName
-
-	#	local _rsvOID _rsvMemberType _rsvMemberName
-	__resolveMemberChain "$forceFlag" "$oidIn" "$exprIn"
-	#_resolveMemberChain $allowOnDemandObjCreation "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName
-
-	[ "$finalOIDVar"    != "_rsvOID" ]        && varSetRef "$finalOIDVar"    "$_rsvOID"
-	[ "$finalTypeVar"   != "_rsvMemberType" ] && varSetRef "$finalTypeVar"   "$_rsvMemberType"
-	[ "$finalMemberVar" != "_rsvMemberName" ] && varSetRef "$finalMemberVar" "$_rsvMemberName"
-}
 function __resolveMemberChain()
 {
 	# Operates on these variables from the calling scope
@@ -1245,6 +1211,7 @@ function __resolveMemberChain()
 
 	local _objRefV
 
+	# this block can only happen if the expression is being evaluated someway other than a _bgclassCall
 	# if <oid> was not passed in, the expression starts at the function global scope so use the first part as the starting oid
 	# it can either be a valid object (array or var containing _bgclassCall...) or it can be the left hand side of an assignment
 	if [ ! "$_rsvOID" ]; then
@@ -1357,10 +1324,40 @@ function __resolveMemberChain()
 			method:exists:*)          _rsvMemberType="method$_methodType" ;;
 			memberVar:*:nullVar)      _rsvMemberType="null:memberVar" ;;
 			memberVar:*:*)            _rsvMemberType="$_memberVarInfo" ;;
-			unknown:noMethod:nullVar) _rsvMemberType="null:either" ;;
+			unknown:noMethod:nullVar) _rsvMemberType="null:either"; [ ${#_argsV[@]} -gt 0 ] && [ ! "$_memberOp" ] && _rsvMemberType="null:method$_methodType" ;;
 			unknown:*:nullVar)        _rsvMemberType="method$_methodType" ;;
 			unknown:noMethod:*)       _rsvMemberType="$_memberVarInfo" ;;
 		esac
+	fi
+}
+
+function _bgclassCallSetup()
+{
+	if ! varIsAnyArray "$1"; then
+		assertObjExpressionError "bad object reference. The object is out of scope. \nObjRef='_bgclassCall $@'"
+	fi
+
+	_OID="$1";           shift
+	_CLASS="$1";         shift
+	_hierarchLevel="$1"; shift
+	[ "$1" == "|" ] && shift
+	_memberExpression="$*"; _memberExpression="${_memberExpression#|}"
+	__parseObjSyntax "$@"
+
+
+	local allowOnDemandObjCreation; [[ "${_memberOp:-defaultOp}" =~ ^(defaultOp|=new|\+=|=|::)$ ]] && allowOnDemandObjCreation="-f"
+	__resolveMemberChain "$allowOnDemandObjCreation" "$_OID" "$_chainedObjOrMember" # optimization
+
+	if [ "$_rsvOID" ]; then
+		_OID="$_rsvOID"
+		this="$_OID"
+
+		_OID_sys="${_OID}"
+		varExists "${_OID}_sys" && _OID_sys+="_sys"
+		_this="${_OID_sys}"
+
+		_CLASS="${_this[_CLASS]}"
+		static="${_this[_CLASS]}"
 	fi
 }
 
@@ -1386,7 +1383,7 @@ function __resolveMemberChain()
 #    _memberExpression
 #
 # Object Syntax:
-# See man(5) bgBashObjectsSyntax which is created by comments above the _parseObjSyntax function
+# See man(5) bgBashObjectsSyntax
 # See Also:
 #    ParseObjExpr
 #    completeObjectSyntax
@@ -1394,61 +1391,83 @@ function __resolveMemberChain()
 function _bgclassCall()
 {
 	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
-	# if <oid> does not exist, its because the myObj=$(NewObject <class>) syntax was used to create the
-	# object reference and it had to delay creation because it was in a subshell.
-	if [ "$1" ] && ! varIsA array "$1"; then
-		[[ "$1" =~ ^heap_[aAixrnlut]*_ ]] || assertObjExpressionError "bad object reference. The object is out of scope. \nObjRef='_bgclassCall $@'"
-		declare -gA "$1=()"
-		if [[ "$4" =~ ^[._]*construct$ ]]; then
-			local _OID="$1"; shift
-			local _CLASS="$1"; shift
-			ConstructObject "$_CLASS" "$_OID" "$@"
-			bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
-			return
-		else
-			ConstructObject "$2" "$1"
-		fi
-	fi
 
 	((_bgclassCallCount++))
 	#local msStart="10#${EPOCHREALTIME#*.}"; local msLap; local msLapLast=$msStart
 
-	# the local variables we declare in this function will be available to access in the method function
-	local _OID="$1";           shift
-	local _CLASS="$1";         shift
-	local _hierarchLevel="$1"; shift
-	local _memberExpression="$*"; _memberExpression="${_memberExpression#|}"
-
-	local _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
-	#_parseObjSyntax _chainedObjOrMember _memberOp _argsV "$@"
-	__parseObjSyntax "$@"
-
-	#bgtraceVars "" "" -l"$*"
-
 	#declare -g msCP1; msLap="10#${EPOCHREALTIME#*.}"; (( msCP1+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 
-	set -- "${_argsV[@]}"
+	# this block parses the incoming expression into the object and its member being operated on and the operator to perform.
+	# if bgObjectsBuiltinIsInstalled is not set, the bash function _bgclassCallSetup is used and it needs some code before and after
+	# it to declare variables in this scope.
+	# if bgObjectsBuiltinIsInstalled is set, the builtin command bgObjects does everything since a builtin can create local variables
+	# in the function context that called it.
+	# The builtin is much faster and is prefered but since it is much easier to distribute scripts without relying on a compiled
+	# loadable builtin,
+	if [ ! "$bgObjectsBuiltinIsInstalled" ]; then
+		# this block is the bash version of the context setup.
+		local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+		local _OID _OID_sys _resultCode
+		local -n this _this static
 
-	local allowOnDemandObjCreation; [[ "${_memberOp:-defaultOp}" =~ ^(defaultOp|=new|\+=|=|::)$ ]] && allowOnDemandObjCreation="-f"
-	#_resolveMemberChain $allowOnDemandObjCreation "$_OID" "$_chainedObjOrMember" _rsvOID _rsvMemberType _rsvMemberName
-	__resolveMemberChain "$allowOnDemandObjCreation" "$_OID" "$_chainedObjOrMember" # optimization
+		_bgclassCallSetup "$@"
 
+		# This section contains things that the builtin bgObjects does but we cant put it inside _bgclassCallSetup because it needs
+		# to change the context (local variables) at this function scope and not inside the _bgclassCallSetup function call.
+
+		set -- "${_argsV[@]}"
+
+		# fixup the :: override syntax
+		if [ "$_memberOp" == "::" ] && [[ "$_rsvMemberType" == "null"* ]]; then
+			# virtual mechanism override
+			# $myObj.Object::bgtrace ...
+			_rsvMemberName="${_rsvMemberName}::$1"; shift
+			_rsvMemberType="method"
+			_memberOp="" # set it to the defaultOp
+		fi
+
+		# do the part of the method call case that the builtin does
+		if [[ "$_rsvMemberType" == "method"* ]] && [ "${_memberOp:-defaultOp}" == "defaultOp" ]; then
+			# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
+			_classUpdateVMT "${_this[_CLASS]}"
+
+			# find the _VMT taking into account super calls
+			if [ ${_hierarchLevel:-0} -eq 0 ]; then
+				local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
+			else
+				local -n _VMT="${refClass[baseClass]}_vmt"
+			fi
+
+			local _METHOD
+			if [[ "${_rsvMemberName}" =~ .:: ]]; then
+				_METHOD="${_rsvMemberName}"
+			else
+				_METHOD="${_VMT[_method::${_rsvMemberName}]}"
+			fi
+
+			# super is relative to the the class of the polymorphic method we are executing
+			local super="_bgclassCall ${_OID} ${_METHOD%%::*} 1 |"
+
+			# create local nameRefs for each logical member variable that has a valid var name not starting with an '_'
+			if [[ "${static[oidAttributes]:-A}" =~ A ]]; then
+				local _memberVarName; for _memberVarName in "${!this[@]}"; do
+					[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
+					if IsAnObjRef "${this[$_memberVarName]}"; then
+						declare -n $_memberVarName; GetOID ${this[$_memberVarName]} "$_memberVarName"
+					fi
+				done
+			fi
+		fi
+
+	else
+		# this is the builtin version of the context setup
+		builtin bgObjects _bgclassCall "$@"
+		#bgtraceBreak --plumbing
+	fi
 	#declare -g msCP2; msLap="10#${EPOCHREALTIME#*.}"; (( msCP2+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 
+	# if parsing the expression failed, _rsvMemberType will be invalidExpression:<msg>
 	[[ "$_rsvMemberType" =~ ^invalidExpression ]] && assertObjExpressionError -v expression:_memberExpression -v errorType:_rsvMemberType -v _OID -v memberExpr:_chainedObjOrMember  "invalid object expression. The <memberExpr> can not be interpretted relative to the <oid>"
-
-	if [ "$_rsvOID" ]; then
-		local _OID="$_rsvOID"
-		local -n this="$_OID"
-
-		local _OID_sys="${_OID}"
-		varExists "${_OID}_sys" && _OID_sys+="_sys"
-		local -n _this="${_OID_sys}"
-
-		local -n static="${_this[_CLASS]}"
-	fi
-
-	#declare -g msCP3; msLap="10#${EPOCHREALTIME#*.}"; (( msCP3+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 
 	#bgtraceVars -1 _memberOp _rsvMemberType
 	#bgtraceVars "" _chainedObjOrMember _memberOp _argsV _rsvOID _rsvMemberType _rsvMemberName -l"${_memberOp:-defaultOp}:${_rsvMemberType}"
@@ -1458,6 +1477,7 @@ function _bgclassCall()
 			;;
 
 		defaultOp:self)
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			[ "$_rsvOID" ] && Object::toString "$@"
 			;;
 
@@ -1474,7 +1494,8 @@ function _bgclassCall()
 			false
 			;;
 
-		defaultOp:object:*)
+		defaultOp:object*)
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			${this[$_rsvMemberName]}.toString "$@"
 			;;
 
@@ -1489,44 +1510,17 @@ function _bgclassCall()
 		defaultOp:method*)
 			local -n refClass="$_CLASS"
 
-			# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
-			_classUpdateVMT "${_this[_CLASS]}"
+			if [ "$_METHOD" ]; then
+				objOnEnterMethod "$@"
+				bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
+				$_METHOD "$@"
 
-			# find the _VMT taking into account super calls
-			if [ ${_hierarchLevel:-0} -eq 0 ]; then
-				local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
+			elif [ ${_hierarchLevel:-0} -eq 0 ]; then
+				assertObjExpressionError -v method:_rsvMemberName  "method does not exist"
 			else
-				local -n _VMT="${refClass[baseClass]}_vmt"
+				# its a noop to call $super.something when there is no super.something
+				:
 			fi
-
-			if [[ "${_rsvMemberName}" =~ .:: ]]; then
-				local _METHOD="${_rsvMemberName}"
-			else
-				local _METHOD="${_VMT[_method::${_rsvMemberName}]}"
-			fi
-
-			# its a noop to call $super.somthing when there is no super.something. We know it exists in the object's class
-			# because _resolveMemberChain told us so
-			[ "$_METHOD" ] || break
-
-			# create local nameRefs for each logical member variable that has a valid var name not starting with an '_'
-			if [ "$_OID_sys" != "$_OID" ] && [[ "${static[oidAttributes]:-A}" =~ A ]]; then
-				local _memberVarName; for _memberVarName in "${!this[@]}"; do
-					[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
-					if IsAnObjRef "${this[$_memberVarName]}"; then
-						declare -n $_memberVarName; GetOID ${this[$_memberVarName]} "$_memberVarName"
-					else
-						declare -n $_memberVarName="this[$_memberVarName]"
-					fi
-				done
-			fi
-
-			# super is relative to the the class of the polymorphic method we are executing
-			local super="_bgclassCall ${_OID} ${_METHOD%%::*} 1 |"
-
-			objOnEnterMethod "$@"
-			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
-			$_METHOD "$@"
 			;;
 
 		:::self)
@@ -1586,7 +1580,7 @@ function _bgclassCall()
 			;;
 		.unset:null*|.unset:method*)
 			;;
-		.unset:object:*) # member objects are left over after the other cases
+		.unset:object*) # member objects are left over after the other cases
 			DeleteObject "${this[$_rsvMemberName]}"
 			unset this[$_rsvMemberName]
 			;;
@@ -1603,7 +1597,7 @@ function _bgclassCall()
 		.isA:self)
 			[ "$_rsvOID" ] && [ "${_classIsAMap[${_this[_CLASS]},$1]+exists}" ]
 			;;
-		.isA:object:*)
+		.isA:object*)
 			[ "${_classIsAMap[${_rsvMemberType#object:},$1]+exists}" ]
 			;;
 		.isA:primitive|.isA:null*|.isA:method*|.isA:*)
@@ -1645,15 +1639,19 @@ function _bgclassCall()
 			;;
 
 		.toString:self)
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			Object::toString "$@"
 			;;
-		.toString:object:*)
+		.toString:object*)
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			${this[$_rsvMemberName]}.toString "$@"
 			;;
 		.toString:primitive)
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			Primitive::toString --name="$_rsvMemberName" --value="${this[$_rsvMemberName]}" "$@"
 			;;
 		.toString:null*)
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			Primitive::toString --name="$_rsvMemberName" --value="${_rsvMemberType%:either}" "$@"
 			;;
 		.toString:method*)
@@ -1674,6 +1672,7 @@ function _bgclassCall()
 			else
 				local _METHOD="${_VMT[_method::${_rsvMemberName}]}"
 			fi
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			Primitive::toString --name="$_rsvMemberName" --value="method<$_METHOD()>" "$@"
 			;;
 
@@ -1682,10 +1681,12 @@ function _bgclassCall()
 		=new:self) assertObjExpressionError "direct object assignment (as opposed to member variable assignment) is not yet supported" ;;
 		=new:globalVar)
 			local _className="$1"; shift
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			ConstructObject "${_className:-Object}" $_rsvMemberName "$@"
 			;;
 		=new:*)
 			local _className="$1"; shift
+			bgDebuggerPlumbingCode=${bgDebuggerPlumbingCode[1]:-0}
 			local _newObject; ConstructObject "${_className:-Object}" _newObject "$@"
 			[[ "$_rsvMemberType" =~ ^object: ]] && DeleteObject "${this[$_rsvMemberName]}"
 			this[$_rsvMemberName]="$_newObject"
@@ -1713,9 +1714,12 @@ function _bgclassCall()
 
 		*) assertObjExpressionError -v _memberOp -v _rsvMemberType "case block for object syntax operators by target type is missing this case"
 	esac
+# 	local temp=$?
+# bgtraceVars temp _resultCode ""
+	_resultCode="${_resultCode:-$?}"
 
-	local _resultCode="$?"
-	#declare -g msCP4; msLap="10#${EPOCHREALTIME#*.}"; (( msCP4+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
+	#declare -g msCP3; msLap="10#${EPOCHREALTIME#*.}"; (( msCP3+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
+	# #declare -g msCP4; msLap="10#${EPOCHREALTIME#*.}"; (( msCP4+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 	#declare -g msTotal; msLap="10#${EPOCHREALTIME#*.}"; (( msTotal+=((msLap>msStart) ? (msLap-msStart) : 0)   ))
 
 	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
@@ -1976,10 +1980,7 @@ function returnObject()
 
 # usage: ParseObjExpr <objExpr> <oidPartVar> <remainderPartVar> <oidVar> <remainderTypeVar>
 # Params:
-# TODO: consider making this the definitive place for all bash Object syntax. Currently (circa 2016-07)
-#       the _bgclassCall is the definitive keeper of the syntax and this function has to be kept in sync.
-# Update: The _parseObjSyntax implementation has been refactor and is now on par to ths one. This can be reconsidered to see if it
-#       can use the __parseObjSyntax and/or __resolveMemberChain functions.
+# TODO: reimplement this or BC (which is the only place that uses this) in terms of _bgclassCallSetup
 # See Also:
 #    _bgclassCall
 #    completeObjectSyntax()
@@ -2131,7 +2132,11 @@ function completeObjectSyntax()
 ### Defining the Object::methods
 
 
-
+# usage: $Object::assign target source
+function static::Object::assign()
+{
+	assertError "not yet implemented"
+}
 
 function Object::eval()
 {
@@ -2270,7 +2275,7 @@ function Object::addMethod()
 function Object::getIndexes() { Object::getAttributes "$@"; }  # alias
 function Object::getAttributes()
 {
-	local retOpts mode="real"
+	local retOpts=(--echo) mode="real"
 	while [ $# -gt 0 ]; do case $1 in
 		--sys) mode="sys"  ;;
 		--all) mode="both" ;;
@@ -2288,7 +2293,7 @@ function Object::getAttributes()
 	# in this case 'this[]' has no system vars. The Array class is like this
 	if [ "$_OID_sys" != "$_OID" ] && [ "${static[defaultIndex]:-on}" != "on" ]; then
 		case $mode in
-			real) 	outputValue -1 "${retOpts[@]}" "${!this[@]}" ;;
+			real) 	outputValue -1                             "${retOpts[@]}" "${!this[@]}" ;;
 			sys)  	outputValue -1 --filters="0 _Ref"          "${retOpts[@]}" "${!_this[@]}" ;;
 			both) 	outputValue -1                             "${retOpts[@]}" "${!this[@]}"
 					outputValue -1 --append --filters="0 _Ref" "${retOpts[@]}" "${!_this[@]}"
@@ -2489,9 +2494,9 @@ function Primitive::toString() {
 	done
 	local toString_fmtExtraLines='{if (NR>1) printf("%-*s+ ", 0, ""); print $0}'
 	if [ "$doTitle" ]; then
-		printf "%s=%s\n" "${title:-$name}" "$value" | awk "$toString_fmtExtraLines"
+		printf "%s=%s\n" "${title:-$name}" "$value" | gawk "$toString_fmtExtraLines"
 	else
-		printf "%s\n" "$value" | awk "$toString_fmtExtraLines"
+		printf "%s\n" "$value" | gawk "$toString_fmtExtraLines"
 	fi
 }
 
@@ -2512,16 +2517,21 @@ function Object::toString()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	# the pattern allows objDictionary to be shared among this and any recursive call that it spawns
+	# rawMode means divert to printfVars --noObjects to just show the raw arrays (and nested arrays)
+	if [ "$rawMode" ]; then
+		if [ "_OID" != "_OID_sys" ]; then
+			printfVars --noObjects  this _this
+		else
+			printfVars --noObjects  this
+		fi
+		return 0
+	fi
+
+	# this pattern allows objDictionary to be shared among this and any recursive call that it spawns
 	if ! varExists objDictionary; then
 		local -A objDictionary=()
 	fi
 	objDictionary[$_OID]="seen"
-
-	if [ "$rawMode" ]; then
-		printfVars --rawObjects this
-		return 0
-	fi
 
 	local indexes; $_this.getIndexes $mode -A indexes
 
@@ -2566,15 +2576,15 @@ function Object::toString()
 			if [ ! "${objDictionary[$refOID]+hasBeenSeen}" ]; then
 				printf "${indent}"
 				Try:
-					$value.toString $mode --title="${lDecor}${attrib}${rDecor}" | awk '{if (NR>1) printf("'"$indent"'"); print $0}'
+					$value.toString $mode --title="${lDecor}${attrib}${rDecor}" | gawk '{if (NR>1) printf("'"$indent"'"); print $0}'
 				Catch: && {
 					printf "%-${labelWidth}s=<error calling '$value.toString $mode'\n" "${lDecor}${attrib}${rDecor}"
 				}
 			else
-				printf "${indent}%-${labelWidth}s=<Reference to already printed %s object>\n" "${lDecor}${attrib}${rDecor}" "${refClass}" | awk "$toString_fmtExtraLines"
+				printf "${indent}%-${labelWidth}s=<Reference to already printed %s object>\n" "${lDecor}${attrib}${rDecor}" "${refClass}" | gawk "$toString_fmtExtraLines"
 			fi
 		else
-			printf "${indent}%-${labelWidth}s=%s\n" "${lDecor}${attrib}${rDecor}" "$value" | awk "$toString_fmtExtraLines"
+			printf "${indent}%-${labelWidth}s=%s\n" "${lDecor}${attrib}${rDecor}" "$value" | gawk "$toString_fmtExtraLines"
 		fi
 	done
 	true
@@ -2732,6 +2742,9 @@ declare -A Object=(
 )
 # because "DeclareClass Class" will access its base class's (Object) vmt, we nee to declare it as an -A array early
 declare -A Object_vmt
+
+# for $super.<method> calls when there are no supers left
+declare -A empty_vmt=()
 
 DeclareClass  Class
 DeclareClass  Object

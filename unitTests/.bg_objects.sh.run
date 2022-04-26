@@ -5,15 +5,25 @@
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo'
-memberChain='.foo'
-memberOp=''
-argsV[]
+'myoid Object 0 | .foo'
+_chainedObjOrMember='.foo'
+_memberOp=''
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='.foo'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfEmptyOp0 finished
 ###############################################################################################################################
@@ -25,15 +35,25 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.bar.foo'
-memberChain='.bar.foo'
-memberOp=''
-argsV[]
+'myoid Object 0 | .bar.foo'
+_chainedObjOrMember='.bar.foo'
+_memberOp=''
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='.bar.foo'
+_rsvOID='heap_A_<redacted>'
+_OID='heap_A_<redacted>'
+_OID_sys='heap_A_<redacted>_sys'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfEmptyOp1 finished
 ###############################################################################################################################
@@ -45,16 +65,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo p1'
-memberChain='.foo'
-memberOp=''
-argsV[]
-     [0]='p1'
+'myoid Object 0 | .foo p1'
+_chainedObjOrMember='.foo'
+_memberOp=''
+_argsV[]
+      [0]='p1'
+_hierarchLevel='0'
+_memberExpression='.foo p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:method'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfEmptyOp2 finished
 ###############################################################################################################################
@@ -66,16 +96,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.bar.foo p1'
-memberChain='.bar.foo'
-memberOp=''
-argsV[]
-     [0]='p1'
+'myoid Object 0 | .bar.foo p1'
+_chainedObjOrMember='.bar.foo'
+_memberOp=''
+_argsV[]
+      [0]='p1'
+_hierarchLevel='0'
+_memberExpression='.bar.foo p1'
+_rsvOID='heap_A_<redacted>'
+_OID='heap_A_<redacted>'
+_OID_sys='heap_A_<redacted>_sys'
+_CLASS='Object'
+_rsvMemberType='null:method'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfEmptyOp3 finished
 ###############################################################################################################################
@@ -87,15 +127,25 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.unset'
-memberChain=''
-memberOp='.unset'
-argsV[]
+'myoid Object 0 | .unset'
+_chainedObjOrMember=''
+_memberOp='.unset'
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='.unset'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='self'
+_rsvMemberName=''
 
 ## bg_objects.sh:_parseObjSyntax:pOfUnsetOp0 finished
 ###############################################################################################################################
@@ -107,15 +157,25 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo.unset'
-memberChain='.foo'
-memberOp='.unset'
-argsV[]
+'myoid Object 0 | .foo.unset'
+_chainedObjOrMember='.foo'
+_memberOp='.unset'
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='.foo.unset'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfUnsetOp1 finished
 ###############################################################################################################################
@@ -127,16 +187,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.unset p1'
-memberChain=''
-memberOp='.unset'
-argsV[]
-     [0]='p1'
+'myoid Object 0 | .unset p1'
+_chainedObjOrMember=''
+_memberOp='.unset'
+_argsV[]
+      [0]='p1'
+_hierarchLevel='0'
+_memberExpression='.unset p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='self'
+_rsvMemberName=''
 
 ## bg_objects.sh:_parseObjSyntax:pOfUnsetOp2 finished
 ###############################################################################################################################
@@ -148,16 +218,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo.unset p1'
-memberChain='.foo'
-memberOp='.unset'
-argsV[]
-     [0]='p1'
+'myoid Object 0 | .foo.unset p1'
+_chainedObjOrMember='.foo'
+_memberOp='.unset'
+_argsV[]
+      [0]='p1'
+_hierarchLevel='0'
+_memberExpression='.foo.unset p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfUnsetOp3 finished
 ###############################################################################################################################
@@ -169,15 +249,25 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'=new'
-memberChain=''
-memberOp='=new'
-argsV[]
+'myoid Object 0 | =new'
+_chainedObjOrMember=''
+_memberOp='=new'
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='=new'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='self'
+_rsvMemberName=''
 
 ## bg_objects.sh:_parseObjSyntax:pOfNewOp0 finished
 ###############################################################################################################################
@@ -189,15 +279,25 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo=new'
-memberChain='.foo'
-memberOp='=new'
-argsV[]
+'myoid Object 0 | .foo=new'
+_chainedObjOrMember='.foo'
+_memberOp='=new'
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='.foo=new'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfNewOp1 finished
 ###############################################################################################################################
@@ -209,16 +309,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'=new p1'
-memberChain=''
-memberOp='=new'
-argsV[]
-     [0]='p1'
+'myoid Object 0 | =new p1'
+_chainedObjOrMember=''
+_memberOp='=new'
+_argsV[]
+      [0]='p1'
+_hierarchLevel='0'
+_memberExpression='=new p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='self'
+_rsvMemberName=''
 
 ## bg_objects.sh:_parseObjSyntax:pOfNewOp2 finished
 ###############################################################################################################################
@@ -230,16 +340,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo=new p1'
-memberChain='.foo'
-memberOp='=new'
-argsV[]
-     [0]='p1'
+'myoid Object 0 | .foo=new p1'
+_chainedObjOrMember='.foo'
+_memberOp='=new'
+_argsV[]
+      [0]='p1'
+_hierarchLevel='0'
+_memberExpression='.foo=new p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfNewOp3 finished
 ###############################################################################################################################
@@ -251,15 +371,25 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'='
-memberChain=''
-memberOp='='
-argsV[]
+'myoid Object 0 | ='
+_chainedObjOrMember=''
+_memberOp='='
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='='
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='self'
+_rsvMemberName=''
 
 ## bg_objects.sh:_parseObjSyntax:pOfAssignOp0 finished
 ###############################################################################################################################
@@ -271,15 +401,25 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo='
-memberChain='.foo'
-memberOp='='
-argsV[]
+'myoid Object 0 | .foo='
+_chainedObjOrMember='.foo'
+_memberOp='='
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='.foo='
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfAssignOp1 finished
 ###############################################################################################################################
@@ -291,16 +431,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'= p1'
-memberChain=''
-memberOp='='
-argsV[]
-     [0]=' p1'
+'myoid Object 0 | = p1'
+_chainedObjOrMember=''
+_memberOp='='
+_argsV[]
+      [0]=' p1'
+_hierarchLevel='0'
+_memberExpression='= p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='self'
+_rsvMemberName=''
 
 ## bg_objects.sh:_parseObjSyntax:pOfAssignOp2 finished
 ###############################################################################################################################
@@ -312,16 +462,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'=p1'
-memberChain=''
-memberOp='='
-argsV[]
-     [0]='p1'
+'myoid Object 0 | =p1'
+_chainedObjOrMember=''
+_memberOp='='
+_argsV[]
+      [0]='p1'
+_hierarchLevel='0'
+_memberExpression='=p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='self'
+_rsvMemberName=''
 
 ## bg_objects.sh:_parseObjSyntax:pOfAssignOp3 finished
 ###############################################################################################################################
@@ -333,16 +493,26 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo= p1'
-memberChain='.foo'
-memberOp='='
-argsV[]
-     [0]=' p1'
+'myoid Object 0 | .foo= p1'
+_chainedObjOrMember='.foo'
+_memberOp='='
+_argsV[]
+      [0]=' p1'
+_hierarchLevel='0'
+_memberExpression='.foo= p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfAssignOp4 finished
 ###############################################################################################################################
@@ -354,18 +524,149 @@ argsV[]
 
 ##----------
 ## setup
-##     | cmd> local memberChain memberOp argsV
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
 
 ##----------
 ## test
-cmd> echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
-'.foo=p1'
-memberChain='.foo'
-memberOp='='
-argsV[]
-     [0]='p1'
+'myoid Object 0 | .foo=p1'
+_chainedObjOrMember='.foo'
+_memberOp='='
+_argsV[]
+      [0]='p1'
+_hierarchLevel='0'
+_memberExpression='.foo=p1'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:either'
+_rsvMemberName='foo'
 
 ## bg_objects.sh:_parseObjSyntax:pOfAssignOp5 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfStatic0 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
+
+##----------
+## test
+'Object Object 0 | ::assign'
+_chainedObjOrMember=''
+_memberOp='::'
+_argsV[]
+      [0]='assign'
+_hierarchLevel='0'
+_memberExpression='::assign'
+_rsvOID='Object'
+_OID='Object'
+_OID_sys='Object'
+_CLASS='Class'
+_rsvMemberType='self'
+_rsvMemberName=''
+
+## bg_objects.sh:_parseObjSyntax:pOfStatic0 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pOfStatic1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
+
+##----------
+## test
+'myoid Object 0 | .static.toString'
+_chainedObjOrMember='.static'
+_memberOp='.toString'
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='.static.toString'
+_rsvOID='Object'
+_OID='Object'
+_OID_sys='Object'
+_CLASS='Class'
+_rsvMemberType='self'
+_rsvMemberName=''
+
+## bg_objects.sh:_parseObjSyntax:pOfStatic1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pMemVarSyntax1 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
+
+##----------
+## test
+'myoid Object 0 | [foo]'
+_chainedObjOrMember='[foo]'
+_memberOp=''
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='[foo]'
+_rsvOID='myoid'
+_OID='myoid'
+_OID_sys='myoid'
+_CLASS='Object'
+_rsvMemberType='null:memberVar'
+_rsvMemberName='foo'
+
+## bg_objects.sh:_parseObjSyntax:pMemVarSyntax1 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_objects.sh:_parseObjSyntax:pMemVarSyntax2 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+##     | cmd> local _OID _OID_sys
+##     | cmd> local -n this _this static
+##     | cmd> local -A myoid; ConstructObject Object myoid
+
+##----------
+## test
+'myoid Object 0 | .bar[foo]'
+_chainedObjOrMember='.bar[foo]'
+_memberOp=''
+_argsV[]
+_hierarchLevel='0'
+_memberExpression='.bar[foo]'
+_rsvOID='heap_A_<redacted>'
+_OID='heap_A_<redacted>'
+_OID_sys='heap_A_<redacted>_sys'
+_CLASS='Object'
+_rsvMemberType='null:memberVar'
+_rsvMemberName='foo'
+
+## bg_objects.sh:_parseObjSyntax:pMemVarSyntax2 finished
 ###############################################################################################################################
 
 
@@ -416,7 +717,7 @@ Object[]
                        +Object::toFlatINI
                        +Object::toString'
       [subClasses    ]='Class NullObject Stack Array Map'
-      [staticMethods ]=''
+      [staticMethods ]='static::Object::assign'
       [name          ]='Object'
       [_OID          ]='Object'
 #
@@ -441,6 +742,7 @@ Object_vmt[]
           [_method::fromString      ]='Object::fromString'
           [_method::set             ]='Object::set'
           [_method::bgtrace         ]='Object::bgtrace'
+          [_static::assign          ]='static::Object::assign'
           [_method::get             ]='Object::get'
           [_method::clear           ]='Object::clear'
           [_method::getStaticMethods]='Object::getStaticMethods'
@@ -493,6 +795,7 @@ Class_vmt[]
          [_method::bgtrace            ]='Object::bgtrace'
          [_method::set                ]='Object::set'
          [_method::get                ]='Object::get'
+         [_static::assign             ]='static::Object::assign'
          [_method::getClassStaticMethods]='Class::getClassStaticMethods'
          [_method::reloadMethods      ]='Class::reloadMethods'
          [_method::isDerivedFrom      ]='Class::isDerivedFrom'
@@ -572,6 +875,24 @@ Map_vmt[]
 
 
 ###############################################################################################################################
+## bg_objects.sh:methodCall: start
+## expect: 
+
+##----------
+## setup
+##     | cmd> DeclareClass Animal
+##     | cmd> local animal; ConstructObject Animal animal
+
+##----------
+## test
+cmd> $animal.speak
+the animal says...
+
+## bg_objects.sh:methodCall: finished
+###############################################################################################################################
+
+
+###############################################################################################################################
 ## bg_objects.sh:isDerivedFrom: start
 ## expect:  that true tests indicate true and false tests indicate false
 
@@ -618,7 +939,7 @@ no
 cmd> $Animal.getClassMethods
 speak feed pet
 cmd> $Animal.getClassMethods -i
-get speak hasMethod fromINI addMethod getAttributes toDebControl fromFlatINI restoreFile clear fromString bgtrace getStaticMethods fromDebControl toString set eval toFlatINI getValues getSize getMethods saveFile feed getIndexes clone pet
+get speak hasMethod fromINI toJSON addMethod getAttributes toDebControl fromFlatINI restoreFile clear fromString bgtrace getStaticMethods fromDebControl toString set eval toFlatINI getValues getSize fromJSON getMethods saveFile feed getIndexes clone pet
 cmd> $Animal.getClassMethods -d$'\n'
 speak
 feed
@@ -644,17 +965,17 @@ cmd> eval 'local petOIDVars="${!'"$petOID"'*}"'
 cmd> echo "global vars for this object = ${petOIDVars}"
 global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet $petOIDVars
-pet='_bgclassCall heap_A_<redacted> Animal 0 |'
-heap_A_<redacted>[]
-                [0       ][]'<objRef to 'heap_A_<redacted>'>'
-                [legCount]='unk'
-                [species ]='unk'
-                [family  ]='unk'
+pet[]
+   [0       ][]'<objRef to 'pet'>'
+   [legCount]='unk'
+   [species ]='unk'
+   [family  ]='unk'
+heap_A_<redacted>[]'<objRef to 'pet'>'
 heap_A_<redacted>_sys[]
                     [_CLASS]='Animal'
-                    [0     ][]'<objRef to 'heap_A_<redacted>'>'
-                    [_Ref  ][]'<objRef to 'heap_A_<redacted>'>'
-                    [_OID  ][]'<objRef to 'heap_A_<redacted>'>'
+                    [0     ][]'<objRef to 'pet'>'
+                    [_Ref  ][]'<objRef to 'pet'>'
+                    [_OID  ][]'<objRef to 'pet'>'
 
 ##----------
 ## test
@@ -1034,6 +1355,10 @@ cmd> $obj.getOID
 heap_A_<redacted>
 cmd> local type; $obj.getOID type; printfVars type
 type='heap_A_<redacted>
+type[]
+    [foo  ]='5'
+    [0    ][]'<objRef to 'type'>'
+    [array][]
 cmd> $obj.foo.getOID
 [exitCode 1]
 cmd> $obj.array.getOID
@@ -1063,7 +1388,10 @@ cmd> $obj.dontExist.getOID
 cmd> $obj.getRef
 _bgclassCall heap_A_<redacted> Object 0 |
 cmd> local type; $obj.getRef type; printfVars --noObjects type
-type='_bgclassCall heap_A_<redacted> Object 0 |'
+type[]
+    [foo  ]='5'
+    [0    ][]'<objRef to 'type'>'
+    [array][]
 cmd> $obj.foo.getRef
 [exitCode 1]
 cmd> $obj.array.getRef
@@ -1175,6 +1503,7 @@ methods       =Object::addMethod
 + Object::fromDebControl
 + Object::fromFlatINI
 + Object::fromINI
++ Object::fromJSON
 + Object::fromString
 + Object::get
 + Object::getAttributes
@@ -1189,8 +1518,9 @@ methods       =Object::addMethod
 + Object::set
 + Object::toDebControl
 + Object::toFlatINI
++ Object::toJSON
 + Object::toString
-staticMethods =
+staticMethods =static::Object::assign
 subClasses    =<redacted>
 name          =Object
 

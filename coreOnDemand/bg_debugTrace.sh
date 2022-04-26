@@ -504,6 +504,7 @@ function bgtraceBreak()
 
 	local logicalFrameStart=1 breakContext defaultDbgID skipCount
 	while [ $# -gt 0 ]; do case $1 in
+		--plumbing)      bgDebuggerStepIntoPlumbing="1" ;;
 		--skipCount*)    bgOptionGetOpt val: skipCount "$@" && shift ;;
 		--defaultDbgID*) bgOptionGetOpt val: defaultDbgID "$@" && shift ;;
 		--context*) bgOptionGetOpt val: breakContext "$@" && shift ;;

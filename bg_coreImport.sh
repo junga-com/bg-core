@@ -414,6 +414,7 @@ esac
 #######################################################################################################################################
 ### Include the mandatory libraries that define the minimum environment that code can rely on
 
+
 # bg_coreBashVars.sh provides functions that support patterns of variable use in bash
 import bg_coreBashVars.sh ;$L1;$L2
 
@@ -427,6 +428,14 @@ import bg_coreStrings.sh ;$L1;$L2
 # Also, any function that is used in other bg_core* libraries can be moved to this library so that these functions are available
 # regardless of what order the rest of the bg_core* librares are sourced
 import bg_coreLibsMisc.sh ;$L1;$L2
+
+# Typically each library will take from 0.004 to 0.040 to load with the average being around 0.012
+if [ "$bgImportProfilerOn" ]; then
+	import bg_coreTimer.sh ;$L1;$L2
+	import bg_debugTrace.sh ;$L1;$L2
+	importCntr traceOn
+	bgtimerLapTrace -T ImportProfiler "bg-core loaded minimal core libraries"
+fi
 
 # bg_libSysRuntime.sh works with the OS system paths to allow discovery of other installed components (plugins, templates, etc..)
 import bg_coreSysRuntime.sh ;$L1;$L2
@@ -457,6 +466,12 @@ import bg_coreStack.sh ;$L1;$L2
 # things like $(getUserCmpApp)...
 import bg_coreCuiUserApps.sh  ;$L1;$L2
 
+
+# Typically each library will take from 0.004 to 0.040 to load with the average being around 0.012
+if [ "$bgImportProfilerOn" ]; then
+	bgtimerLapTrace -T ImportProfiler "bg-core loaded mandatory core libraries"
+fi
+
 # if we are being sourced in a terminal, tell importCntr to record the timestamp used to tell if libraries are newer
 # and also import the bgtrace functions assuming that we are being sourced to debug stuff
 if [ "$bgLibExecMode" == "terminal" ]; then
@@ -470,12 +485,6 @@ fi
 #   invokeOutOfBandSystem, it signals that its initialization is over. If import profiling is called for, we start it here and
 #   end it in invokeOutOfBandSystem.
 
-# Typically each library will take from 0.004 to 0.040 to load with the average being around 0.012
-if [ "$bgImportProfilerOn" ]; then
-	import bg_debugTrace.sh ;$L1;$L2
-	importCntr traceOn
-	bgtimerLapTrace -T ImportProfiler "bg-core loaded mandatory core libraries"
-fi
 
 # This block moved to the invokeOutOfBandSystem function
 # if [ "$bgImportProfilerOn" ]; then

@@ -3,7 +3,7 @@
 # traditional table type format or a vertical, list of record type format (similar to mysql client's \G terminator).
 
 # Whether column/field labels are included in the output is controlled by at runtime (typically the -H option).
-# If lables/header data is included in the output colLabelType format attribute will determine if the labels appear as the first
+# If labels/header data is included in the output colLabelType format attribute will determine if the labels appear as the first
 # record (colLabelType==header) or at each data cell as a field label (colLabelType==inline). The value colLabelType==none will
 # suppress labels even if the runtime options call for it.
 #    colLabelType=header  : first table row is a header with column names

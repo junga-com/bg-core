@@ -137,6 +137,7 @@ function static::RBACPermission::report()
 {
 	local pkg scrap pluginKey filename
 	printf "%-20s %-11s\n" "Name" "Enabled"
+	local -n cp
 	while read -r pkg scrap pluginKey filename; do
 		Try:
 			unset -n cp; local -n cp; $Plugin::get "$pluginKey" cp

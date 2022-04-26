@@ -1,6 +1,6 @@
 
 ###############################################################################################################################
-## bg_json.sh:Object_toJSON: start
+## bg_json.sh:Object_toJSON:all start
 ## expect: 
 
 ##----------
@@ -14,7 +14,7 @@ cmd> $foo.toJSON
    "pmemB": "5",
    "pmemA": "hello",
    "memberTwo": "14",
-   "memberOne": "this and that",
+   "memberOne": " this and that",
    "words": [
       "zero",
       "one",
@@ -31,12 +31,12 @@ cmd> $foo.toJSON
 
 ##----------
 ## test
-cmd> $foo.toJSON --all
+cmd> $foo.toJSON "$1"
 {
    "pmemB": "5",
    "pmemA": "hello",
    "memberTwo": "14",
-   "memberOne": "this and that",
+   "memberOne": " this and that",
    "words": [
       "zero",
       "one",
@@ -44,9 +44,7 @@ cmd> $foo.toJSON --all
       {
          "_CLASS": "Object",
          "_OID": "sessionOID_2"
-      },
-      "Array",
-      "sessionOID_1"
+      }
    ],
    "numbers": {
       "two": "2",
@@ -63,24 +61,80 @@ cmd> $foo.toJSON --all
    "_OID": "sessionOID_0"
 }
 
-## bg_json.sh:Object_toJSON: finished
+## bg_json.sh:Object_toJSON:all finished
 ###############################################################################################################################
 
 
 ###############################################################################################################################
-## bg_json.sh:ConstructObjectFromJson: start
+## bg_json.sh:Object_toJSON:real start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local -n foo; ConstructObject TestClass foo
+
+##----------
+## test
+cmd> $foo.toJSON
+{
+   "pmemB": "5",
+   "pmemA": "hello",
+   "memberTwo": "14",
+   "memberOne": " this and that",
+   "words": [
+      "zero",
+      "one",
+      "two",
+      {}
+   ],
+   "numbers": {
+      "two": "2",
+      "obj": {},
+      "zero": "0",
+      "one": "1"
+   }
+}
+
+##----------
+## test
+cmd> $foo.toJSON "$1"
+{
+   "pmemB": "5",
+   "pmemA": "hello",
+   "memberTwo": "14",
+   "memberOne": " this and that",
+   "words": [
+      "zero",
+      "one",
+      "two",
+      {}
+   ],
+   "numbers": {
+      "two": "2",
+      "obj": {},
+      "zero": "0",
+      "one": "1"
+   }
+}
+
+## bg_json.sh:Object_toJSON:real finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_json.sh:ConstructObjectFromJson:plain start
 ## expect: 
 
 ##----------
 ## setup
 ##     | cmd> local jsonFile; bgmktemp --auto jsonFile
-##     | cmd> cat > "$jsonFile" <<-EOS
+##     | cmd> echo "$1" > "$jsonFile"
 ##     | cmd> cat "$jsonFile"
 ##     | {
 ##     |    "pmemB": "5",
 ##     |    "pmemA": "hello",
 ##     |    "memberTwo": "14",
-##     |    "memberOne": "this and that",
+##     |    "memberOne": " this and that",
 ##     |    "words": [
 ##     |       "zero",
 ##     |       "one",
@@ -103,7 +157,7 @@ obj= <instance> of Object
   pmemB    =5
   pmemA    =hello
   memberTwo=14
-  memberOne=this and that
+  memberOne= this and that
   words= <instance> of Array
     [0]=zero
     [1]=one
@@ -115,6 +169,136 @@ obj= <instance> of Object
     zero=0
     one =1
 
-## bg_json.sh:ConstructObjectFromJson: finished
+## bg_json.sh:ConstructObjectFromJson:plain finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_json.sh:ConstructObjectFromJson:withSys start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local jsonFile; bgmktemp --auto jsonFile
+##     | cmd> echo "$1" > "$jsonFile"
+##     | cmd> cat "$jsonFile"
+##     | {
+##     |    "pmemB": "5",
+##     |    "pmemA": "hello",
+##     |    "memberTwo": "14",
+##     |    "memberOne": " this and that",
+##     |    "words": [
+##     |       "zero",
+##     |       "one",
+##     |       "two",
+##     |       {
+##     |          "_CLASS": "Object",
+##     |          "_OID": "sessionOID_2"
+##     |       }
+##     |    ],
+##     |    "numbers": {
+##     |       "two": "2",
+##     |       "obj": {
+##     |          "_CLASS": "Object",
+##     |          "_OID": "sessionOID_4"
+##     |       },
+##     |       "zero": "0",
+##     |       "one": "1",
+##     |       "_CLASS": "Map",
+##     |       "_OID": "sessionOID_3"
+##     |    },
+##     |    "_CLASS": "TestClass",
+##     |    "_OID": "sessionOID_0"
+##     | }
+
+##----------
+## test
+cmd> local obj; ConstructObjectFromJson obj "$jsonFile"
+cmd> printfVars  obj
+obj= <instance> of TestClass
+  pmemB    =5
+  pmemA    =hello
+  memberTwo=14
+  memberOne= this and that
+  words= <instance> of Array
+    [0]=zero
+    [1]=one
+    [2]=two
+    [3]= <instance> of Object
+  numbers= <instance> of Map
+    two =2
+    obj= <instance> of Object
+    zero=0
+    one =1
+
+## bg_json.sh:ConstructObjectFromJson:withSys finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_json.sh:jsonEscape:100 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local val="$1"
+##     | cmd> local valEsc="$2"
+##     | cmd> local test1 test2
+
+##----------
+## test
+input         :"hello"
+input escaped :\"hello\"
+
+escaped       :\"hello\"                      CORRECT
+unescaped     :"hello"                        CORRECT
+
+## bg_json.sh:jsonEscape:100 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_json.sh:jsonEscape:110 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local val="$1"
+##     | cmd> local valEsc="$2"
+##     | cmd> local test1 test2
+
+##----------
+## test
+input         :path/file.data
+input escaped :path\/file.data
+
+escaped       :path\/file.data                CORRECT
+unescaped     :path/file.data                 CORRECT
+
+## bg_json.sh:jsonEscape:110 finished
+###############################################################################################################################
+
+
+###############################################################################################################################
+## bg_json.sh:jsonEscape:120 start
+## expect: 
+
+##----------
+## setup
+##     | cmd> local val="$1"
+##     | cmd> local valEsc="$2"
+##     | cmd> local test1 test2
+
+##----------
+## test
+input         :
+	
+input escaped :\b\n\f\r\t
+
+escaped       :\b\n\f\r\t                     CORRECT
+unescaped     :
+	                          CORRECT
+
+## bg_json.sh:jsonEscape:120 finished
 ###############################################################################################################################
 

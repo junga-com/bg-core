@@ -10,7 +10,7 @@ DeclareClass TestClass '
 '
 function TestClass::__construct()
 {
-	this[memberOne]="this and that"
+	this[memberOne]=" this and that"
 	this[memberTwo]="14"
 	$this[numbers]=new Map
 	local -n numbers; GetOID ${this[numbers]} numbers || assertError
@@ -18,7 +18,6 @@ function TestClass::__construct()
 	numbers[one]=1
 	numbers[two]=2
 	$this.numbers[obj]=new Object
-bgtraceVars numbers
 
 	$this[words]=new Array "zero" "one" "two"
 	$this.words[3]=new Object
@@ -26,6 +25,10 @@ bgtraceVars numbers
 #	words=(zero one two)
 }
 
+declare -A ut_Object_toJSON=(
+	[all]="--all"
+	[real]=""
+)
 function ut_Object_toJSON()
 {
 	ut setup
@@ -35,20 +38,16 @@ function ut_Object_toJSON()
 	$foo.toJSON
 
 	ut test
-	$foo.toJSON --all
+	$foo.toJSON "$1"
 }
 
-
-function ut_ConstructObjectFromJson()
-{
-	ut setup
-	local jsonFile; bgmktemp --auto jsonFile
-	cat > "$jsonFile" <<-EOS
+declare -A ut_ConstructObjectFromJson=(
+	[plain]="$(cmdline "$(dedent '
 	{
 	   "pmemB": "5",
 	   "pmemA": "hello",
 	   "memberTwo": "14",
-	   "memberOne": "this and that",
+	   "memberOne": " this and that",
 	   "words": [
 	      "zero",
 	      "one",
@@ -62,11 +61,74 @@ function ut_ConstructObjectFromJson()
 	      "one": "1"
 	   }
 	}
-	EOS
+	')")"
+	[withSys]="$(cmdline "$(dedent '
+	{
+	   "pmemB": "5",
+	   "pmemA": "hello",
+	   "memberTwo": "14",
+	   "memberOne": " this and that",
+	   "words": [
+	      "zero",
+	      "one",
+	      "two",
+	      {
+	         "_CLASS": "Object",
+	         "_OID": "sessionOID_2"
+	      }
+	   ],
+	   "numbers": {
+	      "two": "2",
+	      "obj": {
+	         "_CLASS": "Object",
+	         "_OID": "sessionOID_4"
+	      },
+	      "zero": "0",
+	      "one": "1",
+	      "_CLASS": "Map",
+	      "_OID": "sessionOID_3"
+	   },
+	   "_CLASS": "TestClass",
+	   "_OID": "sessionOID_0"
+	}
+	')")"
+)
+function ut_ConstructObjectFromJson()
+{
+	ut setup
+	local jsonFile; bgmktemp --auto jsonFile
+	echo "$1" > "$jsonFile"
 	cat "$jsonFile"
 
 	ut test
 	local obj; ConstructObjectFromJson obj "$jsonFile"
 	#printfVars --noObjects obj
 	printfVars  obj
+}
+
+declare -A ut_jsonEscape=(
+	[100]="$(cmdline '"hello"' $'\\"hello\\"')"
+	[110]="$(cmdline 'path/file.data' $'path\/file.data')"
+	[120]="$(cmdline $'\b\n\f\r\t' '\b\n\f\r\t')"
+)
+function ut_jsonEscape()
+{
+	ut setup
+	local val="$1"
+	local valEsc="$2"
+	local test1 test2
+
+	ut test noecho
+	printf "%-14s:%s\n"   "input"            "$val"
+	printf "%-14s:%s\n\n" "input escaped"    "$valEsc"
+
+	test1="$val"
+	jsonEscape test1
+	printf "%-14s:%-30s " "escaped"  "$test1"
+	[ "$test1" == "$valEsc" ] && printf "CORRECT\n" || printf "FAIL\n"
+
+	test2="$valEsc"
+	jsonUnescape test2
+	printf "%-14s:%-30s " "unescaped"  "$test2"
+	[ "$test2" == "$val" ] && printf "CORRECT\n" || printf "FAIL\n"
 }

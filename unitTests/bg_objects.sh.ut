@@ -4,33 +4,45 @@ import bg_objects.sh  ;$L1;$L2
 
 
 declare -A ut__parseObjSyntax=(
-	[pOfEmptyOp0]="$(cmdline ".foo")"
-	[pOfEmptyOp1]="$(cmdline ".bar.foo")"
-	[pOfEmptyOp2]="$(cmdline ".foo p1")"
-	[pOfEmptyOp3]="$(cmdline ".bar.foo p1")"
+	[pOfEmptyOp0]="$( cmdline "myoid" "Object" "0" "|" ".foo")"
+	[pOfEmptyOp1]="$( cmdline "myoid" "Object" "0" "|" ".bar.foo")"
+	[pOfEmptyOp2]="$( cmdline "myoid" "Object" "0" "|" ".foo" "p1")"
+	[pOfEmptyOp3]="$( cmdline "myoid" "Object" "0" "|" ".bar.foo" "p1")"
 
-	[pOfUnsetOp0]="$(cmdline ".unset")"
-	[pOfUnsetOp1]="$(cmdline ".foo.unset")"
-	[pOfUnsetOp2]="$(cmdline ".unset p1")"
-	[pOfUnsetOp3]="$(cmdline ".foo.unset p1")"
+	[pOfUnsetOp0]="$( cmdline "myoid" "Object" "0" "|" ".unset")"
+	[pOfUnsetOp1]="$( cmdline "myoid" "Object" "0" "|" ".foo.unset")"
+	[pOfUnsetOp2]="$( cmdline "myoid" "Object" "0" "|" ".unset" "p1")"
+	[pOfUnsetOp3]="$( cmdline "myoid" "Object" "0" "|" ".foo.unset" "p1")"
 
-	[pOfNewOp0]="$(cmdline "=new")"
-	[pOfNewOp1]="$(cmdline ".foo=new")"
-	[pOfNewOp2]="$(cmdline "=new p1")"
-	[pOfNewOp3]="$(cmdline ".foo=new p1")"
+	[pOfNewOp0]="$(   cmdline "myoid" "Object" "0" "|" "=new")"
+	[pOfNewOp1]="$(   cmdline "myoid" "Object" "0" "|" ".foo=new")"
+	[pOfNewOp2]="$(   cmdline "myoid" "Object" "0" "|" "=new" "p1")"
+	[pOfNewOp3]="$(   cmdline "myoid" "Object" "0" "|" ".foo=new" "p1")"
 
-	[pOfAssignOp0]="$(cmdline "=")"
-	[pOfAssignOp1]="$(cmdline ".foo=")"
-	[pOfAssignOp2]="$(cmdline "= p1")"
-	[pOfAssignOp3]="$(cmdline "=p1")"
-	[pOfAssignOp4]="$(cmdline ".foo= p1")"
-	[pOfAssignOp5]="$(cmdline ".foo=p1")"
+	[pOfAssignOp0]="$(cmdline "myoid" "Object" "0" "|" "=")"
+	[pOfAssignOp1]="$(cmdline "myoid" "Object" "0" "|" ".foo=")"
+	[pOfAssignOp2]="$(cmdline "myoid" "Object" "0" "|" "= p1")"
+	[pOfAssignOp3]="$(cmdline "myoid" "Object" "0" "|" "=p1")"
+	[pOfAssignOp4]="$(cmdline "myoid" "Object" "0" "|" ".foo= p1")"
+	[pOfAssignOp5]="$(cmdline "myoid" "Object" "0" "|" ".foo=p1")"
+
+	[pOfStatic0]="$(cmdline "Object" "Object" "0" "|" "::assign")"
+	[pOfStatic1]="$(cmdline "myoid" "Object" "0" "|" ".static.toString")"
+
+	[pMemVarSyntax1]="$(cmdline "myoid" "Object" "0" "|" "[foo]")"
+	[pMemVarSyntax2]="$(cmdline "myoid" "Object" "0" "|" ".bar[foo]")"
 )
 function ut__parseObjSyntax() {
 	ut setup
-	local memberChain memberOp argsV
-	ut test
-	echo "'$*'"; _parseObjSyntax  memberChain memberOp argsV "$@"; printfVars memberChain memberOp argsV
+	local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+	local _OID _OID_sys
+	local -n this _this static
+	local -A myoid; ConstructObject Object myoid
+
+	ut test noecho
+	echo "'$*'"
+	$_bgclassCallSetupUseBuiltin _bgclassCallSetup "$@"
+	printfVars _chainedObjOrMember _memberOp _argsV --noNest --noObjects --plain _hierarchLevel _memberExpression _rsvOID _OID _OID_sys _CLASS _rsvMemberType _rsvMemberName
 }
 
 
@@ -42,6 +54,22 @@ function ut_initialState()
 	ut test
 	./unitTests/bg_objectsInitialStateTest.sh
 }
+
+
+function ut_methodCall()
+{
+	ut setup
+	DeclareClass Animal
+	Animal::speak() {
+		echo "the animal says..."
+	}
+	local animal; ConstructObject Animal animal
+#printfVars --noNest --noObjects "$animal" "${animal}_sys" Animal Animal_vmt
+
+	ut test
+	$animal.speak
+}
+
 
 function ut_isDerivedFrom()
 {
@@ -222,8 +250,8 @@ function ut_nestedObjects()
 		$_this.read
 	}
 	DataFile::read() {
-		if [ -f "$filename" ]; then
-			mapfile -t data <"$filename"
+		if [ -f "${this[filename]}" ]; then
+			mapfile -t data <"${this[filename]}"
 		fi
 	}
 	local tmpFile; bgmktemp tmpFile

@@ -1,16 +1,3 @@
-printfVars:0 
-printfVars:1 
-printfVars:2 
-printfVars:3 
-printfVars:4 
-printfVars:5 
-printfVars:6 
-printfVars:7 
-printfVars:8 
-printfVars:9 
-printfVars:10 
-printfVars_nameRefs: 
-printfVars_objects: 
 varOutput:oneValue 
 varOutput:multipleValues 
 varGetAttributes: 

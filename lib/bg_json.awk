@@ -14,7 +14,7 @@ function addFlattenValue(jpath, value, valType, relName) {
 		if (! noJpathOutOpt)
 			printf("%-24s %s\n", jpath, value)
 	}
-	valueHook(jpath, value, valType, relName)
+	valueHook(jpath, gensub(/%22/,"\"","g",value), valType, relName)
 }
 
 #function assert(message) {assertHit=1; printf("error: %s\n", message); exit 100}
@@ -131,8 +131,14 @@ BEGIN {
 	split(topNamesStr,topNames)
 }
 {
-	# collect the input in one big string because there is no guarantee that a construct wont span lines
+	# collect the input in one big string because there is no guarantee that a construct wont span lines which will mess up the regex
 	jdata=jdata""$0
+
+	# Note on handling linefeeds in string data:
+	# well formed json data requires linefeeds in strings to be escaped so conctenating the lines does not change the data.
+	# however, this algorithm could support it but we dont because its not the standard. If we need to we could create a magic
+	# token (e.g. __%0A__), add it bettween the lines we concatenate here, add it to the start of the regex (/__%0A__|...),
+	# update the parser to silently pass them when they are a token by themsleves, and finally, search and replace in the strings.
 }
 END {
 	# insert a line feed after each token and split jdata into a token array using \n as the delimiter
