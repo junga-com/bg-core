@@ -4,10 +4,27 @@
 
 ##################################################################################################################
 ### bgtimer -- time and report on sections of scripts
-# TODO: now that we are using the numeric array method, implement a stack of lap structs with (startTime,endTime,description)
-#       $timerVar[0] would be the stackSize. each stack frame would increment by 3. each attribute would be an offset (0,1 or 2)
 
-declare -a bgtimerGlobalTimer
+
+# usage: timeGetEpocInNanoSec <retVar>
+# this function lets us preserve compatibility with bash 4.3. EPOCHREALTIME became available in 5.0
+function timeGetEpocInNanoSec()
+{
+	local -n retVar="$1"
+	if [ "${EPOCHREALTIME+exists}" ]; then
+		retVar="${EPOCHREALTIME/.}000"
+	else
+		retvar="$(date +"%s%N")"
+	fi
+}
+
+declare -g _forkCnt=0
+declare -ga bgtimerGlobalTimer
+# [0] == starttime  (epoch when bgtimerStart was called )
+# [1] == lap time   (epoch when the last lap or start function was called)
+# [2] == starting fork count (when -f passed to bgtimerStart, a trap is started that increments _forkCnt whenever a child finishes)
+# [3] == lap fork count
+# [4] == current indent level
 
 # usage: bgtimerStart [-T <timerVar>] [-f]
 # start or restart the timer.
@@ -19,41 +36,32 @@ declare -a bgtimerGlobalTimer
 #    -f : forks.  turn on fork counting as well as time counting
 function bgtimerStart()
 {
-	declare -g _forkCnt=0 forkFlag
-	local timerVar_start="bgtimerGlobalTimer[0]"
-	local timerVar_lap="bgtimerGlobalTimer[1]"
-	local timerVar_forkStart="bgtimerGlobalTimer[2]"
-	local timerVar_forkLap="bgtimerGlobalTimer[3]"
-	local timerVar_indent="bgtimerGlobalTimer[4]"
-	local noResetFlag indentFlag
+	local tname="bgtimerGlobalTimer"
+	local -n timer="$tname"
+	local noResetFlag
 	while [ $# -gt 0 ]; do case $1 in
-		--stub) ;;
-		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
-		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
-			timerVar_start="$tname[0]"
-			timerVar_lap="$tname[1]"
-			timerVar_forkStart="$tname[2]"
-			timerVar_forkLap="$tname[3]"
-			timerVar_indent="$tname[4]"
+		-T*)bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
+			unset -n timer; local -n timer=$tname
 			;;
-		-f) forkFlag="-f"
+		-f) timer[4]+=" -f "
 			set -o monitor
 			_forkCnt=1
 			bgtrap "((_forkCnt++))" CHLD
 			;;
+		-i) timer[4]+=" -i " ;;
+		--stub) ;;
 		--no-reset) noResetFlag="--no-reset" ;;
-		-i) indentFlag="-i" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	[ "$indentFlag" ] && printf -v "$timerVar_indent" "%s" "$indentFlag"
+	# this allows changing the -i or -f options after the fact. see bgtimerConfig
 	[ "$noResetFlag" ] && return
 
-	printf -v "$timerVar_start"     "%s" "$(date +"%s%N")"
-	printf -v "$timerVar_lap"       "%s" "${!timerVar_start}"
+	timeGetEpocInNanoSec timer[0]
+	timer[1]="${timer[0]}"
 
-	[ "$forkFlag" ] && printf -v "$timerVar_forkStart" "%s" "${_forkCnt:-0}"
-	[ "$forkFlag" ] && printf -v "$timerVar_forkLap"   "%s" "${_forkCnt:-0}"
+	timer[2]="${_forkCnt:-0}"
+	timer[3]="${timer[2]}"
 }
 
 
@@ -75,32 +83,19 @@ function bgtimerConfig()
 #     1 (false) : the current value of the timer is less than <timePeriod>
 function bgtimerIsPast()
 {
-	local timerVar_start="bgtimerGlobalTimer[0]"
-	local timerVar_lap="bgtimerGlobalTimer[1]"
-	local timerVar_forkStart="bgtimerGlobalTimer[2]"
-	local timerVar_forkLap="bgtimerGlobalTimer[3]"
-	local timerVar_indent="bgtimerGlobalTimer[4]"
-	local prec=3 retVar retForksVar
+	local tname="bgtimerGlobalTimer"
+	local -n timer="$tname"
 	while [ $# -gt 0 ]; do case $1 in
-		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
-		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
-			timerVar_start="$tname[0]"
-			timerVar_lap="$tname[1]"
-			timerVar_forkStart="$tname[2]"
-			timerVar_forkLap="$tname[3]"
-			timerVar_indent="$tname[4]"
+		-T*)bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
+			unset -n timer; local -n timer=$tname
 			;;
-		-R)  retVar="$2"; shift ;;
-		-F)  retForksVar="$2"; shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	while [[ "$1" =~ ^- ]]; do case $1 in
-	esac; shift; done
 	local timePeriod="$1"
 
 	local timePeriodInNS; bgtimePeriodConvert -ns "${timePeriod}" timePeriodInNS
 
-	local delta="$(( $(date +"%s%N") - ${!timerVar_start:-0} ))"
+	local delta; timeGetEpocInNanoSec delta; (( delta-= ${timer[0]:-0} ))
 
 	(( delta > timePeriodInNS ))
 }
@@ -109,183 +104,207 @@ function bgtimerIsPast()
 # get current elapsed time from the last time bgtimerStart was called
 function bgtimerGet()
 {
-	local timerVar_start="bgtimerGlobalTimer[0]"
-	local timerVar_lap="bgtimerGlobalTimer[1]"
-	local timerVar_forkStart="bgtimerGlobalTimer[2]"
-	local timerVar_forkLap="bgtimerGlobalTimer[3]"
-	local timerVar_indent="bgtimerGlobalTimer[4]"
+	local tname="bgtimerGlobalTimer"
+	local -n timer="$tname"
 	local prec=3 retVar retForksVar
 	while [ $# -gt 0 ]; do case $1 in
-		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
-		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
-			timerVar_start="$tname[0]"
-			timerVar_lap="$tname[1]"
-			timerVar_forkStart="$tname[2]"
-			timerVar_forkLap="$tname[3]"
-			timerVar_indent="$tname[4]"
+		-T*)bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
+			unset -n timer; local -n timer=$tname
 			;;
-		-R)  retVar="$2"; shift ;;
-		-F)  retForksVar="$2"; shift ;;
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		-F*)  bgOptionGetOpt val: retForksVar "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	[ "${!timerVar_start}" ] || bgtimerStart
+	if [ ! "${timer[0]}" ]; then
+		timer[0]="${bgScriptStartInEpocNanoSecs:-${EPOCHREALTIME/.}000}"
+		timer[1]="${timer[0]}"
+		timer[2]="${_forkCnt:-0}"
+		timer[3]="${timer[2]}"
+	fi
 
-	local delta="$(( $(date +"%s%N") - ${!timerVar_start:-0} ))"
+	local delta; timeGetEpocInNanoSec delta; (( delta-= ${timer[0]:-0} ))
 	local results; bgNanoToSec -R results $delta $prec
 	returnValue "$results" "$retVar"
 
-	[ "$retForksVar" ] &&  printf -v "$retForksVar"   "%s" "$(( ${_forkCnt:-0}-${!timerVar_forkStart:-0} ))"
+	setReturnValue "$retForksVar" "$(( ${_forkCnt:-0} - ${timer[2]:-0} ))"
 }
 
 # usage: bgtimerGetNano [-T <timerVar>] [-R <retVar>] [-F <retForksVar>]
 # get current elapsed time from the last time bgtimerStart was called
 function bgtimerGetNano()
 {
-	local timerVar_start="bgtimerGlobalTimer[0]"
-	local timerVar_lap="bgtimerGlobalTimer[1]"
-	local timerVar_forkStart="bgtimerGlobalTimer[2]"
-	local timerVar_forkLap="bgtimerGlobalTimer[3]"
-	local timerVar_indent="bgtimerGlobalTimer[4]"
-	local prec=3 retVar retForksVar
+	local tname="bgtimerGlobalTimer"
+	local -n timer="$tname"
+	local retVar retForksVar
 	while [ $# -gt 0 ]; do case $1 in
-		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
-		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
-			timerVar_start="$tname[0]"
-			timerVar_lap="$tname[1]"
-			timerVar_forkStart="$tname[2]"
-			timerVar_forkLap="$tname[3]"
-			timerVar_indent="$tname[4]"
+		-T*)bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
+			unset -n timer; local -n timer=$tname
 			;;
-		-R)  retVar="$2"; shift ;;
-		-F)  retForksVar="$2"; shift ;;
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		-F*)  bgOptionGetOpt val: retForksVar "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	[ "${!timerVar_start}" ] || bgtimerStart
+	if [ ! "${timer[0]}" ]; then
+		timer[0]="${bgScriptStartInEpocNanoSecs:-${EPOCHREALTIME/.}000}"
+		timer[1]="${timer[0]}"
+		timer[2]="${_forkCnt:-0}"
+		timer[3]="${timer[2]}"
+	fi
 
-	local delta="$(( $(date +"%s%N") - ${!timerVar_start:-0} ))"
+	local delta; timeGetEpocInNanoSec delta; (( delta-= ${timer[0]:-0} ))
 	returnValue "$delta" "$retVar"
 
-	[ "$retForksVar" ] &&  printf -v "$retForksVar"   "%s" "$(( ${_forkCnt:-0}-${!timerVar_forkStart:-0} ))"
+	setReturnValue "$retForksVar" "$(( ${_forkCnt:-0} - ${timer[2]:-0} ))"
 }
 
 # usage: bgtimerLapGet [-T <timerVar>] [-p <precision>] [-R <retVar>] [-F <retForksVar>]
 # get current elapsed time from the last time bgtimerLapPrint was called
-# this does not reset the lap time so it is typically call just before bgtimerLapPrint
+# this does not reset the lap time so it is typically called just before bgtimerLapPrint
 # if the lap time is needed in a variable
 function bgtimerLapGet()
 {
-	local timerVar_start="bgtimerGlobalTimer[0]"
-	local timerVar_lap="bgtimerGlobalTimer[1]"
-	local timerVar_forkStart="bgtimerGlobalTimer[2]"
-	local timerVar_forkLap="bgtimerGlobalTimer[3]"
-	local timerVar_indent="bgtimerGlobalTimer[4]"
+	local tname="bgtimerGlobalTimer"
+	local -n timer="$tname"
 	local prec=3 retVar retForksVar
 	while [ $# -gt 0 ]; do case $1 in
-		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
-		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
-			timerVar_start="$tname[0]"
-			timerVar_lap="$tname[1]"
-			timerVar_forkStart="$tname[2]"
-			timerVar_forkLap="$tname[3]"
-			timerVar_indent="$tname[4]"
+		-T*)bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
+			unset -n timer; local -n timer=$tname
 			;;
-		-R)  retVar="$2"; shift ;;
-		-F)  retForksVar="$2"; shift ;;
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		-F*)  bgOptionGetOpt val: retForksVar "$@" && shift ;;
+		--stub) ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	[ "${!timerVar_start}" ] || bgtimerStart
+	if [ ! "${timer[0]}" ]; then
+		timer[0]="${bgScriptStartInEpocNanoSecs:-${EPOCHREALTIME/.}000}"
+		timer[1]="${timer[0]}"
+		timer[2]="${_forkCnt:-0}"
+		timer[3]="${timer[2]}"
+	fi
 
-	local delta="$(( $(date +"%s%N") - ${!timerVar_lap:-0} ))"
+	local delta; timeGetEpocInNanoSec delta; (( delta-= ${timer[1]:-0} ))
 	local results; bgNanoToSec -R results $delta $prec
 	returnValue "$results" "$retVar"
 
-	[ "$retForksVar" ] &&  printf -v "$retForksVar"   "%s" "$(( ${_forkCnt:-0}-${!timerVar_forkLap:-0} ))"
+	setReturnValue "$retForksVar" "$(( ${_forkCnt:-0} - ${timer[3]:-0} ))"
 }
 
 
-# usage: bgtimerLapPrint [-T <timerVar>] [-p <precision>] [<description>]
-# mark the current lap and print the lap time
+# usage: bgtimerLapPrint [-T <timerVar>] [-p <precision>] [-R <retVar>] [-F <retForksVar>] [<description>]
+# mark the current lap and print the lap time. If bgtimerStart has not been called on the specified timer, it will act as if it
+# was started at the start of the script
 # the notion of a lap is that each lap is a separate part of the whole. If you add up all the lap times
 # since the start, you get the total elapsed time. This facilitates printing the intermediate lap times and the
 # overall elapsed time
 function bgtimerLapPrint()
 {
-	local timerVar_start="bgtimerGlobalTimer[0]"
-	local timerVar_lap="bgtimerGlobalTimer[1]"
-	local timerVar_forkStart="bgtimerGlobalTimer[2]"
-	local timerVar_forkLap="bgtimerGlobalTimer[3]"
-	local timerVar_indent="bgtimerGlobalTimer[4]"
-	local prec=3 indentFlag
+	local tname="bgtimerGlobalTimer"
+	local -n timer="$tname"
+	local prec=3 retVar retForksVar bgtraceFlag
 	while [ $# -gt 0 ]; do case $1 in
-		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
-		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
-			timerVar_start="$tname[0]"
-			timerVar_lap="$tname[1]"
-			timerVar_forkStart="$tname[2]"
-			timerVar_forkLap="$tname[3]"
-			timerVar_indent="$tname[4]"
+		-T*)bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
+			unset -n timer; local -n timer=$tname
 			;;
-		-i) indentFlag="-i" ;;
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		-F*)  bgOptionGetOpt val: retForksVar "$@" && shift ;;
+		# --bgtrace causes the exit trap (if set) to write to bgtrace instead of stdout
+		--bgtrace) bgtraceFlag="--bgtrace" ;;
+		--stub) ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	[ "$indentFlag" ] && printf -v "$timerVar_indent" "%s" "$indentFlag"
-	[ "${!timerVar_start}" ] || bgtimerStart
-
-	local forkStr
-	if [ "${!timerVar_forkStart}" ]; then
-		local forkDelta="$(( ${_forkCnt:-0} - ${!timerVar_forkLap:-0} ))"
-		printf -v "$timerVar_forkLap"   "%s" "${_forkCnt:-0}"
-		forkStr=" $forkDelta forks"
+	# if bgtimerLapPrint is called before bgtimerStart, we take it to mean that we are profiling the whole script so this block
+	# sets the start time to the bgScriptStartInEpocNanoSecs global which bg_core.sh sets and also we set an EXIT trap to record
+	# the final time when the script exits.
+	if [ ! "${timer[0]}" ]; then
+		timer[0]="${bgScriptStartInEpocNanoSecs:-${EPOCHREALTIME/.}000}"
+		timer[1]="${timer[0]}"
+		timer[2]="${_forkCnt:-0}"
+		timer[3]="${timer[2]}"
+		if [ "$bgtraceFlag" ]; then
+			bgtrap 'bgtimerTrace -T "'"$tname"'" --lap "script exitting" ' EXIT
+		else
+			bgtrap 'bgtimerPrint -T "'"$tname"'" --lap "script exitting" ' EXIT
+		fi
 	fi
 
-	local current="$(date +"%s%N")"
-	local delta="$(( $current - ${!timerVar_lap:-0} ))"
-	printf -v "$timerVar_lap"   "%s" "$current"
+	local forkStr
+	if [[ "${timer[4]}" == *" -f "* ]]; then
+		local forkDelta="$(( ${_forkCnt:-0} - ${timer[3]:-0} ))"
+		timer[3]="${_forkCnt:-0}"
+		forkStr=" $forkDelta forks"
+		setReturnValue "$retForksVar" "$forkDelta"
+	fi
+
+	local current; timeGetEpocInNanoSec current
+	local delta="$(( $current - ${timer[1]:-0} ))"
+	setReturnValue "$retVar" "$delta"
+	timer[1]="$current"
 	local desc="$*"
 	local leadingIndent="${desc%%[^[:space:]]*}"
 	desc="${desc#$leadingIndent}"
-	[ "${!timerVar_indent}" ] && printf -v leadingIndent "%s%*s" "$leadingIndent" "$((${#FUNCNAME[*]} * 1))"  ""
+	[[ "${timer[4]}" == *" -i "*  ]] && printf -v leadingIndent "%s%*s" "$leadingIndent" "$((${#FUNCNAME[*]} * 1))"  ""
 	echo "${leadingIndent}lap: $(bgNanoToSec $delta $prec)$forkStr : $desc"
 }
 
-# usage: bgtimerPrint [-T <timerVar>] [-p <precision>] [<description>]
+# usage: bgtimerPrint [-T <timerVar>] [-p <precision>] [-R <retVar>] [-F <retForksVar>] [<description>]
 # print the current elapsed time from bgtimerStart in secs as a decimal with <prec> number of places after the .
 function bgtimerPrint()
 {
-	local timerVar_start="bgtimerGlobalTimer[0]"
-	local timerVar_lap="bgtimerGlobalTimer[1]"
-	local timerVar_forkStart="bgtimerGlobalTimer[2]"
-	local timerVar_forkLap="bgtimerGlobalTimer[3]"
-	local timerVar_indent="bgtimerGlobalTimer[4]"
-	local prec=3 indentFlag accumulateVar
+	local tname="bgtimerGlobalTimer"
+	local -n timer="$tname"
+	local prec=3 accumulateVar retVar retForksVar lapFlag
 	while [ $# -gt 0 ]; do case $1 in
-		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
-		-T*)local tname; bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
-			timerVar_start="$tname[0]"
-			timerVar_lap="$tname[1]"
-			timerVar_forkStart="$tname[2]"
-			timerVar_forkLap="$tname[3]"
-			timerVar_indent="$tname[4]"
+		-T*)bgOptionGetOpt val: tname "$@" && shift; assertNotEmpty tname
+			unset -n timer; local -n timer=$tname
 			;;
-		-i) indentFlag="-i" ;;
+		-p*)  bgOptionGetOpt val: prec "$@" && shift ;;
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
+		-F*)  bgOptionGetOpt val: retForksVar "$@" && shift ;;
+		--lap) lapFlag="--lap" ;;
 		--accumulate*) bgOptionGetOpt val: accumulateVar "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	[ "$indentFlag" ] && printf -v "$timerVar_indent" "%s" "$indentFlag"
-	[ "${!timerVar_start}" ] || bgtimerStart
+	if [ "$lapFlag" ]; then
+		bgtimerLapPrint -T "$tname" "last part"
+	fi
 
-	local delta="$(( $(date +"%s%N") - ${!timerVar_start:-0} ))"
-	[ "$accumulateVar" ] && printf -v "$accumulateVar" "%s" $((${!accumulateVar}+delta))
+	if [ ! "${timer[0]}" ]; then
+		timer[0]="${bgScriptStartInEpocNanoSecs:-${EPOCHREALTIME/.}000}"
+		timer[1]="${timer[0]}"
+		timer[2]="${_forkCnt:-0}"
+		timer[3]="${timer[2]}"
+		if [ "$bgtraceFlag" ]; then
+			bgtrap 'bgtimerTrace -T "'"$tname"'" --lap "script exitting" ' EXIT
+		else
+			bgtrap 'bgtimerPrint -T "'"$tname"'" --lap "script exitting" ' EXIT
+		fi
+	fi
+
+	local forkStr
+	if [[ "${timer[4]}" == *" -f "* ]]; then
+		local forkDelta="$(( ${_forkCnt:-0} - ${timer[2]:-0} ))"
+		forkStr=" $forkDelta forks"
+		setReturnValue "$retForksVar" "$forkDelta"
+	fi
+
+	local delta; timeGetEpocInNanoSec delta; (( delta-= ${timer[0]:-0} ))
+	setReturnValue "$retVar" "$delta"
+	setReturnValue "$accumulateVar" "$((${!accumulateVar}+delta))"
+
 	local desc="$@"
 	local leadingIndent="${desc%%[^[:space:]]*}"
 	desc="${desc#$leadingIndent}"
-	[ "${!timerVar_indent}" ] && printf -v leadingIndent "%s%*s" "$leadingIndent" "$((${#FUNCNAME[*]} * 1))"  ""
-	echo "${leadingIndent}total: $(bgNanoToSec $delta $prec) : $desc"
+	[[ "${timer[4]}" == *" -i "*  ]] && printf -v leadingIndent "%s%*s" "$leadingIndent" "$((${#FUNCNAME[*]} * 1))"  ""
+
+	echo "${leadingIndent}total: $(bgNanoToSec $delta $prec)$forkStr : $desc"
 }
 
 
@@ -428,7 +447,7 @@ function bgNanoToSec()
 {
 	local tenseFlag retVar
 	while [[ "$1" =~ ^- ]]; do case $1 in
-		-R)  retVar="$2"; shift ;;
+		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;
 	esac; shift; done
 	local nano="$1"
 	[[ "$nano" =~ ^[0-9]*$ ]] || assertError "expected integer number of nanosecs. got '$nano'"
@@ -542,7 +561,7 @@ function bgTimePeriodFromLabel()
 
 
 # usage: bgTimePeriodToLabel [-t] [-p <numOfLevelesOfPrecision>] <seconds>
-# returns a string label the represents the time period in human terms
+# returns a string label that represents the time period in human terms
 # Output:
 #   [-][<d>:d][<h>h:][<m>:m:][<s>:s] [tense]
 #   1d:3h:54m:3s

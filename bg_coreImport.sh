@@ -418,7 +418,7 @@ esac
 # bg_coreBashVars.sh provides functions that support patterns of variable use in bash
 import bg_coreBashVars.sh ;$L1;$L2
 
-# bg_corePrintfVars.sh provides the printfVar function which is the workhorse on all bash data inspection and formatting
+# bg_corePrintfVars.sh provides the printfVars function which is the workhorse on all bash data inspection and formatting
 import bg_corePrintfVars.sh ;$L1;$L2
 
 # string manipulation functions

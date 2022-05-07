@@ -4517,6 +4517,31 @@ function bgtimerStart() # ondemandStub
 	bgtimerStart --stub "$@"
 }
 
+# FUNCMAN_SKIP
+# this is a stub function that will load the bg_coreTimer.sh and the real bgtimerStart if its called
+function bgtimerLapPrint() # ondemandStub
+{
+	[ "$1" == "--stub" ] && {
+		(assertError  "could not load bg_coreTimer.sh from libCore stub")
+		return
+	}
+	import -f bg_coreTimer.sh ;$L1;$L2
+	bgtimerLapPrint --stub "$@"
+}
+
+
+# FUNCMAN_SKIP
+# this is a stub function that will load the bg_coreTimer.sh and the real bgtimerStart if its called
+function bgtimerLapGet() # ondemandStub
+{
+	[ "$1" == "--stub" ] && {
+		(assertError  "could not load bg_coreTimer.sh from libCore stub")
+		return
+	}
+	import -f bg_coreTimer.sh ;$L1;$L2
+	bgtimerLapGet --stub "$@"
+}
+
 
 # usage: timeGetAproximateRelativeExpr <timeInEpoch> [<retVar>]
 function timeGetAproximateRelativeExpr() {

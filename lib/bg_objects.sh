@@ -1,6 +1,6 @@
 
 bgObjectsBuiltinIsInstalled=""
-[ ! "$BASH_LOADABLES_PATH" ] && BASH_LOADABLES_PATH="/usr/lib:"
+[ ! "$BASH_LOADABLES_PATH" ] && BASH_LOADABLES_PATH="/usr/lib/bash:"
 enable -f bgObjects.so bgObjects 2>/dev/null && bgObjectsBuiltinIsInstalled="yes"
 type -t bgtraceVars &>/dev/null && bgtraceVars bgObjectsBuiltinIsInstalled
 
@@ -1448,12 +1448,23 @@ function _bgclassCall()
 			# super is relative to the the class of the polymorphic method we are executing
 			local super="_bgclassCall ${_OID} ${_METHOD%%::*} 1 |"
 
-			# create local nameRefs for each logical member variable that has a valid var name not starting with an '_'
+			# create local nameRefs for each member variable that has an <objRef> or heap_ value except for "0" and "_Ref"
 			if [[ "${static[oidAttributes]:-A}" =~ A ]]; then
-				local _memberVarName; for _memberVarName in "${!this[@]}"; do
-					[[ "$_memberVarName" =~ ^[a-zA-Z][a-zA-Z0-9]*$ ]] || continue
+				local _memberVarName
+				for _memberVarName in "${!this[@]}"; do
+					[[ " 0 _Ref " != *" $_memberVarName "* ]] || continue
 					if IsAnObjRef "${this[$_memberVarName]}"; then
-						declare -n $_memberVarName; GetOID ${this[$_memberVarName]} "$_memberVarName"
+						local -n $_memberVarName; GetOID ${this[$_memberVarName]} "$_memberVarName"
+					elif [[ "${this[$_memberVarName]}" == heap_* ]]; then
+						local -n $_memberVarName="${this[$_memberVarName]}"
+					fi
+				done
+				[ "$_OID" != "$_OID_sys" ] && for _memberVarName in "${!_this[@]}"; do
+					[[ " 0 _Ref " != *" $_memberVarName "* ]] || continue
+					if IsAnObjRef "${_this[$_memberVarName]}"; then
+						local -n $_memberVarName; GetOID ${_this[$_memberVarName]} "$_memberVarName"
+					elif [[ "${_this[$_memberVarName]}" == heap_* ]]; then
+						local -n $_memberVarName="${_this[$_memberVarName]}"
 					fi
 				done
 			fi
@@ -2579,10 +2590,13 @@ function Object::toString()
 					$value.toString $mode --title="${lDecor}${attrib}${rDecor}" | gawk '{if (NR>1) printf("'"$indent"'"); print $0}'
 				Catch: && {
 					printf "%-${labelWidth}s=<error calling '$value.toString $mode'\n" "${lDecor}${attrib}${rDecor}"
+					printfVars ${!catch*}
 				}
 			else
 				printf "${indent}%-${labelWidth}s=<Reference to already printed %s object>\n" "${lDecor}${attrib}${rDecor}" "${refClass}" | gawk "$toString_fmtExtraLines"
 			fi
+		elif [ "${value:0:5}" == "heap_" ]; then
+			printfVars "${indent}" "$attrib:${value}"
 		else
 			printf "${indent}%-${labelWidth}s=%s\n" "${lDecor}${attrib}${rDecor}" "$value" | gawk "$toString_fmtExtraLines"
 		fi

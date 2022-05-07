@@ -247,14 +247,16 @@ function ut_nestedObjects()
 	DataFile::__construct() {
 		this[filename]="$1"; shift
 		$_this.data=new Array
+		newHeapVar -a _this[_someSysArray] one two three
 		$_this.read
 	}
 	DataFile::read() {
 		if [ -f "${this[filename]}" ]; then
 			mapfile -t data <"${this[filename]}"
 		fi
+		declare -p _someSysArray
 	}
-	local tmpFile; bgmktemp tmpFile
+	local tmpFile; bgmktemp --auto tmpFile
 	echo "$(dedent '
 		one fish
 		two fish
@@ -263,7 +265,7 @@ function ut_nestedObjects()
 	')" | tee "$tmpFile"
 
 	ut test
-	ConstructObject DataFile datafile "$tmpFile"
+	local  datafile; ConstructObject DataFile datafile "$tmpFile"
 	printfVars datafile
 }
 

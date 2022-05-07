@@ -628,9 +628,10 @@ function bgtimerStartTrace()
 	while [ $# -gt 0 ]; do case $1 in
 		--add-to-bgrace-out) bgTracingTimer="on" ;;
 		-T*) bgOptionGetOpt  opt: passThruOpts "$@" && shift ;;
-		-f)  bgOptionGetOpt  opt  passThruOpts "$@" && shift ;;
 		-p*) bgOptionGetOpt  opt: passThruOpts "$@" && shift ;;
+		-f)  bgOptionGetOpt  opt  passThruOpts "$@" && shift ;;
 		-i)  bgOptionGetOpt  opt  passThruOpts "$@" && shift ;;
+		--no-reset) bgOptionGetOpt  opt  passThruOpts "$@" && shift ;;
 		*)   bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift
 	done
 
@@ -643,7 +644,7 @@ function bgtimerLapTrace()
 {
 	bgtraceIsActive || return 0
 
-	bgtimerLapPrint "$@" >> "$_bgtraceFile"
+	bgtimerLapPrint --bgtrace "$@" >> "$_bgtraceFile"
 }
 
 

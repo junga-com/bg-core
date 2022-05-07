@@ -134,8 +134,9 @@ function fsMakeTemp()
 			local -A stackFrame=(); bgStackFrameGet "${callerStackFrame:-1}" stackFrame
 			caller="${stackFrame[frmSummary]}"
 			trapHandler='
-				# bgmktemp '"${keepFlag}"' '"${passThruOpts[@]}"' '"${fileNameVar}"'
-				# created at: '"${caller%%$'\n'*}"''
+				 # bgmktemp '"${keepFlag}"' '"${passThruOpts[@]}"' '"${fileNameVar}"'
+				 # created at: '"${caller%%$'\n'*}"'
+			'
 		fi
 
 		if [ ! "$keepFlag" ]; then
@@ -184,7 +185,7 @@ function fsMakeTemp()
 				if [ ! -e "$fileNameValue" ]; then
 					(assertError --continue -v fileNameValue -v trapHandler "a temp file created with bgmktemp was already missing when it was released" &>>$_bgtraceFile)
 				elif [ ${#fileNameValue} -lt 10 ]; then
-					# note that there is also a check above on fileNameValue 
+					# note that there is also a check above on fileNameValue
 					(assertError --continue -v fileNameValue -v trapHandler "refusing to delete temp file because the fileNameValue is suspiciously short" &>>$_bgtraceFile)
 				else
 					rm -rf "${fileNameValue:-__NON_EXISTENT_FILE__}"*

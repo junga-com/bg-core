@@ -102,7 +102,6 @@ function ut_ConstructObjectFromJson()
 
 	ut test
 	local obj; ConstructObjectFromJson obj "$jsonFile"
-	#printfVars --noObjects obj
 	printfVars  obj
 }
 

@@ -1213,7 +1213,7 @@ element='one'
 ##----------
 ## setup
 ##     | cmd> DeclareClass DataFile
-##     | cmd> local tmpFile; bgmktemp tmpFile
+##     | cmd> local tmpFile; bgmktemp --auto tmpFile
 ##     | cmd> ')" | tee "$tmpFile"
 ##     | one fish
 ##     | two fish
@@ -1222,7 +1222,8 @@ element='one'
 
 ##----------
 ## test
-cmd> ConstructObject DataFile datafile "$tmpFile"
+cmd> local  datafile; ConstructObject DataFile datafile "$tmpFile"
+declare -n _someSysArray="heap_a_<redacted>"
 cmd> printfVars datafile
 datafile= <instance> of DataFile
   filename=/tmp/bgmktemp.tmpFile.<redacted>
