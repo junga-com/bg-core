@@ -192,6 +192,10 @@ function _importSetErrorCode() { return 202; }
 # See Also:
 #    importCntr  : change settings and get the current state of imported libraries
 #    findInPaths : this is a much more flexible algorithm for finding various types of installed files
+if builtin bgCore ping 2>/dev/null; then
+enable -f bgCore.so import
+else
+#bgCoreBuiltinIsInstalled=""
 function import()
 {
 	# (needs debugging b4 we uncomment - code was left set so debugger never stopped) bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
@@ -209,12 +213,14 @@ function import()
 	### return quickly when the library is already loaded
 	if [ ! "$forceFlag" ] && [ ! "$getPathFlag" ] && [ "${_importedLibraries[lib:$scriptName]}" ]; then
 		L1=""
+
+		# CRITICALTODO: 2022-05 noticed these two lines that seem wrong. if we did not source the lib, we probably should not do post processing. Remove these when we can test it thoroughly
 		L2="_postImportProcessing"
 		_importInProgressStack=("#$scriptName" "${_importInProgressStack[@]}")
 		return 0
 	fi
 
-	### look up the library in the system paths
+	### find the library in the manifest or in the system paths
 
 	local foundScriptPath
 
@@ -307,13 +313,14 @@ function import()
 	# because of the unusual ;$L1;$L2 pattern, we cant just return the exit code from this function
 	if [ "$quietFlag" ]; then
 		L1='_importSetErrorCode'
+		# 2022-05 bobg: not sure why we are setting _postImportProcessing in the fail case. maybe we should put _postImportProcessing in L1 and L2
 		L2="_postImportProcessing"
 		_importInProgressStack=("#$scriptName" "${_importInProgressStack[@]}")
 	else
-		assertError -v bgLibPath -v scriptName "bash library not found by in any system path. Default system path is '/usr/lib'"
+		assertError -v bgLibPath -v scriptName "bash library not found in manifest nor in any system path. Default system path is '/usr/lib'"
 	fi
 }
-
+fi
 
 
 #######################################################################################################################################

@@ -41,7 +41,7 @@ function ut__parseObjSyntax() {
 
 	ut test noecho
 	echo "'$*'"
-	$_bgclassCallSetupUseBuiltin _bgclassCallSetup "$@"
+	_bgclassCallSetup "$@"
 	printfVars _chainedObjOrMember _memberOp _argsV --noNest --noObjects --plain _hierarchLevel _memberExpression _rsvOID _OID _OID_sys _CLASS _rsvMemberType _rsvMemberName
 }
 

@@ -168,14 +168,21 @@ function pvPrArray()
 {
 	local pvl_label="$1"
 	local -n pvl_array="$2"
+	local pvla_value="$3"
 	local pvl_startLabelStyle=arrayStart; [ "${FUNCNAME[1]}" != "printfVars" ] && pvl_startLabelStyle="arrayStartRecursed"
 
 	local canonicalOID; varGetNameRefTarget "$2" "canonicalOID"
-	if [ "${objDictionary[$canonicalOID]+isSeen}" ]; then
-		pvPrAttribute "$pvl_label" "<objRef to '${objDictionary[$2]}'>" "$pvl_startLabelStyle"
+	if [ ! "$pv_noNestFlag" ] && [ "${pv_objDictionary[$canonicalOID]+isSeen}" ]; then
+		if [ "${pvla_value:0:12}" == "_bgclassCall" ]; then
+			pvPrAttribute "$pvl_label" " <objRef to '${pv_objDictionary[$2]}'>" "arrayIndex"
+		elif [ "${pvla_value:0:5}" == "heap_" ]; then
+			pvPrAttribute "$pvl_label" "<array reference to '${pv_objDictionary[$2]}'>" "arrayIndex"
+		else
+			pvPrAttribute "$pvl_label" "<supressing repeated array '${pv_objDictionary[$2]}'>" "arrayIndex"
+		fi
 		return
 	fi
-	objDictionary[$canonicalOID]="$pvl_label"
+	pv_objDictionary[$canonicalOID]="$pvl_label"
 
 	### print the label using the current value of pv_prefix and pv_labelWidth
 	pvEndOneLineMode
@@ -206,10 +213,10 @@ function pvPrArray()
 	# Note that we never have to recurse into printfVars because array elements can only be strings. possibly containing an <objRef>
 	for pvl_index in "${!pvl_array[@]}"; do
 		if [ ! "$pv_noNestFlag" ] && [[ "${pvl_array[$pvl_index]}" == heap_*[aA]*_* ]]; then
-			pvPrArray "$pvl_index" "${pvl_array[$pvl_index]}"
+			pvPrArray "$pvl_index" "${pvl_array[$pvl_index]}" "${pvl_array[$pvl_index]}"
 		elif [ ! "$pv_noNestFlag" ] && [ "${pvl_array[$pvl_index]:0:12}" == "_bgclassCall" ]; then
 			local pvl_elementValue; bgread "" pvl_elementValue "" <<<"${pvl_array[$pvl_index]}"
-			pvPrArray "$pvl_index" "$pvl_elementValue"
+			pvPrArray "$pvl_index" "$pvl_elementValue" "${pvl_array[$pvl_index]}"
 		else
 			pvPrAttribute "$pvl_index" "${pvl_array[$pvl_index]}"  "arrayIndex"
 		fi
@@ -288,9 +295,9 @@ function printfVars()
 	# if the bg_objects.sh library is not loaded, turn off object detection
 	type -t _bgclassCall &>/dev/null || pv_noObjectsFlag="1"
 
-	# this pattern allows objDictionary to be shared among this and any recursive call that it spawns
-	if ! varExists objDictionary; then
-		local -A objDictionary=()
+	# this pattern allows pv_objDictionary to be shared among this and any recursive call that it spawns
+	if ! varExists pv_objDictionary; then
+		local -A pv_objDictionary=()
 	fi
 
 	if [ -t 1 ] && type -t import &>/dev/null; then
@@ -359,7 +366,7 @@ function printfVars()
 			pvPrAttribute "$pv_label" "$pv_varname"
 
 		# case where it contains an object reference and we are doing object integration
-		elif [ ! "${pv_noObjectsFlag}" ]  && [[ ! "$pv_varname" =~ [[][@*][]] ]]  && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
+	elif [ ! "$pv_plainFlag" ] && [ ! "${pv_noObjectsFlag}" ]  && [[ ! "$pv_varname" =~ [[][@*][]] ]]  && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
 			pvEndOneLineMode
 			Try:
 				${!pv_varname}.toString "${pv_objOpts[@]}" --title="${pv_varname}"
@@ -369,21 +376,22 @@ function printfVars()
 				# in debugger when the watch window printfVars sees an object reference that has been created with NewObject,
 				# toString failed on that object. added this try/catch but the catch did not execute.
 				pvPrAttribute "$pv_label" "<error in '${!pv_varname}.toString --title=${pv_varname}' call>"
+				printfVars ${!catch*}
 			}
 
 		# if its an array, iterate its content
 		elif [[ "$pv_type" == *[aA]* ]]; then
-			pvPrArray "$pv_label" "$pv_varname"
+			pvPrArray "$pv_label" "$pv_varname" ""
 
 		# if its a string var that contains an <objRef> and we are not doing objects (--noObjects) do it as an array
 		elif [ ! "$pv_plainFlag" ] &&  [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
 			local pv_oid; bgread "" pv_oid "" <<<"${!pv_varname}"
-			pvPrArray "$pv_label" "$pv_oid"
+			pvPrArray "$pv_label" "$pv_oid" "${!pv_varname}"
 
 		# if its a string var that contains a heap var array
 		elif [ ! "$pv_plainFlag" ] && [[ "${!pv_varname}" == heap_*[aA]*_* ]]; then
 			pvPrAttribute "$pv_label" "${!pv_varname}"
-			pvPrArray "$pv_label" "${!pv_varname}"
+			pvPrArray "$pv_label" "${!pv_varname}" "${!pv_varname}"
 
 		# default case is to treat it as a variable name. we already handled the case where pv_varname is not a variable (pv_type="")
 		else

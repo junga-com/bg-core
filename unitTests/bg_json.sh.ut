@@ -25,6 +25,9 @@ function TestClass::__construct()
 #	words=(zero one two)
 }
 
+DeclareClassEnd TestClass
+
+
 declare -A ut_Object_toJSON=(
 	[all]="--all"
 	[real]=""

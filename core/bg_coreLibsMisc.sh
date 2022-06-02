@@ -58,6 +58,11 @@
 #                            $1,$2,$3,$4 to refer to the columns of the manifest file respectively. $0 is all colums.
 #    --manifest=<file>     : override the path of the manifest file to use. This string is prepended with 'print ' and executed in awk.
 function manifestGet() {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local manifestFile
 	local pkgMatch=".*" outputStr='$0'
 	while [ $# -gt 0 ]; do case $1 in

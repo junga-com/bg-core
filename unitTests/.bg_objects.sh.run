@@ -689,8 +689,8 @@ global array vars: Object Object_vmt
 Object[]
       [baseClass     ]=''
       [_CLASS        ]='Class'
-      [0             ][]'<objRef to 'Object'>'
-      [_Ref          ][]'<objRef to 'Object'>'
+      [0             ]=' <objRef to 'Object'>'
+      [_Ref          ]=' <objRef to 'Object'>'
       [classHierarchy]='Object'
       [vmtCacheNum   ]=<redacted>
       [methods       ]='Object::addMethod
@@ -754,8 +754,8 @@ global array vars: Class Class_vmt
 Class[]
      [baseClass        ]='Object'
      [_CLASS           ]='Class'
-     [0                ][]'<objRef to 'Class'>'
-     [_Ref             ][]'<objRef to 'Class'>'
+     [0                ]=' <objRef to 'Class'>'
+     [_Ref             ]=' <objRef to 'Class'>'
      [pendingClassCtors]=''
      [classHierarchy   ]='Object Class'
      [vmtCacheNum      ]=<redacted>
@@ -809,8 +809,8 @@ global array vars: NullObject NullObjectInstance
 NullObject[]
           [baseClass     ]='Object'
           [_CLASS        ]='Class'
-          [0             ][]'<objRef to 'NullObject'>'
-          [_Ref          ][]'<objRef to 'NullObject'>'
+          [0             ]=' <objRef to 'NullObject'>'
+          [_Ref          ]=' <objRef to 'NullObject'>'
           [classHierarchy]='Object NullObject'
           [name          ]='NullObject'
           [_OID          ]='NullObject'
@@ -828,8 +828,8 @@ global array vars: Stack
 Stack[]
      [baseClass     ]='Object'
      [_CLASS        ]='Class'
-     [0             ][]'<objRef to 'Stack'>'
-     [_Ref          ][]'<objRef to 'Stack'>'
+     [0             ]=' <objRef to 'Stack'>'
+     [_Ref          ]=' <objRef to 'Stack'>'
      [classHierarchy]='Object Stack'
      [name          ]='Stack'
      [_OID          ]='Stack'
@@ -843,8 +843,8 @@ global array vars: Array
 Array[]
      [baseClass     ]='Object'
      [_CLASS        ]='Class'
-     [0             ][]'<objRef to 'Array'>'
-     [_Ref          ][]'<objRef to 'Array'>'
+     [0             ]=' <objRef to 'Array'>'
+     [_Ref          ]=' <objRef to 'Array'>'
      [oidAttributes ]='a'
      [classHierarchy]='Object Array'
      [defaultIndex  ]='off'
@@ -860,8 +860,8 @@ global array vars: Map
 Map[]
    [baseClass     ]='Object'
    [_CLASS        ]='Class'
-   [0             ][]'<objRef to 'Map'>'
-   [_Ref          ][]'<objRef to 'Map'>'
+   [0             ]=' <objRef to 'Map'>'
+   [_Ref          ]=' <objRef to 'Map'>'
    [classHierarchy]='Object Map'
    [defaultIndex  ]='off'
    [name          ]='Map'
@@ -966,16 +966,16 @@ cmd> echo "global vars for this object = ${petOIDVars}"
 global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet $petOIDVars
 pet[]
-   [0       ][]'<objRef to 'pet'>'
+   [0       ]=' <objRef to 'pet'>'
    [legCount]='unk'
    [species ]='unk'
    [family  ]='unk'
-heap_A_<redacted>[]'<objRef to 'pet'>'
+[heap_A_<redacted>]='<supressing repeated array 'pet'>'
 heap_A_<redacted>_sys[]
-                    [_CLASS]='Animal'
-                    [0     ][]'<objRef to 'pet'>'
-                    [_Ref  ][]'<objRef to 'pet'>'
-                    [_OID  ][]'<objRef to 'pet'>'
+                     [_CLASS]='Animal'
+                     [0     ]=' <objRef to 'pet'>'
+                     [_Ref  ]=' <objRef to 'pet'>'
+                     [_OID  ]='<array reference to 'pet'>'
 
 ##----------
 ## test
@@ -987,8 +987,8 @@ vars for this object = pet2 pet2OID
 cmd> printfVars --noObjects $pet2OIDVars
 pet2[]
     [_CLASS  ]='Animal'
-    [0       ][]'<objRef to 'pet2'>'
-    [_Ref    ][]'<objRef to 'pet2'>'
+    [0       ]=' <objRef to 'pet2'>'
+    [_Ref    ]=' <objRef to 'pet2'>'
     [legCount]='unk'
     [species ]='unk'
     [family  ]='unk'
@@ -1004,16 +1004,16 @@ cmd> echo "global vars for this object = ${pet3OIDVars}"
 global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet3 $pet3OIDVars
 pet3[]
-    [0       ][]'<objRef to 'pet3'>'
+    [0       ]=' <objRef to 'pet3'>'
     [legCount]='unk'
     [species ]='unk'
     [family  ]='unk'
-heap_A_<redacted>[]'<objRef to 'pet3'>'
+[heap_A_<redacted>]='<supressing repeated array 'pet3'>'
 heap_A_<redacted>_sys[]
-                    [_CLASS]='Animal'
-                    [0     ][]'<objRef to 'pet3'>'
-                    [_Ref  ][]'<objRef to 'pet3'>'
-                    [_OID  ][]'<objRef to 'pet3'>'
+                     [_CLASS]='Animal'
+                     [0     ]=' <objRef to 'pet3'>'
+                     [_Ref  ]=' <objRef to 'pet3'>'
+                     [_OID  ]='<array reference to 'pet3'>'
 
 ## bg_objects.sh:ConstructObject: finished
 ###############################################################################################################################
@@ -1110,10 +1110,10 @@ heap_A_<redacted>
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
 heap_A_<redacted>_sys[]
-                    [_CLASS]='Map'
-                    [0     ][]'<objRef to 'heap_A_<redacted>'>'
-                    [_Ref  ][]'<objRef to 'heap_A_<redacted>'>'
-                    [_OID  ][]'<objRef to 'heap_A_<redacted>'>'
+                     [_CLASS]='Map'
+                     [0     ]=' <objRef to 'heap_A_<redacted>'>'
+                     [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
+                     [_OID  ]='<array reference to 'heap_A_<redacted>'>'
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
 a2= <instance> of Map
@@ -1129,14 +1129,14 @@ a2= <instance> of Map
   one  =1
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
-                [two  ]='2'
-                [three]='3'
-                [one  ]='1'
+                 [two  ]='2'
+                 [three]='3'
+                 [one  ]='1'
 heap_A_<redacted>_sys[]
-                    [_CLASS]='Map'
-                    [0     ][]'<objRef to 'heap_A_<redacted>'>'
-                    [_Ref  ][]'<objRef to 'heap_A_<redacted>'>'
-                    [_OID  ][]'<objRef to 'heap_A_<redacted>'>'
+                     [_CLASS]='Map'
+                     [0     ]=' <objRef to 'heap_A_<redacted>'>'
+                     [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
+                     [_OID  ]='<array reference to 'heap_A_<redacted>'>'
 cmd> $a2.getSize
 3
 
@@ -1358,7 +1358,7 @@ cmd> local type; $obj.getOID type; printfVars type
 type='heap_A_<redacted>
 type[]
     [foo  ]='5'
-    [0    ][]'<objRef to 'type'>'
+    [0    ]=' <objRef to 'type'>'
     [array][]
 cmd> $obj.foo.getOID
 [exitCode 1]
@@ -1387,16 +1387,16 @@ cmd> $obj.dontExist.getOID
 ##----------
 ## test
 cmd> $obj.getRef
-_bgclassCall heap_A_<redacted> Object 0 |
+_bgclassCall heap_A_<redacted> Object 0 | 
 cmd> local type; $obj.getRef type; printfVars --noObjects type
 type[]
     [foo  ]='5'
-    [0    ][]'<objRef to 'type'>'
+    [0    ]=' <objRef to 'type'>'
     [array][]
 cmd> $obj.foo.getRef
 [exitCode 1]
 cmd> $obj.array.getRef
-_bgclassCall heap_a_<redacted> Array 0 |
+_bgclassCall heap_a_<redacted> Array 0 | 
 cmd> $obj.getIndexes.getRef
 [exitCode 1]
 cmd> $obj.dontExist.getRef

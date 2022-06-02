@@ -1,5 +1,7 @@
 #!/usr/bin/env bg-utRunner
 
+import bg_objects.sh ;$L1;$L2
+
 ut_printfVars=(
 	[0]="$(cmdline string narray aarray -l"hello world")"
 	[1]="$(cmdline var1:string var2:narray var3:aarray)"

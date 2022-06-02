@@ -1,9 +1,4 @@
 
-bgObjectsBuiltinIsInstalled=""
-[ ! "$BASH_LOADABLES_PATH" ] && BASH_LOADABLES_PATH="/usr/lib/bash:"
-enable -f bgObjects.so bgObjects 2>/dev/null && bgObjectsBuiltinIsInstalled="yes"
-type -t bgtraceVars &>/dev/null && bgtraceVars bgObjectsBuiltinIsInstalled
-
 # Library
 # This library implements an object oriented syntax for bash scripts. In classic bash, its hard to write a function that works
 # with an array that the caller picks when the function is called (passing an array to a function). Also its not possible to have
@@ -207,7 +202,7 @@ type -t bgtraceVars &>/dev/null && bgtraceVars bgObjectsBuiltinIsInstalled
 #   If additional class methods are subsequently sourced, we want to know that the VMT needs to be rebuilt. We use the import feature
 #   of the bg_lib.sh to record the import state counter at the time we build a VMT table. Each new library that is sourced results
 #   in that counter being incremented. Also, code that dynamically adds functions can use importCntr to increment that counter.
-#   When _bgclassCall is processing a reference invocation, if any VMT in the hierachy has a lower import counter number than the
+#   When _bgclassCall is processing a reference invocation, if any VMT in the hierarchy has a lower import counter number than the
 #   current, its VMT is rebuilt.
 #
 # See Also:
@@ -352,6 +347,11 @@ function DeclareClass()
 # RealizeClass function for those situtaions.
 function DeclareClassEnd()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local className="$1"; shift
 
 	# make it idempotent so that we can call is on ConstructObject unconditionally. protect against doing the work more than once.
@@ -370,7 +370,7 @@ function DeclareClassEnd()
 
 	if type -t static::$className::__construct &>/dev/null; then
 		local -n newClass="$className"
-		$newClass::__construct "$@"
+		$newClass::__construct "$className" "$baseClass" "${initData[@]}"
 	fi
 }
 
@@ -419,7 +419,7 @@ function static::Class::setClass()
 	_this[_Ref]="_bgclassCall ${_OID} $_CLASS 0 |"
 
 	_this[0]="${_this[_Ref]}"
-	if [ "${class[defaultIndex]:-on}" == "on" ]; then
+	if [ "${class[defaultIndex]:-on}" != "off" ]; then
 		this[0]="${_this[_Ref]}"
 	else
 		unset this[0]
@@ -461,8 +461,11 @@ function static::Class::assertClassExists()
 # and static::<className>::__construct is a static method and uses 'static' inside the function body
 function Class::__construct()
 {
-	this[name]="$1"; shift
-	this[baseClass]="$1"; shift
+	local className="$1"; shift
+	local baseClass="$1"; shift
+
+	this[name]="$className"
+	this[baseClass]="$baseClass"
 
 	# Since each class does not have its own *class* constructor, we allow DeclareClass to specify attributes to assign.
 	# TODO: this makes DeclareClass and plugins_register very similar. They should merge when 10.04 support is completely dropped
@@ -761,6 +764,11 @@ function NewObject()
 # The range of syntax supported in <something...> is defined by the _bgclassCall function.
 function ConstructObject()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
 	[[ "${BASH_VERSION:0:3}" < "4.3" ]] && assertError "classes need the declare -n option which is available in bash 4.3 and above"
 	local _CLASS="$1"; assertNotEmpty _CLASS "className is a required parameter"
@@ -862,7 +870,7 @@ function ConstructObject()
 	# create the ObjRef string at index [0]. This supports $objRef.methodName syntax where objRef is the associative array itself
 	# This is always available in the $_this.. but some Classes of objects (like Array and Map) do not set [0] in the $this array
 	_this[0]="${_this[_Ref]}"
-	if [ "${class[defaultIndex]:-on}" == "on" ]; then
+	if [ "${class[defaultIndex]:-on}" != "off" ]; then
 		this[0]="${_this[_Ref]}"
 	fi
 
@@ -878,12 +886,13 @@ function ConstructObject()
 
 	# invoke the constructors from Object to this class
 	local -n static
+	local -n prototype
 	local _cname; for _cname in ${class[classHierarchy]}; do
 		unset -n static; local -n static="$_cname"
 
 		# init members from the _prototype if it exists
 		if varExists ${_cname}_prototype; then
-			local -n prototype="${_cname}_prototype";
+			unset -n prototype; local -n prototype="${_cname}_prototype";
 			local _memberVarName; for _memberVarName in "${!prototype[@]}"; do
 				this[$_memberVarName]="${prototype[$_memberVarName]}"
 			done
@@ -918,16 +927,15 @@ function ConstructObject()
 #    <className> : the class for which to update the VMT.  Each of its base classes will also be updated since it needs to know
 #                  all methods of all base classes to decide which method implementation should be used.
 # Options:
-#    -f|--force  : rescan all the classes in this hierachy even if the import revision number is current.
+#    -f|--force  : rescan all the classes in this hierarchy even if the import revision number is current.
 # See Also:
 #    Class::reloadMethods
 # usage: _classUpdateVMT [-f|--force] <className>
 function _classUpdateVMT()
 {
-	if  [ "$bgObjectsBuiltinIsInstalled" ]; then
-		builtin bgObjects _classUpdateVMT "$@"
-		[[ "$_rsvMemberType" =~ ^invalidExpression ]] && assertObjExpressionError -v expression:_memberExpression -v errorType:_rsvMemberType -v _OID -v memberExpr:_chainedObjOrMember  "invalid object expression. The <memberExpr> can not be interpretted relative to the <oid>"
-		return 0
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
 	fi
 
 	local forceFlag
@@ -1398,13 +1406,13 @@ function _bgclassCall()
 	#declare -g msCP1; msLap="10#${EPOCHREALTIME#*.}"; (( msCP1+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 
 	# this block parses the incoming expression into the object and its member being operated on and the operator to perform.
-	# if bgObjectsBuiltinIsInstalled is not set, the bash function _bgclassCallSetup is used and it needs some code before and after
+	# if bgCoreBuiltinIsInstalled is not set, the bash function _bgclassCallSetup is used and it needs some code before and after
 	# it to declare variables in this scope.
-	# if bgObjectsBuiltinIsInstalled is set, the builtin command bgObjects does everything since a builtin can create local variables
+	# if bgCoreBuiltinIsInstalled is set, the builtin command bgCore does everything since a builtin can create local variables
 	# in the function context that called it.
 	# The builtin is much faster and is prefered but since it is much easier to distribute scripts without relying on a compiled
 	# loadable builtin,
-	if [ ! "$bgObjectsBuiltinIsInstalled" ]; then
+	if [ ! "$bgCoreBuiltinIsInstalled" ]; then
 		# this block is the bash version of the context setup.
 		local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
 		local _OID _OID_sys _resultCode
@@ -1412,7 +1420,7 @@ function _bgclassCall()
 
 		_bgclassCallSetup "$@"
 
-		# This section contains things that the builtin bgObjects does but we cant put it inside _bgclassCallSetup because it needs
+		# This section contains things that the builtin bgCore does but we cant put it inside _bgclassCallSetup because it needs
 		# to change the context (local variables) at this function scope and not inside the _bgclassCallSetup function call.
 
 		set -- "${_argsV[@]}"
@@ -1472,7 +1480,7 @@ function _bgclassCall()
 
 	else
 		# this is the builtin version of the context setup
-		builtin bgObjects _bgclassCall "$@"
+		builtin bgCore _bgclassCall "$@"
 		#bgtraceBreak --plumbing
 	fi
 	#declare -g msCP2; msLap="10#${EPOCHREALTIME#*.}"; (( msCP2+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
@@ -2538,11 +2546,11 @@ function Object::toString()
 		return 0
 	fi
 
-	# this pattern allows objDictionary to be shared among this and any recursive call that it spawns
-	if ! varExists objDictionary; then
-		local -A objDictionary=()
+	# this pattern allows ots_objDictionary to be shared among this and any recursive call that it spawns
+	if ! varExists ots_objDictionary; then
+		local -A ots_objDictionary=()
 	fi
-	objDictionary[$_OID]="seen"
+	ots_objDictionary[$_OID]="seen"
 
 	local indexes; $_this.getIndexes $mode -A indexes
 
@@ -2584,7 +2592,7 @@ function Object::toString()
 		fi
 		if [ "${value:0:12}" == "_bgclassCall" ]; then
 			local refOID refClass scrap; read -r scrap refOID refClass scrap <<<"${value}"
-			if [ ! "${objDictionary[$refOID]+hasBeenSeen}" ]; then
+			if [ ! "${ots_objDictionary[$refOID]+hasBeenSeen}" ]; then
 				printf "${indent}"
 				Try:
 					$value.toString $mode --title="${lDecor}${attrib}${rDecor}" | gawk '{if (NR>1) printf("'"$indent"'"); print $0}'

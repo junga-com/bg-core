@@ -11,6 +11,15 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 
 	set +e
 
+	# source the optional bgCore bash loadable builtin if its available.
+	# This builtin provides a much faster implementation to some critical bash functions. We strive to make behavior of the each
+	# function with a builtin implementation to be identical to its corresponding bash implementation but some differences may exist.
+	bgCoreBuiltinIsInstalled=""
+	if [ "$bgInhibitBGCoreBuiltin" != "no" ]; then
+		[ ! "$BASH_LOADABLES_PATH" ] && BASH_LOADABLES_PATH="/usr/lib/bash:"
+		enable -f bgCore.so bgCore 2>/dev/null && bgCoreBuiltinIsInstalled="yes"
+	fi
+
 	# Library bg_core.sh
 	# bg_core.sh is the entry point into the bg_* script system. Scripts should source this script in the typical way using its absolute
 	# path like...

@@ -397,7 +397,7 @@ function templateGetSubtypes()
 
 
 # usage: templateTree <templateSpec>
-# print a tree showing the hierachy of installed templates.
+# print a tree showing the hierarchy of installed templates.
 # Template names are hierarchical with parts separated by '.'. <templateSpec> is typically the base type of the template but
 # could also contain additional parts. This function scans all the template names and returns the additional sub types that exist.
 function templateTree()

@@ -105,7 +105,6 @@ function DeclarePluginType()
 	true
 }
 
-
 DeclareClass Plugin
 
 function static::Plugin::__construct()

@@ -171,6 +171,11 @@ function jsonRead()
 #            to read from a cmd's output use: $obj.fromJSON < <(someCmd p1 p2)
 function Object::fromJSON()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore Object_fromJSON "$@"
+		return
+	fi
+
 	local file="$1"
 
 	local name value
@@ -291,6 +296,11 @@ function Object::toJSON()
 # usage: ConstructObjectFromJson <objRefVar> <jsonText>
 function ConstructObjectFromJson()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local file="-"
 	while [ $# -gt 0 ]; do case $1 in
 		-f*|--file*)  bgOptionGetOpt val: file "$@" && shift ;;
@@ -319,81 +329,76 @@ function ConstructObjectFromJson()
 
 	local -n scope; ConstructObject Object "scope"
 
-	if [ "$bgObjectsBuiltinIsInstalled" ]; then
-		bgObjects restoreObject scope
-	else
-		local scopeOID; GetOID $scope scopeOID
+	local scopeOID; GetOID $scope scopeOID
 
-		local -a currentStack="$scope"
-		local -n current="$scopeOID"
-		local -A objDictionary
+	local -a currentStack="$scope"
+	local -n current="$scopeOID"
+	local -A objDictionary
 
-		local relName valType jpath value className
-		while read -r  valType relName jpath value ; do
-			[ "$valType" == "!ERROR" ] && assertError -v objRefVar -v file "jsonAwk returned an error reading restoration file"
+	local relName valType jpath value className
+	while read -r  valType relName jpath value ; do
+		[ "$valType" == "!ERROR" ] && assertError -v objRefVar -v file "jsonAwk returned an error reading restoration file"
 
-			# the space==%20 escaping is not a json standard -- its because read will loose the leading spaces of value. Since value
-			# is the last value, it concatenates the remaining input to the EOL but any leading spaces just become the separator between
-			# it and the previous variable (jpath)
-			value="${value//%20/ }"
+		# the space==%20 escaping is not a json standard -- its because read will loose the leading spaces of value. Since value
+		# is the last value, it concatenates the remaining input to the EOL but any leading spaces just become the separator between
+		# it and the previous variable (jpath)
+		value="${value//%20/ }"
 
-			# now escape according to the json standard
-			jsonUnescape value
+		# now escape according to the json standard
+		jsonUnescape value
 
-			case $valType in
+		case $valType in
 
-				startObject) className="Object" ;;&
-				startList)   className="Array"  ;;&
-				startObject|startList)
-					currentStack=(""  "${currentStack[@]}")
-					ConstructObject "$className" currentStack[0]
-					if [ "$relName" == "<arrayEl>" ]; then
-						current+=("$currentStack")
-					else
-						current[$relName]="$currentStack"
-					fi
+			startObject) className="Object" ;;&
+			startList)   className="Array"  ;;&
+			startObject|startList)
+				currentStack=(""  "${currentStack[@]}")
+				ConstructObject "$className" currentStack[0]
+				if [ "$relName" == "<arrayEl>" ]; then
+					current+=("$currentStack")
+				else
+					current[$relName]="$currentStack"
+				fi
 
-					unset -n current; local -n current; GetOID $currentStack current || assertError
-					;;
+				unset -n current; local -n current; GetOID $currentStack current || assertError
+				;;
 
-				endObject|endList)
-					currentStack=("${currentStack[@]:1}")
-					unset -n current; local -n current; GetOID $currentStack current || assertError
-					className=""
-					;;
-				tObject) ;;
-				tArray)  ;;
+			endObject|endList)
+				currentStack=("${currentStack[@]:1}")
+				unset -n current; local -n current; GetOID $currentStack current || assertError
+				className=""
+				;;
+			tObject) ;;
+			tArray)  ;;
 
-				*)	if [[ "$value" =~ _bgclassCall.*sessionOID_[0-9]+ ]]; then
-						:
-					fi
-					case $relName in
-						# we don't restore 0, _OID, nor _Ref although we use them to update the dictionary with the sessionOID_<n> and new _OID
-						0) ;;
-						_OID) local sessionOID="$value"  ;;&
-						_Ref) local partsIn=($value); local sessionOID="${partsIn[1]}" ;;&
-						_Ref|_OID)
-							local partsOut=($currentStack)
-							objDictionary["${sessionOID}"]="${partsOut[1]}"
-							objDictionary["${partsOut[1]}"]="${sessionOID}"
-							;;
-						_CLASS)
-							static::Class::setClass $current "$value"
-							;;
+			*)	if [[ "$value" =~ _bgclassCall.*sessionOID_[0-9]+ ]]; then
+					:
+				fi
+				case $relName in
+					# we don't restore 0, _OID, nor _Ref although we use them to update the dictionary with the sessionOID_<n> and new _OID
+					0) ;;
+					_OID) local sessionOID="$value"  ;;&
+					_Ref) local partsIn=($value); local sessionOID="${partsIn[1]}" ;;&
+					_Ref|_OID)
+						local partsOut=($currentStack)
+						objDictionary["${sessionOID}"]="${partsOut[1]}"
+						objDictionary["${partsOut[1]}"]="${sessionOID}"
+						;;
+					_CLASS)
+						static::Class::setClass $current "$value"
+						;;
 
-						_*)	# SetupObjContext <objRef> <_OIDRef> <thisRef> <_thisRef> <_vmtRef> <staticRef>
-							local -n  current_sys; SetupObjContext $current "" "" current_sys
-							current_sys[$relName]="$value"
-							;;
+					_*)	# SetupObjContext <objRef> <_OIDRef> <thisRef> <_thisRef> <_vmtRef> <staticRef>
+						local -n  current_sys; SetupObjContext $current "" "" current_sys
+						current_sys[$relName]="$value"
+						;;
 
-						'<arrayEl>') current+=("$value") ;;
-						*) current[$relName]="$value" ;;
-					esac
-					;;
-			esac
-		done
-	fi
-
+					'<arrayEl>') current+=("$value") ;;
+					*) current[$relName]="$value" ;;
+				esac
+				;;
+		esac
+	done
 
 	exec <&- 0<&$saveFD
 

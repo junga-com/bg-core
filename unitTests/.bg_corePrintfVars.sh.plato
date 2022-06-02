@@ -403,8 +403,8 @@ myCat= <instance> of Cat
 cmd> printfVars --noObjects myCat
 myCat[]
      [_CLASS ]='Cat'
-     [0      ][]'<objRef to 'myCat'>'
-     [_Ref   ][]'<objRef to 'myCat'>'
+     [0      ]=' <objRef to 'myCat'>'
+     [_Ref   ]=' <objRef to 'myCat'>'
      [species]='cat'
      [_OID   ]='myCat'
 
