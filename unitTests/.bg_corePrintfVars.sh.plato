@@ -373,8 +373,8 @@ Animal= <instance> of Class
   vmtCacheNum   =<redacted>
   methods       =Animal::__construct
                 + Animal::speak
-  subClasses    =Dog Cat
   staticMethods =
+  subClasses    =Dog Cat
   name          =Animal
 
 Dog= <instance> of Class

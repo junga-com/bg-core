@@ -2289,15 +2289,22 @@ function Object::addMethod()
 #
 # Options:
 #    <outputValueOptions>  : see man(3) outputValue for supported options
+#    --real  : (default) return only real object member variables and not any system variables.
 #    --sys   : return only system vars instead of real object member variables. (Note that '0' and '_Ref' are never returned)
 #    --all   : return both system and real object member variables
 function Object::getIndexes() { Object::getAttributes "$@"; }  # alias
 function Object::getAttributes()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local retOpts=(--echo) mode="real"
 	while [ $# -gt 0 ]; do case $1 in
-		--sys) mode="sys"  ;;
 		--all) mode="both" ;;
+		--sys) mode="sys"  ;;
+		--real) mode="real"  ;;
 		*)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done

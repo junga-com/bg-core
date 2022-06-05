@@ -202,6 +202,11 @@ function Object::fromJSON()
 #    man(3) Object::toString
 function Object::toJSON()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore Object_toJSON "$@"
+		return
+	fi
+
 	((recurseCount++ >10)) && assertError
 	local indent recordSep mode
 	while [ $# -gt 0 ]; do case $1 in
@@ -212,7 +217,7 @@ function Object::toJSON()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	# the pattern allows objDictionary to be shared among this and any recursive call that it spawns
+	# this pattern allows objDictionary to be shared among this and any recursive call that it spawns
 	if ! varExists objDictionary; then
 		local -A objDictionary=()
 	fi
@@ -239,9 +244,9 @@ function Object::toJSON()
 	printf "%s" "$tOpen"
 	indent+="   "
 
-	# use getIndexes to get the memberNames. Its temping to try to use "${!this[@]}" and "${!_this[@]}" but its too complicated to
+	# use getIndexes to get the memberNames. Its tempting to try to use "${!this[@]}" and "${!_this[@]}" but its too complicated to
 	# repeat all the edge cases and getAttributes is pretty well optimized so that when possible it just returns those constructs
-	local memberNames; $_this.getIndexes $myMode -A memberNames
+	local -a memberNames; $_this.getIndexes $myMode -A memberNames
 	local totalMemberCount="${#memberNames[@]}"
 	local writtenCount="$totalMemberCount"
 	local sep=","
@@ -261,7 +266,7 @@ function Object::toJSON()
 		# JSON requires some characters to be escaped. see https://www.json.org/json-en.html
 		jsonEscape value
 
-		# print the start of the line, upt to the <value>
+		# print the start of the line, up to the <value>
 		printf "${indent}"
 		[ "$labelsOn" ] && printf '"%s": ' "$name"
 

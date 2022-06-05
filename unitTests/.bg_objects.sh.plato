@@ -1521,8 +1521,8 @@ methods       =Object::addMethod
 + Object::toFlatINI
 + Object::toJSON
 + Object::toString
-staticMethods =static::Object::assign
 subClasses    =<redacted>
+staticMethods =static::Object::assign
 name          =Object
 
 ## bg_objects.sh:Object_staticCallSyntax: finished

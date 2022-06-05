@@ -326,17 +326,17 @@ fi
 #######################################################################################################################################
 ### Init the very early environment. This code stands alone and does not use any library functions
 
-
-# process the cmd line arguments that are meant for us (source /usr/lib/bg_core.sh -f|--<bgLibDefaultLibrarySet>)
-# -f means force reload of already loaded libraries
-# <bgLibDefaultLibrarySet> identifies a set of libraries that will be initially sourced
-bgLibDefaultLibrarySet="all"
-while [ $# -gt 0 ]; do case $1 in
-	-f|--force) importCntr clearLoadedList ;;
-	--minimal)  bgLibDefaultLibrarySet="${1#--}" ;;
-	*) break ; esac; shift
-	#*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
-done
+# OBSOLETE? consuming options here is problematic b/c we cant tell (can we?) if they are the script's options or source bg_core.sh<options>
+# # process the cmd line arguments that are meant for us (source /usr/lib/bg_core.sh -f|--<bgLibDefaultLibrarySet>)
+# # -f means force reload of already loaded libraries
+# # <bgLibDefaultLibrarySet> identifies a set of libraries that will be initially sourced
+# bgLibDefaultLibrarySet="all"
+# while [ $# -gt 0 ]; do case $1 in
+# 	-f|--force) importCntr clearLoadedList ;;
+# 	--minimal)  bgLibDefaultLibrarySet="${1#--}" ;;
+# 	*) break ; esac; shift
+# 	#*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+# done
 
 
 
