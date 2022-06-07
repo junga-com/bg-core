@@ -57,7 +57,8 @@
 #    -o|--output=<outStr>  : specify what is returned for each matching asset record. default is '$0'. This can use the the terms
 #                            $1,$2,$3,$4 to refer to the columns of the manifest file respectively. $0 is all colums.
 #    --manifest=<file>     : override the path of the manifest file to use. This string is prepended with 'print ' and executed in awk.
-function manifestGet() {
+function manifestGet()
+{
 	if  [ "$bgCoreBuiltinIsInstalled" ]; then
 		builtin bgCore $FUNCNAME "$@"
 		return
@@ -1084,7 +1085,9 @@ function _bgsudoAdjustPriv()
 		done
 	fi
 
-	[ "$_sapAction" ] && setReturnValue --array --append "$sudoOptsVar" "--defaultAction" "$_sapAction"
+	if [ "$_sapAction" ] && [ "$sudoOptsVar" ]; then
+		varOutput  --append --array "$sudoOptsVar" -- "--defaultAction" "$_sapAction"
+	fi
 	setReturnValue "$actionVar" "$_sapAction"
 }
 
@@ -3049,7 +3052,7 @@ function assertError()
 				_ae_contextVarName="${BASH_REMATCH[1]}"
 				_ae_contextVarNameValue="${_ae_contextVarNameValue#"$_ae_contextVarName:"}"
 			fi
-			varSetRef "$_ae_contextVarName" "$_ae_contextVarNameValue"
+			setReturnValue "$_ae_contextVarName" "$_ae_contextVarNameValue"
 			# TODO: after printfVars supports renamed vars like "<displayVarName>:<varNameWithData>" use that here
 			[ ! "${_ae_contextVarsCheck["${_ae_contextVarName:-empty}"]}" ] && _ae_contextVars+=("$_ae_contextVarName")
 			_ae_contextVarsCheck["${_ae_contextVarName:-empty}"]=1
@@ -3808,7 +3811,7 @@ function extractVariableRefsFromSrc()
 		done
 	done <<< $srcCode
 
-	varSetRef --array "$2" "${varNames[@]}"
+	varOutput ${2:- --array "$2"} "${varNames[@]}"
 }
 
 #"  atom syntax highlight bug

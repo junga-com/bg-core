@@ -298,7 +298,7 @@ function Object::toJSON()
 }
 
 
-# usage: ConstructObjectFromJson <objRefVar> <jsonText>
+# usage: ConstructObjectFromJson <objRefVar> <jsonFilename>
 function ConstructObjectFromJson()
 {
 	if  [ "$bgCoreBuiltinIsInstalled" ]; then

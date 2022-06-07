@@ -106,8 +106,8 @@ function bgwaitAll()
 		local result=$?
 		[ "$namesByResultsVar" ] && stringJoin -R "$namesByResultsVar[$result]" -d " " -a "$name"
 		[ "$resultsByNameVar" ]  && stringJoin -R "$resultsByNameVar[$name]" -d " " -a "$result"
-		[ $result -eq 0 ] && setRef "$succeedCountVar"  $((${!succeedCountVar}+1))
-		[ $result -ne 0 ] && setRef "$errorCountVar"    $((${!errorCountVar}+1))
+		[ $result -eq 0 ] && setReturnValue "$succeedCountVar"  $((${!succeedCountVar}+1))
+		[ $result -ne 0 ] && setReturnValue "$errorCountVar"    $((${!errorCountVar}+1))
 	done
 
 	### result will be set to the overall status for all the process - all good, all bad, or some of each

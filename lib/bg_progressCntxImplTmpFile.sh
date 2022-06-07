@@ -38,7 +38,7 @@ function _progressStackGet()
 	# if set, progressScope is the file that this thread is writing its progress messages to
 	if [ "$progressScope" ]; then
 		[ -f "$progressScope" ] || assertError -v progressScope "progress scope file is missing"
-		varSetRef --array "$retArrayVar" $(gawk '
+		varOutput --array "$retArrayVar" $(gawk '
 			{parent=parent sep $1; sep="/"}
 			END {
 				print parent" "$0
@@ -73,7 +73,7 @@ function _progressStackPush()
 
 	if [ "$progressScope" ]; then
 		[ -f "$progressScope" ] || assertError -v progressScope "progress scope file is missing"
-		varSetRef --array "$retArrayVar" $(
+		varOutput --array "$retArrayVar" $(
 			bgawk -i -n -v record="$out" '
 				{print $0}
 				{parent=parent sep $1; sep="/"}
@@ -94,7 +94,7 @@ function _progressStackPop()
 	local retArrayVar="$1"
 	if [ "$progressScope" ]; then
 		[ -f "$progressScope" ] || assertError -v progressScope "progress scope file is missing"
-		varSetRef --array "$retArrayVar" $(
+		varOutput --array "$retArrayVar" $(
 			bgawk -i -n '
 				on {print last}
 				{last=$0; on="1"}
@@ -118,7 +118,7 @@ function _progressStackUpdate()
 	escapeTokens msg current
 	if [ "$progressScope" ]; then
 		[ -f "$progressScope" ] || assertError -v progressScope "progress scope file is missing"
-		varSetRef --array "$retArrayVar" $(
+		varOutput --array "$retArrayVar" $(
 			bgawk -i -n \
 				-v msg="$msg" \
 				-v current="$current" '

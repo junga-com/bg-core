@@ -1505,12 +1505,11 @@ function _bgclassCall()
 		defaultOp:null:memberVar) false  ;;
 		defaultOp:null:method*)   assertObjExpressionError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found" ;;
 		defaultOp:null:either)
-			# in this ambiguous case, if the the caller provided an argument, it looks more like a method call except if its only
-			# one and it is the name of a variable (that the member value would be returned in)
-			if [ $# -ge 2 ] || { [ "$1" ] && ! varExists "$1"; }; then
-				assertObjExpressionError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found"
-			fi
-			false
+			# if we knew that the user intended _rsvMemberName to be an attribute, we would just return false indicating that there
+			# is no value to return but the problem with that is if the user intends it to be a method but mispelled it, it would
+			# quiet do nothing which is confusing.
+			# So, we assert an error here and if the user wants to check if a variable exists, they can append .exists to the member.
+			assertObjExpressionError -v class:_this[_CLASS] -v memberName:_rsvMemberName -v objectExpression:_memberExpression "This object has no member (variable nor method) with this name"
 			;;
 
 		defaultOp:object*)

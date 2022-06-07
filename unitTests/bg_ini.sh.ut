@@ -380,6 +380,7 @@ function ut_ini_validChars()
 	}
 
 	ut test
+	local var
 	# Can the character be used in an unquoted value string
 	getIniParam -R var "$iniFile" readDataTest  p1 badValue; echo "$var" >> "$iniFile.t1"
 	echo "value read from [readDataTest]p1       = '$var'"

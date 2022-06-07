@@ -8,9 +8,10 @@ declare -A ut_csiSplitOnCSI=(
 	[0]="$(cmdline "\033[34mHello \033[34mWorld\033[34m")"
 )
 function ut_csiSplitOnCSI() {
+	local out
 	ut test noecho
 	cmdline -q csiSplitOnCSI "$@" out
-	csiSplitOnCSI "$@" out
+	csiSplitOnCSI "$*" out
 	printfVars out
 }
 

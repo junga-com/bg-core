@@ -209,7 +209,7 @@ function awkData_getValue()
 		[ "$refreshFlag" ] && return
 	fi
 
-	# How this loop algorithm works. We run the lookup awk script in loop i==0 and if the awkDataID is not dirty, it rturns the data.
+	# How this loop algorithm works. We run the lookup awk script in loop i==0 and if the awkDataID is not dirty, it returns the data.
 	# but if the awkDataID is dirty, that first run will return quickly reporting that it needs building. We call awkData_build in
 	# that condition and then iterate to the next loop. If all is good, that second i==1 iteration will return the data but if it
 	# also indicates that the awkDataID needs building, then we fail.
@@ -219,7 +219,7 @@ function awkData_getValue()
 			[ "$count" == "assertOneFlag" ] && assertError -v filters "expected one or zero values for '$attribute' but got '$values'"
 			case ${countFlag}:${retVar:+retVar} in
 				--count:retVar) printf -v "$retVar[${value:---}]" "%s" "$count" ;;
-				       :retVar) setRef --array -a "$retVar" "$value" ;;
+				       :retVar) varOutput -a --array "$retVar" "$value" ;;
 				--count:)       printf "%4s %s\n" "$count" "$value" ;;
 				       :)       printf "%s\n" "$value" ;;
 			esac

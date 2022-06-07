@@ -695,7 +695,7 @@ function stringInsert()
 # See Also:
 #   arrayJoin
 #   arrayAdd
-#   varSetRef -- this man page lists all similar functions
+#   varOutput
 function stringJoin()
 {
 	local sj_resultValue resultStrVar="sj_resultValue" separator="," allowEmptyElements="1" appendMode
@@ -865,7 +865,7 @@ function arrayJoin()
 #    <arrayVarName> : name of a variable to add <element> to
 #    <element>      : the value (not the name of a variable) to add
 # See Also:
-#   varSetRef -- this man page lists all similar functions
+#   varOutput
 function arrayAdd()
 {
 	local -n _aaArrayVarName="$1" || assertError; shift
@@ -1333,7 +1333,7 @@ function strFill()
 	local _sfFillChar="$2"
 	local _sfTmp; printf -v _sfTmp "%*s" "${_sfCount:-1}" ""
 	_sfTmp="${_sfTmp// /${_sfFillChar:- }}"
-	outputValue "${retOpts[@]}" "$_sfTmp"
+	outputValue "${retOpts[@]}"  "$_sfTmp"
 }
 
 

@@ -306,10 +306,10 @@ function cuiWinOpen()
 				genRandomIDRef winObj
 				declare -Ag $winObj='()'
 				_debugWins[$cuiWinID]="$winObj"
-				setRef $winObj[_OID] "$winObj"
+				setReturnValue $winObj[_OID] "$winObj"
 			fi
-			setRef $winObj[tty] "$_ttyVal"
-			setRef $winObj[cuiWinID] "$cuiWinID"
+			setReturnValue $winObj[tty] "$_ttyVal"
+			setReturnValue $winObj[cuiWinID] "$cuiWinID"
 
 
 			# deleting this file signifies that its ok to use the pipe as long as it exists.

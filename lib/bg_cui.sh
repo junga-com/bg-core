@@ -677,7 +677,7 @@ function cuiPromptForPassword()
 
 	bgtrap -r 'stty echo; assertError "password prompt canceled by user"' SIGINT
 
-	setRef "$passwordVar" "$pw1"
+	varOutput -R "$passwordVar" "$pw1"
 }
 
 
@@ -954,7 +954,8 @@ function csiSplitOnCSI() {
 	local _string="$1"; shift
 	local retArray="$1"; shift
 	local retOpts=(--echo -1); [ "$retArray" ] && retOpts=(-a --array "$retArray")
-	outputValue --array "$retArray" --
+	# empty the retArray since below we call it multiple times with the --append flag
+	[ "$retArray" ] && outputValue --array "$retArray" --
 	local rematch
 
 	# for the regex test, we convert all the string representations of ESC to the actual, binary character because regex can only
@@ -977,10 +978,10 @@ function csiSplitOnCSI() {
 		# rematch[2]=<escapeSeq>
 		# rematch[<last>]=<remainderToParse>
 		rematch[2]="${rematch[2]//$'\033'/\\033}"
-		outputValue -a --array "$retArray" -- "${rematch[1]}" "${rematch[2]}"
+		outputValue "${retOpts[@]}" -- "${rematch[1]}" "${rematch[2]}"
 		_string="${rematch[@]: -1}" #"
 	done
-	[ "$_string" ] && outputValue -a --array "$retArray" -- "$_string" #"
+	[ "$_string" ] && outputValue "${retOpts[@]}" -- "$_string" #"
 	true
 }
 

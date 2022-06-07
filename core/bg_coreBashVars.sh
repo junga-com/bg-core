@@ -13,7 +13,6 @@
 #     varIsA      : (core function) true if the name referes to a bash variable of the specified type
 #     returnValue : (core function) return a single value from a function either on stdout or in a retVar if one was passed in
 #     setReturnValue : (core function) optionally set the value if a parameter passed by reference if its not empty.
-#     varSetRef   : (core function) set the value of a reference variable (name)
 #     varDeRef    : (core function) get the value of a reference variable (name)
 #     varToggle   : toggle the value of a variable between two constants
 #     varToggleRef: ref version of toggle the value of a variable between two constants
@@ -359,8 +358,8 @@ function varUnMarshalToGlobal()
 	case $vima_type in
 		A) declare -gA $vima_varName; arrayFromString "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
 		a) declare -ga $vima_varName; arrayFromString "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
-		i) declare -gi $vima_varName; setRef "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
-		\#) declare -g $vima_varName; setRef "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
+		i) declare -gi $vima_varName; varOutput -R "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
+		\#) declare -g $vima_varName; varOutput -R "$vima_varName" "${vima_marshalledData//\\n/$'\n'}" ;;
 		*) assertError -v data:"$1" -v type:vima_type -v varName:vima_varName "unknown type in marshalled data. The first character should be one on 'Aai-', followed immediately by the <varName> then a single space then arbitrary data" ;;
 	esac
 }
@@ -448,7 +447,6 @@ function unescapeTokens()
 #    -q       : quiet. if <varRef> is not given, do not print <value> to stdout
 # See Also:
 #   man(3) returnObject : which is similar to returnValue but with special handling for object references
-#   man(3) varSetRef
 #   man(3) varOutput
 #   man(3) setReturnValue
 #   local -n <variable> (for ubuntu 14.04 and beyond, bash supports reference variables)
@@ -517,12 +515,16 @@ function returnValue()
 #                           system member variables. Since varOutput needs to iterate the <value> list anyway, this saves functions
 #                           like getIndexes from having to iterate and build a separate list from "${!_this[@]}"
 # See Also:
-#    man(3) varSetRef  # obsolete function that this function replaces.
 #    man(3) returnValue # a simpler pattern when th eoutput is a scalar.
 #    man(3) bgOptions_DoOutputVarOpts # helper function often used with outputValue
 function outputValue() { varOutput "$@"; } # ALIAS:
 function varOutput()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local _sr_appendFlag _sr_varType="--echo" _sr_varRef _sr_delim=${IFS:0:1} _sr_filters
 	while [ $# -gt 0 ]; do case $1 in
 		-1)               _sr_delim=$'\n' ;;
@@ -681,10 +683,14 @@ function bgOptions_DoOutputVarOpts()
 #   arrayCopy  -- does a similar thing for arrays (=)
 #   arraryAdd  -- does a similar thing for array (+=)
 #   stringJoin -- -a mode does similar but appends to the varName (+=)
-#   varSetRef (aka setRef)
+#   varOutput
 function setReturnValue()
 {
-	varSetRef "$@"
+	[ $# -ne 2 ] && assertError -v argCount:-l$# -v args:-l"$*" "invalid arguments. setReturnValue must be called with 2 parameters. Consider using varOutput"
+	[ "${1:0:1}" == "-" ] && assertError "invalid option. setReturnValue does not accept any options"
+	if [ "$1" ]; then
+		varOutput -R "$@"
+	fi
 }
 
 # usage: setExitCode <exitCode>
@@ -698,71 +704,6 @@ function setExitCode()
 }
 
 
-# OBSOLETE: use varOutput instead. varOutput makes <varRef> the argument of options instead of a required positional param.
-# usage: varSetRef [-a] [--array|--set] <varRef> <value...>
-# See http://mywiki.wooledge.org/BashFAQ/048#line-120 for a discussion of why varRefs are problematic.
-# This sets the <varRef> with <value> only if it is not empty.
-# Note that this is an alternative using local -n varName. Each have tradeoffs.
-# Equivalent Statements:
-#    varSetRef            foo 42 yo    becomes=>  foo="42 yo"
-#    varSetRef --array    foo 42 yo    becomes=>  foo=(42 yo)
-#    varSetRef -a         foo 42 yo    becomes=>  foo+="42 yo"
-#    varSetRef --array -a foo 42 yo    becomes=>  foo+=(42 yo)
-#    varSetRef --set      foo 42 yo    becomes=>  foo+=("42 yo")
-#    varSetRef --echo     foo 42 yo    becomes=>  echo "42 yo"
-# Options:
-#    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no effect with --set or --echo
-#    --array     : arrayFlag. assign the remaining cmdline params into <varRef>[N] as array elements.
-#                  W/o -a it replaces existing elements.
-#    --set       : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
-#    --echo      : dont assign to foo. Instead, echo to stdout. This supports functions that may return in a variable or may write to stdout
-#
-# See Also:
-#   man(3) varOutput
-#   man(3) setReturnValue
-#   man(3) returnValue
-#   local -n <variable>=<varRef> (for ubuntu 14.04 and beyond) allows direct manipulation of the varRef
-#   arrayCopy  -- does a similar thing for two arrays (<varRef>=(<varRef2>))
-#   arraryAdd  -- does a similar thing for two arrays (<varRef>+=(<varRef2>))
-#   stringJoin -- -a mode does similar but also adds a separator
-#   http://mywiki.wooledge.org/BashFAQ/048#line-120
-#   https://wiki.bash-hackers.org/scripting/bashchanges?s[]=versions
-#   https://wiki.bash-hackers.org/internals/shell_options
-function setRef() { varSetRef "$@"; }
-function varSetRef()
-{
-	local _sr_appendFlag _sr_varType
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-a|--append) _sr_appendFlag="-a" ;;
-		--string)    _sr_varType="--string" ;;
-		--array)     _sr_varType="--array" ;;
-		--set)       _sr_varType="--set" ;;
-		--echo)      _sr_varType="--echo" ;;
-	esac; shift; done
-	local sr_varRef="$1"; shift
-
-	[ ! "$sr_varRef" ] && [ "$_sr_varType" != "--echo" ] && return 0
-
-	case ${_sr_varType:---string}:$_sr_appendFlag in
-		--set:*)
-			while [ $# -gt 0 ]; do
-				printf -v "$sr_varRef[$1]" "%s" ""
-				shift
-			done
-			;;
-
-		# these use the -n syntax now because they used to use eval. If we need to be compaitble with older bashes, this will have
-		# to change
-		--array:)    local -n _sr_varRef="$sr_varRef"; _sr_varRef=("$@")  ;;
-		--array:-a)  local -n _sr_varRef="$sr_varRef" || assertError; _sr_varRef+=("$@") ;;
-
-		--string:)   printf -v "$sr_varRef" "%s" "$*" ;;
-		--string:-a) printf -v "$sr_varRef" "%s%s" "${!sr_varRef}" "$*" ;;
-
-		--echo:*) echo "$*" ;;
-	esac || assertError
-	true
-}
 
 # usage: varDeRef <variableReference> [<retVar>]
 # This returns the value contained in the variable refered to by <variableReference>
@@ -863,7 +804,7 @@ function arrayExistsAt()
 function arrayPush()
 {
 	local aa_varRef="$1"; shift
-	varSetRef -a --array "$aa_varRef" "$*"
+	varOutput -a --array "$aa_varRef" "$*"
 }
 
 # usage: arrayPop <varName> <retVar>

@@ -91,8 +91,8 @@ function findInPaths()
 		--listPaths:*) listPathsFlag="--listPaths" ;;
 		--debug:*)           debug="1"; preCmd="echo " ;;
 		--return-relative:*) findPrintFmt="%P" ;;
-		-R*|--retVar*)   bgOptionGetOpt val: retVar "$@" && shift; retArgs=(); singleValueFlag="1" ;;
-		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
+		-R*|--retVar*|--string*)  bgOptionGetOpt val: retVar "$@" && shift; retArgs=(-R "$retVar"); singleValueFlag="1" ;;
+		-A*|--retArray*|--array*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
 
 		# first positional param is the filespec
 		[^-]*:1) fileSpec="$1"; ((posCwords++))
@@ -148,7 +148,7 @@ function findInPaths()
 	local count=0
 	while IFS="" read -r -d$'\b' _line; do
 		((count++))
-		varSetRef "${retArgs[@]}"  "$retVar" "$_line"
+		varOutput "${retArgs[@]}"  "$_line"
 		[ "$singleValueFlag" ] && return 0
 	done < <(find "${allPaths[@]}" -maxdepth 1 -type f -name "$fileSpec" -printf "${findPrintFmt}\0" 2>/dev/null \
 		| awk -v RS='\0' -F"/" -v allowDupes="$allowDupes" '
@@ -316,7 +316,7 @@ function templateFind()
 	# so system templates will always be an absoulte path.
 	# Code that takes a template name or path will run it through this function to turn it into a working path.
 	if [[ "$templateName" =~ ^/ ]] && [ -e "$templateName" ]; then
-		varSetRef "${retArgs[@]}" "$templateName"
+		varOutput "${retArgs[@]}" "$templateName"
 		return
 	fi
 
@@ -339,7 +339,7 @@ function templateFind()
 	# SECURITY: see todo below...
 	# TODO: consider if this function should check the permissions on the found path and refuse to return a path to a non-system file?
 	#       I think that the default should be to check the permissions, but a flag --allow-user-templates would override it
-	[ "$result" ] && varSetRef "${retArgs[@]}" "$result"
+	[ "$result" ] && varOutput "${retArgs[@]}" "$result"
 }
 
 # usage: templateList [-A|--retArray=<retArray>] <templateSpec>
@@ -362,7 +362,7 @@ function templateList()
 	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
 	while read -r name; do
-		varSetRef "${retArgs[@]}" "$name"
+		varOutput "${retArgs[@]}" "$name"
 	done < <(gawk \
 		-v templateSpec="$templateSpec" '
 		@include "bg_template.list.awk"
@@ -387,7 +387,7 @@ function templateGetSubtypes()
 	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
 	while read -r name; do
-		varSetRef "${retArgs[@]}" "$name"
+		varOutput "${retArgs[@]}" "$name"
 	done < <(gawk \
 		-v templateSpec="$templateSpec" \
 		-v outFormat="getSubtypes" '
