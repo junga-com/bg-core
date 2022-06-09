@@ -17,6 +17,30 @@
 #
 
 
+#######################################################################################################################################
+### From bg_objects.sh
+
+# usage: IsAnObjRef <objRef>
+# returns true if <objRef> is a variable whose content matches "^_bgclassCall .*"
+# The <objRef> variable should be deferenced like "IsAnObjRef $myObj" instead of "IsAnObjRef myObj"
+# Params:
+#   <objRef> : the string to be tested
+if builtin bgCore ping 2>/dev/null; then
+function IsAnObjRef() { bgCore IsAnObjRef "$@"; }
+else
+function IsAnObjRef()
+{
+	# this test supports <objectRef> being passed inside quotes or not. Even though normally in bash its important to put arguments
+	# in quotes, passing an <objRef> to some functions like GetOID support passing without quotes for efficiency so we try to be
+	# consistent by supporting it here (even though it does not matter in this function)
+	# _bgclassCall <oid> <class> <superFlag> |
+	[ "$1"  == "_bgclassCall" ] && [ $# -eq 5 ] && [ "$5" == "|" ] && return 0;
+	[[ "$1" == _bgclassCall\ *\ *\ [01]\ '|'?([\ ]) ]] && return 0;
+	return 1
+}
+fi
+
+
 
 #######################################################################################################################################
 ### From bg_manifest.sh
@@ -2811,6 +2835,12 @@ function bgTrapUtils()
 # in man(1) bash, but there is not much info there. It seems that there is not much we can do in this function because BASH runs
 # it in its own subshell and does not appear to offer any control over how it behaives next.
 #
+# From the bash source I can see that what happens is that it determines that its not a builtin nor shell function so then it calls
+# execute_disk_command() in its own sub proc so when execute_disk_command sees that there is no command, it runs this hook, but its
+# already in the sub process.
+#
+# TODO: see if we can find an available signal to send from this to its parent PID which would then throw an assertError
+#
 # Terminated Msg:
 # when we kill -TERM -$$ BASH writes two 'Terminated' lines (one for each PID -- there are at least two b/c this handler is in its
 # own PID). I prevented one of them by adding 'builtin trap 'exit 127' SIGTERM ' below but I dont want the library to install a
@@ -2859,12 +2889,15 @@ function command_not_found_handle()
 	# recognize $foo.something... object syntax where the $foo variable is empty to make a better error msg
 	if [[ "$cmdName" =~ ^[.[] ]] && type -t bgStackFrameGet &>/dev/null; then
 		local -A exprFrame; bgStackFrameGet  command_not_found_handle:+1 exprFrame
-		msg="empty object variable referenced. '${exprFrame[cmdSrc]}'  cmdline='$cmdline'"
+		msg="(cmd not found) empty object variable referenced. '${exprFrame[cmdSrc]}'  cmdline='$cmdline'"
 	fi
 
 	# write msg to stderr and to bgtrace (with a stack)
 	echo "$msg" >&2
-	type -t bgtraceStack &>/dev/null && type -t bgStackPrint &>/dev/null && bgtraceStack
+	if type -t bgtraceStack &>/dev/null && type -t bgStackPrint &>/dev/null; then
+		bgtraceStack
+		bgtraceIsActive && type -t bgStackPrint &>/dev/null && bgStackPrint
+	fi
 	type -t bgtrace &>/dev/null && bgtrace "$msg"
 
 	# special case running in the terminal.
@@ -3811,7 +3844,7 @@ function extractVariableRefsFromSrc()
 		done
 	done <<< $srcCode
 
-	varOutput ${2:- --array "$2"} "${varNames[@]}"
+	varOutput ${2:+ --array "$2"} "${varNames[@]}"
 }
 
 #"  atom syntax highlight bug

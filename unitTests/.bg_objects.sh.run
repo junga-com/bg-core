@@ -1452,10 +1452,8 @@ cmd> $obj.::dontExist.toString
    catch_errorFn='ut_Object_toString'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: ut_Object_toString: The class 'Object' does not contain a static method 'dontExist.toString'
-                          +    objectExpression='$obj.::dontExist.toString'
-                          +    class='Object'
-                          +    staticMethod='dontExist.toString''
+                          +error: ut_Object_toString: '_static::dontExist.toString' is not a member function of the Class 'Object'
+                          +    objectExpression='$obj.::dontExist.toString''
 ## bg_objects.sh:Object_toString: finished
 ###############################################################################################################################
 
@@ -1639,8 +1637,6 @@ cmd> $obj[foo]
 hello world
 
 # expect that all of these syntax will be interpreted as a missing member var when it does not exist
-cmd> $obj.bar
-[exitCode 1]
 cmd> $obj[bar]
 [exitCode 1]
 cmd> $obj[doit] p1 # this would look like a method call except the [] means that doit has to be a member var
@@ -1654,20 +1650,15 @@ cmd> $obj.::doit
    catch_errorFn='ut_Object_memberVarReadAccess'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: ut_Object_memberVarReadAccess: The class 'Object' does not contain a static method 'doit'
-                          +    objectExpression='$obj.::doit'
-                          +    class='Object'
-                          +    staticMethod='doit''
+                          +error: ut_Object_memberVarReadAccess: '_static::doit' is not a member function of the Class 'Object'
+                          +    objectExpression='$obj.::doit''
 ** caught expected exception
    catch_errorClass='assertObjExpressionError'
    catch_errorFn='ut_Object_memberVarReadAccess'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: ut_Object_memberVarReadAccess: object method not found
-                          +    objectExpression='$obj.doit p1 p2 p3'
-                          +    class='Object'
-                          +    methodName='doit'
-                          +    objectExpression='.doit p1 p2 p3''
+                          +error: ut_Object_memberVarReadAccess: method not found 'doit'
+                          +    objectExpression='$obj.doit p1 p2 p3''
 
 ## bg_objects.sh:Object_memberVarReadAccess: finished
 ###############################################################################################################################
@@ -1689,11 +1680,8 @@ cmd> $obj.:foo
    catch_errorFn='ut_expressionErrors'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: ut_expressionErrors: object method not found
-                          +    objectExpression='$obj.:foo'
-                          +    class='Object'
-                          +    methodName='foo'
-                          +    objectExpression='.:foo''
+                          +error: ut_expressionErrors: method not found 'foo'
+                          +    objectExpression='$obj.:foo''
 ## bg_objects.sh:expressionErrors: finished
 ###############################################################################################################################
 

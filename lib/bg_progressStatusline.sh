@@ -200,7 +200,7 @@ function _readProgressMsgLoop()
 				# note that we dont have to change the scroll region to write outside of it but we have to be careful not
 				# cause a scroll while we are outside of it b/c that resets the scroll region to the full terminal
 
-				if [ "$target" ]; then
+				if [ "$target" ] && (( target != 0 )); then
 					local divCol msgSection meter meterBarStart meterBarEnd meterDiv meterBar="" marker
 					# divCol=$(( ${#formattedStr} +1 ))
 					# divCol=$(( (divCol < termWidth*60/100) ? divCol : termWidth*60/100 ))

@@ -1228,7 +1228,7 @@ function __resolveMemberChain()
 		local attributes; varGetAttributes "$_rsvOID" attributes
 		if [[ "$attributes" =~ [aA] ]]; then
 			:
-		elif [ "${!_rsvOID:0:12}" == "_bgclassCall" ]; then
+		elif IsAnObjRef ${!_rsvOID} ; then
 			GetOID "${!_rsvOID}" $_rsvOID || assertError
 		else
 			[ ${#parts[@]} -gt 0 ] && { _rsvMemberType="invalidExpression:the first term is not a valid object or assignment left hand side. "; return 101; }
@@ -1398,91 +1398,84 @@ function _bgclassCallSetup()
 #    man(5) bgBashObjectsSyntax
 function _bgclassCall()
 {
+	((_bgclassCallCount++))
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	bgDebuggerPlumbingCode=(1 "${bgDebuggerPlumbingCode[@]}")
 
-	((_bgclassCallCount++))
 	#local msStart="10#${EPOCHREALTIME#*.}"; local msLap; local msLapLast=$msStart
 
 	#declare -g msCP1; msLap="10#${EPOCHREALTIME#*.}"; (( msCP1+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 
 	# this block parses the incoming expression into the object and its member being operated on and the operator to perform.
-	# if bgCoreBuiltinIsInstalled is not set, the bash function _bgclassCallSetup is used and it needs some code before and after
-	# it to declare variables in this scope.
-	# if bgCoreBuiltinIsInstalled is set, the builtin command bgCore does everything since a builtin can create local variables
-	# in the function context that called it.
-	# The builtin is much faster and is prefered but since it is much easier to distribute scripts without relying on a compiled
-	# loadable builtin,
-	if [ ! "$bgCoreBuiltinIsInstalled" ]; then
-		# this block is the bash version of the context setup.
-		local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
-		local _OID _OID_sys _resultCode
-		local -n this _this static
+	# this block is the bash version of the context setup.
+	local _OID _CLASS _hierarchLevel _memberExpression _chainedObjOrMember _memberOp _argsV  _rsvOID _rsvMemberType _rsvMemberName
+	local _OID _OID_sys _resultCode
+	local -n this _this static
 
-		_bgclassCallSetup "$@"
+	_bgclassCallSetup "$@"
 
-		# This section contains things that the builtin bgCore does but we cant put it inside _bgclassCallSetup because it needs
-		# to change the context (local variables) at this function scope and not inside the _bgclassCallSetup function call.
+	# This section contains things that the builtin bgCore does but we cant put it inside _bgclassCallSetup because it needs
+	# to change the context (local variables) at this function scope and not inside the _bgclassCallSetup function call.
 
-		set -- "${_argsV[@]}"
+	set -- "${_argsV[@]}"
 
-		# fixup the :: override syntax
-		if [ "$_memberOp" == "::" ] && [[ "$_rsvMemberType" == "null"* ]]; then
-			# virtual mechanism override
-			# $myObj.Object::bgtrace ...
-			_rsvMemberName="${_rsvMemberName}::$1"; shift
-			_rsvMemberType="method"
-			_memberOp="" # set it to the defaultOp
-		fi
-
-		# do the part of the method call case that the builtin does
-		if [[ "$_rsvMemberType" == "method"* ]] && [ "${_memberOp:-defaultOp}" == "defaultOp" ]; then
-			# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
-			_classUpdateVMT "${_this[_CLASS]}"
-
-			# find the _VMT taking into account super calls
-			if [ ${_hierarchLevel:-0} -eq 0 ]; then
-				local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
-			else
-				local -n _VMT="${refClass[baseClass]}_vmt"
-			fi
-
-			local _METHOD
-			if [[ "${_rsvMemberName}" =~ .:: ]]; then
-				_METHOD="${_rsvMemberName}"
-			else
-				_METHOD="${_VMT[_method::${_rsvMemberName}]}"
-			fi
-
-			# super is relative to the the class of the polymorphic method we are executing
-			local super="_bgclassCall ${_OID} ${_METHOD%%::*} 1 |"
-
-			# create local nameRefs for each member variable that has an <objRef> or heap_ value except for "0" and "_Ref"
-			if [[ "${static[oidAttributes]:-A}" =~ A ]]; then
-				local _memberVarName
-				for _memberVarName in "${!this[@]}"; do
-					[[ " 0 _Ref " != *" $_memberVarName "* ]] || continue
-					if IsAnObjRef "${this[$_memberVarName]}"; then
-						local -n $_memberVarName; GetOID ${this[$_memberVarName]} "$_memberVarName"
-					elif [[ "${this[$_memberVarName]}" == heap_* ]]; then
-						local -n $_memberVarName="${this[$_memberVarName]}"
-					fi
-				done
-				[ "$_OID" != "$_OID_sys" ] && for _memberVarName in "${!_this[@]}"; do
-					[[ " 0 _Ref " != *" $_memberVarName "* ]] || continue
-					if IsAnObjRef "${_this[$_memberVarName]}"; then
-						local -n $_memberVarName; GetOID ${_this[$_memberVarName]} "$_memberVarName"
-					elif [[ "${_this[$_memberVarName]}" == heap_* ]]; then
-						local -n $_memberVarName="${_this[$_memberVarName]}"
-					fi
-				done
-			fi
-		fi
-
-	else
-		# this is the builtin version of the context setup
-		builtin bgCore _bgclassCall "$@"
-		#bgtraceBreak --plumbing
+	# fixup the :: override syntax
+	if [ "$_memberOp" == "::" ] && [[ "$_rsvMemberType" == "null"* ]]; then
+		# virtual mechanism override
+		# $myObj.Object::bgtrace ...
+		_rsvMemberName="${_rsvMemberName}::$1"; shift
+		_rsvMemberType="method"
+		_memberOp="" # set it to the defaultOp
 	fi
+
+	# do the part of the method call case that the builtin does
+	if [[ "$_rsvMemberType" == "method"* ]] && [ "${_memberOp:-defaultOp}" == "defaultOp" ]; then
+		# _classUpdateVMT returns quickly if new scripts have not been sourced or Class::reloadMethods has not been called
+		_classUpdateVMT "${_this[_CLASS]}"
+
+		# find the _VMT taking into account super calls
+		if [ ${_hierarchLevel:-0} -eq 0 ]; then
+			local -n _VMT="${_this[_VMT]:-${_this[_CLASS]}_vmt}"
+		else
+			local -n _VMT="${refClass[baseClass]}_vmt"
+		fi
+
+		local _METHOD
+		if [[ "${_rsvMemberName}" =~ .:: ]]; then
+			_METHOD="${_rsvMemberName}"
+		else
+			_METHOD="${_VMT[_method::${_rsvMemberName}]}"
+		fi
+
+		# super is relative to the the class of the polymorphic method we are executing
+		local super="_bgclassCall ${_OID} ${_METHOD%%::*} 1 |"
+
+		# create local nameRefs for each member variable that has an <objRef> or heap_ value except for "0" and "_Ref"
+		if [[ "${static[oidAttributes]:-A}" =~ A ]]; then
+			local _memberVarName
+			for _memberVarName in "${!this[@]}"; do
+				[[ " 0 _Ref " != *" $_memberVarName "* ]] || continue
+				if IsAnObjRef "${this[$_memberVarName]}"; then
+					local -n $_memberVarName; GetOID ${this[$_memberVarName]} "$_memberVarName"
+				elif [[ "${this[$_memberVarName]}" == heap_* ]]; then
+					local -n $_memberVarName="${this[$_memberVarName]}"
+				fi
+			done
+			[ "$_OID" != "$_OID_sys" ] && for _memberVarName in "${!_this[@]}"; do
+				[[ " 0 _Ref " != *" $_memberVarName "* ]] || continue
+				if IsAnObjRef "${_this[$_memberVarName]}"; then
+					local -n $_memberVarName; GetOID ${_this[$_memberVarName]} "$_memberVarName"
+				elif [[ "${_this[$_memberVarName]}" == heap_* ]]; then
+					local -n $_memberVarName="${_this[$_memberVarName]}"
+				fi
+			done
+		fi
+	fi
+
 	#declare -g msCP2; msLap="10#${EPOCHREALTIME#*.}"; (( msCP2+=((msLap>msLapLast) ? (msLap-msLapLast) : 0)  )); msLapLast=$msLap
 
 	# if parsing the expression failed, _rsvMemberType will be invalidExpression:<msg>
@@ -1804,7 +1797,7 @@ function ObjEval()
 	local oPart="${objExpr%%[.[]*}"
 	local mPart="${objExpr#$oPart}"
 	local callExpr="${!oPart}"
-	[ "${callExpr:0:12}" == "_bgclassCall" ] || assertError "invalid object expression '$objExpr'. '\$$oPart' is not an object reference"
+	IsAnObjRef ${callExpr} || assertError "invalid object expression '$objExpr'. '\$$oPart' is not an object reference"
 	# TODO: escape $objExpr so that it cant be a compound statement
 	# SECURITY: escape $objExpr so that it cant be a compound statement
 	eval \$$objExpr "$@"
@@ -1951,19 +1944,6 @@ function SetupObjContext()
 	fi
 }
 
-
-# usage: IsAnObjRef <objRef>
-# returns true if <objRef> is a variable whose content matches "^_bgclassCall .*"
-# The <objRef> variable should be deferenced like "IsAnObjRef $myObj" instead of "IsAnObjRef myObj"
-# Params:
-#   <objRef> : the string to be tested
-function IsAnObjRef()
-{
-	# this test supports <objectRef> being passed inside quotes or not. Even though normally in bash its important to put arguments
-	# in quotes, passing an <objRef> to some functions like GetOID support passing without quotes for efficiency so we try to be
-	# consistent by supporting it here (even though it does not matter in this function)
-	[ "${1:0:12}"  == "_bgclassCall" ]
-}
 
 # usage: returnObject <objRef> [<retVar>]
 # This is similar to 'returnValue' but does extra processing for objects.
@@ -2210,7 +2190,7 @@ function Object::clone()
 	if [ ! "$shallowFlag" ]; then
 		local memberName; for memberName in $($that.getIndexes); do
 			local memberValue="${that[$memberName]}"
-			if [ "${memberValue:0:12}" == "_bgclassCall" ]; then
+			if IsAnObjRef ${memberValue}; then
 				$memberValue.clone that[$memberName]
 			fi
 		done
@@ -2457,7 +2437,7 @@ function Object::fromDebControl()
 			IFS=':' read -r name value <<<$line
 			name="$(trimString "$name")"
 			value="$(trimString "$value")"
-			if [ "${value:0:12}" == "_bgclassCall" ]; then
+			if IsAnObjRef ${value}; then
 				local objType _donotneed objRef
 				read -r _donotneed _donotneed objType _donotneed <<<$value
 				ConstructObject "$objType" value
@@ -2565,9 +2545,9 @@ function Object::toString()
 		# I dont remember why we exclude object attribute names from the labelWidth. It might be obsolete because we format the
 		# first line of objects differently now
 		if [ "${attrib:0:1}" == "_" ]; then
-			[ "${_this[$attrib]:0:12}" == "_bgclassCall" ] && continue
+			IsAnObjRef ${_this[$attrib]} && continue
 		else
-			[ "${this[$attrib]:0:12}" == "_bgclassCall" ] && continue
+			IsAnObjRef ${this[$attrib]} && continue
 		fi
 		((labelWidth=(labelWidth<${#attrib}) ?${#attrib} :labelWidth ))
 	done
@@ -2596,7 +2576,7 @@ function Object::toString()
 		else
 			local value="${this[$attrib]}"
 		fi
-		if [ "${value:0:12}" == "_bgclassCall" ]; then
+		if IsAnObjRef ${value}; then
 			local refOID refClass scrap; read -r scrap refOID refClass scrap <<<"${value}"
 			if [ ! "${ots_objDictionary[$refOID]+hasBeenSeen}" ]; then
 				printf "${indent}"
@@ -2684,7 +2664,7 @@ function Object::toFlatINI()
 
 	local attrib; for attrib in $($_this.getIndexes); do
 		local value="${this[$attrib]}"
-		if [ "${value:0:12}" == "_bgclassCall" ]; then
+		if IsAnObjRef ${value}; then
 			$_this.$attrib.toFlatINI -s ${scope}${scope:+.}$attrib
 		else
 			printf "%s=%s\n" "${scope}${scope:+.}$attrib" "${value//$'\n'/\\n}"

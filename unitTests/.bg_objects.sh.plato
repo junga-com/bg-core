@@ -1639,8 +1639,6 @@ cmd> $obj[foo]
 hello world
 
 # expect that all of these syntax will be interpreted as a missing member var when it does not exist
-cmd> $obj.bar
-[exitCode 1]
 cmd> $obj[bar]
 [exitCode 1]
 cmd> $obj[doit] p1 # this would look like a method call except the [] means that doit has to be a member var

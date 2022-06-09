@@ -464,7 +464,7 @@ function ut()
 		printf "** Exception thrown by testcase **\n"
 		#catch_errorDescription="${catch_errorDescription##$'\n'}"
 		#printfVars "   " ${!catch_*}
-		printfVars "   " catch_errorClass catch_errorFn catch_errorCode catch_errorDescription
+		printfVars --noObjects "   " catch_errorClass catch_errorFn catch_errorCode catch_errorDescription
 		if [ "$_utRun_section" == "setup" ]; then
 			[ "$_utRun_expectSetupFail"  ] || printfVars catch_stkArray catch_psTree
 		 	ut setupFailed;
@@ -637,7 +637,7 @@ function utfRunner_execute()
 	local _utRun_srcLineStart=${_utRun_srcLineStart:-0}
 	local _utRun_expect="${_utRun_expect}"
 	local _utRun_srcLineEnd=${_utRun_srcLineEnd:-0}
-	local _utRun_section=""  # default is 'test'. init to "" allows us to distinguish the case were no section is declared
+	local _utRun_section=""  # default is 'test'. init to "" allows us to distinguish the case where no section is declared
 	local _utRun_curLineNo=0
 
 	# if the caller has not already loaded the source,  load source file into an array

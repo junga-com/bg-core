@@ -404,7 +404,7 @@ function Object::bgtrace()
 		local i; for i in "${!this[@]}"; do
 			if [[ ! "$i" =~ ^((_)|(0$)) ]]; then
 				printf "${pad}   %-18s : %s" "$i" "${this[$i]}" | awk 'NR>1{printf("'"${pad}"'   %-18s  +", "")}  {print $0}' >>$_bgtraceFile
-				if [ "$recurseFlag" ] && [ "${this[$i]:0:12}" == "_bgclassCall" ]; then
+				if [ "$recurseFlag" ] && IsAnObjRef ${this[$i]}; then
 					${this[$i]}.bgtrace -l$((level+1)) --rlevel "$rlevel" --rstate "$recurseFlag" -m -s -h "$@"
 				fi
 			fi
@@ -427,7 +427,7 @@ function Object::bgtrace()
 		local i; for i in "${!this[@]}"; do
 			if [[ "$i" =~ ^((0)|(_)) ]] && [ "${i:0:9}" != "_method::" ]; then
 				printf "${pad}   %-18s : %s" "$i" "${this[$i]}" | awk 'NR>1{printf("'"${pad}"'   %-18s  +", "")}  {print $0}' >>$_bgtraceFile
-				if [ "$recurseFlag" ] && [ "${this[$i]:0:12}" == "_bgclassCall" ] && [ "$i" != "_Ref" ] && [ "$i" != "0" ] ; then
+				if [ "$recurseFlag" ] && IsAnObjRef ${this[$i]} && [ "$i" != "_Ref" ] && [ "$i" != "0" ] ; then
 					${this[$i]}.bgtrace -l$((level+1)) --rlevel "$rlevel" --rstate "$recurseFlag" -m -s -h "$@"
 				fi
 			fi

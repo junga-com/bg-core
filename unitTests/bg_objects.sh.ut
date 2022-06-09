@@ -456,8 +456,8 @@ function ut_Object_memberVarReadAccess() {
 	$obj.foo
 	$obj[foo]
 	ut expect "that all of these syntax will be interpreted as a missing member var when it does not exist"
-	$obj.bar
 	$obj[bar]
+#	$obj.bar
 	$obj[doit] p1 # this would look like a method call except the [] means that doit has to be a member var
 	ut expect "that these two syntax will be interpreted as a missing method when it does not exist"
 	Try:

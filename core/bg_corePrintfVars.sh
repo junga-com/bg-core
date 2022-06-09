@@ -37,6 +37,15 @@
 #
 
 
+function pvIsAnObjRef()
+{
+	type -t IsAnObjRef &>/dev/null && { IsAnObjRef "$@"; return; }
+
+	[ "$1"  == "_bgclassCall" ] && [ $# -eq 5 ] && [ "$5" == "|" ] && return 0;
+	[[ "$1" == _bgclassCall\ *\ *\ [01]\ '|'?([\ ]) ]] && return 0;
+	return 1
+}
+
 # usage: pvCalcLocalIndent <labelLength> <retVar>
 # given the <labelLength> passed in and the global pv_labelWidth, calculate how big the indent should be for subsequent lines
 # The returned value is clipped between 2 and 30
@@ -167,7 +176,7 @@ function pvPrAttribute()
 function pvPrArray()
 {
 	local pvl_label="$1"
-	local -n pvl_array="$2"
+	local -n pvl_array="$2" || assertError
 	local pvla_value="$3"
 	local pvl_startLabelStyle=arrayStart; [ "${FUNCNAME[1]}" != "printfVars" ] && pvl_startLabelStyle="arrayStartRecursed"
 
@@ -214,7 +223,7 @@ function pvPrArray()
 	for pvl_index in "${!pvl_array[@]}"; do
 		if [ ! "$pv_noNestFlag" ] && [[ "${pvl_array[$pvl_index]}" == heap_*[aA]*_* ]]; then
 			pvPrArray "$pvl_index" "${pvl_array[$pvl_index]}" "${pvl_array[$pvl_index]}"
-		elif [ ! "$pv_noNestFlag" ] && [ "${pvl_array[$pvl_index]:0:12}" == "_bgclassCall" ]; then
+		elif [ ! "$pv_noNestFlag" ] && pvIsAnObjRef ${pvl_array[$pvl_index]}; then
 			local pvl_elementValue; bgread "" pvl_elementValue "" <<<"${pvl_array[$pvl_index]}"
 			pvPrArray "$pvl_index" "$pvl_elementValue" "${pvl_array[$pvl_index]}"
 		else
@@ -366,7 +375,7 @@ function printfVars()
 			pvPrAttribute "$pv_label" "$pv_varname"
 
 		# case where it contains an object reference and we are doing object integration
-	elif [ ! "$pv_plainFlag" ] && [ ! "${pv_noObjectsFlag}" ]  && [[ ! "$pv_varname" =~ [[][@*][]] ]]  && [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
+		elif [ ! "$pv_plainFlag" ] && [ ! "${pv_noObjectsFlag}" ]  && [[ ! "$pv_varname" =~ [[][@*][]] ]]  && pvIsAnObjRef ${!pv_varname}; then
 			pvEndOneLineMode
 			Try:
 				${!pv_varname}.toString "${pv_objOpts[@]}" --title="${pv_varname}"
@@ -384,7 +393,7 @@ function printfVars()
 			pvPrArray "$pv_label" "$pv_varname" ""
 
 		# if its a string var that contains an <objRef> and we are not doing objects (--noObjects) do it as an array
-		elif [ ! "$pv_plainFlag" ] &&  [ "${!pv_varname:0:12}" == "_bgclassCall" ]; then
+		elif [ ! "$pv_plainFlag" ] &&  pvIsAnObjRef ${!pv_varname}; then
 			local pv_oid; bgread "" pv_oid "" <<<"${!pv_varname}"
 			pvPrArray "$pv_label" "$pv_oid" "${!pv_varname}"
 

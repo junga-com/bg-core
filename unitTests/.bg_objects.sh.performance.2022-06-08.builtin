@@ -1,0 +1,49 @@
+Object Calls -- mix
+count='1200'
+total: 0.298 : 
+time per oo call = 0.000248
+msCP1
+msCP2
+msCP3
+msCP4
+msTotal
+
+OO Calls null var
+iterationCount='1200'
+total: 0.172 : 
+time per normal call = 0.000143
+msCP1='0'
+msCP2='0'
+msCP3='0'
+msCP4='0'
+msTotal='0'
+
+OO Calls noop method
+iterationCount='1200'
+total: 0.158 : 
+time per normal call = 0.000132
+msCP1='0'
+msCP2='0'
+msCP3='0'
+msCP4='0'
+msTotal='0'
+
+OO Calls -- doSomething()
+iterationCount='1200'
+total: 0.308 : 
+time per normal call = 0.000256
+msCP1='0'
+msCP2='0'
+msCP3='0'
+msCP4='0'
+msTotal='0'
+
+Normal Calls - Foo::doSomething()
+iterationCount='1200'
+total: 0.123 : 
+time per normal call = 0.000102
+
+Normal Calls - empty function
+iterationCount='1200'
+total: 0.037 : 
+time per normal call = 0.000031
