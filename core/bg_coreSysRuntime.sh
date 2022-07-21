@@ -92,7 +92,7 @@ function findInPaths()
 		--debug:*)           debug="1"; preCmd="echo " ;;
 		--return-relative:*) findPrintFmt="%P" ;;
 		-R*|--retVar*|--string*)  bgOptionGetOpt val: retVar "$@" && shift; retArgs=(-R "$retVar"); singleValueFlag="1" ;;
-		-A*|--retArray*|--array*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
+		-A*|--retArray*|--array*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --retArray "$retVar") ;;
 
 		# first positional param is the filespec
 		[^-]*:1) fileSpec="$1"; ((posCwords++))
@@ -353,7 +353,7 @@ function templateList()
 	local manifestFile retArgs retVar name
 	local -a retArgs=(--echo -d $'\n')
 	while [ $# -gt 0 ]; do case $1 in
-		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --retArray "$retVar") ;;
 		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -378,7 +378,7 @@ function templateGetSubtypes()
 	local manifestFile retArgs retVar name
 	local -a retArgs=(--echo -d $'\n')
 	while [ $# -gt 0 ]; do case $1 in
-		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --array "$retVar") ;;
+		-A*|--retArray*) bgOptionGetOpt val: retVar "$@" && shift; retArgs=(--append --retArray "$retVar") ;;
 		--manifest*)  bgOptionGetOpt val: manifestFile "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done

@@ -412,7 +412,7 @@ function templateEvaluateVarToken()
 		_defaultValueETV="${rematch[$_idxDef]}"
 
 		# if config type expression
-		if [ "${rematch[$_idxConfigExpr]}" == "config" ]; then
+		if [[ "${rematch[$_idxConfigExpr]}" == config* ]]; then
 			local _sectETV="${rematch[$_idxConfigSect]}"
 			local _settingETV="${rematch[$_idxConfigName]}"
 			_nameValueETV="${rematch[$_idxConfigExpr]}"
@@ -453,7 +453,7 @@ function templateEvaluateVarToken()
 
 		# error: some unknown syntax
 		else
-			assertLogicError "The template regex matched the expression but the code does not recognize which type of syntax matched"
+			assertLogicError -v rematch "The template regex matched the expression but the code does not recognize which type of syntax matched"
 		fi
 	else
 		assertError -v expression:_expressionTokenETV "Could not parse the template expression. Did not recognize it as any known syntax"
@@ -496,10 +496,14 @@ function templateEvaluateVarToken()
 #    templateListVars
 #    templateExpand
 #    templateExpandExtended
-function expandString2() { templateExpandStr "$@"; }
 function expandString() { templateExpandStr "$@"; }
 function templateExpandStr()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local _objectContextES retVar
 	while [ $# -gt 0 ]; do case $1 in
 		-s) ;;

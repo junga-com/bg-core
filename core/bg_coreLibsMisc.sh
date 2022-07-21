@@ -1110,7 +1110,7 @@ function _bgsudoAdjustPriv()
 	fi
 
 	if [ "$_sapAction" ] && [ "$sudoOptsVar" ]; then
-		varOutput  --append --array "$sudoOptsVar" -- "--defaultAction" "$_sapAction"
+		varOutput  --append --retArray "$sudoOptsVar" -- "--defaultAction" "$_sapAction"
 	fi
 	setReturnValue "$actionVar" "$_sapAction"
 }
@@ -2789,7 +2789,7 @@ function bgTrapUtils()
 					sep=$'\n'
 				fi
 			done  <<<"$trapString"
-			returnValue --array _tu_trapHandlers "$1"
+			returnValue --retArray _tu_trapHandlers "$1"
 			;;
 
 		# this is used by the bgStack code so it can quickly lookup [<trap>:<lineno>] for any trap and lineno
@@ -2821,7 +2821,7 @@ function bgTrapUtils()
 					sep=$'\n'
 				fi
 			done  <<<"$trapString"
-			returnValue --array _tu_trapHandlers "$1"
+			returnValue --retArray _tu_trapHandlers "$1"
 			;;
 	esac
 }
@@ -3030,6 +3030,7 @@ function command_not_found_handle()
 # Params:
 #    <errorDescription>  : A statement about why the script is failing. If left empty, the source line will be examined to create
 #                     an <errorDescription> and add context variable for any variable reference in that source line
+function Throw() { assertError "$@"; }
 function assertError()
 {
 	# if varExists _ae_exitCodeLast; then
@@ -3298,6 +3299,14 @@ function assertError()
 			;;
 	esac
 }
+
+# usage: PrintException
+# This is used to print the exception that was caught in a Catch: block. It should only ever be called from inside a Catch block.
+function PrintException()
+{
+	echo "$catch_errorDescription"
+}
+
 
 # usage: Rethrow
 # This is used to re-throw the exception caught in a Catch: block. It should only ever be called from inside a Catch block.
@@ -3844,7 +3853,7 @@ function extractVariableRefsFromSrc()
 		done
 	done <<< $srcCode
 
-	varOutput ${2:+ --array "$2"} "${varNames[@]}"
+	varOutput ${2:+ --retArray "$2"} "${varNames[@]}"
 }
 
 #"  atom syntax highlight bug
@@ -4378,6 +4387,7 @@ function fsPolicyToPerms()
 #    -b    : base names. remove the path part of the filename before returning
 #    -B <prefix> : remove <prefix>. remove <prefix> from the pathname before returning. This is similar to
 #            -b but allows more control. Example: fsExpandFiles -B "$tmpFolder/"  $tmpFolder/man3/* returns "man3/*" names
+# Find native options.
 #    -H|-L|-P    : gnu find's symbolic link options. -H(follow only links in <fileSpec>) -L(follow all descendant links) -P(never follow)
 #    -D*         : gnu find's debug options. See 'man find'
 #    -O*         : gnu find's optimization options. See 'man find'
@@ -4386,6 +4396,11 @@ function fsPolicyToPerms()
 function bgfind() { fsExpandFiles --findCmdLineCompat -R "$@"; }
 function fsExpandFiles()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local outputOpts=()
 	local recursiveOpt=("-maxdepth" "0")
 	local forceFlag fsef_prefixToRemove fsef_outputVarName fTypeOpt=() findCmdLineCompat findOpts=() findPruneExpr=() excludePaths=()
@@ -4409,8 +4424,8 @@ function fsExpandFiles()
 		-d*|--delim*) bgOptionGetOpt  opt: outputOpts "$@" && shift ;;
 		-a|--append)  bgOptionGetOpt  opt  outputOpts "$@" && shift ;;
 		--string*)    bgOptionGetOpt  opt: outputOpts "$@" && shift ;;
-		-A*|--array*) bgOptionGetOpt  opt: outputOpts "$@" && shift; outputOpts+=(--append) ;; # adding append is legacy we  have to find all places that rely on this and add -a|--append before we can remove it
-		-S*|--set*)   bgOptionGetOpt  opt: outputOpts "$@" && shift ;;
+		-A*|--retArray*) bgOptionGetOpt  opt: outputOpts "$@" && shift; outputOpts+=(--append) ;; # adding append is legacy we  have to find all places that rely on this and add -a|--append before we can remove it
+		-S*|--retSet*)   bgOptionGetOpt  opt: outputOpts "$@" && shift ;;
 
 		# modify the output
 		-b|--baseNames) fsef_prefixToRemove="*/" ;;
@@ -4433,7 +4448,7 @@ function fsExpandFiles()
 
 	# Section2: these are the <fileSpec> positional parameters. Bash will expand any wild cards if they match any paths but will
 	# leave them in if they dont match any. We cant pass any non existing paths to find or it will fail with an error. find will
-	# interpret each of these as a starting point but if -R is not specified, we will give find the -maxdepth 0 global option that
+	# interpret each of these as a starting point but if +R is specified, we will give find the -maxdepth 0 global option that
 	# will cause it to only apply the test expressions to the starting points and do no directory traversal.
 	while [ $# -gt 0 ]; do case $1 in
 		-*) break ;;

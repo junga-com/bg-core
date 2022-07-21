@@ -140,7 +140,7 @@ function configGet()
 #           ':'         : use the format <sectionName>:<paramName>
 #           '<delim>'   : use the format <sectionName><delim><paramName>
 #    -t|--expandValue   : expand each value as a template string before returning it
-#    -A|--array <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>)
+#    -A|--retArray <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>)
 #          that will be filled in with the settings like <retArrayName>[[sect.]name]=value
 # See Also:
 #     man(7) bg_config.sh
@@ -152,7 +152,7 @@ function configGetAll()
 		-f|--fullyQualified) bgOptionGetOpt opt  passThruOpts "$@" && shift ;;
 		-d*|--scopeDelim*)   bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
 		-t|--expandValue)    bgOptionGetOpt opt  passThruOpts "$@" && shift ;;
-		-A*|--array*)        bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
+		-A*|--retArray*)        bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local sectionName="$1"

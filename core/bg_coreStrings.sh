@@ -1889,6 +1889,11 @@ function strSetIntersection()
 #   out = /var/lib/
 function pathGetCommon()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local retVar
 	while [ $# -gt 0 ]; do case $1 in
 		-R*)  bgOptionGetOpt val: retVar "$@" && shift ;;

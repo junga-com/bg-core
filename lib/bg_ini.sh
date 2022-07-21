@@ -410,6 +410,11 @@ function iniParamList()
 function getIniParam() { iniParamGet "$@"; }
 function iniParamGet()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local ipg_addFlag ipg_iniDelim ipg_templateFlag retVar ipg_sectPad ipg_schema
 	while [ $# -gt 0 ]; do case $1 in
 		-R*|--retVar*)         bgOptionGetOpt val: retVar       "$@" && shift ;;
@@ -510,7 +515,7 @@ function iniParamGet()
 #           ':'         : use the format <sectionName>:<paramName>
 #           '<delim>'   : use the format <sectionName><delim><paramName>
 #    -t|--expandValue   : expand each value as a template string before returning it
-#    -A|--array <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>)
+#    -A|--retArray <retArrayName> : <retArrayName> is the name of an associative array (local -A <retArrayName>)
 #          that will be filled in with the settings like <retArrayName>[[sect.]name]=value
 function getAllIniParams() { iniParamGetAll "$@"; }
 function iniParamGetAll()
@@ -520,7 +525,7 @@ function iniParamGetAll()
 		-f|--fullyQualified) fullyQualifiedFlag="full" ;;
 		-d*|--scopeDelim*)   bgOptionGetOpt val: scopeDelim "$@" && shift ;;
 		-t|--expandValue)    templateFlag="-t" ;;
-		-A*|--array*)        bgOptionGetOpt val: retArray "$@" && shift ;;
+		-A*|--retArray*|--array*)     bgOptionGetOpt val: retArray "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local ipg_iniFileSpec="$1"
@@ -636,6 +641,11 @@ function iniParamGetAll()
 function setIniParam() { iniParamSet "$@"; }
 function iniParamSet()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local quoteMode comment sectComment statusVarName resultsVarName mkdirFlag paramDelim paramPad commentsStyle ipg_schema
 	local sectPad=" " verbosity="$verbosity"
 	while [ $# -gt 0 ]; do case $1 in

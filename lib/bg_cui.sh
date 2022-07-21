@@ -953,9 +953,9 @@ function csiSplitOnCSI() {
 	done
 	local _string="$1"; shift
 	local retArray="$1"; shift
-	local retOpts=(--echo -1); [ "$retArray" ] && retOpts=(-a --array "$retArray")
+	local retOpts=(--echo -1); [ "$retArray" ] && retOpts=(-a --retArray "$retArray")
 	# empty the retArray since below we call it multiple times with the --append flag
-	[ "$retArray" ] && outputValue --array "$retArray" --
+	[ "$retArray" ] && outputValue --retArray "$retArray" --
 	local rematch
 
 	# for the regex test, we convert all the string representations of ESC to the actual, binary character because regex can only

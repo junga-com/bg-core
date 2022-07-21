@@ -133,8 +133,7 @@ function parseSectionLine(parser                      ,sectName,commStr) {
 	if (parserNext(parser) != "]") {
 		iniLineType="invalid.section"
 		parser["error"]="invalid section line starting with '['. No matching ']'"
-		if (verbosity>0) bgtrace("awk ini parse error: "parser["error"])
-		if (verbosity>1) warning(parser["error"])
+		iniWarning(parser);
 		return(0)
 	}
 	# commentsStyle only affects settings lines because there does not seem to be a down side to recognizing comments after the section.
@@ -144,8 +143,7 @@ function parseSectionLine(parser                      ,sectName,commStr) {
 	if (!parserIsDone(parser)) {
 		iniLineType="invalid.section"
 		parser["error"]="invalid section. extra tokens after closing bracket"
-		if (verbosity>0) bgtrace("awk ini parse error: "parser["error"])
-		if (verbosity>1) warning(parser["error"])
+		iniWarning(parser);
 		return(0)
 	}
 
@@ -156,15 +154,14 @@ function parseSectionLine(parser                      ,sectName,commStr) {
 	iniLineType="section"
 }
 
-# this is called by the line parser no other line type is recognized.
+# this is called by the line parser when no other line type is recognized.
 function parseSettingLine(parser                     ,pName) {
 	parserEatWhitespace(parser)
 	pName=parseUpToWithTrim(parser, paramDelimRE)
 	if (parserNext(parser) !~ paramDelimRE) {
 		iniLineType="invalid.setting"
 		parser["error"]="invalid setting line. Missing '"paramDelim"'"
-		if (verbosity>0) bgtrace("awk ini parse error: "parser["error"])
-		if (verbosity>1) warning(parser["error"])
+		iniWarning(parser);
 		return(0)
 	}
 	iniParamName=pName
@@ -179,6 +176,11 @@ function parseSettingLine(parser                     ,pName) {
 		iniComment=parserNext(parser)
 
 	iniLineType="setting"
+}
+
+function iniWarning(parser,                           msg) {
+	msg = sprintf("%s(%s): awk ini parse error:\n\terror: %s\n\tline: %s\n", FILENAME, NR, parser["error"], $0)
+	if (verbosity>0) bgtrace(msg);
 }
 
 function normalizeComment(comment) {

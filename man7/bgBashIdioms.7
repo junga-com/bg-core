@@ -46,7 +46,7 @@ The eye should focus on lines 3 and 4. Each describes one option and as the func
 
 Line 3 says that this function accepts a option that has the short form "-a" and the long form "--all". Because they lack the trailing *, they do not have a required argument.
 
-Line 4 is an option with an argument because the short (-f*) and long (--file*) forms end with a '*'. Processing all the variants of an option with argument is not trivial so the task is delegated to the bgOptionGetOpt function. The first argument to bgOptionGetOpt is one of (val,val:,opt,opt:). The second argument is the name of the variable that will receive the information from this option. 'val' means that we want the variable filled with the value of the option and 'opt' means that we want the variable appended with the full option, suitable passing on to another command that supports the same option. The ':' suffix indicates that the option has a required argument.
+Line 4 is an option with an argument because the short (-f*) and long (--file*) forms end with a '*'. Processing all the variants of an option with argument is not trivial so the task is delegated to the bgOptionGetOpt function. The first argument to bgOptionGetOpt is one of (val,val:,opt,opt:). The second argument is the name of the variable that will receive the information from this option. 'val' means that we want the variable filled with the value of the option and 'opt' means that we want the variable appended with the full option, suitable passing on to another command that supports the same option. The ':' suffix indicates that the option has a required argument. The 'value' of an option that does not take an argument is the option itself so 'val' and 'opt' do the same thing but are both provided for the completeness of syntax.
 
 The author can do what ever processing is required in the option's case statement but typically, options will only set a variable which the body of the function will use to affect its behavior. Note that the option without an argument sets its corresponding value to the short form of the option.  This makes is convenient both to check if the option is set (non-empty string) and also to pass that option through to another command that accepts the same option, if needed.
 
@@ -60,11 +60,67 @@ My Atom snippets make it so that I start typing "bgoptloop" to insert line 2,5, 
 
 
 .SH Pattern: Library Functions Returning Values
-Other languages allow a function to return information either in reference (output) parameters or by returning a value. Bash only allows returning an exitcode integer and does not have native support for passing parameters by reference. Typically, a function or command writes its information to stdout but that has several shortcomings when writing complex bash frameworks.
+When a bash function returns a single variable I use the following pattern.
+    # usage: foo [-R|--retVar=<retVar>] <p1> <p2>
+    function foo() {
+        local retvar
+        while [ $# -gt 0 ]; do case $1 in
+            -R*|--retVar*) bgOptionGetOpt  val: retVar "$@" && shift ;;
+        *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+        local p1="$1"
+        local p2="$2"
 
-This pattern is about passing the name of a variable into the function as a parameter as a way to support something like reference parameters to return information from the function to the caller.
+        # ... code to calculate the result
+        local retValue="hello world with p1='$p1' and p2='$p2'"
 
-This technique is problematic in bash for several reasons. There are security concerns because its easy to unintentionally allow arbitrary code execution by the user of the script when using this technique. If the function declares a local variable that has the same name as the variable name that the user passes in to receive the results, the local variable will be set instead of the caller's variable. In the function, accessing and setting the value of the variable using its name is cumbersome, especially when it is an array.
+        returnValue "$retValue" "$retVar"
+    done
+   }
+
+This supports the function 'foo' being called two different ways. First, when performance is not an issue, a script author can choose the familiar construct of...
+   local myValue="$(foo "p1This" "p2That")"
+ ... but when performance could be an issue (for example in a library function) the more efficient form can be used.
+   local myValue; foo -R "myValue" "p1This" "p2That"
+
+The returnValue function used in the code above is actually a wrapper over the more general outputValue function.
+
+The most general way to return a single variable whose value could consist of zero, one or more tokens is this...
+    # usage: foo2 [-R|--retVar=<retVar>] [-A|--retArray=<retVar>] [-S|--retSet=<retVar>] <p1> <p2>
+    function foo() {
+        local -a retOpts=()
+        while [ $# -gt 0 ]; do case $1 in
+           *)  bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
+        *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+        local p1="$1"
+        local p2="$2"
+
+        # ... code to calculate the result
+        local retValues=(hello world with p1='$p1' and p2='$p2')
+
+        outputValue "${retOpts[@]}" "${retValues[@]}"
+    done
+   }
+
+This supports the caller deciding how it would like to receive the value.
+   local myValue="$(foo2 "p1This" "p2That")"
+   local    myValue; foo2 -R "myValue" "p1This" "p2That" # the returned values are concatenated using a delimiter specified by -d <delim>
+   local -a myValue; foo2 -A "myValue" "p1This" "p2That" # the returned values are set in the elements of the array variable
+   local -A myValue; foo2 -S "myValue" "p1This" "p2That" # the returned values are set in the indexes of the associated array variable
+
+
+
+
+
+
+Most languages allow a function to return information to the caller either in reference (output) parameter passed to the function or by returning a value. Bash only allows returning an exitcode integer and does not have native support for passing parameters by reference. Typically in bash, a function or command passes information back to the caller by writing its information to stdout but that requires running the function in a forked subshell which is too inefficient to be used by commonly called functions.
+
+A common pattern is to pass the name of a variable in the caller's scope into the function so that its value can be set from within the function, but this technique is problematic for several reasons. First, there are security concerns because naive attempts to set a variable using its name can be subject to arbitrary code execution. Second, in the function, accessing and setting the value of the variable using its name is cumbersome, especially when it is an array. Third, the passed in name can conflict with a local variable name in the function which results in the intended variable quietly not being set.
+
+The -n (nameref) feature added to bash solved the first two problems but not the third. I do use namerefs to implement reference variables when I can be reasonably sure that the caller will not use variables with the same name as the local variables in the function and when the the reference parameter to the function is mandatory.
+
+Also, the bash completion project uses a mechanism called upVars but I find that syntax to be too onerous for the script author.
+
+
 
 This pattern deals with writing functions in a way that overcomes these problems by using functions provided by the bg_coreBashVars.sh library. Most of these functions begin with var* so you can find them by looking up their man pages "man var<tab><tab>". Note that some also have alias names that do not begin with var* because they read better in scripts that way.
 
@@ -80,6 +136,7 @@ This allows the reference variable to be accessed and set with any appropriate n
 Indirect Access.
     local _nameVar="$n"
     echo "I am ${!_nameVar}"
+
 Bash provides a convenient and secure way to access the value of a simple scalar (not an array) indirectly, but not a way to set its value (other than local -n)
 
 When I started writing this bash library, the local -n feature was not available and even now, there are times when it is not the best option so bg_coreBashVars.sh provides var* functions to access and set reference variables in various ways.
@@ -139,10 +196,10 @@ The `outputValue [<option>] <value(s)>...` (alias varOutout) can be used to supp
 
 These are the optional parameters that outputValue accepts.
     --echo               : (default) write the output to stdout
-    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no effect with --set or stdout
+    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no effect with --retSet or stdout
     -R*|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
-    -A*|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
-    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
+    -A*|--retArray=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
+    -S*|--retSet=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
     -d*|--delim=<delim>  : the delimiter to use to separate multiple values when writing to stdout or to a string variable.
     [+-]1                : shortcut to set --delim=$'\n'. inspired by 'ls -1' which causes it to write one entry per line.
 

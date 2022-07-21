@@ -107,11 +107,11 @@ DeclarePluginType Config "
 # lists information about the installed Config plugins on the host.
 # Option determine the nature of the list returned. By default the list is written to stdout but all of the options supported by
 # the outputValue function can be used to redirect the output to a variable passed in. This function overrides the outputValue
-# -S|--set=<varName> option to return both the set of installed ConfigTypes and the list of installed ConfigNames for each.
+# -S|--retSet=<varName> option to return both the set of installed ConfigTypes and the list of installed ConfigNames for each.
 #
 # Options:
 #    <outputValueOptions> : see man(3) outputValue for options supported to return the list. Default is to write to stdout, one per line.
-#    -S|--set=<varName> : Fills in the associative array <varName> such that each key is an installed ConfigType whose value is a
+#    -S|--retSet=<varName> : Fills in the associative array <varName> such that each key is an installed ConfigType whose value is a
 #                space separated list of all ConfigNames of that ConfigType installed on the host. This implies the --group option.
 #    --short   : the words returned are names without the "Config:" prefix (only affects --list and --activeConfigs modes)
 #    --full    : (default) the words returned include the "Config:" prefix like "Config:<name>"
@@ -119,7 +119,7 @@ DeclarePluginType Config "
 #    --activeConfigs : return just the pluginKeys (--full) or pluginIDs (--short) that are currently active. Each type can have 0
 #                or 1 active configs.
 #    --tree    : print a tree view where Config Plugins are nested under their configType
-#                if -S|--set=<varName> is specified as the method to return the results, --tree is automatically selected and the
+#                if -S|--retSet=<varName> is specified as the method to return the results, --tree is automatically selected and the
 #                set (aka associative array, aka map) is filled in such that the keys are ConfigTypes and the values are a space
 #                separated list of Config Plugins of that type
 #    --grouped : print one line per type in the format : <ConfigType>: <plugin1> ..<pluginN>
@@ -135,7 +135,7 @@ function static::Config::list()
 		--activeConfigs) modeFlag="--activeConfigs" ;;
 		--short)   shortFlag="--short" ;;
 		--full)    shortFlag="--full" ;;
-		-S*|--set*) bgOptionGetOpt val: setVarName "$@" && shift; retOpts+=("-S$setVarName") ;;
+		-S*|--retSet*) bgOptionGetOpt val: setVarName "$@" && shift; retOpts+=("-S$setVarName") ;;
 		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done

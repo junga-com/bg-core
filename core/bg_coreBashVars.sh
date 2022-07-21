@@ -436,13 +436,13 @@ function unescapeTokens()
 # should be immediately followed by 'return'
 # Examples:
 #    returnValue "$data" "$2"
-#    returnValue --array "$data" "$2"; return
+#    returnValue --retArray "$data" "$2"; return
 # Params:
 #    <value> : this is the value being returned. By default it is treated as a simple string but that can be changed via options.
 #    <varRef> : this is the name of the variable to return the value in. If its empty,'-' or '--', <value> is written to stdout
 # Options:
 #    --string : (default) treat <value> as a literal string
-#    --array  : treat <value> as a name of an array variable. If <value> is an associative array then <varRef> must be one too
+#    --retArray  : treat <value> as a name of an array variable. If <value> is an associative array then <varRef> must be one too
 #    --strset : treat <value> as a string containing space separated array elements
 #    -q       : quiet. if <varRef> is not given, do not print <value> to stdout
 # See Also:
@@ -456,7 +456,7 @@ function returnValue()
 	local _rv_inType="string" _rv_outType="stdout" quietFlag
 	while [[ "$1" =~ ^- ]]; do case $1 in
 		-q)       quietFlag="-q" ;;
-		--array)  _rv_inType="array"  ;;
+		--retArray)  _rv_inType="array"  ;;
 		--string) _rv_inType="string" ;;
 		--strset) _rv_inType="strset" ;;
 		*) break ;;
@@ -501,12 +501,12 @@ function returnValue()
 # Options:
 #    --echo               : (default behavior). echo <value> to stdout.
 #    -R|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
-#    -A|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
-#    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
-#    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no affect with --set or --echo
+#    -A|--retArray=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
+#    -S*|--retSet=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
+#    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no affect with --retSet or --echo
 #    -d|--delim=<delim>   : This is the delimeter used between multiple <valueN> when the results are written to stdout or to a string.
 #                           if --append is specified, it is also used between the existing value in <retVar> and the first <value1>.
-#                           The <delim> Has no affect with --array or --set forms. The default is the first character of IFS.
+#                           The <delim> Has no affect with --retArray or --retSet forms. The default is the first character of IFS.
 #    -1                   : shortcut to set the delimiter to '\n' so that each <valueN> will be on a separate line.
 #    +1                   : shortcut to set the delimiter to ' ' so that all the <valueN> will be on one line.
 #    -f|--filters=<filters>: filters are a whitespace separated list of <value> that will be excluded from the output even if they
@@ -527,16 +527,16 @@ function varOutput()
 
 	local _sr_appendFlag _sr_varType="--echo" _sr_varRef _sr_delim=${IFS:0:1} _sr_filters
 	while [ $# -gt 0 ]; do case $1 in
-		-1)               _sr_delim=$'\n' ;;
-		+1)               _sr_delim=' ' ;;
-		-a|--append)      _sr_appendFlag="-a" ;;
-		+a|++append)      _sr_appendFlag="" ;;
-		-R*|--string*|--retVar)    _sr_varType="--string";   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
-		-A*|--array*|--retArray)   _sr_varType="--array" ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
-		-S*|--set*)       _sr_varType="--set"   ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
-		-e|--echo)        _sr_varType="--echo"  ;;
-		-d*|--delim*)     bgOptionGetOpt val: _sr_delim "$@" && shift ;;
-		-f*|--filters*)    bgOptionGetOpt val: _sr_filters "$@" && shift ;;
+		-1)                       _sr_delim=$'\n' ;;
+		+1)                       _sr_delim=' ' ;;
+		-a|--append)              _sr_appendFlag="-a" ;;
+		+a|++append)              _sr_appendFlag="" ;;
+		-R*|--string*|--retVar*)  _sr_varType="--string";   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
+		-A*|--array*|--retArray*) _sr_varType="--retArray" ;   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
+		-S*|--retSet*)            _sr_varType="--retSet";   bgOptionGetOpt val: _sr_varRef "$@" && shift ;;
+		-e|--echo)                _sr_varType="--echo"  ;;
+		-d*|--delim*)             bgOptionGetOpt val: _sr_delim "$@" && shift ;;
+		-f*|--filters*)           bgOptionGetOpt val: _sr_filters "$@" && shift ;;
 		--) shift; break ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -555,7 +555,7 @@ function varOutput()
 	[ ! "$_sr_varRef" ] && [ "$_sr_varType" != "--echo" ] && return 0
 
 	case ${_sr_varType:---string}:${_sr_appendFlag}:${_sr_delim} in
-		--set:*)
+		--retSet:*)
 			[ "$_sr_appendFlag" ] || { local -n _sr_varRefNR="$_sr_varRef"; _sr_varRefNR=(); }
 			local i; for i in "$@"; do
 				printf -v "$_sr_varRef[$i]" "%s" ""
@@ -564,8 +564,8 @@ function varOutput()
 
 		# these use the -n syntax now because they used to use eval. If we need to be compaitble with older bashes, this will have
 		# to change
-		--array::*)   local -n __sr_varRef="$_sr_varRef" || assertError; __sr_varRef=("$@")   ;;
-		--array:-a:*) local -n __sr_varRef="$_sr_varRef" || assertError; __sr_varRef+=("$@")  ;;
+		--retArray::*)   local -n __sr_varRef="$_sr_varRef" || assertError; __sr_varRef=("$@")   ;;
+		--retArray:-a:*) local -n __sr_varRef="$_sr_varRef" || assertError; __sr_varRef+=("$@")  ;;
 
 		--string::" ")   printf -v "$_sr_varRef" "%s" "$*" ;;
 		--string:-a:" ") printf -v "$_sr_varRef" "%s%s%s" "${!_sr_varRef}" "${!_sr_varRef:+ }" "$*" ;;
@@ -616,14 +616,14 @@ function varOutput()
 # Options:
 # These options will be supportted by a function that uses this pattern.
 #    --echo               : (default behavior). echo <value> to stdout.
-#    -R|--string=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
-#    -A|--array=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
-#    -S*|--set=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
-#    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no affect with --set or --echo
-#    +a|++append : anti-appendFlag. undoes the -a option so that the value in <varRef> is overwritten. Has no affect with --set or --echo
+#    -R|--retVar=<retVar> : return Var. assign the remaining cmdline params into <varRef> as a single string
+#    -A|--retArray=<retVar>  : arrayFlag. assign the remaining cmdline params into <varRef>[N]=$n as array elements.
+#    -S*|--retSet=<retVar>   : setFlag. assign the remaining cmdline params into <varRef>[$n]="" as array indexes.
+#    -a|--append : appendFlag. append to the existing value in <varRef> instead of overwriting it. Has no affect with --retSet or --echo
+#    +a|++append : anti-appendFlag. undoes the -a option so that the value in <varRef> is overwritten. Has no affect with --retSet or --echo
 #    -d|--delim=<delim>   : This is the delimeter used between multiple <valueN> when the results are written to stdout or to a string.
 #                           if --append is specified, it is also used between the existing value in <retVar> and the first <value1>.
-#                           The <delim> Has no affect with --array or --set forms. The default is the first character of IFS.
+#                           The <delim> Has no affect with --retArray or --retSet forms. The default is the first character of IFS.
 #    -1|+1                : set the delimiter to '\n' so that each <valueN> will be on a separate line.
 function bgOptions_DoOutputVarOpts()
 {
@@ -634,7 +634,7 @@ function bgOptions_DoOutputVarOpts()
 		+a|++append)      bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
 		-R*|--string*|--retVar*)  bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
 		-A*|--array*|--retArray*) bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
-		-S*|--set*)       bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
+		-S*|--retSet*)            bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
 		-e|--echo)        bgOptionHandled="1"; bgOptionGetOpt opt  "$_do_retVar" "$@" && return 0 ;;
 		-d*|--delim*)     bgOptionHandled="1"; bgOptionGetOpt opt: "$_do_retVar" "$@" && return 0 ;;
 		*) return 1 ;;
@@ -672,10 +672,6 @@ function bgOptions_DoOutputVarOpts()
 # No solution is ideal, but I find that this technique provides a good compromise of readable scripts
 # and reliable scripts.
 #
-# Options:
-#    -a|--append : appendFlag. append the string or array value
-#    --array     : arrayFlag. assign the remaining cmdline params into <varRef>[N] as array elements.
-#                  W/o -a it replaces existing elements.
 # See Also:
 #   returnValue -- similar to this function but input order is reversed and if the return var is not set
 #                  it writes it to stdout. i.e. returnValue mimics a function that always returns one value
@@ -804,7 +800,7 @@ function arrayExistsAt()
 function arrayPush()
 {
 	local aa_varRef="$1"; shift
-	varOutput -a --array "$aa_varRef" "$*"
+	varOutput -a --retArray "$aa_varRef" "$*"
 }
 
 # usage: arrayPop <varName> <retVar>

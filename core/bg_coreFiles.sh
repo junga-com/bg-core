@@ -209,7 +209,7 @@ function fsIsNewer()
 	[ "$1" -nt "$2" ]
 }
 
-# usage: fsGetNewerDeps [-A|--array=<varName>] <referenceFilename> <depFilename1> [.. <depFilenameN>]
+# usage: fsGetNewerDeps [-A|--retArray=<varName>] <referenceFilename> <depFilename1> [.. <depFilenameN>]
 #        if fsGetNewerDeps <referenceFilename> <depFilename1> [.. <depFilenameN>] >/dev/null; ...
 # Determine if any of the dependent files of <referenceFilename> are newer than <referenceFilename>.
 # This function returns true/false in its exit code and the list of newer files on stdout or in <varName>. If you just want to test
@@ -223,10 +223,10 @@ function fsGetNewerDeps()
 {
 	local retArrayOpt
 	while [ $# -gt 0 ]; do case $1 in
-		-R|--string*) bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
-		-A|--array*)  bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
-		-S|--set*)    bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
-		-a|--append)  bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
+		-R|--string*)    bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
+		-A|--retArray*)  bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
+		-S|--retSet*)    bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
+		-a|--append)     bgOptionGetOpt opt: retArrayOpt "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local refFile="$1"; shift

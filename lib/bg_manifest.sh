@@ -144,7 +144,7 @@ function manifestUpdateInstalledManifest() {
 	case ${action:-all} in
 		all)
 			local rebuildInstalled dirtyDeps
-			if fsGetNewerDeps --array=dirtyDeps "$manifestInstalledPath" /var/lib/bg-core/*/hostmanifest; then
+			if fsGetNewerDeps --retArray=dirtyDeps "$manifestInstalledPath" /var/lib/bg-core/*/hostmanifest; then
 				cat $(fsExpandFiles -f /var/lib/bg-core/*/hostmanifest) | sort | fsPipeToFile "$manifestInstalledPath"
 			fi
 

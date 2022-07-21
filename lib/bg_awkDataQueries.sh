@@ -219,7 +219,7 @@ function awkData_getValue()
 			[ "$count" == "assertOneFlag" ] && assertError -v filters "expected one or zero values for '$attribute' but got '$values'"
 			case ${countFlag}:${retVar:+retVar} in
 				--count:retVar) printf -v "$retVar[${value:---}]" "%s" "$count" ;;
-				       :retVar) varOutput -a --array "$retVar" "$value" ;;
+				       :retVar) varOutput -a --retArray "$retVar" "$value" ;;
 				--count:)       printf "%4s %s\n" "$count" "$value" ;;
 				       :)       printf "%s\n" "$value" ;;
 			esac
