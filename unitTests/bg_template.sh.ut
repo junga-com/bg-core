@@ -40,6 +40,7 @@ function ut_templateExprRegex() {
 		'esc1 %\%'
 		'esc2 %\\%'
 		'esc3 %\\\%'
+		'esc4 %/%'
 	)
 
 	ut noecho
@@ -50,7 +51,7 @@ function ut_templateExprRegex() {
 	reTNameObj="([\$])([^:%]+)"
 	reTNameConfig="(config(${reIndex})?(${reVar}+))"
 	reDefVal="[^%]*"
-	reEsc="[\]*"
+	reEsc="[/\]*"
 	reVarExp="(${rePrefix})?((${reTNameConfig})|(${reTNameObj})|(${reTNameEnv}))(:(${reDefVal}))?"
 	templateExprRegEx="%((${reVarExp})|(${reEsc}))%"
 	verbosity=0
@@ -127,6 +128,9 @@ function ut_templateExpand() {
 		Default var w/empty    -- %\%color2:red%\%     : %color2:red%
 		Default var no exists  -- %\%color3:red%\%     : %color3:red%
 		Default as a var       -- %\%nickName:$name%\% : %nickName:$name%
+		Literal percent        -- %\%\%\%              : %\%
+		Literal percent        -- %\%/%\%              : %/%
+		Multiple percent       -- %\%\\\%\%            : %\\\%
 	EOS
 	local size1=42
 	local size2=
@@ -152,6 +156,8 @@ function ut_templateExpandMissingRequired() {
 		Default var w/empty    -- %\%color2:red%\%     : %color2:red%
 		Default var no exists  -- %\%color3:red%\%     : %color3:red%
 		Default as a var       -- %\%nickName:$name%\% : %nickName:$name%
+		Literal %              -- %\%/%\%              : %/%
+		Multiple Literal %     -- %\%///%\%            : %///%
 	EOS
 
 	ut test

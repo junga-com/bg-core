@@ -1496,7 +1496,7 @@ function _bgclassCall()
 		defaultOp:null:noGlobal)  false  ;;
 		defaultOp:null:chain)     false  ;;
 		defaultOp:null:memberVar) false  ;;
-		defaultOp:null:method*)   assertObjExpressionError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found" ;;
+		defaultOp:null:method*)   assertObjExpressionError -v class:_this[_CLASS] -v methodName:_rsvMemberName -v objectExpression:_memberExpression "object method not found '$_rsvMemberName'" ;;
 		defaultOp:null:either)
 			# if we knew that the user intended _rsvMemberName to be an attribute, we would just return false indicating that there
 			# is no value to return but the problem with that is if the user intends it to be a method but mispelled it, it would

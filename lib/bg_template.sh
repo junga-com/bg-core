@@ -100,6 +100,8 @@
 #                    ocurrence of color as a variable in the template has a +, then it is required.
 #
 # Directive Syntax:
+# TODO: 2022-07 bobg: the extended syntaxt is not yet implemented in the C builtin version. In the builtin version, its easier to
+#       support it in a better way. Consider supporting a non-line oriented syntax. %!if %, %!<directive> <p1>...<pN>%
 #   The template expansion functions with the work "Extended" in their name support addtional directive syntax in template content.
 #   A directive must start at the beginning of a line. The extended template syntax is processed line by line. Any %varname%
 #   variable references are expanded on the line before the directive is processed so directives can contain variables.
@@ -299,7 +301,7 @@ function templateGetVarTokens()
 	# "%(  ([$+]*     []:a-zA-Z0-9._[]* (:[^%]*)*)   |([\]*)   )%"
 	#     '$ or +'    '------<expr>---'  :<def>      or \\...
 	templateGetContent "$@" \
-		| grep -o "%\(\([$+]*[]:a-zA-Z0-9._[]*\(:[^%]*\)*\)\|\([\]*\)\)%" \
+		| grep -o "%\(\([$+]*[]:a-zA-Z0-9._[]*\(:[^%]*\)*\)\|\([/\]*\)\)%" \
 		| tr -d "%" | sed -e "s/ /%20/g; /^[[:space:]]*$/d" \
 		| sort -u
 }
@@ -393,7 +395,7 @@ function templateEvaluateVarToken()
 	local _nameValueETV _valueValueETV _defaultValueETV _requiredFlagETV _foundFlagETV
 
 	# to check or change this regex, look at the bg_template.sh:templateExprRegex: unit test testcase
-	local templateExprRegEx='%((([+])?(((config([[]([^]]+)[]])?([a-zA-Z0-9_]*+)))|(([$])([^:%]+))|(([a-zA-Z0-9_]*+)([[]([^]]+)[]])?))(:([^%]*))?)|([\]*))%'
+	local templateExprRegEx='%((([+])?(((config([[]([^]]+)[]])?([a-zA-Z0-9_]*+)))|(([$])([^:%]+))|(([a-zA-Z0-9_]*+)([[]([^]]+)[]])?))(:([^%]*))?)|([/\]*))%'
 	local _idxReqFlag=3
 	local _idxConfigExpr=6
 	local _idxConfigSect=8
@@ -408,6 +410,7 @@ function templateEvaluateVarToken()
 
 	local rematch
 	if match "${_expressionTokenETV}"  $templateExprRegEx rematch; then
+
 		_requiredFlagETV="${rematch[$_idxReqFlag]}"
 		_defaultValueETV="${rematch[$_idxDef]}"
 
@@ -450,6 +453,7 @@ function templateEvaluateVarToken()
 		elif [ "${rematch[$_idxEsc]}" ]; then
 			_foundFlagETV="1"
 			_valueValueETV="${rematch[$_idxEsc]//\\/$templateMagicEscToken}"
+			_valueValueETV="${_valueValueETV//\//$templateMagicEscToken}"
 
 		# error: some unknown syntax
 		else
@@ -461,7 +465,7 @@ function templateEvaluateVarToken()
 
 	# if its required but its not found, throw an exception
 	if [ "$_requiredFlagETV" ] && [ ! "$_foundFlagETV" ]; then
-		assertTemplateError -v context:_contextETV "required template var '$_nameValueETV' is not defined"
+		assertTemplateError -v context:_contextETV "The required template variable '$_nameValueETV' does not exist"
 	fi
 
 	# if not found, set the default value if any
@@ -492,6 +496,7 @@ function templateEvaluateVarToken()
 #           prepended to the template variable so that the members of the <objectScope> object will be the global scope of template vars
 #           The default is "" so that the callers bash variables are queried for individual objects.
 # See Also:
+#    man(5) bgTemplateFileFormat
 #    templateEvaluateVarToken
 #    templateListVars
 #    templateExpand
@@ -570,6 +575,7 @@ templateMagicEscToken="|#0.0.7#|"
 #    --interactive : if the destination file already exists and the expanded template is different, start a compare gui app to
 #           allow the user to merge the changes
 # See Also:
+#    man(5) bgTemplateFileFormat
 #    templateEvaluateVarToken
 #    templateListVars
 #    templateExpandStr
@@ -577,11 +583,17 @@ templateMagicEscToken="|#0.0.7#|"
 function expandTemplate() { templateExpand "$@"; }
 function templateExpand()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local origArgs=("$@")
-	local _objectContextES changedStatusVar_ interactiveFlag
+	local _objectContextES changedStatusVar_ interactiveFlag mkdirFlag
 	local srcTemplate srcTemplateParams srcTemplateContent srcTemplateSpecified
 	local dstFilename dstFilenameSpecified fileOpts=() userOwner groupOwner permMode policy
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		-p|--mkdir)   mkdirFlag="-p" ;;
 		-u*|--user*)  bgOptionGetOpt val: userOwner  "$@" && shift; fileOpts+=(-u       "$userOwner" ) ;;
 		-g*|--group*) bgOptionGetOpt val: groupOwner "$@" && shift; fileOpts+=(-g       "$groupOwner") ;;
 		--perm*)      bgOptionGetOpt val: permMode   "$@" && shift; fileOpts+=(--perm   "$permMode"  ) ;;
@@ -597,7 +609,7 @@ function templateExpand()
 			dstFilenameSpecified="1"
 			;;
 		-o*|--objCtx) bgOptionGetOpt val: _objectContextES "$@" && shift ;;
-		-S*) bgOptionGetOpt val: changedStatusVar_ "$@" && shift ;;
+		-S*|--statusVar*) bgOptionGetOpt val: changedStatusVar_ "$@" && shift ;;
 		--interactive) interactiveFlag="--interactive" ;;
 	esac; shift; done
 	[ ! "$srcTemplateSpecified" ] && { srcTemplate="$1"; shift; }
@@ -651,6 +663,7 @@ function templateExpand()
 		# maybe we should to support pipes?
 		if [ ! "$usedTemplatePath" ] && [ -f "$srcTemplate" ] && [[ ! "$(file -ib $srcTemplate)" =~ ^text ]]; then
 			if [ "$dstFilename" ] && [ "$srcTemplate" != "$dstFilename" ]; then
+				fsMakeParent $mkdirFlag "$dstFilename"
 				bgsudo -O sudoOpts cp "$srcTemplate" "$dstFilename"
 			fi
 			[ "$dstFilename" ] && [ ${#fileOpts[@]} -gt 0 ] && fsTouch --typeMode=f "${fileOpts[@]}" "$dstFilename"
@@ -709,7 +722,7 @@ function templateExpand()
 			fi
 			fsMakeTemp --release tmpDir
 		else
-			templateGetContent "${srcTemplateParams[@]}" | sed -e "$sedScript" | pipeToFile "$dstFilename"
+			templateGetContent "${srcTemplateParams[@]}" | sed -e "$sedScript" | pipeToFile $mkdirFlag "$dstFilename"
 			results=("${PIPESTATUS[@]}")
 			pipeToFile --didChange "$dstFilename" && setReturnValue "$changedStatusVar_" "1"
 			if [ "$srcTemplate" ] && (( ${results[0]:-0}+${results[1]:-0}+${results[2]:-0} == 0 )); then
@@ -741,6 +754,7 @@ function templateExpand()
 #           prepended to the template variable so that the members of the <objectScope> object will be the global scope of template vars
 #           The default is "" so that the callers bash variables are queried for individual objects.
 # See Also:
+#    man(5) bgTemplateFileFormat
 #    templateEvaluateVarToken
 #    templateListVars
 #    templateExpand
@@ -1076,6 +1090,8 @@ function templateLeaveScope()
 #                           the caller passes into this function. Bash completion routines can use this
 #                           option to get the list of variables that are expected so that it can prompt the
 #                           user to enter them
+# See Also:
+#    man(5) bgTemplateFileFormat
 function expandTemplateExtended() { templateExpandExtended "$@"; }
 function templateExpandExtended()
 {

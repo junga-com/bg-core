@@ -673,7 +673,7 @@ function iniParamSet()
 
 	[ "$ipg_schema" ] && iniValidate "$ipg_schema" "$paramValue"
 
-	local _ipsResults="$(bgawk -i -n  \
+	local _ipsResults="$(bgawk -i -n $mkdirFlag \
 		-v iniTargetSection="$sectionName" \
 		-v setName="$paramName" \
 		-v setValue="$paramValue" \

@@ -1661,7 +1661,7 @@ cmd> $obj.::doit
    catch_errorFn='ut_Object_memberVarReadAccess'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: ut_Object_memberVarReadAccess: object method not found
+                          +error: ut_Object_memberVarReadAccess: object method not found 'doit'
                           +    objectExpression='$obj.doit p1 p2 p3'
                           +    class='Object'
                           +    methodName='doit'
@@ -1687,7 +1687,7 @@ cmd> $obj.:foo
    catch_errorFn='ut_expressionErrors'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: ut_expressionErrors: object method not found
+                          +error: ut_expressionErrors: object method not found 'foo'
                           +    objectExpression='$obj.:foo'
                           +    class='Object'
                           +    methodName='foo'

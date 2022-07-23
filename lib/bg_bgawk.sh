@@ -83,9 +83,10 @@
 #                                 whether the file was or would be changed
 function bgawk()
 {
-	local file awkScript inplace inplaceSort quietFlag debugFlag outOffFlag cols1Flag cols2Flag outputDefaultOff
+	local file awkScript inplace inplaceSort quietFlag debugFlag outOffFlag cols1Flag cols2Flag outputDefaultOff mkdirFlag
 	local useCols checkOnlyFlag stripCommentsFlag passThruOpts=("--re-interval") returnTrueIfChanged="1" returnTrueIfSuccessful
 	while [ $# -gt 0 ]; do case $1 in
+		-p|--mkdirFlag) mkdirFlag="-p" ;;
 		-i)  inplace="-i" ;;
 		--sort) inplaceSort="sort" ;;
 		-q)  quietFlag="-q" ;;
@@ -255,7 +256,7 @@ function bgawk()
 			# if files are different, overwrite/create the original with the new
 			elif fsIsDifferent "$tmpFile" "$file"; then
 				if [ ! "$checkOnlyFlag" ]; then
-					cat "$tmpFile" | pipeToFile "$file" || assertError
+					cat "$tmpFile" | pipeToFile $mkdirFlag "$file" || assertError
 				fi
 				rm "$tmpFile"
 				[ ! "$returnTrueIfSuccessful" ] && [ ! "$returnTrueIfChanged" ] && inplaceExitCode=1

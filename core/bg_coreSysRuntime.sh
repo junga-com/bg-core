@@ -302,6 +302,11 @@ fi
 #           this function only returns files listed as assets in the hostmanifest file which only admins can write to
 function templateFind()
 {
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+
 	local manifestFile retArgs retVar packageOverride result
 	local -a retArgs=(--echo -d $'\n')
 	while [ $# -gt 0 ]; do case $1 in

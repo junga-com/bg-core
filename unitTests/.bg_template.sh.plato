@@ -27,7 +27,7 @@
 ##     | cmd> : 17; local xxx=17
 ##     | cmd> : 18; local _idxDef=18
 ##     | cmd> : 19; local _idxEsc=19
-##     | templateExprRegEx='%((([+])?(((config([[]([^]]+)[]])?([a-zA-Z0-9_]*+)))|(([$])([^:%]+))|(([a-zA-Z0-9_]*+)([[]([^]]+)[]])?))(:([^%]*))?)|([\]*))%'
+##     | templateExprRegEx='%((([+])?(((config([[]([^]]+)[]])?([a-zA-Z0-9_]*+)))|(([$])([^:%]+))|(([a-zA-Z0-9_]*+)([[]([^]]+)[]])?))(:([^%]*))?)|([/\]*))%'
 
 ##----------
 ## test
@@ -98,6 +98,9 @@ ESC: value=\\
 INPUT: esc3 %\\\%
 ESC: value=\\\
 
+INPUT: esc4 %/%
+ESC: value=/
+
 ## bg_template.sh:templateExprRegex: finished
 ###############################################################################################################################
 
@@ -128,6 +131,9 @@ Default var w/value    -- %color1:red%     : green
 Default var w/empty    -- %color2:red%     : 
 Default var no exists  -- %color3:red%     : red
 Default as a var       -- %nickName:$name% : bobg
+Literal percent        -- %\%              : %
+Literal percent        -- %/%              : %
+Multiple percent       -- %\\\%            : %%%
 
 ## bg_template.sh:templateExpand: finished
 ###############################################################################################################################
@@ -152,7 +158,7 @@ cmd> templateExpand -f "$templateFile"
    catch_errorFn='templateEvaluateVarToken'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: templateEvaluateVarToken: required template var 'name' is not defined
+                          +error: templateEvaluateVarToken: The required template variable 'name' does not exist
                           +    context='/tmp/bgmktemp.templateFile.<redacted>''
 ## bg_template.sh:templateExpandMissingRequired: finished
 ###############################################################################################################################

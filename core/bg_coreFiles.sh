@@ -629,9 +629,10 @@ function fsPipeToFile()
 {
 	local channelID mode tmpdir fileOpts=()
 	while [ $# -gt 0 ]; do case $1 in
+		-p|--mkdir)    mkdirFlag="-p"  ;;
 		--channelID*)  bgOptionGetOpt  val: channelID        "$@" && shift ;;
 		--didChange)   mode="--didChange" ;;
-		-p*|--tmpdir*) bgOptionGetOpt  val: tmpdir           "$@" && shift ;;
+		--tmpdir*)     bgOptionGetOpt  val: tmpdir           "$@" && shift ;;
 		-u*|--user*)   bgOptionGetOpt opt: fileOpts          "$@" && shift ;;
 		-g*|--group*)  bgOptionGetOpt opt: fileOpts          "$@" && shift ;;
 		--perm*)       bgOptionGetOpt opt: fileOpts          "$@" && shift ;;
@@ -674,6 +675,7 @@ function fsPipeToFile()
 		sudoOpts=(); bgsudo --makeOpts=sudoOpts -w "$destFile" -p "writing to '${destFile##*/}' [sudo] "
 		if [[ "$destFile" =~ / ]]; then
 			local destFolder="${destFile%/*}"
+			[ ! -d "$destFolder" ] && [ ! "$mkdirFlag" ] && assertError -v destFolder "destination folder does not exist and -p|--mkdir was not specified to create it"
 			[ ! -d "$destFolder" ] && bgsudo -O sudoOpts mkdir -p "${destFolder}"
 		fi
 		cat "$tmpFile" | bgsudo -O sudoOpts tee "$destFile" >/dev/null #|| assertError

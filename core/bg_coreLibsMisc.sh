@@ -3046,7 +3046,7 @@ function assertError()
 	local _ae_msg _ae_exitCode=36 _ae_actionOverride _ae_contextVarName _ae_catchAction _ae_catchSubshell _ae_frameOffsetTerm=1
 	local -A _ae_dFiles _ae_contextVarsCheck=([empty]=1)
 	local _ae_dFilesList _ae_contextVars _ae_contextOutput _ae_noFuncnameFlag _ae_stackSourceFlag _ae_stackDebugFlag
-	local _ae_traceCatchFlag _ae_alreadyFrozenFlag
+	local _ae_traceCatchFlag _ae_alreadyFrozenFlag _ae_assertFunctionName _ae_failingFunctionName
 
 	# TODO: we need to figure out a good way to associate assertErrorContext with the tryStack so that we stop at the right level
 	### add any assertErrorContext data to the command line parameters.
@@ -3067,6 +3067,8 @@ function assertError()
 
 	### process the command line
 	while [[ "$1" =~ ^- ]]; do case $1 in
+		--errorClass*)   bgOptionGetOpt val: _ae_assertFunctionName "$@" && shift ;;
+		--errorFn*)      bgOptionGetOpt val: _ae_failingFunctionName "$@" && shift ;;
 		--alreadyFrozen) _ae_alreadyFrozenFlag="--alreadyFrozen" ;;
 		--traceCatch)    _ae_traceCatchFlag="--traceCatch" ;;
 		--no-funcname)   _ae_noFuncnameFlag="--no-funcname" ;;
@@ -3134,7 +3136,7 @@ function assertError()
 	# by calling another assert*  function which ultimately calls this one. The first one will be the most specific that we will
 	# attribute this exception to. The _ae_assertFunctionName is used as the exception class for the purpose of choosing a Catch block
 	local _ae_stackAssertFnIdx; bgStackFrameFind '^[aA]ssert' _ae_stackAssertFnIdx
-	local _ae_assertFunctionName="${bgSTK_cmdName[_ae_stackAssertFnIdx]}"
+	_ae_assertFunctionName="${_ae_assertFunctionName:-${bgSTK_cmdName[_ae_stackAssertFnIdx]}}"
 
 	# the failing function is the one where the error ocurred. Typically it is the one that called the assertFunctionName we
 	# just identified but some library code uses the --frameOffset option to indicate that we should consider a different function
@@ -3142,7 +3144,7 @@ function assertError()
 	# contains the error in its options processing loop that lead to bgOptionsEndLoop failing.
 	[[ "$_ae_frameOffsetTerm" =~ ^[+-]?[0-9]*$ ]] && _ae_frameOffsetTerm="${_ae_assertFunctionName}:${_ae_frameOffsetTerm:-1}"
 	local _ae_stackFailingFnIdx; bgStackFrameFind "$_ae_frameOffsetTerm" _ae_stackFailingFnIdx
-	local _ae_failingFunctionName="${bgSTK_cmdName[$_ae_stackFailingFnIdx]}"
+	_ae_failingFunctionName="${_ae_failingFunctionName:-${bgSTK_cmdName[$_ae_stackFailingFnIdx]}}"
 
 	# get the action from the Try/Catch stack. If not being caught, the default action is to abort the script
 	# the caller can use the --critical, --exitOneShell, or --continue options to override the action
