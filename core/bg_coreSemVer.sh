@@ -22,8 +22,8 @@
 #           if those changes will increment patch, minor, or major when released
 function versionCompare()
 {
-	local lVersion="$1"
-	local rVersion="$2"
+	local lVersion="${1#v}"
+	local rVersion="${2#v}"
 	local rematch
 
 	match "$lVersion" "^([0-9]+)([.]([0-9]+)([.]([0-9]+)[.-]?(.*))?)?$" rematch || assertError -v lVersion "lVersion is not a valid semver format"
@@ -121,7 +121,7 @@ function versionIncrement()
 		--keepDevTag) keepDevTag="--keepDevTag" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local version=$1
+	local version="${1#v}"
 	local rematch
 
 	match "$version" "^([0-9]+)([.]([0-9]+)([.]([0-9]+)[.-]?(.*))?)?$" rematch || assertError -v version "version is not a valid semver format"
@@ -138,5 +138,5 @@ function versionIncrement()
 
 	[ ! "$keepDevTag" ] && devTag='';
 
-	returnValue "${major}.${minor}.${patch}${devTag:--}${devTag}" "$2"
+	returnValue "${major}.${minor}.${patch}${devTag:+-}${devTag}" "$2"
 }

@@ -3860,7 +3860,7 @@ function extractVariableRefsFromSrc()
 
 #"  atom syntax highlight bug
 #######################################################################################################################################
-### From bg_libFile.sh
+### From bg_coreFile.sh
 
 # usage: fsExists [-F|-D|-E] <fileSpec1> [... <fileSpecN>]
 # returns true if at least one file system object of the specified type matches any fileSpec. Checks for files by default

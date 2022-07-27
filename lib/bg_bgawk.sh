@@ -115,17 +115,21 @@ function bgawk()
 	fi
 
 
-	# files may or may not contain the files list specified. if inplace is set it will because we have to process
-	# each file separately, creating a new temp file, etc...  Otherwise, its set to '-' to indicate that we can invoke
-	# awk once with what ever files were passed to us. This might be no files in which case awk will read from stdin.
-	local files="<>#"; [ "$inplace$cols1Flag" ] && files=("$@")
+	# at this point, $@ is a list of 0 or more files to operate on.
+	# Each iteration of this loop will invoke gawk once. if we have multiple input files in some cases we need to pass them all to
+	# one run of gawk but other times (namely if either or both of $inplace and $cols1Flag are true) we need to process each file
+	# with a separate run of gawk.
+	local files="<>#" # special value detected in the loop to indicate to use all the files in "$@" in one run of awk
+	if [ "$inplace$cols1Flag" ] && [ $# -gt 0 ]; then
+		files=("$@")
+	fi
 	local inplaceExitCode=0
 	for file in "${files[@]}"; do
 		# this is the case where we want one pass using the 0, 1, or multiple files passed in on the command line
 		[ "$file" == "<>#" ] && file=("$@")
 
 		if [ "$useCols" == "1" ]; then
-			assertNotEmpty file "an input file must be specified when the -c (use awkData colunms) option it specified"
+			assertNotEmpty file "an input file must be specified when the -c (use awkData colunms) option is specified"
 			assertFileExists "$file"
 			local cols="$(gawk -i bg_awkDataSchema.awk  '
 				NR==1 {awkData_readHeader()}
@@ -220,14 +224,17 @@ function bgawk()
 		#       not know what exploit that is meant to protect against.
 		#       Another solution could be to replace "/dev/fd/3" in the script with "/tmp/<tempfile>" and then cat "/tmp/<tempfile>" >&3
 		#       after awk runs.
+		local exitCode
 		case ${file:+fileExists}:${inplace:+inplace} in
-			fileExists:inplace) { bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}" | ${inplaceSort:-cat} > "$tmpFile" ; } 3>&1 ;;
-			fileExists:)          bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}"                   ;;
-			          :inplace)   gawk "${passThruOpts[@]}" "$script"              3>&1 > "$tmpFile" ;;
-			          :)          gawk "${passThruOpts[@]}" "$script"                                ;;
-		esac; local exitCode=$?
+			fileExists:inplace) { bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}" | ${inplaceSort:-cat} > "$tmpFile" ; } 3>&1; exitCode="${PIPESTATUS[0]}"; ;;
+			fileExists:)          bgsudo -O sudoOpts gawk "${passThruOpts[@]}" "$script" "${file[@]}";                                             exitCode=$? ;;
+			          :inplace)   gawk "${passThruOpts[@]}" "$script"              3>&1 > "$tmpFile";                                              exitCode=$? ;;
+			          :)          gawk "${passThruOpts[@]}" "$script";                                                                             exitCode=$? ;;
+		esac
 
 		# if a temp resultsFile was created, process it now
+		# this is the case where its inplace editting (-i) but the caller also wants to process the redirected stdout
+		# e.g. foo="$(bgawk -i '...' <file>)"
 		if [ "$resultsFile" ] && [ -e "$resultsFile" ]; then
 			cat "$resultsFile"
 			bgsudo -O sudoOpts rm -f "$resultsFile"
@@ -235,10 +242,10 @@ function bgawk()
 
 		# if the awk command returns non-zero, we will not proceed with the inplace processing below
 		# and we might assert an error depending on the -q option
-		if [ $exitCode -gt 0 ] || [ ! "$inplace" ]; then
+		if [ ${exitCode:-0} -gt 0 ] || [ ! "$inplace" ]; then
 			local scriptFile="$(mktemp)"; echo "$script" > "$scriptFile"
 			local output="$tmpFile"
-			[ "$inplace" ] && assertError -e "$exitCode" -v file -v tmpFile -v scriptFile -v exitCode -f output "the awk script returned a non-zero exit code in inplace edit mode (-i). Exit code 1 may mean that the script had a syntax error "
+			[ ! "$quietFlag" ] && [ "$inplace" ]      && assertError -e "$exitCode" -v file -v tmpFile -v scriptFile -v exitCode -f output "the awk script returned a non-zero exit code in inplace edit mode (-i). Exit code 1 may mean that the script had a syntax error "
 			[ ! "$quietFlag" ] && [ $exitCode -eq 1 ] && assertError -e "$exitCode"  -v scriptFile -v exitCode "likely error in awk script"
 			rm "$scriptFile"
 			[ "$tmpFile" ] && rm "$tmpFile"

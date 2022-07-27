@@ -70,6 +70,7 @@
 #   %\% will expand to the literal %
 #   %\\% will expand to the literal %%
 #   (each \ in the escape sequence %\\\\% will become a literal %)
+#   %now[:<format>]% will expand to the current time/date using <format>
 #
 #     +            : The optional leading + indicates that the variable is required. If varName is not defined as a shell variable,
 #                    an error will be asserted. Note that the empty string is a valid value so a variable that whose value is ""
@@ -82,6 +83,13 @@
 #                    can contain simple $varName references. If the leading + syntax is used, the defaultValue will not be used
 #     $objSyntax   : If the first character after the optional + is a $ and/or the varName contains a '.' it is interpreted as an
 #                    object reference. See man(3) completeObjectSyntax for that syntax
+#     <format>     : for the special variable name 'now', the token after the ':' is interpreted as a format string instead of a
+#                    default value. The value of <format> can be one of the following...
+#                         'RFC5322'   :  This specifies the internet email date format as defined in REF5322 (or 2822 or 822)
+#                         '<any other value>' : any other value for <format> will be passed on to the gnu date utility as  +<format>
+#                                               because the date util format uses '%' characters which would be combersome to escape,
+#                                               the all occurances of the '^' character will be replaced with '%' before passing to
+#                                               the date utility.
 #
 #   note that the escape sequences are designed so that there wont be any unmatched % characters in the template content.
 #
@@ -447,6 +455,13 @@ function templateEvaluateVarToken()
 			if varExists "$_nameValueETV"; then
 		 		_foundFlagETV="1"
 				_valueValueETV="${!_nameValueETV}"
+			elif [[ "$_nameValueETV" == now ]]; then
+				_foundFlagETV="1"
+				local format="$_defaultValueETV"
+				case $format in
+					RFC5322|rfc5322) _valueValueETV="$(date -R)" ;;
+					*) _valueValueETV="$(date +"${format//^/%}")" ;;
+				esac
 			fi
 
 		# if its one or more escaped %
