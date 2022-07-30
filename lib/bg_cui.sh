@@ -41,6 +41,214 @@
 # see http://en.wikipedia.org/wiki/ANSI_escape_code
 # see http://invisible-island.net/xterm/ctlseqs/ctlseqs.html
 
+# usage: readKey <retVar>
+# returns one key pressed by the user of the terminal.
+# If the key pressed by the user is a printable character, that character is returned in <retVar>.
+# If the key is a special key a string in the form of <code> is returned where code is a short nmemonic for the key press.
+# Special Keys Nmemonics:
+#    <esc>
+#    <bs>
+#    <del>    <shift-del>
+#    <home>   <shift-home>
+#    <end>    <shift-end>
+#    <insert> <shift-insert>
+#    <up>     <shift-up>
+#    <down>   <shift-down>
+#    <right>  <shift-right>
+#    <left>   <shift-left>
+#    <pgUp>   <shift-pgUp>
+#    <pgDown> <shift-pgDown>
+#
+#    <f1>     <shift-f1>
+#    <f2>     <shift-f2>
+#    <f3>     <shift-f3>
+#    <f4>     <shift-f4>
+#    <f5>     <shift-f5>
+#    <f6>     <shift-f6>
+#    <f7>     <shift-f7>
+#    <f8>     <shift-f8>
+#    <f9>     <shift-f9>
+#
+#    <cntr-a>     <alt-a>      <alt-A>
+#    <cntr-b>     <alt-b>      <alt-B>
+#    <cntr-c>     <alt-c>      <alt-C>
+#    <cntr-d>     <alt-d>      <alt-D>
+#    <cntr-e>     <alt-e>      <alt-E>
+#    <cntr-f>     <alt-f>      <alt-F>
+#    <cntr-g>     <alt-g>      <alt-G>
+#    <cntr-h>     <alt-h>      <alt-H>
+#    <cntr-i>     <alt-i>      <alt-I>
+#    <cntr-j>     <alt-j>      <alt-J>
+#    <cntr-k>     <alt-k>      <alt-K>
+#    <cntr-l>     <alt-l>      <alt-L>
+#    <cntr-m>     <alt-m>      <alt-M>
+#    <cntr-n>     <alt-n>      <alt-N>
+#    <cntr-o>     <alt-o>      <alt-O>
+#    <cntr-p>     <alt-p>      <alt-P>
+#    <cntr-q>     <alt-q>      <alt-Q>
+#    <cntr-r>     <alt-r>      <alt-R>
+#    <cntr-s>     <alt-s>      <alt-S>
+#    <cntr-t>     <alt-t>      <alt-T>
+#    <cntr-u>     <alt-u>      <alt-U>
+#    <cntr-v>     <alt-v>      <alt-V>
+#    <cntr-w>     <alt-w>      <alt-W>
+#    <cntr-x>     <alt-x>      <alt-X>
+#    <cntr-y>     <alt-y>      <alt-Y>
+#    <cntr-z>     <alt-z>      <alt-Z>
+function cuiReadKey() { readKey "$@"; }
+function readKey()
+{
+	local char;
+	read -s -N1  char
+	case $char in
+		$'\033')
+			read -s -t0.001 -N6 char
+			case ${char:-empty} in
+				empty) char="<esc>" ;;
+
+				[3~) char="<del>"   ;;
+				[H)  char="<home>"   ;;
+				[F)  char="<end>"    ;;
+				[2~) char="<insert>" ;;
+
+				[A)  char="<up>"    ;;
+				[B)  char="<down>"  ;;
+				[C)  char="<right>" ;;
+				[D)  char="<left>"  ;;
+				[5~) char="<pgUp>"  ;;
+				[6~) char="<pgDown>";;
+
+				OP) char="<f1>"    ;;
+				OQ) char="<f2>"    ;;
+				OR) char="<f3>"    ;;
+				OS) char="<f4>"    ;;
+				[15~) char="<f5>"    ;;
+				[17~) char="<f6>"    ;;
+				[18~) char="<f7>"    ;;
+				[19~) char="<f8>"    ;;
+				[20~) char="<f9>"    ;;
+				[24~) char="<f12>"   ;;
+
+				'[3;2~') char="<shift-del>"   ;;
+				'[1~')   char="<shift-home>"   ;;
+				'[4~')   char="<shift-end>"    ;;
+				'[2~')   char="<shift-insert>" ;;
+				'[Z')    char="<shift-tab>" ;;
+
+				'[1;2A')  char="<shift-up>"    ;;
+				'[1;2B')  char="<shift-down>"  ;;
+				'[1;2C')  char="<shift-right>" ;;
+				'[1;2D')  char="<shift-left>"  ;;
+				'[1;25~') char="<shift-pgUp>"  ;;
+				'[1;26~') char="<shift-pgDown>";;
+
+				'[1;5A')  char="<cntr-up>"    ;;
+				'[1;5B')  char="<cntr-down>"  ;;
+				'[1;5C')  char="<cntr-right>" ;;
+				'[1;5D')  char="<cntr-left>"  ;;
+				'[1;55~') char="<cntr-pgUp>"  ;;
+				'[1;56~') char="<cntr-pgDown>";;
+
+				'[1;2P')  char="<shift-f1>"    ;;
+				'[1;2Q')  char="<shift-f2>"    ;;
+				'[1;2R')  char="<shift-f3>"    ;;
+				'[1;2S')  char="<shift-f4>"    ;;
+				'[15;2~') char="<shift-f5>"    ;;
+				'[17;2~') char="<shift-f6>"    ;;
+				'[18;2~') char="<shift-f7>"    ;;
+				'[19;2~') char="<shift-f8>"    ;;
+				'[20;2~') char="<shift-f9>"    ;;
+				'[24;2~') char="<shift-f12>"   ;;
+
+				a) char="<alt-a>"  ;;
+				b) char="<alt-b>"  ;;
+				c) char="<alt-c>"  ;;
+				d) char="<alt-d>"  ;;
+				e) char="<alt-e>"  ;;
+				f) char="<alt-f>"  ;;
+				g) char="<alt-g>"  ;;
+				h) char="<alt-h>"  ;;
+				i) char="<alt-i>"  ;;
+				j) char="<alt-j>"  ;;
+				k) char="<alt-k>"  ;;
+				l) char="<alt-l>"  ;;
+				m) char="<alt-m>"  ;;
+				n) char="<alt-n>"  ;;
+				o) char="<alt-o>"  ;;
+				p) char="<alt-p>"  ;;
+				q) char="<alt-q>"  ;;
+				r) char="<alt-r>"  ;;
+				s) char="<alt-s>"  ;;
+				t) char="<alt-t>"  ;;
+				u) char="<alt-u>"  ;;
+				v) char="<alt-v>"  ;;
+				w) char="<alt-w>"  ;;
+				x) char="<alt-x>"  ;;
+				y) char="<alt-y>"  ;;
+				z) char="<alt-z>"  ;;
+
+				A) char="<alt-A>"  ;;
+				B) char="<alt-B>"  ;;
+				C) char="<alt-C>"  ;;
+				D) char="<alt-D>"  ;;
+				E) char="<alt-E>"  ;;
+				F) char="<alt-F>"  ;;
+				G) char="<alt-G>"  ;;
+				H) char="<alt-H>"  ;;
+				I) char="<alt-I>"  ;;
+				J) char="<alt-J>"  ;;
+				K) char="<alt-K>"  ;;
+				L) char="<alt-L>"  ;;
+				M) char="<alt-M>"  ;;
+				N) char="<alt-N>"  ;;
+				O) char="<alt-O>"  ;;
+				P) char="<alt-P>"  ;;
+				Q) char="<alt-Q>"  ;;
+				R) char="<alt-R>"  ;;
+				S) char="<alt-S>"  ;;
+				T) char="<alt-T>"  ;;
+				U) char="<alt-U>"  ;;
+				V) char="<alt-V>"  ;;
+				W) char="<alt-W>"  ;;
+				X) char="<alt-X>"  ;;
+				Y) char="<alt-Y>"  ;;
+				Z) char="<alt-Z>"  ;;
+
+			esac
+			;;
+		$'\177') char="<bs>" ;;
+		$'\012') char="<cr>" ;;
+		$'\011') char="<tab>";;
+
+		$'\001') char="<cntr-a>"  ;;
+		$'\002') char="<cntr-b>"  ;;
+		$'\003') char="<cntr-c>"  ;;
+		$'\004') char="<cntr-d>"  ;;
+		$'\005') char="<cntr-e>"  ;;
+		$'\006') char="<cntr-f>"  ;;
+		$'\007') char="<cntr-g>"  ;;
+		$'\008') char="<cntr-h>"  ;;
+		$'\009') char="<cntr-i>"  ;;
+		$'\010') char="<cntr-j>"  ;;
+		$'\011') char="<cntr-k>"  ;;
+		$'\012') char="<cntr-l>"  ;;
+		$'\010') char="<cntr-m>"  ;;
+		$'\014') char="<cntr-n>"  ;;
+		$'\015') char="<cntr-o>"  ;;
+		$'\016') char="<cntr-p>"  ;;
+		$'\017') char="<cntr-q>"  ;;
+		$'\018') char="<cntr-r>"  ;;
+		$'\019') char="<cntr-s>"  ;;
+		$'\020') char="<cntr-t>"  ;;
+		$'\021') char="<cntr-u>"  ;;
+		$'\022') char="<cntr-v>"  ;;
+		$'\023') char="<cntr-w>"  ;;
+		$'\024') char="<cntr-x>"  ;;
+		$'\025') char="<cntr-y>"  ;;
+		$'\026') char="<cntr-z>"  ;;
+	esac
+	returnValue "$char" "$1"
+}
 
 # usage: cuiSetTitle <title>
 function cuiSetTitle()
@@ -193,7 +401,7 @@ function CSImoveTo() { cuiMoveTo "$@"; }
 function cuiSetCursor() { cuiMoveTo "$@"; }
 function cuiMoveTo()
 {
-	echo -en "${CSI}${1:-0};${2:-0}$cMoveAbs"
+	printf "${CSI}${1:-0};${2:-0}$cMoveAbs"
 }
 
 # usage: cuiMoveBy <lineDelta> <columnDelta>
@@ -208,7 +416,10 @@ function cuiMoveBy()
 	local columnDelta="${2:-0}"
 	local vCmd=B; [ $lineDelta   -lt 0 ] && vCmd=A && lineDelta=$((   0 - lineDelta   ))
 	local hCmd=C; [ $columnDelta -lt 0 ] && hCmd=D && columnDelta=$(( 0 - columnDelta ))
-	echo -n "${CSI}${lineDelta}${vCmd}${CSI}${columnDelta}${hCmd}"
+	local moveStr=""
+	((lineDelta!=0))   && moveStr+="${CSI}${lineDelta}${vCmd}"
+	((columnDelta!=0)) && moveStr+="${CSI}${columnDelta}${hCmd}"
+	printf "$moveStr"
 }
 
 # usage: cuiScrollTerm <count>
@@ -455,24 +666,24 @@ declare -Ag _csiCMD_p0=(
 )
 
 # Sample Color Scheme. Scripts can define one or more associative arrays like this one. When a script
-# call cuiRealizeFmtToTerm, it can pass in one or more of these array names. cuiRealizeFmtToTerm will
+# calls cuiRealizeFmtToTerm, it can pass in one or more of these array names. cuiRealizeFmtToTerm will
 # turn the index names into variable names. The value will be either the empty string when realized to
 # non-tty destinations or the value from the array. The values in the array are the default values.
 # A mechanism will be added that will create a schema data file from the combined set of index names
 # that can be edited with values that can override the default values provided in the script arrays
 declare -Ag cuiColorTheme_sample1=(
-	[csiColorDefault]="$_CSI${_csiCMD_p0[csiDefBkColor]}$_CSI${_csiCMD_p0[csiDefColor]}$_CSI${_csiCMD_p0[csiNorm]}"
-	[csiColorChanged]="$_CSI${_csiCMD_p0[csiHiRed]}"
-	[csiColorSelected]="$_CSI${_csiCMD_p0[csiBold]}"
-	[csiColorHilighted]="$_CSI${_csiCMD_p0[csiHiYellow]}"
-	[csiColorHilightBk]="$_CSI${_csiCMD_p0[csiUnderline]}"
-	[csiColorAttention]="$_CSI${_csiCMD_p0[csiWhite]}$_CSI${_csiCMD_p0[csiBkRed]}"
-	[csiColorStatusLineDef]="$_CSI${_csiCMD_p0[csiNorm]}${_CSI}48;2;64;64;64m${_CSI}38;2;252;255;255m"
-	[csiColorCompleted]="$_CSI${_csiCMD_p0[csiBlack]}$_CSI${_csiCMD_p0[csiBkGreen]}"
-	[csiColorError]="$_CSI${_csiCMD_p0[csiHiRed]}"
-	[csiColorH1]="$_CSI${_csiCMD_p0[csiBlack]}$_CSI${_csiCMD_p0[csiBkBlue]}$_CSI${_csiCMD_p0[csiBold]}"
-	[csiColorH2]="$_CSI${_csiCMD_p0[csiBlack]}$_CSI${_csiCMD_p0[csiBkBlue]}"
-	[csiColorH3]="$_CSI${_csiCMD_p0[csiBold]}"
+	[csiColorDefault]="$_CSI${_csiCMD_p0[cDefBkColor]}$_CSI${_csiCMD_p0[cDefColor]}$_CSI${_csiCMD_p0[cNorm]}"
+	[csiColorChanged]="$_CSI${_csiCMD_p0[cHiRed]}"
+	[csiColorSelected]="$_CSI${_csiCMD_p0[cBold]}"
+	[csiColorHilighted]="$_CSI${_csiCMD_p0[cHiYellow]}"
+	[csiColorHilightBk]="$_CSI${_csiCMD_p0[cUnderline]}"
+	[csiColorAttention]="$_CSI${_csiCMD_p0[cWhite]}$_CSI${_csiCMD_p0[cBkRed]}"
+	[csiColorStatusLineDef]="$_CSI${_csiCMD_p0[cNorm]}${_CSI}48;2;64;64;64m${_CSI}38;2;252;255;255m"
+	[csiColorCompleted]="$_CSI${_csiCMD_p0[cBlack]}$_CSI${_csiCMD_p0[cBkGreen]}"
+	[csiColorError]="$_CSI${_csiCMD_p0[cHiRed]}"
+	[csiColorH1]="$_CSI${_csiCMD_p0[cBlack]}$_CSI${_csiCMD_p0[cBkBlue]}$_CSI${_csiCMD_p0[cBold]}"
+	[csiColorH2]="$_CSI${_csiCMD_p0[cBlack]}$_CSI${_csiCMD_p0[cBkBlue]}"
+	[csiColorH3]="$_CSI${_csiCMD_p0[cBold]}"
 )
 
 # init the global version of the $csi* vars to reflect stdout(1)
@@ -498,7 +709,7 @@ declare -g $(cuiRealizeFmtToTerm cuiColorTheme_sample1)
 #                 it can be simple or compound command calling shell functions and external commands.
 #    <readlineFn : when --readlineFn is specified, the macro will be interpreted as a readline internal
 #                  function. See man readline or bind -l for a list.
-#    <text>      : when --readlineFn is specified, the macro will be interpreted as text to insert into
+#    <text>      : when --text is specified, the macro will be interpreted as text to insert into
 #                  the cmdline string. If it ends in \015 (enter), it will cause readline to return
 # See Also:
 #    man(3) readline
@@ -571,20 +782,8 @@ function cuiFlashScreen()
 	printf \\e[?5l
 }
 
-# usage: cuiHasControllingTerminal
-# returns 0(true) if the command is running under a controlling terminal. The controlling terminal
-# can be used to interact with the user. W/o one, it is probably being invoked from a daemon. The
-# other common case is that a user is running a remote ssh command without the -t option.
-function cuiHasControllingTerminal()
-{
-	# this sets the exit code to 0 or 1 based on if the controlling terminal device can be written to
-	# by using it in a redirection. since the 'true' command never outputs anything, nothing will be
-	# written to the terminal.
-	# note: that /dev/tty always exists even if its not connected to a terminal
-	# note that it is often suggested to use $(ps hotty $$) to get the psuedo term used by /dev/tty
-	# and if its '?' then there is none but checking the redirect is 100 times faster.
-	(true >/dev/tty)2>/dev/null
-}
+
+# function cuiHasControllingTerminal() moved to bg_coreLibsMisc.sh
 
 # usage: cuiGetSpinner <periodInMS> [<retVar>]
 # this returns a single character that changes periodically to simulate a spinning wheel on a text display.

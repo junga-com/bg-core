@@ -54,13 +54,13 @@ function confirm()
 	 	e) assertError "can not confirm with the user because there is no interactive terminal" ;;
 	esac; fi
 
-	bgtrap 'assertError "confirm prompt canceled by user"' SIGINT
+	bgtrap -n confirm 'stty echo; assertError --errorFn="confirm" "confirm prompt canceled by user"' SIGINT
 
 	printf "$prompt (y/n)" >/dev/tty
 	while [[ ! "$result" =~ ^[yYnN] ]]; do read -s -n1 result </dev/tty; done
 	printf "$result\n" >/dev/tty
 
-	bgtrap -r 'assertError "confirm prompt canceled by user"' SIGINT
+	bgtrap -r -n confirm SIGINT
 
 	[[ "$result" =~ ^[yY] ]]
 }

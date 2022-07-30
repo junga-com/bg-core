@@ -118,6 +118,7 @@ function versionIncrement()
 		--major)  mode="major" ;;
 		--minor)  mode="minor" ;;
 		--patch)  mode="patch" ;;
+		--same)   mode="same" ;;
 		--keepDevTag) keepDevTag="--keepDevTag" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -131,6 +132,7 @@ function versionIncrement()
 	local devTag=${rematch[6]}
 
 	case $mode in
+		same)  ;;
 		patch) ((patch++))  ;;
 		minor) ((minor++)); patch=0 ;;
 		major) ((major++)); minor=0; patch=0 ;;
@@ -139,4 +141,20 @@ function versionIncrement()
 	[ ! "$keepDevTag" ] && devTag='';
 
 	returnValue "${major}.${minor}.${patch}${devTag:+-}${devTag}" "$2"
+}
+
+# usage: versionGetRelation <olderVersion> <newerVersion> [<retVar>]
+# returns one of "same" "patch" "minor" or "major"
+function versionGetRelation()
+{
+	versionCompare "$1" "$2"
+	local code="$?"
+	case $code in
+		0)   returnValue "same" "$3" ;;
+		1)   returnValue "patch" "$3" ;;
+		11)  returnValue "minor" "$3" ;;
+		101) returnValue "major" "$3" ;;
+		201) returnValue "devTag" "$3" ;;
+		*)   returnValue "error: <olderVersion> is greater than <newerVersion>" "$3" ;;
+	esac
 }

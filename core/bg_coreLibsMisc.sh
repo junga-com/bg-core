@@ -1286,6 +1286,22 @@ function progressCntr() # ondemandStub
 	fi
 }
 
+# usage: cuiHasControllingTerminal
+# returns 0(true) if the command is running under a controlling terminal. The controlling terminal
+# can be used to interact with the user. W/o one, it is probably being invoked from a daemon. The
+# other common case is that a user is running a remote ssh command without the -t option.
+function cuiHasControllingTerminal()
+{
+	# this sets the exit code to 0 or 1 based on if the controlling terminal device can be written to
+	# by using it in a redirection. since the 'true' command never outputs anything, nothing will be
+	# written to the terminal.
+	# note: that /dev/tty always exists even if its not connected to a terminal
+	# note that it is often suggested to use $(ps hotty $$) to get the psuedo term used by /dev/tty
+	# and if its '?' then there is none but checking the redirect is 100 times faster.
+	(true >/dev/tty)2>/dev/null
+}
+
+
 
 #######################################################################################################################################
 ### From bg_unitTest.sh
