@@ -2077,7 +2077,7 @@ function bgexit()
 	local whereAmIRunning; whereAmIRunning "whereAmIRunning"
 
 	case $whereAmIRunning:${exitCompletelyFlag:---oneShell} in
-		inTerminal:*)linuxlinux
+		inTerminal:*)
 			# in the terminal, exit will close the users terminal window so we dont want to do that. We must be running in a
 			# sourced function (like bg-debugCntr or when the user 'source /usr/lib/bg_core.sh' to be able to run functions from
 			# the terminal cmdline).

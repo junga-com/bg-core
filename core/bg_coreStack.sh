@@ -122,20 +122,21 @@ function bgStackFreeze() {
 		-a|--all) allFlag="-f" ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-
 	# what to do if we already have a frozen stack
 	# TODO: circa 2021-02: Try/Catch never calls bgStackFreezeDone because the block after Catch needs to access it and so far, we
 	#       dont have any function that gets called when the user's catch block finishes. So the default action is to overwrite
 	#       the last stack. Time should tell if there are cases where we need to call bgStackFreeze without changing the frozen stack
-	local dontOverwritePreviousFrozenStack # TODO: should this be an option?
+	#       2022-08 bobg: update: it seems that the only conflict at this time is the debugger stepping through assertError. I changed
+	#                     the debugger to not clobber the application's global stack vars so we might be fine on this.
 	if varExists bgSTK_cmdName; then
-		[ "$dontOverwritePreviousFrozenStack" ] && return 0
 		bgStackFreezeDone
 	fi
 
 	local ignoreFrames="${1:-1}"; (( ignoreFrames=((ignoreFrames<(${#FUNCNAME[@]})) ? (ignoreFrames) : (${#FUNCNAME[@]}-1)) ))
 	local interruptedSimpleCmd="$2"
 	local interuptedLineNo="$3"
+
+	# TODO: BASH5.0: BASH_ARGV0 is a new variable. should we do something with it?
 
 	### copy the builtin bash stack array vars. The only modification is that we optionally remove on or more frames from the bottom
 	declare -ga bgFUNCNAME=("${FUNCNAME[@]:$ignoreFrames}")

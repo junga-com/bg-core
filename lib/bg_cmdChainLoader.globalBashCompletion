@@ -2,7 +2,7 @@
 # MAN(7.bashLibrary) bg_cmdChainLoader.globalBashCompletion
 # This bash completion script library is intended to be placed in the /etc/bash_completion.d/ folder where it will be auto loaded
 # into every user's bash sessions. It inserts an additional default completion loader function to load the completion spec for cmds
-# on demand. If chains itself with the previous default handler so that it gets a chance to recognize and load the completion handler
+# on demand. It chains itself with the previous default handler so that it gets a chance to recognize and load the completion handler
 # for cmds it recognizes and then passes through to the previous default behavior if it does not.
 #
 # If the cmd contains the string "invokeOutOfBandSystem" then it is assumed that it supports the protocol defined by the
@@ -39,9 +39,10 @@ function _bg_subclassed_completionLoader() {
 		# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
 
 	else
-		# the cmd is not one of ours so apply the default specs that we replaced which is probably the default loader
-		complete $_bg_subclassed_completionLoader_prevLoader $cmd && return 124
-		# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
+		#echo "$_bg_subclassed_completionLoader_prevLoader $@" >> /tmp/bgtrace.out
+		# pass off to the chained loader that we replaced
+		$_bg_subclassed_completionLoader_prevLoader "$@"
+		return $? # ... to make sure we return the exit code from the chained loader
 	fi
 }
 
@@ -51,6 +52,7 @@ if [[ ! "$(complete -D -p)" =~ _bg_subclassed_completionLoader  ]]; then
 	# we also remove the leading 'complete ' so that when we execute it we cant be tricked into running an unknown command
 	_bg_subclassed_completionLoader_prevLoader="$(complete -D -p)"
 	_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader//-D}"
+	_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader//-F}"
 	_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader#complete }"
 
 	# overwrite the default loader with our function

@@ -39,8 +39,7 @@
 
 function pvIsAnObjRef()
 {
-	type -t IsAnObjRef &>/dev/null && { IsAnObjRef "$@"; return; }
-
+	type -t IsAnObjRef &>/dev/null && { IsAnObjRef "$@"; return $?; }
 	[ "$1"  == "_bgclassCall" ] && [ $# -eq 5 ] && [ "$5" == "|" ] && return 0;
 	[[ "$1" == _bgclassCall\ *\ *\ [01]\ '|'?([\ ]) ]] && return 0;
 	return 1

@@ -243,6 +243,7 @@ function bgwait()
 	# also, its not clear from the documentation on the -f option to wait that it might return when the status of a child changes
 	# in a way other than it ended.
 	while true; do
+		# TODO: BASH5.1: wait -n now can accept a list of PIDs and will only return one of those. The -p <retVar> will set <retVar> to the returned PID
 		# wait -n returns whenever a child proc ends (or if its already ended but has not yet been acknowledged with a 'wait $pid')
 		# It only tells us the exit code of the proc, not the pid so we have to iterate the pids to find one that is ended
 		# we might need the -f option too. Then man page is ambiguous but maybe -f causes it to only return when it ends.

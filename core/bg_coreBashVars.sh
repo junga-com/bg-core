@@ -90,7 +90,9 @@ function newHeapVar() {
 	returnValue "$_instanceName" $_retVar
 }
 
-
+# TODO: BASH5.1: local -p is now available to list only the variables in the current function. does this change anything?
+# TODO: BASH5.1: declare and local now have -I to inherit attributes from the same var in previous scope. does this change anything?
+# TODO: BASH5.1: assoc arrays can now be converted to/from a list of pairs assoc=(one 1 two 2) and ${assoc[@]@K}. does this change anything?
 
 # usage: varExists <varName> [.. <varNameN>]
 # returns true(0) if all the vars listed on the cmd line exits

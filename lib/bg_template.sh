@@ -306,12 +306,23 @@ function templateListVars()
 #    templateListVars
 function templateGetVarTokens()
 {
-	# "%(  ([$+]*     []:a-zA-Z0-9._[]* (:[^%]*)*)   |([\]*)   )%"
+	# "%(  ([$+]*     []:a-zA-Z0-9._[]* (:[^%]*)*)   |([\/]*)   )%"
 	#     '$ or +'    '------<expr>---'  :<def>      or \\...
 	templateGetContent "$@" \
 		| grep -o "%\(\([$+]*[]:a-zA-Z0-9._[]*\(:[^%]*\)*\)\|\([/\]*\)\)%" \
 		| tr -d "%" | sed -e "s/ /%20/g; /^[[:space:]]*$/d" \
-		| sort -u
+		| LC_ALL=C sort -u | gawk '
+			# this filter sorts the literal /+ and \+ tokens first so that the resulting script will replace the literal tokens with
+			# a templateMagicEscToken first so that those % wont interfere with other matches
+			/^[\/\\]+$/ {firstLines[NR]=$0; next}
+			{lines[NR]=$0}
+			END {
+				for (i in firstLines)
+					print firstLines[i];
+				for (i in lines)
+					print lines[i];
+			}
+		'
 }
 
 
@@ -467,8 +478,11 @@ function templateEvaluateVarToken()
 		# if its one or more escaped %
 		elif [ "${rematch[$_idxEsc]}" ]; then
 			_foundFlagETV="1"
-			_valueValueETV="${rematch[$_idxEsc]//\\/$templateMagicEscToken}"
-			_valueValueETV="${_valueValueETV//\//$templateMagicEscToken}"
+			if [[ rematch[$_idxEsc] == /* ]]; then
+				_valueValueETV="${rematch[$_idxEsc]//\//$templateMagicEscToken}"
+			else
+				_valueValueETV="${rematch[$_idxEsc]//\\/$templateMagicEscToken}"
+			fi
 
 		# error: some unknown syntax
 		else
@@ -542,6 +556,7 @@ function templateExpandStr()
 	local _literalPercentsSeen
 	for varNameToken in $(templateGetVarTokens -s $str); do
 		[[ "$varNameToken" =~ ^\\\\*$ ]] && _literalPercentsSeen="1"
+		[[ "$varNameToken" =~ ^/*$ ]] && _literalPercentsSeen="1"
 		varNameToken="${varNameToken//%20/ }"
 		local _nameETV="" _valueETV=""
 		templateEvaluateVarToken "$varNameToken" _nameETV _valueETV "${scrContextForErrors:-string:${str:0:40}}"
@@ -694,12 +709,15 @@ function templateExpand()
 
 	# the empty escape sequence is an empty string without the pair of % so templateGetVarTokens won't
 	# return it. So put its rule in unconditionally
-	sedScript=" s/%%//g "
+	local sedScript=""
 
 	# now add a replacement sed command for each token found in the template.
+	# note that we rely on templateGetVarTokens returning the %/% and %\% tokens first so that we will replace them with templateMagicEscToken
+	# first so that those % do not interfere with other matches. e.g. "%/%name%/%" -> name should not be a token b/c its % are escaped
 	local _literalPercentsSeen
 	local varNameToken; for varNameToken in $(templateGetVarTokens "${srcTemplateParams[@]}" ); do
 		[[ "$varNameToken" =~ ^\\\\*$ ]] && _literalPercentsSeen="1"
+		[[ "$varNameToken" =~ ^/*$ ]] && _literalPercentsSeen="1"
 		varNameToken="${varNameToken//%20/ }"
 		local _nameETV="" _valueETV=""
 		templateEvaluateVarToken "$varNameToken" _nameETV _valueETV "$srcTemplate"
@@ -719,6 +737,7 @@ function templateExpand()
 		newScriptPart='s/%'"${varNameToken//\//\\/}"'%/'"$_valueETV"'/g'
 		printf -v sedScript "%s \n%s" "$sedScript" "$newScriptPart"
 	done
+	printf -v sedScript "%s \n%s" "$sedScript" "s/%%//g"
 	[ "$_literalPercentsSeen" ] && printf -v sedScript "%s \n%s" "$sedScript" "s/$templateMagicEscToken/%/g"
 	#bgtraceVars sedScript
 
