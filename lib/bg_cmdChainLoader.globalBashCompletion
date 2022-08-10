@@ -35,6 +35,7 @@ function _bg_subclassed_completionLoader() {
 
 	if [ "$isOneOfOurs" ]; then
 		# register our generic handler which invokes the command with the -hb syntax to ask it to provide the completion list
+		echo "BGBC: chain loading installing for '$cmd'" >>/tmp/bgtrace.out
 		complete -F _bgbc-complete-viaCmdDelegation "$cmd" && return 124
 		# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
 
@@ -48,6 +49,7 @@ function _bg_subclassed_completionLoader() {
 
 # in case we get reloaded, this block only runs the when the _bg_subclassed_completionLoader has not yet been installed (typically the first time)
 if [[ ! "$(complete -D -p)" =~ _bg_subclassed_completionLoader  ]]; then
+	echo "BGBC: default chain loader being installed" >>/tmp/bgtrace.out
 	# save the previous default loader spec, removing the -D b/c we will apply it to a specific cmd when we have to use it
 	# we also remove the leading 'complete ' so that when we execute it we cant be tricked into running an unknown command
 	_bg_subclassed_completionLoader_prevLoader="$(complete -D -p)"

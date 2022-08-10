@@ -972,10 +972,10 @@ pet[]
    [family  ]='unk'
 [heap_A_<redacted>]='<supressing repeated array 'pet'>'
 heap_A_<redacted>_sys[]
-                     [_CLASS]='Animal'
-                     [0     ]=' <objRef to 'pet'>'
-                     [_Ref  ]=' <objRef to 'pet'>'
-                     [_OID  ]='<array reference to 'pet'>'
+                    [_CLASS]='Animal'
+                    [0     ]=' <objRef to 'pet'>'
+                    [_Ref  ]=' <objRef to 'pet'>'
+                    [_OID  ]='<array reference to 'pet'>'
 
 ##----------
 ## test
@@ -1010,10 +1010,10 @@ pet3[]
     [family  ]='unk'
 [heap_A_<redacted>]='<supressing repeated array 'pet3'>'
 heap_A_<redacted>_sys[]
-                     [_CLASS]='Animal'
-                     [0     ]=' <objRef to 'pet3'>'
-                     [_Ref  ]=' <objRef to 'pet3'>'
-                     [_OID  ]='<array reference to 'pet3'>'
+                    [_CLASS]='Animal'
+                    [0     ]=' <objRef to 'pet3'>'
+                    [_Ref  ]=' <objRef to 'pet3'>'
+                    [_OID  ]='<array reference to 'pet3'>'
 
 ## bg_objects.sh:ConstructObject: finished
 ###############################################################################################################################
@@ -1110,10 +1110,10 @@ heap_A_<redacted>
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
 heap_A_<redacted>_sys[]
-                     [_CLASS]='Map'
-                     [0     ]=' <objRef to 'heap_A_<redacted>'>'
-                     [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
-                     [_OID  ]='<array reference to 'heap_A_<redacted>'>'
+                    [_CLASS]='Map'
+                    [0     ]=' <objRef to 'heap_A_<redacted>'>'
+                    [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
+                    [_OID  ]='<array reference to 'heap_A_<redacted>'>'
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
 a2= <instance> of Map
@@ -1129,14 +1129,14 @@ a2= <instance> of Map
   one  =1
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
-                 [two  ]='2'
-                 [three]='3'
-                 [one  ]='1'
+                [two  ]='2'
+                [three]='3'
+                [one  ]='1'
 heap_A_<redacted>_sys[]
-                     [_CLASS]='Map'
-                     [0     ]=' <objRef to 'heap_A_<redacted>'>'
-                     [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
-                     [_OID  ]='<array reference to 'heap_A_<redacted>'>'
+                    [_CLASS]='Map'
+                    [0     ]=' <objRef to 'heap_A_<redacted>'>'
+                    [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
+                    [_OID  ]='<array reference to 'heap_A_<redacted>'>'
 cmd> $a2.getSize
 3
 
@@ -1387,7 +1387,7 @@ cmd> $obj.dontExist.getOID
 ##----------
 ## test
 cmd> $obj.getRef
-_bgclassCall heap_A_<redacted> Object 0 | 
+_bgclassCall heap_A_<redacted> Object 0 |
 cmd> local type; $obj.getRef type; printfVars --noObjects type
 type[]
     [foo  ]='5'
@@ -1396,7 +1396,7 @@ type[]
 cmd> $obj.foo.getRef
 [exitCode 1]
 cmd> $obj.array.getRef
-_bgclassCall heap_a_<redacted> Array 0 | 
+_bgclassCall heap_a_<redacted> Array 0 |
 cmd> $obj.getIndexes.getRef
 [exitCode 1]
 cmd> $obj.dontExist.getRef
@@ -1521,8 +1521,8 @@ methods       =Object::addMethod
 + Object::toFlatINI
 + Object::toJSON
 + Object::toString
-subClasses    =<redacted>
 staticMethods =static::Object::assign
+subClasses    =<redacted>
 name          =Object
 
 ## bg_objects.sh:Object_staticCallSyntax: finished

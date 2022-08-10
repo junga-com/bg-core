@@ -687,7 +687,7 @@ function setReturnValue()
 	[ $# -ne 2 ] && assertError -v argCount:-l$# -v args:-l"$*" "invalid arguments. setReturnValue must be called with 2 parameters. Consider using varOutput"
 	[ "${1:0:1}" == "-" ] && assertError "invalid option. setReturnValue does not accept any options"
 	if [ "$1" ]; then
-		varOutput -R "$@"
+		varOutput -R "$1" -- "${@:2}"
 	fi
 }
 
@@ -696,10 +696,7 @@ function setReturnValue()
 # typically you would use 'return <exitCode>' in a function and 'exit <exitCode>' in the main script
 # but in a debug trap, you need to set the exit code to 0,1, or 2 but return is not valid in a trap
 # and exit will exit the shell
-function setExitCode()
-{
-	return $1
-}
+function setExitCode(){ return $1; }
 
 
 

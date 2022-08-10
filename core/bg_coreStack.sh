@@ -116,7 +116,8 @@
 #   <interuptedLineNo> : if <interruptedSimpleCmd> is specified, this must be also. Note that in a DEBUG trap handler, LINENO starts
 #                     out to be the interupted line number but it will continue to increment with each line of the trap handler so
 #                     the handler must copy LINENO is its first line, before any carrage return in the handler string.
-function bgStackFreeze() {
+function bgStackFreeze()
+{
 	local readCodeFlag="true" allFlag i
 	while [ $# -gt 0 ]; do case $1 in
 		-a|--all) allFlag="-f" ;;
@@ -585,8 +586,10 @@ function bgStackPrint()
 # 'bg-debugCntr trace errStack [debugStack|no-debugStack]' commands for a terminal session.
 function bgStackDump()
 {
-	### first dump a table of the copied original vars.
 	echo "BASH STACK:"
+	echo "bgBASH_COMMAND='$bgBASH_COMMAND'"
+
+	### first dump a table of the copied original vars.
 	printf "%4s %-25s %14s %-25s %s %s\n" "frm#" "bgFUNCNAME#=${#bgFUNCNAME[@]}"  "bgBASH_LINENO#=${#bgBASH_LINENO[@]}"  "bgBASH_SOURCE#=${#bgBASH_SOURCE[@]}"   "bgBASH_ARGC#=${#bgBASH_ARGC[@]}" "bgBASH_ARGV#=${#bgBASH_ARGV[@]}"
 	#local frameNo; for frameNo in "${!bgFUNCNAME[@]}"; do
 	local frameNo; for ((frameNo=${#bgFUNCNAME[@]}-1; frameNo>=0; frameNo--)); do
