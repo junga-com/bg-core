@@ -548,10 +548,10 @@ function bgtraceBreak()
 # usage: bgtraceXTrace [-f <file>] marker [<label> [<msg>]]
 # turn on|off the bash set -x feature only if bgtracing is on
 # Params:
-#   <file> : the file to write the XTrace log to. default is /tmp/bgtrace.xtrace
+#   <file> : the file to write the XTrace log to. default is the _bgtraceFile destination
 function bgtraceXTrace()
 {
-	local file="/tmp/bgtrace.xtrace"
+	local file="$_bgtraceFile"
 	while [ $# -gt 0 ]; do case $1 in
 		-f*|--file*) bgOptionGetOpt val: file "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
@@ -563,7 +563,8 @@ function bgtraceXTrace()
 		on:curOff)
 			bgtraceIsActive || return 1
 			exec {BASH_XTRACEFD}>>$file
-			export PS4='+($$:$BASHPID)(${BASH_SOURCE##*/}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+			# note: that the first char of PS4 will be repeated to reflect the function depth
+			export PS4='+(${BASH_SOURCE##*/}:${LINENO}): ${FUNCNAME[0]:-main}() | '
 			set -x
 			;;
 		off:curOn)

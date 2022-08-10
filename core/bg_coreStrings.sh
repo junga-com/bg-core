@@ -416,6 +416,39 @@ function stringConsumeNextBashToken()
 	return $returnCode
 }
 
+# function stringSplitIntoBashTokens()
+# {
+# 	local -n arrayRet="$1"; shift
+# 	local contents="$*"
+# 	local token
+# 	while stringConsumeNextBashToken contents token; do
+# 		arrayRet+=("$token")
+# 	done
+# }
+
+
+# usage: stringSplitIntoBashTokens <arrayVar> "<stringToParse>"
+# This uses the 'hostory' command (thanks to Koichi Murase), to get bash to parse the input without eval'ing it.
+# it's fast (0.0017secs) and since it comes from bash, it should be completely accurite
+function stringSplitIntoBashTokens()
+{
+	# using history to parse tokens is thanks to Koichi Murase (see help-bash@gnu.org archives 8/5/22 16:28)
+	local -n arrayRet="$1"; shift
+	local input="$*"
+	history -s "$input"
+	local word i=0
+	arrayRet=()
+	while word=$(history -p '!:'$i 2>/dev/null); do
+		arrayRet+=("$word")
+		((i++))
+	done
+	history -d 1
+}
+
+
+
+
+
 # OBSOLETE: use stringConsumeNext instead (only used by stringParseURL)
 # usage: parseOneStringPart [-i] stringVarName delimiter tokenVarName
 # Params:

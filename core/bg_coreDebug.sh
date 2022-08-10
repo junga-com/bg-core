@@ -4,7 +4,7 @@
 # the environment that the script is ran in.
 #
 # This library is unconditionally sourced by bg_coreImport.sh. When debug features are not allowed or not asked for by the
-# user's environment (controlled by bg-debugCntr), the only noop stub funciton will be provided for all the fetaure entrypoints.
+# user's environment (controlled by bg-debugCntr), only noop stub funcitons will be provided for all the fetaure entrypoints.
 # If the a feature is called for and allowed, bg_debugTrace.sh will be imported and further, if the interactive debugger is called
 # for, bg_debugger.sh will be imported.
 #          bg_coreDebug.sh  : always sourced
@@ -119,7 +119,6 @@ else
 		fi
 	}
 fi
-
 
 
 

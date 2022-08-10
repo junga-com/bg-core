@@ -200,6 +200,12 @@ declare -gA _bgbcData
 #    man(3) bgOptionsEndLoop
 function _bgbc-complete-viaCmdDelegation()
 {
+#_bgtrace "STARTing _bgbc-complete-viaCmdDelegation"
+#return
+#exec {BASH_XTRACEFD}>>/tmp/bgtrace.out
+#export PS4='+${FUNCNAME[0]:-main}() | '
+#set -x
+
 	# disable the DEBUG trap handler while we are in this function
 	builtin trap - DEBUG
 
@@ -213,6 +219,7 @@ function _bgbc-complete-viaCmdDelegation()
 	if [ "$bgBashCmdHookFeature" ]; then
 		builtin trap 'cmdlineHook_debugTrap' DEBUG
 	fi
+#set +x
 }
 
 # see _bgbc-complete-viaCmdDelegation

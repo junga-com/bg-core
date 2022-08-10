@@ -3253,9 +3253,9 @@ function assertError()
 			local throwingStatePID="$BASHPID"
 
 			if [ "$_ae_traceCatchFlag" ]; then
-				bgtrace "!!!throwing exception "
-				bgtrace "   PID of throw ='$throwingStatePID'"
-				bgtrace "   PID of catch ='$tryStatePID'"
+				bgtrace "!!!throwing exception that will be caught"
+				[ "$throwingStatePID" != "$$" ] && bgtrace "   PID of throw ='$throwingStatePID'"
+				[ "$throwingStatePID" != "tryStatePID" ] && bgtrace "   PID of catch ='$tryStatePID'"
 				bgtracePSTree
 				declare -g traceCatchFlag="1"
 			fi
@@ -3305,11 +3305,14 @@ function assertError()
 			# whose SIGUSR2 trap handler will install a DEBUG handler that will skip simple commands until it finds a "Catch".
 			# Some bash commands are interuptable by SIGINT but if we are running a bash script, all the parents between us and
 			# tryStatePID must be bash subshells stopped on bash functions.
-			[ "$_ae_traceCatchFlag" ] && bgtrace "!!! kill -SIGUSR2 $tryStatePID  "
+			[ "$traceCatchFlag" ] && {
+				bgtrace "!!! unwind is sending kill -SIGUSR2 $tryStatePID  "
+				bgDebuggerStepIntoPlumbing=1
+			}
 			kill -SIGUSR2 "$tryStatePID"     # this wont return if we are tryStatePID
 			(( ${#pidsToKill[@]} > 0 )) && kill -SIGINT "${pidsToKill[@]}"
-			[ "$tryStatePID" != "$BASHPID" ] && bgExit  ${_ae_exitCode:-36}
-			[ "$_ae_traceCatchFlag" ] && bgtrace "!!! returning normally. this is an error"
+			[ "$tryStatePID" != "$throwingStatePID" ] && bgExit  ${_ae_exitCode:-36}
+			[ "$traceCatchFlag" ] && bgtrace "!!! assertError: this exception is being caught but assertError is ending normally. this is an error"
 			;;
 
 		*)	echo "error: logic error. In assertError the action was computed to be '$tryStateAction' but should be one of catch,abort,continue,exitOneShell"
@@ -3363,14 +3366,6 @@ function Rethrow()
 			local tryStatePID="${bgBASH_tryStackPID[@]:0:1}"
 			local throwingStatePID="$BASHPID"
 
-			if [ "$_ae_traceCatchFlag" ]; then
-				bgtrace "!!!Re-throwing exception "
-				bgtrace "   PID of throw ='$throwingStatePID'"
-				bgtrace "   PID of catch ='$tryStatePID'"
-				bgtracePSTree
-				declare -g traceCatchFlag="1"
-			fi
-
 			## fill in pidsToKill with each pid between where the assert is being thrown (throwingStatePID) and where it will be
 			# caught (tryStatePID)
 			local pidsToKill=()
@@ -3416,11 +3411,18 @@ function Rethrow()
 			# whose SIGUSR2 trap handler will install a DEBUG handler that will skip simple commands until it finds a "Catch".
 			# Some bash commands are interuptable by SIGINT but if we are running a bash script, all the parents between us and
 			# tryStatePID must be bash subshells stopped on bash functions.
-			[ "$_ae_traceCatchFlag" ] && bgtrace "!!! kill -SIGUSR2 $tryStatePID  "
+			if [ "$traceCatchFlag" ]; then
+				bgtrace "!!!throwing exception that will be caught"
+				[ "$throwingStatePID" != "$$" ] && bgtrace "   PID of throw ='$throwingStatePID'"
+				[ "$throwingStatePID" != "tryStatePID" ] && bgtrace "   PID of catch ='$tryStatePID'"
+				bgtracePSTree
+				declare -g traceCatchFlag="1"
+			fi
+
 			kill -SIGUSR2 "$tryStatePID"     # this wont return if we are tryStatePID
 			(( ${#pidsToKill[@]} > 0 )) && kill -SIGINT "${pidsToKill[@]}"
-			[ "$tryStatePID" != "$BASHPID" ] && bgExit  ${_ae_exitCode:-36}
-			[ "$_ae_traceCatchFlag" ] && bgtrace "!!! returning normally. this is an error"
+			[ "$tryStatePID" != "$throwingStatePID" ] && bgExit  ${_ae_exitCode:-36}
+			[ "$traceCatchFlag" ] && bgtrace "!!! assertError: this exception is being caught but assertError is ending normally. this is an error"
 			;;
 
 		*)	echo "error: logic error. In assertError the action was computed to be '$tryStateAction' but should be one of catch,abort,continue,exitOneShell"
@@ -3517,7 +3519,7 @@ function Try()
 {
 	local funcDepthOffset=1 traceCatchFlag
 	while true; do case $1 in
-		--traceCatch)   traceCatchFlag='bgtrace "!!!$FUNCNAME | $BASH_COMMAND"' ;;
+		--traceCatch)   traceCatchFlag="--traceCatchFlag" ;;
 		--decFuncDepth) funcDepthOffset=2 ;;
 		 *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -3535,27 +3537,32 @@ function Try()
 	local tryStateTryStatementLocation; local -A stackFrame=(); bgStackFrameGet "$funcDepthOffset" stackFrame; tryStateTryStatementLocation="${stackFrame[cmdLoc]}"
 	local tryStateIFS="$IFS"
 	local tryStateExtdebug="$(shopt -p extdebug)"
-	local debugTrapScript='bgBASH_debugTrapLINENO=$((LINENO))
-		'"${traceCatchFlag}"'
+	local debugTrapScript=''"${traceCatchFlag:+echo \"########## ENTER UNWIND TRAP ##########(\${FUNCNAME:-main\}) | \$BASH_COMMAND\" >>$_bgtraceFile;}"':
 		if (( ${#BASH_SOURCE[@]} < '"$tryStateFuncDepth"' )); then
-			IFS="$bgWS" # no need to save because we will restore the tryStateIFS copy when we return to user code
+			IFS="$bgWS" # no need to save because we are ending
 			assertError --critical "For Try block located at '"$tryStateTryStatementLocation"' no Catch block was found in the same Function. Check that code in the Try block did not skip the Catch by returning\n" >&2
 
 		elif (( ${#BASH_SOURCE[@]} > '"$tryStateFuncDepth"' )); then
-			(exit 2) # set exit code to simulate a return
+			# in ubuntu 22.04 (bash5.1) returning 2 resulted in an infinite loop entering this DEBUG trap over and over.
+			#setExitCode 2 # set exit code to simulate a return
+			setExitCode 2 # set exit code to simulate a return
 
 		elif  [[ ! "$BASH_COMMAND" =~ ^Catch:?([[:space:]]|$) ]]; then
-			(exit 1) # set exit code to not run BASH_COMMAND, go to the next command
+			setExitCode 1 # set exit code to not run BASH_COMMAND, go to the next command
 
 		else # bingo. BASH_COMMAND == Catch: at this funcDepth
-			IFS="$bgWS" # no need to save because we will restore the tryStateIFS copy when we return to user code
+			'"${traceCatchFlag:+set +x}"'
+			IFS="$bgWS" # no need to save because we will restore the tryStateIFS copy below
+
+			# restore the debugger DEBUG trap if it was installed ehn we started unwining
+			# we are in a debug trap so this line wont interrupt us and the rest of the function will complete
 			bgTrapStack pop DEBUG
 
 			unset bgBASH_debugTrapLINENO
 			IFS="'"$tryStateIFS"'" # return IFS to the value it had at the try statement
 			'"$tryStateExtdebug"'  # return the extdebug shopt to the value it had in at the try statement
 			bgBASH_tryStackWasThrown[0]="1" # the Catch function will check this to know the context its being called in
-			(exit 0) # run BASH_COMMAND and since we restore the DEBUG trap, the script will resume from there
+			setExitCode 0 # run BASH_COMMAND and since we restore the DEBUG trap, the script will resume from there
 		fi
 	'
 
@@ -3571,11 +3578,20 @@ function Try()
 	bgBASH_tryStackWasThrown=(""                   "${bgBASH_tryStackWasThrown[@]}")
 
 	# install our try block trap
-	bgTrapStack push SIGUSR2 '
+	bgTrapStack push SIGUSR2 \
+		'bgDebuggerGlobalDisable=1
+		if [ "$traceCatchFlag" ]; then
+			echo "########## ENTER SIGUSR TRAP ##########" >>$_bgtraceFile
+			exec {BASH_XTRACEFD}>>$_bgtraceFile
+			# note: that the first char of PS4 will be repeated to reflect the function depth
+			export PS4="+(${BASH_SOURCE##*/}:${LINENO}): ${FUNCNAME[0]:-main}() | "
+			set -x
+		fi
 		builtin trap - SIGUSR2
-		bgTrapStack push DEBUG '\'''"$debugTrapScript"''\''
 		shopt -s extdebug
 		set +o errtrace # extdebug turns this on but unit tests need it off
+		'"${traceCatchFlag:+bgtrace !!! SIGUSR2 removed this SIGUSR2 trap. the next line should install and switch to the DEBUG trap }"'
+		bgTrapStack push DEBUG '\''bgDebuggerGlobalDisable=; '"$debugTrapScript"''\''
 	'
 	[ "$traceCatchFlag" ] && bgtrace "!!! Try: installed SIGUSR2 in pid='$BASHPID'"
 	return 0

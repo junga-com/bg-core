@@ -1145,7 +1145,7 @@ cmd> unitTests/bgStackTest "$1"
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_func
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
-USR1-<redacted><handler>(3): : USR1_HANDLER : oneDown
+USR1-<redacted><handler>(3): : USR1_HANDLER: oneDown
 ================= bottom of stack invoked the stack trace ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1198,7 +1198,7 @@ cmd> unitTests/bgStackTest "$1"
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_DBG
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
-USR1-<redacted><handler>(3): : USR1_HANDLER : aNoopCommand
+USR1-<redacted><handler>(3): : USR1_HANDLER: aNoopCommand
 ================= bottom of stack invoked the stack trace ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1221,12 +1221,60 @@ bash(<redacted>)---bash(<redacted>)*
 ## test
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop intr:USR1..func DEBUGGER
+DBG: (echo hi)
+hi
+DBG: (kill -USR1 $BASHPID)
+DBG: (kill -USR1 $BASHPID)
+DBG: (kill -USR1 $BASHPID)
+DBG: (local bgDebuggerPlumbingCode=1)
+DBG: (local pidOfSetTrap="$1")
+DBG: (local signal="$2")
+DBG: (signalNorm "$signal" signal)
+DBG: (signalNorm "$signal" signal)
+DBG: (local quietFlag listFlag)
+DBG: ([[ "$1" =~ ^- ]])
+DBG: ([ ! "${_signalNormData[1]}" ])
+DBG: ([ "$listFlag" ])
+DBG: (local sn_sigID="${1^^}")
+DBG: (sn_sigID="${sn_sigID#SIG}")
+DBG: (sn_sigID="${_signalNormData[${sn_sigID:-emptyStr}]}")
+DBG: ([ ! "$sn_sigID" ])
+DBG: (returnValue "$sn_sigID" "$2")
+DBG: (returnValue "$sn_sigID" "$2")
+DBG: (local _rv_inType="string" _rv_outType="stdout" quietFlag)
+DBG: ([[ "$1" =~ ^- ]])
+DBG: ([ "$2" ])
+DBG: ([ "${2}" != "-" ])
+DBG: ([ "${2}" != "--" ])
+DBG: (_rv_outType="var")
+DBG: ([ "${quietFlag}" ])
+DBG: (case $_rv_inType:$_rv_outType in )
+DBG: (printf -v "$2" "%s" "$1")
+DBG: (true)
+DBG: (return 0)
+DBG: (local intrrupttedCmd="$3")
+DBG: (local intrrupttedLineno="$4")
+DBG: ([ "$4" == "1" ])
+DBG: (intrrupttedLineno="")
+DBG: (local intrrupttedExitCode="$5")
+DBG: ([[ ! "$signal" =~ ^(ERR|DEBUG)$ ]])
+DBG: (intrrupttedExitCode="")
+DBG: (local intrrupttedFuncDepth=$(( ${#BASH_SOURCE[@]}-1 )))
+DBG: (bgBASH_trapStkFrm_signal=("$signal" "${bgBASH_trapStkFrm_signal[@]}"))
+DBG: (bgBASH_trapStkFrm_lastCMD=("$intrrupttedCmd" "${bgBASH_trapStkFrm_lastCMD[@]}"))
+DBG: (bgBASH_trapStkFrm_LINENO=("$intrrupttedLineno" "${bgBASH_trapStkFrm_LINENO[@]}"))
+DBG: (bgBASH_trapStkFrm_exitCode=("$intrrupttedExitCode" "${bgBASH_trapStkFrm_exitCode[@]}"))
+DBG: (bgBASH_trapStkFrm_setPID=("$pidOfSetTrap" "${bgBASH_trapStkFrm_setPID[@]}"))
+DBG: (bgBASH_trapStkFrm_funcDepth=("$intrrupttedFuncDepth" "${bgBASH_trapStkFrm_funcDepth[@]}"))
+DBG: (oneDown off)
+DBG: (oneDown off)
+DBG: (aNoopCommand)
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1_func_DBG
 bgStackTest(): : main : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
-USR1-<redacted><handler>(3): : USR1_HANDLER : oneDown off
-bgStackTest(43): : oneDown() : aNoopCommand
+USR1-<redacted><handler>(3): : USR1_HANDLER: oneDown off
+bgStackTest(): : oneDown() : aNoopCommand
 ================= bottom of stack invoked the stack trace ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1251,7 +1299,7 @@ cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1
-bgStackTest(127): : $ bgStackTest: c3USR1
+bgStackTest(128): : $ bgStackTest: c3USR1
 libC3.sh(18): : c3USR1 : kill -USR1 $BASHPID(USR1...)
 ================= bottom of stack invoked the stack trace ==========================
 bash(<redacted>)---bash(<redacted>)*
@@ -1277,7 +1325,7 @@ cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1..func
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1_func
-bgStackTest(130): : $ bgStackTest: c3USR1_func
+bgStackTest(131): : $ bgStackTest: c3USR1_func
 libC3.sh(24): : c3USR1_func : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
 USR1-<redacted><handler>(3): : USR1_HANDLER : oneDown
@@ -1305,7 +1353,7 @@ cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func interuptUSR1FirstLine DEBUGGER
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1FirstLine_DBG
-bgStackTest(133): : $ bgStackTest: c3USR1FirstLine_DBG
+bgStackTest(134): : $ bgStackTest: c3USR1FirstLine_DBG
 ----- <UNK>-<UNK> INTERUPT RECEIVED -------------------
 <UNK>-<UNK><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
 ================= bottom of stack invoked the stack trace ==========================
@@ -1332,7 +1380,7 @@ cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1 DEBUGGER
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1_DBG
-bgStackTest(136): : $ bgStackTest: c3USR1_DBG
+bgStackTest(137): : $ bgStackTest: c3USR1_DBG
 libC3.sh(44): : c3USR1_DBG : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
 USR1-<redacted><handler>(3): : USR1_HANDLER : aNoopCommand
@@ -1360,7 +1408,7 @@ cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1..func DEBUGGER
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
 pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1_func_DBG
-bgStackTest(139): : $ bgStackTest : c3USR1_func_DBG
+bgStackTest(140): : $ bgStackTest : c3USR1_func_DBG
 libC3.sh(58): : c3USR1_func_DBG: kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted> INTERUPT RECEIVED -------------------
 USR1-<redacted><handler>(3): : USR1_HANDLER : oneDown off
@@ -1411,7 +1459,7 @@ bash(<redacted>)*
 ## test
 cmd> case $1 in
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted>(0): : bash(<redacted>): source unitTests/bgStackTest f4
+pts-<redacted>(0): : bash(<redacted>): source unitTests/bgStackTest
 bgStackTest(54): : source : f4
 bgStackTest(38): : f4() : f3
 bgStackTest(37): : f3() : f2

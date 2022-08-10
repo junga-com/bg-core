@@ -62,7 +62,7 @@ case $1 in
 				bgStackFreeze --all "" "$BASH_COMMAND" "$dbgLINENO"
 				bgStackPrint $stackPrintOpts
 				builtin trap "" DEBUG
-				(exit 1)
+				setExitCode 1
 			fi
 		' DEBUG
 		aNoopCommand ;;
@@ -105,22 +105,25 @@ case $1 in
 				bgStackFreeze --all "" "$BASH_COMMAND" "$dbgLINENO"
 				bgStackPrint $stackPrintOpts
 				builtin trap "" DEBUG
-				(exit 1)
+				setExitCode 1
 			fi
 		' DEBUG
 		kill -USR1 $BASHPID ;;
 	top_USR1_func_DBG)
 		banner scriptTop intr:USR1..func DEBUGGER
 		trap 'oneDown off' USR1
-		builtin trap 'dbgLINENO="$LINENO"
+		builtin trap 'echo "DBG: ($BASH_COMMAND)"
 			if [[ "$BASH_COMMAND" =~ ^aNoopCommand ]]; then
 				bgStackFreeze --all "" "$BASH_COMMAND" "$dbgLINENO"
 				bgStackPrint $stackPrintOpts
 				builtin trap "" DEBUG
-				(exit 1)
+				setExitCode 1
 			fi
 		' DEBUG
-		kill -USR1 $BASHPID ;;
+		echo hi
+		kill -USR1 $BASHPID
+		echo bye
+		;;
 
 	func_USR1)
 		banner scriptTop..func intr:USR1
