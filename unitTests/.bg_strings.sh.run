@@ -7,9 +7,9 @@
 ## test
 stringSplit -a myArray 'one two three'
 myArray[]
-       [0]='one'
-       [1]='two'
-       [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 
 ## bg_strings.sh:stringSplit_retArray:0 finished
 ###############################################################################################################################
@@ -23,9 +23,9 @@ myArray[]
 ## test
 stringSplit -a myArray -d , one,two,three
 myArray[]
-       [0]='one'
-       [1]='two'
-       [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 
 ## bg_strings.sh:stringSplit_retArray:1 finished
 ###############################################################################################################################
@@ -42,9 +42,9 @@ stringSplit -a myArray -d '
 line two
 line three'
 myArray[]
-       [0]='line one'
-       [1]='line two'
-       [2]='line three'
+   [0]='line one'
+   [1]='line two'
+   [2]='line three'
 
 ## bg_strings.sh:stringSplit_retArray:2 finished
 ###############################################################################################################################
@@ -58,10 +58,10 @@ myArray[]
 ## test
 stringSplit -a myArray -d, 'v1   , v2  ,v3,v4'
 myArray[]
-       [0]='v1   '
-       [1]=' v2  '
-       [2]='v3'
-       [3]='v4'
+   [0]='v1   '
+   [1]=' v2  '
+   [2]='v3'
+   [3]='v4'
 
 ## bg_strings.sh:stringSplit_retArray:3 finished
 ###############################################################################################################################
@@ -75,10 +75,10 @@ myArray[]
 ## test
 stringSplit -a myArray -t -d, 'v1   , v2  ,v3,v4'
 myArray[]
-       [0]='v1'
-       [1]='v2'
-       [2]='v3'
-       [3]='v4'
+   [0]='v1'
+   [1]='v2'
+   [2]='v3'
+   [3]='v4'
 
 ## bg_strings.sh:stringSplit_retArray:4 finished
 ###############################################################################################################################

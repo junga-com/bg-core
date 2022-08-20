@@ -440,6 +440,12 @@ function iniParamGet()
 
 	# normal case that at least one existing file was specified
 	else
+		# gawk complains if the data passed to a -v var=<data> has a \ not followed by one of its special chars so fix them.
+		# note that its not common to have strings with \ in ini files so these checks will be quick and only if presnt will it subshell
+		[[ "$ipg_sectionName" == *\\* ]]   && ipg_sectionName="$(echo "$ipg_sectionName"     | sed 's/\(\\[^abfnrtvx\]\)/\\&/g')"
+		[[ "$ipg_paramName" == *\\* ]]     && ipg_paramName="$(echo "$ipg_paramName"         | sed 's/\(\\[^abfnrtvx\]\)/\\&/g')"
+		[[ "$ipg_defaultValue" == *\\* ]]  && ipg_defaultValue="$(echo "$ipg_defaultValue"   | sed 's/\(\\[^abfnrtvx\]\)/\\&/g')"
+
 		read -r ipg_foundInFile ipg_value < <(bgawk -n \
 			-v iniTargetSection="$ipg_sectionName" \
 			-v defaultValue="$ipg_defaultValue" \
@@ -673,6 +679,12 @@ function iniParamSet()
 
 	[ "$ipg_schema" ] && iniValidate "$ipg_schema" "$paramValue"
 
+	# gawk complains if the data passed to a -v var=<data> has a \ not followed by one of its special chars so fix them.
+	# note that its not common to have strings with \ in ini files so these checks will be quick and only if presnt will it subshell
+	[[ "$sectionName" == *\\* ]] && sectionName="$(echo "$sectionName" | sed 's/\(\\[^abfnrtvx\]\)/\\&/g')"
+	[[ "$paramName" == *\\* ]]   && paramName="$(echo "$paramName"     | sed 's/\(\\[^abfnrtvx\]\)/\\&/g')"
+	[[ "$paramValue" == *\\* ]]  && paramValue="$(echo "$paramValue"   | sed 's/\(\\[^abfnrtvx\]\)/\\&/g')"
+
 	local _ipsResults="$(bgawk -i -n $mkdirFlag \
 		-v iniTargetSection="$sectionName" \
 		-v setName="$paramName" \
@@ -696,10 +708,11 @@ function iniParamSet()
 				while (idx>0 && iniSectBuf[idx]["lineType"] ~ /^(whitespace)|(comment)$/) idx--
 				arrayCreate2(iniSectBuf, idx".5")
 				iniSectBuf[idx".5"]["line"] = makeNewSettingLine(setName, setValue, setComment)
-				if (idx+1==length(iniSectBuf)) {
-					arrayCreate2(iniSectBuf, idx".6")
-					iniSectBuf[idx".6"]["line"] = ""
-				}
+				# 2022-08 bobg: commented out adding a blank line after insert to match the C implementation
+				# if (idx+1==length(iniSectBuf)) {
+				# 	arrayCreate2(iniSectBuf, idx".6")
+				# 	iniSectBuf[idx".6"]["line"] = ""
+				# }
 				settingFoundOrDone="addedToExistingSection"
 			}
 
@@ -707,6 +720,7 @@ function iniParamSet()
 			PROCINFO["sorted_in"] = "@ind_num_asc"
 			for (i in iniSectBuf) {
 				print iniSectBuf[i]["line"]
+				iniSet_lastLineBlank=( iniSectBuf[i]["lineType"] == whitespace )
 			}
 
 			# reset the buffer for the next section
@@ -750,7 +764,9 @@ function iniParamSet()
 
 			# if the target section was not present, add it now at the end
 			if (!settingFoundOrDone) {
-				printf("\n")
+				# 2022-08 bobg: added condition for writing blank line to match the C implementation
+				if (!iniSet_lastLineBlank)
+					printf("\n")
 				print makeNewSectionLine(iniTargetSection, setSectionComment)
 				print makeNewSettingLine(setName, setValue, setComment)
 				settingFoundOrDone="addedSectionAndSetting"

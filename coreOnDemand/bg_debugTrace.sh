@@ -145,7 +145,9 @@ function bgtraceCntr()
 				_bgtraceFile=${_bgtraceFile:-/tmp/bgtrace.out}
 				;;
 		esac
-		if [ "$_bgtraceFile" != "/dev/null" ]; then
+		# 2022-08 bobg: in 5.1 if anything executed by a DEBUG trap creates a subshell (as the following block does), it will re-enter
+		#               the DEBUG trap and leades to infinite recursion so I inhibit this block if the debug trap is active.
+		if [ ! "$bgBASH_debugTrapExitCode" ] && [ "$_bgtraceFile" != "/dev/null" ]; then
 			eval unalias bgtrace 2>/dev/null
 
 			if [ -w "$_bgtraceFile" ] && ! (echo -n >> "$_bgtraceFile") &>/dev/null; then

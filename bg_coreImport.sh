@@ -226,7 +226,7 @@ function import()
 
 	local manFile="/var/lib/bg-core/manifest"
 	[ "$bgVinstalledManifest" ] && manFile="$bgVinstalledManifest"
-	foundScriptPath="$(gawk -v scriptName="$scriptName" -i "bg_manifest.awk" '' "$manFile" )"
+	[ -e "$manFile" ] && foundScriptPath="$(gawk -v scriptName="$scriptName" -i "bg_manifest.awk" '' "$manFile" )"
 
 	if [ "$foundScriptPath" ]; then
 		[ ! -f "$foundScriptPath" ] && assertError  -v scriptName -v foundScriptPath "manifest is out of data. <foundScriptPath> does not exist"

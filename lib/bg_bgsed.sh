@@ -5,7 +5,7 @@
 #
 # Enhancements to Inplace:
 #   * it will use sudo if the user does not have permission to write to the file.
-#   * it will create the inplace file if it does not exist and empty files given one empty line
+#   * it will create the inplace file if it does not exist and empty files are given one empty line (so that scripts have a line to operate on)
 #   * able to inplace edit writable files in readonly folders without resorting to sudo. (e.g. adm can write to a file in /etc/)
 #
 # Enhancements to non-inplace:
@@ -90,7 +90,7 @@ function bgsed()
 		if [ ! -e "$inputFile" ]; then
 			fsTouch $mkdirFlag "${sudoPrompt[@]}" "$inputFile"
 			# # adjust group ownership?
-			# [ ! -f "$inputFile" ] && grep -q "adm:" /etc/group &>/dev/null && which fsTouch &>/dev/null && fsTouch -u adm --perm="... rw. ..." "$inputFile" 
+			# [ ! -f "$inputFile" ] && grep -q "adm:" /etc/group &>/dev/null && which fsTouch &>/dev/null && fsTouch -u adm --perm="... rw. ..." "$inputFile"
 		fi
 
 		# we need to be able to write to the parent folder as well to use "sed -i ..."

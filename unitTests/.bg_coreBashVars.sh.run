@@ -43,23 +43,23 @@ strVar='one two three'
 ## test
 cmd> varOutput -a -AarrayVar "$@"; printfVars arrayVar
 arrayVar[]
-        [0]='initial'
-        [1]='value'
-        [2]='one two three'
+   [0]='initial'
+   [1]='value'
+   [2]='one two three'
 cmd> varOutput -AarrayVar "$@"; printfVars arrayVar
 arrayVar[]
-        [0]='one two three'
+   [0]='one two three'
 
 ##----------
 ## test
 cmd> varOutput -a -SsetVar   "$@"; printfVars setVar
 setVar[]
-      [one two three]=''
-      [initial      ]=''
-      [value        ]=''
+   [initial      ]=''
+   [one two three]=''
+   [value        ]=''
 cmd> varOutput -SsetVar   "$@"; printfVars setVar
 setVar[]
-      [one two three]=''
+   [one two three]=''
 
 ## bg_coreBashVars.sh:varOutput:oneValue finished
 ###############################################################################################################################
@@ -117,31 +117,31 @@ strVar='one two three'
 ## test
 cmd> varOutput -a -AarrayVar "$@"; printfVars arrayVar
 arrayVar[]
-        [0]='initial'
-        [1]='value'
-        [2]='one'
-        [3]='two'
-        [4]='three'
+   [0]='initial'
+   [1]='value'
+   [2]='one'
+   [3]='two'
+   [4]='three'
 cmd> varOutput -AarrayVar "$@"; printfVars arrayVar
 arrayVar[]
-        [0]='one'
-        [1]='two'
-        [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 
 ##----------
 ## test
 cmd> varOutput -a -SsetVar   "$@"; printfVars setVar
 setVar[]
-      [two    ]=''
-      [three  ]=''
-      [initial]=''
-      [value  ]=''
-      [one    ]=''
+   [initial]=''
+   [one    ]=''
+   [three  ]=''
+   [two    ]=''
+   [value  ]=''
 cmd> varOutput -SsetVar   "$@"; printfVars setVar
 setVar[]
-      [two  ]=''
-      [three]=''
-      [one  ]=''
+   [one  ]=''
+   [three]=''
+   [two  ]=''
 
 ## bg_coreBashVars.sh:varOutput:multipleValues finished
 ###############################################################################################################################

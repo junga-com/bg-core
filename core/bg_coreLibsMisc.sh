@@ -100,6 +100,8 @@ function manifestGet()
 	local assetNameMatch="$2"
 	[ ! "$manifestFile" ] && manifestGetHostManifest manifestFile
 
+	assertFileExists "$manifestFile"
+
 	gawk --sandbox  -v assetTypeMatch="$assetTypeMatch"  -v assetNameMatch="$assetNameMatch" -v pkgMatch="$pkgMatch" '
 		$1~"^"pkgMatch"$" && $2~"^"assetTypeMatch"$" && $3~"^"assetNameMatch"$" {print '"$outputStr"'}
 	' $manifestFile
@@ -109,7 +111,7 @@ function manifestGet()
 # This runs gawk to scan the manifest file without having to know where the manifest file is
 function manifestAwk() {
 	local manifestFile; manifestGetHostManifest manifestFile
-	gawk --sandbox "$@" $manifestFile
+	[ -e "$manifestFile" ] && gawk --sandbox "$@" $manifestFile
 }
 
 declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"
@@ -473,7 +475,9 @@ function bgOptionGetOpt()
 				return 1
 			# handle "-o<value>"
 			else
-				returnValue "${1:2}" "$_oga_varNameVar"
+				local _oga_tmpVal="${1:2}"
+				_oga_tmpVal="${_oga_tmpVal# }"
+				returnValue "$_oga_tmpVal" "$_oga_varNameVar"
 				return 1
 			fi
 			;;
@@ -2719,6 +2723,8 @@ function bgtrap()
 #      Library bg_coreAssertError.sh -- uses this
 function bgTrapStack()
 {
+	###!!IMPORTANT: From bash 5.1 on, if anything called by the DEBUG trap creates a subshell (while extdebug is on) it will infinitley loop
+	# This function is called from the Try/Catch unwind DEBUG trap so it can not create any subshells!!
 	local action="$1"; shift
 	local sig; signalNorm "$1" sig; shift; assertNotEmpty sig
 
@@ -3568,7 +3574,6 @@ function Try()
 			# we are in a debug trap so this line wont interrupt us and the rest of the function will complete
 			bgTrapStack pop DEBUG
 
-			unset bgBASH_debugTrapLINENO
 			IFS="'"$tryStateIFS"'" # return IFS to the value it had at the try statement
 			'"$tryStateExtdebug"'  # return the extdebug shopt to the value it had in at the try statement
 			bgBASH_tryStackWasThrown[0]="1" # the Catch function will check this to know the context its being called in

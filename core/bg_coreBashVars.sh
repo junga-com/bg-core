@@ -249,6 +249,7 @@ function varIsA()
 	local anyAttribs mustAttribs
 	while [ $# -gt 1 ]; do case $1 in
 		mapArray|-A) anyAttribs+="A" ;;
+		assocArray|assoc) anyAttribs+="A" ;;
 		numArray|-a) anyAttribs+="a" ;;
 		array)       anyAttribs+="Aa" ;;
 		anyOfThese*) bgOptionGetOpt val: anyAttribs  "--$1" "$2" && shift ;;

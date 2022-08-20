@@ -132,7 +132,7 @@ Default var w/empty    -- %color2:red%     :
 Default var no exists  -- %color3:red%     : red
 Default as a var       -- %nickName:$name% : bobg
 Literal percent        -- %\%              : %
-Literal percent        -- %/%              : %
+Literal percent        -- % / %            : %
 Multiple percent       -- %\\\%            : %%%
 
 ## bg_template.sh:templateExpand: finished

@@ -30,13 +30,9 @@ bgStackFreeze:func_DBG
 bgStackFreeze:top_USR1 
 bgStackFreeze:top_USR1_func 
 bgStackFreeze:top_USR1FirstLine_DBG 
-bgStackFreeze:top_USR1_DBG 
-bgStackFreeze:top_USR1_func_DBG 
 bgStackFreeze:func_USR1 
 bgStackFreeze:func_USR1_func 
 bgStackFreeze:func_USR1FirstLine_DBG 
-bgStackFreeze:func_USR1_DBG 
-bgStackFreeze:func_USR1_func_DBG 
 topStackTypes:main 
 topStackTypes:source 
 topStackTypes:srcdFunc 

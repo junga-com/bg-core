@@ -584,15 +584,17 @@ function _getMethodsFromVMT()
 	local -n vmt="$1"; shift
 	local typeToReturn="$1"; shift
 
-	local -A methods=()
+	local -a methods=()
 	local method; for method in "${!vmt[@]}"; do
 		case ${typeToReturn:-all} in
-			method|all)    [[ "$method" =~ ^_method:: ]] && methods[${method#_method::}]=1 ;;&
-			static|all)    [[ "$method" =~ ^_static:: ]] && methods[${method#_static::}]=1 ;;&
+			method|all)    [[ "$method" =~ ^_method:: ]] && methods+=("${method#_method::}") ;;&
+			static|all)    [[ "$method" =~ ^_static:: ]] && methods+=("${method#_static::}") ;;&
 		esac
 	done
 
-	outputValue "${retOpts[@]}" "${!methods[@]}"
+	[ ${#methods[@]} -gt 0 ] && readarray -t methods < <(printf "%s\n" "${methods[@]}"  | LC_ALL=C sort -u)
+
+	outputValue "${retOpts[@]}" "${methods[@]}"
 }
 
 # usage: <Class>.getClassMethods [<retVar>]
@@ -614,11 +616,14 @@ function Class::getClassMethods()
 	_classUpdateVMT "${this[name]}"
 
 	if [ ! "$includeInherited" ]; then
-		local -A methods=()
+		local -a methods=()
 		local method; for method in ${this[methods]//${this[name]}::}; do
-			methods[$method]=1
+			methods+=("$method")
 		done
-		outputValue "${retOpts[@]}" "${!methods[@]}"
+
+		[ ${#methods[@]} -gt 0 ] && readarray -t methods < <(printf "%s\n" "${methods[@]}"  | LC_ALL=C sort -u)
+
+		outputValue "${retOpts[@]}" "${methods[@]}"
 	else
 		_getMethodsFromVMT "${retOpts[@]}" "${this[name]}_vmt" "method"
 	fi
@@ -1253,7 +1258,7 @@ function __resolveMemberChain()
 		_rsvMemberName="${_rsvMemberName#:}"; _rsvMemberName="${_rsvMemberName#:}"
 	fi
 
-	### follow the 'middle' chained parts which, by syntax, should all be objects. We already removed the last part so this loop is the chaining mechaism
+	### follow the 'middle' chained parts which, by syntax, should all be objects. We already removed the last part so this loop is the chaining mechanism
 	local -n _pthis
 	local nextPart; for nextPart in "${parts[@]}"; do
 		#2022-03 bobg:  seeems not to be used. untested. #local nextPartSyntax="${_rsvMemberName:+dot}"; [[ "${_rsvMemberName}" =~ []]$ ]] && nextPartSyntax="memberVar"
@@ -2539,6 +2544,7 @@ function Object::toString()
 	ots_objDictionary[$_OID]="seen"
 
 	local indexes; $_this.getIndexes $mode -A indexes
+	[ ${#indexes[@]} -gt 0 ] && readarray -t indexes < <(printf "%s\n" "${indexes[@]}"  | LC_ALL=C sort)
 
 	local labelWidth=0
 	local attrib; for attrib in "${indexes[@]}"; do

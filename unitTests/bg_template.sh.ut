@@ -129,7 +129,7 @@ function ut_templateExpand() {
 		Default var no exists  -- %\%color3:red%\%     : %color3:red%
 		Default as a var       -- %\%nickName:$name%\% : %nickName:$name%
 		Literal percent        -- %\%\%\%              : %\%
-		Literal percent        -- %\%/%\%              : %/%
+		Literal percent        -- %\% / %\%            : %/%
 		Multiple percent       -- %\%\\\%\%            : %\\\%
 	EOS
 	local size1=42

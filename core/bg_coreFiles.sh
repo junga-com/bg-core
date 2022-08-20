@@ -601,6 +601,26 @@ function fsCopyAttributes()
 }
 
 
+# usage: bgtee [-aip|--append|--ignore-interrupts|--version|--help] [--output-error=warn|warn-nopipe|exit|exit-nopipe] <filePath>
+# wrapper over gnu 'tee' ultil that adds the feature that it will use sudo if and only if one of the files needs sudo to write to it.
+# Note: its best not to mix some output files that will need sudo and some that do not. If sudo is needed for one it will be used
+#       for all which could leave some files unnecessarily owned by root
+function bgtee()
+{
+	local passThruOpts=()
+	while [ $# -gt 0 ]; do case $1 in
+		-a|--append)             bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+		-i|--ignore-interrupts)  bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+		-p|--help|--version)     bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+		--output-error*)         bgOptionGetOpt opt: passThruOpts "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	local sudoOpts=()
+	bgsudo --makeOpts sudoOpts "${@/#/-w }"
+	bgsudo -O sudoOpts tee "${passThruOpts[@]}" "$@"
+}
+
+
 # usage: fsPipeToFile [--channelID <channelID>] [-p|--tmpdir <tmpdir>] <destFile>
 # usage: fsPipeToFile --didChange --channelID <channelID>
 # usage: <someCommand> | pipeToFile <destFile>
@@ -624,6 +644,8 @@ function fsCopyAttributes()
 #    -p|--tmpdir <tmpdir> : provides an existing location to write its tmp file. Otherwise mktmp will be used
 # See Also:
 #    collectContents
+# TODO: should we add a -a|--append option? This would mean we could use it like 'sudo tee -a ...' but the comparison would no
+#       longer make sense because it would by definition, always change (unless stdin is empty)
 function pipeToFile() { fsPipeToFile "$@"; }
 function fsPipeToFile()
 {

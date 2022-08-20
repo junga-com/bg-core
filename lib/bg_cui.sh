@@ -787,7 +787,7 @@ function cuiFlashScreen()
 
 # usage: cuiGetSpinner <periodInMS> [<retVar>]
 # this returns a single character that changes periodically to simulate a spinning wheel on a text display.
-# it uses the current time to determine which of a roting set of characters to return. each time the mod of the time in milliseconds
+# it uses the current time to determine which of a rotating set of characters to return. each time the mod of the time in milliseconds
 # passes <periodInMS>, the next character will be returned.
 declare -ax _cuiGetSpinner_spinnerChars=( '\' '|' '/' '-' )
 function cuiGetSpinner() {

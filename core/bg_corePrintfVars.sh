@@ -36,7 +36,6 @@
 # and prints each element of the array as an attribute (name/value pair)
 #
 
-
 function pvIsAnObjRef()
 {
 	type -t IsAnObjRef &>/dev/null && { IsAnObjRef "$@"; return $?; }
@@ -207,7 +206,7 @@ function pvPrArray()
 
 	# purposely hide the higher scope pv_prefix,
 	# append pv_labelWidth number of spaces to pv_prefix because that is our new base column.
-	local pv_prefix="$pv_prefix"; printf -v pv_prefix "%s%-*s" "$pv_prefix" "$pv_labelWidth" ""
+	local pv_prefix="$pv_prefix"; printf -v pv_prefix "%s%-*s" "$pv_prefix" "${pvFixedIndents:-$pv_labelWidth}" ""
 
 	# purposely hide the higher scope pv_labelWidth,
 	# now that the current pv_labelWidth is absorbed into pv_prefix, change it to reflect aligning our index name labels (with [])
@@ -215,11 +214,18 @@ function pvPrArray()
 	for pvl_index in "${!pvl_array[@]}"; do
 		[ ${pv_labelWidth:-0} -lt ${#pvl_index} ] && pv_labelWidth=${#pvl_index}
 	done
-	((pv_labelWidth+=2)) # +2 for the [] we add to the lable when its an arrayIndex
+	((pv_labelWidth+=2)) # +2 for the [] we add to the label when its an arrayIndex
+
+	# when pvl_array is empty, the sort expression set [0]="" so we need to special case it
+	if [ ${#pvl_array[@]} -gt 0 ]; then
+		local pvl_indexes; readarray -t pvl_indexes < <(printf "%s\n" "${!pvl_array[@]}"  | LC_ALL=C sort)
+	else
+		local pvl_indexes=()
+	fi
 
 	# iterate over the indexes, printing each attribute.
 	# Note that we never have to recurse into printfVars because array elements can only be strings. possibly containing an <objRef>
-	for pvl_index in "${!pvl_array[@]}"; do
+	for pvl_index in "${pvl_indexes[@]}"; do
 		if [ ! "$pv_noNestFlag" ] && [[ "${pvl_array[$pvl_index]}" == heap_*[aA]*_* ]]; then
 			pvPrArray "$pvl_index" "${pvl_array[$pvl_index]}" "${pvl_array[$pvl_index]}"
 		elif [ ! "$pv_noNestFlag" ] && pvIsAnObjRef ${pvl_array[$pvl_index]}; then

@@ -53,6 +53,8 @@ function makeTestData() {
 
 function ut_awkData_parseID() {
 	ut setup
+	# from gawk 5.0 to 5.1, the format of this error message changed so we redacted it so keep the test cases consistent
+	ut filter '(gawk: fatal: cannot open file ).*$###\1... <redacted>'
 	makeTestData
 	export bgVinstalledManifest="$utDataFolder/manifest"
 	cat "$bgVinstalledManifest"

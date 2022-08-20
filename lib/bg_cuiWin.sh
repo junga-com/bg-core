@@ -73,12 +73,14 @@ declare -g cuiWinCntrFilePrefix="/tmp/bgtrace."
 #    cuiWinProtocol: man(5) page to document the protocol
 function cuiWinCntr()
 {
-	local retVar _cw_retValue cuiWinClass result=0 returnChannelFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-R*) [ ${#1} -eq 2 ] && shift; retVar=${1#-R} ;;
-		--class*) [ "$1" == "--class" ] && shift; cuiWinClass=${1#--class} ;;
+	local retVar _cw_retValue cuiWinClass result=0 returnChannelFlag quietFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-q|--quiet)      quietFlag="-q" ;;
+		-R*)             bgOptionGetOpt val: retVar      "$@" && shift ;;
+		--class*)        bgOptionGetOpt val: cuiWinClass "$@" && shift ;;
 		--returnChannel) returnChannelFlag="--returnChannel" ;;
-	esac; shift; done
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 
 	# detect static commands vs commands that operate on a cuiWinID
 	if strSetHas "list" "$1"; then
@@ -102,7 +104,7 @@ function cuiWinCntr()
 		open)
 			cuiWinOpen $returnChannelFlag --class "${cuiWinClass:-Base}" -R _cw_retValue "$cuiWinID" "$@"; result=$?
 			[ ${result:-0} -ge 2 ] && assertError -e "$result" -v _cw_retValue -v cuiWinID -v result "could not create the terminal emulator window"
-			returnValue "$_cw_retValue" "$retVar"
+			returnValue $quietFlag "$_cw_retValue" "$retVar"
 			return $result
 			;;
 		gettty)
@@ -203,7 +205,7 @@ function cuiWinExec()
 	fi
 
 	local cuiWinExecLock; startLock -u cuiWinExecLock  -w 1 -q "$cntrPipe.lock"    || return 4
-	echo "$*" | timeout 1 tee "$cntrPipe" >/dev/null || result=2
+	echo "$*" | timeout 3 tee "$cntrPipe" >/dev/null || result=2
 	if [ ${result:-0} -eq 0 ] && [ "$retVar" ]; then
 		local _dwe_reply; read -r -t 500 _dwe_reply <"$cntrPipe" || result=3
 		returnValue "$_dwe_reply" "$retVar"
@@ -222,6 +224,12 @@ function cuiWinExec()
 #
 # This function is synchronous meaning that when this function returns succesfully, the caller knows that
 # the window is open and ready to use. If the window fails the start this funtion asserts an error.
+#
+# Options:
+#    -R <retVar> : return the tty path that the new window uses. Use this to read/write to/from the window
+#    --class     : the name of the function to run in the new window's process
+#    --returnChannel : create a separate fifo for the window proc to initiate msgs
+#
 # See Also:
 #    cuiWinCntr : normal entry point to all client level functions
 #    cuiWinExec : implements the low level sync and async <cmd> protocol to the window handler
@@ -229,12 +237,15 @@ function cuiWinExec()
 #    cuiWinProtocol: man(5) page to document the protocol
 function cuiWinOpen()
 {
-	local retVar cuiWinClass="Base" returnChannelFlag
-	while [[ "$1" =~ ^- ]]; do case $1 in
-		-R*) [ ${#1} -eq 2 ] && shift; retVar=${1#-R} ;;
-		--class*) [ "$1" == "--class" ] && shift; cuiWinClass=${1#--class} ;;
+	local retVar cuiWinClass="Base" returnChannelFlag _recurseCheck _ttyVal quietFlag
+	while [ $# -gt 0 ]; do case $1 in
+		-q|--quiet)      quietFlag="-q" ;;
+		-R*)             bgOptionGetOpt val: retVar      "$@" && shift ;;
+		--class*)        bgOptionGetOpt val: cuiWinClass "$@" && shift ;;
 		--returnChannel) returnChannelFlag="--returnChannel" ;;
-	esac; shift; done
+		--_recurseCheck) _recurseCheck="$_recurseCheck" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
 	local cuiWinID="$1"; shift
 	if [ ! "$cuiWinID" ]; then
 		local genericBaseName="debugger.$$"
@@ -248,18 +259,18 @@ function cuiWinOpen()
 
 	# normally the flock pattern does not care if the proc that creates the file is the first one to
 	# obtain the lock but we do because we use the existence of the lock to determine who should create
-	# the window. We also want to create the file is a particulare way -- with mkfifo
+	# the window. We also want to create the file in a particulare way -- with mkfifo
 
 	# 1) the first condition directs procs into the creation block not only if the pipe does not exist
-	#    but also if the createLock file does exist. This gives lets us avoid the creator from having to
-	#    race to lock the pipe after its created because the alternate branch goes directly into locking
+	#    but also if the createLock file does exist. This lets us avoid the creator from having to
+	#    race to lock the pipe after its created when the alternate branch races directly into locking
 	#    the pipe to send a gettty cmd.
-	# 2) in the creation block, procs race to get the library lock and there is only one winner.
+	# 2) in the creation block, procs race to get the library lock and there is only one winner of that race.
 	# 3) winner creates the .createLock file thus ensuring that any new procs will go down the creation
-	#    block path even after it creates the pipe
+	#    block path even before it has a chance to create the pipe
 	# 4) it can now leisurely create the pipe and lock it without fear of another proc getting the pipe lock before it
 	# 5) when the loosers blocking on the library lock get their turns, they see that the pipe exists
-	#    and skip creation.
+	#    and skip creation. Now they can race to use the pipe to get the tty for their callers
 	# 6) after the winner deletes the .createLock file, any new procs take the optimum path, skipping
 	#    the library lock
 	if [ ! -e "$bgdCntrFile" ] || [ -e "$bgdCntrFile.createLock" ]; then
@@ -273,8 +284,7 @@ function cuiWinOpen()
 			# exists. Here we turn on the other reason that prevents them from going after the pipe lock.
 			local createLockFD; exec {createLockFD}<>"$bgdCntrFile.createLock"
 
-
-			# now create the pipe and lock it even after the pipe exists, the things know not to use it
+			# now create the pipe and lock it. Even after the pipe exists the createLock keeps things from using it
 			# if the .createLock file exists, so we are not racing anyone to get the lock after pipe creation.
 			mkfifo "$bgdCntrFile" || assertError "failed to mkfifo $bgdCntrFile"
 			local cuiWinExecLock; startLock -u cuiWinExecLock -w 1 -q "$bgdCntrFile.lock"    || return 4
@@ -291,11 +301,11 @@ function cuiWinOpen()
 				fi
 				type -t ${cuiWinClass} >/dev/null || cuiWinClass="$decoratedWinClass"
 				export -f "${cuiWinClass}"
-				$(getUserTerminalApp) --geometry=130x24+0+0 --zoom=1.0   -- bash -c "$cuiWinClass" 2>$assertOut || assertError
+				$(getUserTerminalApp) --geometry=130x24+0+0 --zoom=1.0   -- bash -c "$cuiWinClass $(cmdline "$@")" 2>$assertOut || assertError
 			)
 
 			# block waiting for the handler to signal that its started by sending its tty on the pipe.
-			local _ttyVal="$(timeout 10 head -n1	 $bgdCntrFile)"
+			_ttyVal="$(timeout 10 head -n1	 $bgdCntrFile)"
 			[ -e "$_ttyVal" ] || assertError -v cuiWinID -v bgdCntrFile -v tty:_ttyVal "the new window did not return a valid tty"
 			setReturnValue "$retVar" "$_ttyVal"
 
@@ -320,11 +330,20 @@ function cuiWinOpen()
 		endLock -u libraryLock
 	fi
 
-	# there are several paths for procs to get here when they did not create the window but either
-	# saw that the window already existed, or was in progress of creating or did not exist but another
-	# proc beat it to the lock. In any case, at this point it should exist so get the tty
-	local __ttyValue; cuiWinCntr -R "__ttyValue" "$cuiWinID" gettty
-	setReturnValue "$retVar" "$__ttyValue"
+	if [ ! "$_ttyVal" ] && [ "$retVar" ]; then
+		# if _ttyVal is not yet set, it means the cuiWinID was already created (or beign created) so this thread did not go through
+		# the createion block above.
+		# If that thread needs to return the tty, it drops into this block to get it.
+		Try:
+			local __ttyValue; cuiWinCntr -R "__ttyValue" "$cuiWinID" gettty
+			setReturnValue "$retVar" "$__ttyValue"
+		Catch: && {
+			[ "$_recurseCheck" ] && assertError -v cuiWinID "could not (re)open the cuiWin"
+			# we could not get the tty so maybe the window was closed. remove the cntr file and try again.
+			rm "$bgdCntrFile"
+			cuiWinOpen ${retVar:+-R $retVar} --class "$cuiWinClass" $returnChannelFlag --_recurseCheck $cuiWinID "$@"
+		}
+	fi
 }
 
 
@@ -344,8 +363,11 @@ function cuiWinBaseClassHandler()
 		[ "$tailPID" ] && kill "$tailPID"
 		tailPID=""
 	' EXIT
+
 	# make sure that we dont inherit the bgtrace SIGINT handler. We should not in any case, but when we do trap -p we might see it otherwise
-	builtin trap - SIGINT
+	# setting 'trap "" SIGINT' will make it so cntr-c does not terminate the window.
+	# setting 'trap - SIGINT' will make it use the default handler which terminates the window.
+	builtin trap "" SIGINT
 
 	local tty="$(tty)"
 	cuiSetTitle "$winTitle $tty"

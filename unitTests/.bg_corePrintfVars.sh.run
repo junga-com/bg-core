@@ -17,14 +17,14 @@ printfVars string narray aarray -lhello world
 cmd> printfVars "$@"
 string='i am a string'
 narray[]
-      [0]='one'
-      [1]='two'
-      [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 aarray[]
-      [two  ]='hello
-              +world'
-      [three]='3'
-      [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='hello
+           +world'
 hello world
 
 ## bg_corePrintfVars.sh:printfVars:0 finished
@@ -49,14 +49,14 @@ printfVars var1:string var2:narray var3:aarray
 cmd> printfVars "$@"
 var1='i am a string'
 var2[]
-    [0]='one'
-    [1]='two'
-    [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 var3[]
-    [two  ]='hello
-            +world'
-    [three]='3'
-    [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='hello
+           +world'
 
 ## bg_corePrintfVars.sh:printfVars:1 finished
 ###############################################################################################################################
@@ -80,14 +80,14 @@ printfVars -w20 string narray aarray
 cmd> printfVars "$@"
 string              ='i am a string'
 narray[]
-                    [0]='one'
-                    [1]='two'
-                    [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 aarray[]
-                    [two  ]='hello
-                            +world'
-                    [three]='3'
-                    [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='hello
+           +world'
 
 ## bg_corePrintfVars.sh:printfVars:2 finished
 ###############################################################################################################################
@@ -133,14 +133,14 @@ printfVars -1 string narray aarray
 cmd> printfVars "$@"
 string='i am a string' 
 narray[]
-      [0]='one'
-      [1]='two'
-      [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 aarray[]
-      [two  ]='hello
-              +world'
-      [three]='3'
-      [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='hello
+           +world'
 
 ## bg_corePrintfVars.sh:printfVars:4 finished
 ###############################################################################################################################
@@ -164,14 +164,14 @@ printfVars -1 var1:string var2:narray var3:aarray
 cmd> printfVars "$@"
 var1='i am a string' 
 var2[]
-    [0]='one'
-    [1]='two'
-    [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 var3[]
-    [two  ]='hello
-            +world'
-    [three]='3'
-    [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='hello
+           +world'
 
 ## bg_corePrintfVars.sh:printfVars:5 finished
 ###############################################################################################################################
@@ -195,14 +195,14 @@ printfVars -1 -w20 string narray aarray
 cmd> printfVars "$@"
 string='i am a string' 
 narray[]
-      [0]='one'
-      [1]='two'
-      [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 aarray[]
-      [two  ]='hello
-              +world'
-      [three]='3'
-      [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='hello
+           +world'
 
 ## bg_corePrintfVars.sh:printfVars:6 finished
 ###############################################################################################################################
@@ -297,15 +297,15 @@ cmd> echo printfVars "$@"
 printfVars narray narray[2] aarray aarray[two]
 cmd> printfVars "$@"
 narray[]
-      [0]='one'
-      [1]='two'
-      [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 narray[2]='three'
 aarray[]
-      [two  ]='hello
-              +world'
-      [three]='3'
-      [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='hello
+           +world'
 aarray[two]='hello
             +world'
 
@@ -335,15 +335,15 @@ aarray[two]='hello
 cmd> printfVars nr_string nr_narray nr_narray_2 nr_aarray nr_aarray_two nr_longStr
 nr_string='i am a string'
 nr_narray[]
-         [0]='one'
-         [1]='two'
-         [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 nr_narray_2='three'
 nr_aarray[]
-         [two  ]='hello
-                 +world'
-         [three]='3'
-         [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='hello
+           +world'
 nr_aarray_two='hello
               +world'
 nr_longStr='now is the time that all good men should come to the aid of their country. Now is the time that all good men should come to the aid of their country'
@@ -370,30 +370,30 @@ cmd> printfVars Animal "" Dog "" Cat "" myDog "" myCat
 Animal= <instance> of Class
   baseClass     =Object
   classHierarchy=Object Animal
-  vmtCacheNum   =<redacted>
   methods       =Animal::__construct
                 + Animal::speak
-  subClasses    =Dog Cat
-  staticMethods =
   name          =Animal
+  staticMethods =
+  subClasses    =Dog Cat
+  vmtCacheNum   =<redacted>
 
 Dog= <instance> of Class
   baseClass     =Animal
   classHierarchy=Object Animal Dog
-  vmtCacheNum   =<redacted>
   methods       =Dog::__construct
                 + Dog::speak
-  staticMethods =
   name          =Dog
+  staticMethods =
+  vmtCacheNum   =<redacted>
 
 Cat= <instance> of Class
   baseClass     =Animal
   classHierarchy=Object Animal Cat
-  vmtCacheNum   =<redacted>
   methods       =Cat::__construct
                 + Cat::speak
-  staticMethods =
   name          =Cat
+  staticMethods =
+  vmtCacheNum   =<redacted>
 
 myDog= <instance> of Dog
   species=dog
@@ -402,11 +402,11 @@ myCat= <instance> of Cat
   species=cat
 cmd> printfVars --noObjects myCat
 myCat[]
-     [_CLASS ]='Cat'
-     [0      ]=' <objRef to 'myCat'>'
-     [_Ref   ]=' <objRef to 'myCat'>'
-     [species]='cat'
-     [_OID   ]='myCat'
+   [0      ]=' <objRef to 'myCat'>'
+   [_CLASS ]='Cat'
+   [_OID   ]='myCat'
+   [_Ref   ]=' <objRef to 'myCat'>'
+   [species]='cat'
 
 ## bg_corePrintfVars.sh:printfVars_objects: finished
 ###############################################################################################################################

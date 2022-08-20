@@ -26,14 +26,14 @@ sudoOpts[]
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:default finished
 ###############################################################################################################################
@@ -62,21 +62,21 @@ sudoOpts[]
 $@= -p 'my sudo prompt'
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='-pmy sudo prompt'
+   [0]='-pmy sudo prompt'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='-pmy sudo prompt'
-        [1]='--defaultAction'
-        [2]='skipSudo'
+   [0]='-pmy sudo prompt'
+   [1]='--defaultAction'
+   [2]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='-pmy sudo prompt'
-        [1]='--defaultAction'
-        [2]='escalate'
+   [0]='-pmy sudo prompt'
+   [1]='--defaultAction'
+   [2]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:prompt finished
 ###############################################################################################################################
@@ -105,20 +105,20 @@ sudoOpts[]
 $@= -w $tmpDir/f_writable
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:w_writable finished
 ###############################################################################################################################
@@ -147,20 +147,20 @@ sudoOpts[]
 $@= -r $tmpDir/f_writable
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:r_writable finished
 ###############################################################################################################################
@@ -189,20 +189,20 @@ sudoOpts[]
 $@= -c $tmpDir/f_writable
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:c_writable finished
 ###############################################################################################################################
@@ -231,20 +231,20 @@ sudoOpts[]
 $@= -w $tmpDir/f_readable
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:w_readable finished
 ###############################################################################################################################
@@ -273,20 +273,20 @@ sudoOpts[]
 $@= -r $tmpDir/f_readable
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:r_readable finished
 ###############################################################################################################################
@@ -315,20 +315,20 @@ sudoOpts[]
 $@= -c $tmpDir/f_readable
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:c_readable finished
 ###############################################################################################################################
@@ -357,20 +357,20 @@ sudoOpts[]
 $@= -w $tmpDir/f_noAccess
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:w_noAccess finished
 ###############################################################################################################################
@@ -399,20 +399,20 @@ sudoOpts[]
 $@= -r $tmpDir/f_noAccess
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:r_noAccess finished
 ###############################################################################################################################
@@ -441,20 +441,20 @@ sudoOpts[]
 $@= -c $tmpDir/f_noAccess
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:c_noAccess finished
 ###############################################################################################################################
@@ -483,20 +483,20 @@ sudoOpts[]
 $@= -w $tmpDir/f_noExist
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:w_noExist finished
 ###############################################################################################################################
@@ -525,20 +525,20 @@ sudoOpts[]
 $@= -r $tmpDir/f_noExist
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:r_noExist finished
 ###############################################################################################################################
@@ -567,20 +567,20 @@ sudoOpts[]
 $@= -c $tmpDir/f_noExist
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts "$@"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this only changes the action if it did not exist yet
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -r "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='skipSudo'
+   [0]='--defaultAction'
+   [1]='skipSudo'
 
 # expect that this makes the action at least escalate
 cmd> _bgsudoAdjustPriv --sudoOptsVar=sudoOpts -w "$tmpDir/f_readable"
 sudoOpts[]
-        [0]='--defaultAction'
-        [1]='escalate'
+   [0]='--defaultAction'
+   [1]='escalate'
 
 ## bg_security.sh:_bgsudoAdjustPriv:c_noExist finished
 ###############################################################################################################################

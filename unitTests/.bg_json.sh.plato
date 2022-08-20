@@ -11,54 +11,54 @@
 ## test
 cmd> $foo.toJSON
 {
-   "pmemB": "5",
-   "pmemA": "hello",
-   "memberTwo": "14",
    "memberOne": " this and that",
+   "memberTwo": "14",
+   "numbers": {
+      "obj": {},
+      "one": "1",
+      "two": "2",
+      "zero": "0"
+   },
+   "pmemA": "hello",
+   "pmemB": "5",
    "words": [
       "zero",
       "one",
       "two",
       {}
-   ],
-   "numbers": {
-      "two": "2",
-      "obj": {},
-      "zero": "0",
-      "one": "1"
-   }
+   ]
 }
 
 ##----------
 ## test
 cmd> $foo.toJSON "$1"
 {
-   "pmemB": "5",
-   "pmemA": "hello",
-   "memberTwo": "14",
+   "_CLASS": "TestClass",
+   "_OID": "sessionOID_0",
    "memberOne": " this and that",
+   "memberTwo": "14",
+   "numbers": {
+      "_CLASS": "Map",
+      "_OID": "sessionOID_1",
+      "obj": {
+         "_CLASS": "Object",
+         "_OID": "sessionOID_2"
+      },
+      "one": "1",
+      "two": "2",
+      "zero": "0"
+   },
+   "pmemA": "hello",
+   "pmemB": "5",
    "words": [
       "zero",
       "one",
       "two",
       {
          "_CLASS": "Object",
-         "_OID": "sessionOID_2"
-      }
-   ],
-   "numbers": {
-      "two": "2",
-      "obj": {
-         "_CLASS": "Object",
          "_OID": "sessionOID_4"
-      },
-      "zero": "0",
-      "one": "1",
-      "_CLASS": "Map",
-      "_OID": "sessionOID_3"
-   },
-   "_CLASS": "TestClass",
-   "_OID": "sessionOID_0"
+      }
+   ]
 }
 
 ## bg_json.sh:Object_toJSON:all finished
@@ -77,44 +77,44 @@ cmd> $foo.toJSON "$1"
 ## test
 cmd> $foo.toJSON
 {
-   "pmemB": "5",
-   "pmemA": "hello",
-   "memberTwo": "14",
    "memberOne": " this and that",
+   "memberTwo": "14",
+   "numbers": {
+      "obj": {},
+      "one": "1",
+      "two": "2",
+      "zero": "0"
+   },
+   "pmemA": "hello",
+   "pmemB": "5",
    "words": [
       "zero",
       "one",
       "two",
       {}
-   ],
-   "numbers": {
-      "two": "2",
-      "obj": {},
-      "zero": "0",
-      "one": "1"
-   }
+   ]
 }
 
 ##----------
 ## test
 cmd> $foo.toJSON "$1"
 {
-   "pmemB": "5",
-   "pmemA": "hello",
-   "memberTwo": "14",
    "memberOne": " this and that",
+   "memberTwo": "14",
+   "numbers": {
+      "obj": {},
+      "one": "1",
+      "two": "2",
+      "zero": "0"
+   },
+   "pmemA": "hello",
+   "pmemB": "5",
    "words": [
       "zero",
       "one",
       "two",
       {}
-   ],
-   "numbers": {
-      "two": "2",
-      "obj": {},
-      "zero": "0",
-      "one": "1"
-   }
+   ]
 }
 
 ## bg_json.sh:Object_toJSON:real finished
@@ -154,20 +154,20 @@ cmd> $foo.toJSON "$1"
 cmd> local obj; ConstructObjectFromJson obj "$jsonFile"
 cmd> printfVars  obj
 obj= <instance> of Object
-  pmemB    =5
-  pmemA    =hello
-  memberTwo=14
   memberOne= this and that
+  memberTwo=14
+  numbers= <instance> of Object
+    obj= <instance> of Object
+    one =1
+    two =2
+    zero=0
+  pmemA    =hello
+  pmemB    =5
   words= <instance> of Array
     [0]=zero
     [1]=one
     [2]=two
     [3]= <instance> of Object
-  numbers= <instance> of Object
-    two =2
-    obj= <instance> of Object
-    zero=0
-    one =1
 
 ## bg_json.sh:ConstructObjectFromJson:plain finished
 ###############################################################################################################################
@@ -216,20 +216,20 @@ obj= <instance> of Object
 cmd> local obj; ConstructObjectFromJson obj "$jsonFile"
 cmd> printfVars  obj
 obj= <instance> of TestClass
-  pmemB    =5
-  pmemA    =hello
-  memberTwo=14
   memberOne= this and that
+  memberTwo=14
+  numbers= <instance> of Map
+    obj= <instance> of Object
+    one =1
+    two =2
+    zero=0
+  pmemA    =hello
+  pmemB    =5
   words= <instance> of Array
     [0]=zero
     [1]=one
     [2]=two
     [3]= <instance> of Object
-  numbers= <instance> of Map
-    two =2
-    obj= <instance> of Object
-    zero=0
-    one =1
 
 ## bg_json.sh:ConstructObjectFromJson:withSys finished
 ###############################################################################################################################

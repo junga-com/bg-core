@@ -637,7 +637,7 @@ function splitOptions(optionsAryOrStr, options                    ,parts,i,remat
 # Options:
 # See splitOptions for details of passing options.
 #    --parseChars=<chars>|all|default|minimal : See the "Lexical Tokenization" section for details.
-function parserStartQuotingTokenizer(line, parser,optionsAryOrStr                    ,options,idxOut,idxIn,state) {
+function parserStartQuotingTokenizer(line, parser,optionsAryOrStr                    ,options,idxOut,idxIn,state,i,hackFound,hackLineType,hackStart) {
 	splitOptions(optionsAryOrStr, options)
 	arrayCreate(parser)
 	arrayCreate2(parser,"tokens")
@@ -664,7 +664,42 @@ function parserStartQuotingTokenizer(line, parser,optionsAryOrStr               
 		case "default": parser["len"]=patsplit(line, parser["tokens"], /(['"#\\ ])|([^'"#\\ ]*)|(\s+)|([$]')|(\\")|(\\')/, parser["seps"]); break
 		case "all":     parser["len"]=patsplit(line, parser["tokens"], /([]'"#\\|&;()<>=+{}:/,`!@$%^*~?.[:space:][-])|([^]'"#\\|&;()<>=+{}:/,`!@$%^*~?.[:space:][-]*)|(\s+)|([$]')|(\\")|(\\')/, parser["seps"]); break
 		default:        parser["len"]=patsplit(line, parser["tokens"], "(["options["--parseChars"]"])|([^"options["--parseChars"]"]*)|(\\s+)|([$]')|(\\\\\")|(\\\\')", parser["seps"]); break
+	} #"atom highlight fix
+
+	# hack to make this match the C implementation. The parse in C will not treat quotes special in param names so we malke this
+	# behave the same so that unit tests results are consistent
+	# TODO: it would probably be simpler to change the algorithm so that the parser does not combine tokens so that each line type can combine them as it makes sense to them
+	hackFound=0
+	hackLineType=""
+	hackStart=1; if (length(parser["tokens"])>0 && parser["tokens"][1] ~ /^[[:space:]]*$/) hackStart=2
+	if (length(parser["tokens"])>0) switch (parser["tokens"][hackStart]) {
+		case "[": hackLineType="section"; break
+		case "#": hackLineType="comment"; break
+		default: hackLineType="setting"; break
 	}
+	if (hackLineType!="comment") for (i=hackStart; i<=length(parser["tokens"]); i++) {
+		if (parser["tokens"][i] == "'")
+			hackFound=1
+		else if (parser["tokens"][i] == "\"")
+			hackFound=1
+		else if (parser["tokens"][i] == "#")
+			hackFound=1
+		else if (hackLineType=="setting" && parser["tokens"][i] == "=")
+			break;
+		else if (hackLineType=="section" && parser["tokens"][i] == "]")
+			break;
+	}
+	if (hackFound) for (i=1; i<=length(parser["tokens"]); i++) {
+		if (parser["tokens"][i] == "'")
+			parser["tokens"][i] = "\\'"
+		else if (parser["tokens"][i] == "\"")
+			parser["tokens"][i] = "\\\""
+		else if (parser["tokens"][i] == "#")
+			parser["tokens"][i] = "\\#"
+		else if (parser["tokens"][i] == "=")
+			break;
+	}
+
 
 	# this loop contracts the tokens in place. The idxOut will always be <= idxIn when we do an assignment so we will never overwrite
 	# something that we have not yet considered and copied. As we join quouted string tokens, idxIn will get ahead of idxOut. We are
@@ -677,7 +712,7 @@ function parserStartQuotingTokenizer(line, parser,optionsAryOrStr               
 		#bgtrace(sprintf("  [%2s/%2s] %-10s %-13s %s", idxOut, idxIn, "("state")", "("parser["tokens"][idxIn]")", "|"parser["tokens"][idxOut]"|" ))
 		switch (state" "parser["tokens"][idxIn]) {
 			# starting the three different types of quoted bash strings
-			case "unquoted $'": #'
+			case "unquoted $'": #'atom fix
 				parser["openningQuote"]=parser["tokens"][idxIn++]
 				parser["tokens"][++idxOut]=""
 				state="dollar"
@@ -722,6 +757,7 @@ function parserStartQuotingTokenizer(line, parser,optionsAryOrStr               
 			case "unquoted \\\"":
 			case "unquoted \\'":
 			case "unquoted \\\\":
+			case "unquoted \\#":
 				parser["tokens"][++idxOut]=substr(parser["tokens"][idxIn++], 2, 1)
 			break
 

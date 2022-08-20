@@ -1522,7 +1522,7 @@ PASS    : char '}' can be used in section name
 ## test
 value read from [readDataTest]p1       = 'c'c'
 unquoted      value written and reread = 'c'c'
-single quoted value written and reread = 'c'
+single quoted value written and reread = 'cc''
 double quoted value written and reread = 'c'c'
 read from [readDataTest]'test'Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test'Name' as = 'hello'
@@ -1557,15 +1557,13 @@ PASS    : char ''' can be used in section name
 value read from [readDataTest]p1       = 'c"c'
 unquoted      value written and reread = 'c"c'
 single quoted value written and reread = 'c"c'
-double quoted value written and reread = 'c'
+double quoted value written and reread = 'cc"'
 read from [readDataTest]'test"Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test"Name' as = 'hello'
 read from [test"Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection"Name]foo as = 'howdy'
 PASS    : char '"' can be used in unquoted value
 PASS    : char '"' can be used in single quoted value
-# If the following line is a PASS, it is a little missleading.
-# Using an unescaped " in a double quoted string will cause an EOL comment to become part of the value
 INVALID : char '"' can NOT be used in double quoted value
 PASS    : char '"' can be used in parameter name
 PASS    : char '"' can be used in section name
@@ -1658,8 +1656,6 @@ PASS    : char ':' can be used in section name
 
 ##----------
 ## test
-# NOTE: This test produces different results based on whether the bgCore builtin is installed. 
-#       That means that how backslash characters are treated in ini files will vary based on that.
 value read from [readDataTest]p1       = 'c\c'
 unquoted      value written and reread = 'c\c'
 single quoted value written and reread = 'c\c'

@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+###############################################################################
+# Includes and defines
+
+packageName=
+
+source /usr/lib/bg_core.sh
+import bg_qemu.sh ;$L1;$L2
+
+cmds="disks machines"
+cmdlineSyntax="<cmd>"
+
+###############################################################################
+# Command manpage
+# usage: bg-qemu [-q|--quiet] [-v|--verbose] [-f|--force] [-u|--user=<user>]  <cmd>
+# <one line description...>
+# <description...>
+#
+# Options:
+# Params:
+# See Also:
+
+
+###############################################################################
+# Functions
+
+# this is invoked by oob_invokeOutOfBandSystem when -hb is the first param
+# The bash completion script calls this get the list of possible words.
+function oob_printBashCompletion()
+{
+	bgBCParse "$cmdlineSyntax" "$@"; set -- "${posWords[@]:1}"
+	#bgtraceVars clInput posWords posCwords completingArgName -l"dollar vars='$*'"
+
+	case $completingArgName:$1:$posCwords in
+		'<cmd>':*) echo "$cmds" ;;
+		*:disks:2) echo "mount umount mountStatus" ;;
+		*:disks:*)
+			case $2:$((posCwords-2)) in
+				mount:1)  completeVMImageFile ;;
+				umount:1) completeUnmount ;;
+			esac
+			;;
+	esac
+}
+
+# Use this function to provide BC suggestions for positional parameters
+# see man bg-overviewOutOfBandScriptFunctions for details
+function oob_helpMode()
+{
+	local -A clInput; bgCmdlineParse -RclInput "$cmdlineSyntax" "$@"; shift "${clInput[shiftCount]}"
+	case ${clInput[cmd]:-main} in
+		main)  man "$(basename $0)" ;;
+		*)     man "$(basename $0)" ;;
+	esac
+}
+
+function diskCntr()
+{
+	local cmd="$1"; shift
+
+	case $cmd in
+		mount)       qemu_mount       "$@" ;;
+		umount)      qemu_umount      "$@" ;;
+		mountStatus) qemu_mountStatus "$@" ;;
+		*) assertError -v subCmd:cmd "unknown sub command"
+	esac
+}
+
+function machineCntr()
+{
+	local cmd="$1"; shift
+
+	case $cmd in
+		1) : ;;
+	esac
+}
+
+###############################################################################
+# Main script
+
+# default values for parameters
+verbosity=1
+forceFlag=""
+userName=""
+oob_invokeOutOfBandSystem "$@"
+while [ $# -gt 0 ]; do case $1 in
+	-v | --verbose)  ((verbosity++)) ;;
+	-q | --quiet)    ((verbosity--)) ;;
+	--verbosity*)    bgOptionGetOpt val: verbosity "$@" && shift ;;
+	-f  | --force)   forceFlag="-f" ;;
+	-u* | --user)    bgOptionGetOpt val: userName "$@" && shift ;;
+	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+done
+cmd="$1"; shift
+
+case ${cmd:-cmd1} in
+	disks)    diskCntr "$@" ;;
+	machines) machineCntr "$@" ;;
+	*) assertError -v subCmd:cmd "Unknown sub command." ;;
+esac

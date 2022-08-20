@@ -9,7 +9,8 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 	fi
 
 
-	set +e
+	set +e  # turn off the horrible stop on error feature
+	set +m  # turn off job control so that bash does not print "Terminate" sometimes
 
 	# source the optional bgCore bash loadable builtin if its available.
 	# This builtin provides a much faster implementation to some critical bash functions. We strive to make behavior of the each

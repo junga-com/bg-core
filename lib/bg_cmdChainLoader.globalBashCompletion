@@ -39,24 +39,46 @@ function _bg_subclassed_completionLoader() {
 		complete -F _bgbc-complete-viaCmdDelegation "$cmd" && return 124
 		# returning 124 tells bash to restart running specs for this cmd since we changed the completion specs
 
-	else
+	elif [ "$_bg_subclassed_completionLoader_prevLoader" ]; then
 		#echo "$_bg_subclassed_completionLoader_prevLoader $@" >> /tmp/bgtrace.out
 		# pass off to the chained loader that we replaced
 		$_bg_subclassed_completionLoader_prevLoader "$@"
 		return $? # ... to make sure we return the exit code from the chained loader
+	else
+		compopt -o default
 	fi
 }
 
 # in case we get reloaded, this block only runs the when the _bg_subclassed_completionLoader has not yet been installed (typically the first time)
-if [[ ! "$(complete -D -p)" =~ _bg_subclassed_completionLoader  ]]; then
+if [[ ! "$(complete -D -p 2>/dev/null)" =~ _bg_subclassed_completionLoader  ]]; then
 	echo "BGBC: default chain loader being installed" >>/tmp/bgtrace.out
 	# save the previous default loader spec, removing the -D b/c we will apply it to a specific cmd when we have to use it
 	# we also remove the leading 'complete ' so that when we execute it we cant be tricked into running an unknown command
-	_bg_subclassed_completionLoader_prevLoader="$(complete -D -p)"
-	_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader//-D}"
-	_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader//-F}"
-	_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader#complete }"
+	_bg_subclassed_completionLoader_prevLoader="$(complete -D -p 2>/dev/null)"
+	if [[ ! "$_bg_subclassed_completionLoader_prevLoader" ]]; then
+		complete -D -F _bg_subclassed_completionLoader
+	elif [[ "$_bg_subclassed_completionLoader_prevLoader" == *-[FC]* ]]; then
+		# the -D is sometimes put at the end but -F and -C must appear before the function or cmd name
+		_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader//-D}"
+		_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader#*-F}"
+		_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader#*-C}"
+		while [[ "$_bg_subclassed_completionLoader_prevLoader" == \ * ]]; do
+			_bg_subclassed_completionLoader_prevLoader="${_bg_subclassed_completionLoader_prevLoader# }"
+		done
 
-	# overwrite the default loader with our function
-	complete -D -F _bg_subclassed_completionLoader
+		# overwrite the default loader with our function
+		complete -D -F _bg_subclassed_completionLoader
+	else
+		cat <<-EOS
+			WARNING: the bg-core package's default bash completion loader was not installed
+			because there is already a default completion loader that is not a function (-F)
+			type. If bg-core is being installed on a new distribution, then the
+			$BASH_SOURCE file needs to be updated to handle this case. It is also possible
+			that the existing default loader was installed by another package and you can
+			consider uninstalling that package or disableing its installation of its default
+			loader (look in /etc/bash_completions.d for a file that installs the default completion
+			loader shown below)
+			    offending default loader = '$(complete -D -p)'
+		EOS
+	fi
 fi

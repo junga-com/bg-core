@@ -478,7 +478,7 @@ function templateEvaluateVarToken()
 		# if its one or more escaped %
 		elif [ "${rematch[$_idxEsc]}" ]; then
 			_foundFlagETV="1"
-			if [[ rematch[$_idxEsc] == /* ]]; then
+			if [[ "${rematch[$_idxEsc]}" == /* ]]; then
 				_valueValueETV="${rematch[$_idxEsc]//\//$templateMagicEscToken}"
 			else
 				_valueValueETV="${rematch[$_idxEsc]//\\/$templateMagicEscToken}"

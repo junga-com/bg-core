@@ -133,6 +133,9 @@ function bgStackFreeze()
 		bgStackFreezeDone
 	fi
 
+	local redactedPIDs redactedTTY
+	[ "$bgInUnitTest" ] && { redactedPIDs="<PID>"; redactedTTY="<tty>"; }
+
 	local ignoreFrames="${1:-1}"; (( ignoreFrames=((ignoreFrames<(${#FUNCNAME[@]})) ? (ignoreFrames) : (${#FUNCNAME[@]}-1)) ))
 	local interruptedSimpleCmd="$2"
 	local interuptedLineNo="$3"
@@ -188,15 +191,17 @@ function bgStackFreeze()
 
 			local ppid ttyName; read -r ppid ttyName <<<"$(ps -o ppid=,tty= --pid $$)"
 			local comm; read -r comm <<<"$(ps -o comm= --pid ${ppid:-$$})"
-			bgSTK_caller[$stackSize-1]="${comm}(${ppid})"
-			bgSTK_cmdFile[$stackSize-1]="${ttyName//\//-}"
+			bgSTK_caller[$stackSize-1]="${comm}(${redactedPIDs:-$ppid})"
+			bgSTK_cmdFile[$stackSize-1]="${redactedTTY:-${ttyName//\//-}}"
 			bgSTK_frmCtx[$stackSize-1]="top.main"
+			bgSTK_cmdLineNo[$stackSize-1]="0"
 			;;
 		# we are executing the global code from a library script being sourced into an interactive terminal. The container is the terminal
 		source)
 			local ttyName; read -r ttyName <<<"$(ps -o tty= --pid $$)"
-			bgSTK_caller[$stackSize-1]="bash($$)"
-			bgSTK_cmdFile[$stackSize-1]="${ttyName//\//-}"
+			bgSTK_caller[$stackSize-1]="bash(${redactedPIDs:-$$})"
+			bgSTK_cmdFile[$stackSize-1]="${redactedTTY:-${ttyName//\//-}}"
+			bgSTK_cmdLineNo[$stackSize-1]="0"
 
 			# there is a quirk in BASH that if there are no additional args sent to the sourced script, the <scriptName> is in the
 			# BASH_ARGV array as the single argument to 'source'. However, if you pass args like 'source <scriptName> <arg1>..<argN>'
@@ -213,9 +218,10 @@ function bgStackFreeze()
 		# we are running a function that has been previously sourced into a terminal. The container is the sourced function.
 		*)
 			local ttyName; read -r ttyName <<<"$(ps -o tty= --pid $$)"
-			bgSTK_caller[$stackSize-1]="bash($$)"
-			bgSTK_cmdFile[$stackSize-1]="${ttyName//\//-}"
+			bgSTK_caller[$stackSize-1]="bash(${redactedPIDs:-$$})"
+			bgSTK_cmdFile[$stackSize-1]="${redactedTTY:-${ttyName//\//-}}"
 			bgSTK_frmCtx[$stackSize-1]="top.srcdFunc"
+			bgSTK_cmdLineNo[$stackSize-1]="0"
 			;;
 	esac
 
@@ -312,7 +318,7 @@ function bgStackFreeze()
 		# falsely attributed to the frame above it before now.
 		if [ ${insertIdx:-0} -gt 0 ]; then
 			bgSTK_caller[$insertIdx-1]="${signal}_HANDLER"
-			bgSTK_cmdFile[$insertIdx-1]="${signal}-${trapPID}<handler>"
+			bgSTK_cmdFile[$insertIdx-1]="${signal}-${redactedPIDs:-$trapPID}<handler>"
 		fi
 
 		# create our new frame data from these two sources
@@ -333,7 +339,7 @@ function bgStackFreeze()
 		bgSTK_argc=(     "${bgSTK_argc[@]:0:$insertIdx}"       "0"                   "${bgSTK_argc[@]:$insertIdx}"      )
 		bgSTK_cmdLine=(  "${bgSTK_cmdLine[@]:0:$insertIdx}"    "$ruptdCmdLine"       "${bgSTK_cmdLine[@]:$insertIdx}"   )
 		bgSTK_cmdFile=(  "${bgSTK_cmdFile[@]:0:$insertIdx}"    "$ruptdCmdFile"       "${bgSTK_cmdFile[@]:$insertIdx}"   )
-		bgSTK_frmCtx=(   "${bgSTK_frmCtx[@]:0:$insertIdx}"     "lastBefore(${signal}-${trapPID})" "${bgSTK_frmCtx[@]:$insertIdx}"    )
+		bgSTK_frmCtx=(   "${bgSTK_frmCtx[@]:0:$insertIdx}"     "lastBefore(${signal}-${redactedPIDs:-$trapPID})" "${bgSTK_frmCtx[@]:$insertIdx}"    )
 		((stackSize++))
 	done
 
@@ -362,7 +368,7 @@ function bgStackFreeze()
 			local signal="${BASH_REMATCH[1]}"
 			local trapPID="${BASH_REMATCH[2]}"
 			bgSTK_caller[0]="${signal}_HANDLER"
-			bgSTK_cmdFile[0]="${signal}-${trapPID}<handler>"
+			bgSTK_cmdFile[0]="${signal}-${redactedPIDs:-$trapPID}<handler>"
 
 		# NOTE: When the debug trap fires before the first line the first line of a trap, BASH_COMMAND is the set for the other trap
 		# and not the DEBUG trap.
@@ -372,7 +378,7 @@ function bgStackFreeze()
 			local signal="${bgSTK_argv[bgSTK_argc[0]-2]}"
 			local trapPID="${bgSTK_argv[bgSTK_argc[0]-1]}"
 			bgSTK_caller[0]="${signal}_HANDLER"
-			bgSTK_cmdFile[0]="${signal}-${trapPID}<handler>"
+			bgSTK_cmdFile[0]="${signal}-${redactedPIDs:-$trapPID}<handler>"
 
 		# we assume that if lineno is 1, its the start of an interupt handler. Unfortunately, because BASH_COMMAND is not set to the
 		# next command in this rare case, we know nothing about the interupt that is starting.
@@ -380,7 +386,7 @@ function bgStackFreeze()
 			local signal="<UNK>"
 			local trapPID="<UNK>"
 			bgSTK_caller[0]="${signal}_HANDLER"
-			bgSTK_cmdFile[0]="${signal}-${trapPID}<handler>"
+			bgSTK_cmdFile[0]="${signal}-${redactedPIDs:-$trapPID}<handler>"
 		fi
 	fi
 
@@ -550,7 +556,7 @@ function bgStackPrint()
 
 	[ "$stackDebugFlag" ] && bgStackDump
 
-	echo "===============  BASH call stack trace P:$$/$BASHPID TTY:$(tty 2>/dev/null) ====================="
+	echo "===============  BASH call stack trace P:$$/${redactedPIDs:-$BASHPID} TTY:${redactedTTY:-$(tty 2>/dev/null)} ====================="
 	local i
 	for ((i=${#bgSTK_cmdFile[@]}-1; i>=${ignoreFramesCount:-0}; i--)); do
 		if [ ! "$bgStackShowPlumbing" ] && [[ "${bgSTK_caller[i]}" =~ ^(_bgclassCall)[(][)]$ ]]; then

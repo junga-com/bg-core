@@ -113,6 +113,7 @@ function parseINIFileLine(line) {
 	iniLineType="<error>" # if the parser below fails to set the iniLineType, it will have this value
 
 	parserStartQuotingTokenizer(line, parser, "--parseChars==[]%20")
+
 	parserEatWhitespace(parser)
 	if (parserIsDone(parser)) {
 		iniLineType="whitespace"

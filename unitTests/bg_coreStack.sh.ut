@@ -90,7 +90,7 @@ function ut_bgStackMarshal()
 {
 	ut setup
 	shopt -s extdebug
-	ut filter '[(][0-9]*[)]:###(<redacted>):'
+	ut filter '[(][0-9]+[)]:###(<redacted>):'
 	local tmpFile; bgmktemp tmpFile bgmktemp.ut_bgStackMarshal.XXXXXXXXXX
 
 	function a1() { bgStackFreeze --all; bgStackMarshal "$tmpFile"; } ; :
@@ -109,6 +109,11 @@ function ut_bgStackMarshal()
 	for ((i=0; i<5; i++)); do echo "   [$i] ${bgSTK_frmSummary[$i]}"; done
 }
 
+# in 5.1 BASH_COMMAND is not updated while in a another non-DEBUG trap so comment out these tests so testcases can be consistent
+# [top_USR1_DBG]="top_USR1_DBG"
+# [top_USR1_func_DBG]="top_USR1_func_DBG"
+# [func_USR1_DBG]="func_USR1_DBG"
+# [func_USR1_func_DBG]="func_USR1_func_DBG"
 
 declare -A ut_bgStackFreeze=(
 	[top]="top"
@@ -119,17 +124,14 @@ declare -A ut_bgStackFreeze=(
 	[top_USR1]="top_USR1"
 	[top_USR1_func]="top_USR1_func"
 	[top_USR1FirstLine_DBG]="top_USR1FirstLine_DBG"
-	[top_USR1_DBG]="top_USR1_DBG"
-	[top_USR1_func_DBG]="top_USR1_func_DBG"
 	[func_USR1]="func_USR1"
 	[func_USR1_func]="func_USR1_func"
 	[func_USR1FirstLine_DBG]="func_USR1FirstLine_DBG"
-	[func_USR1_DBG]="func_USR1_DBG"
-	[func_USR1_func_DBG]="func_USR1_func_DBG"
 )
 function ut_bgStackFreeze()
 {
-	ut setup normWhitespace
+	# 2022-08 bobg: commented out normWhitespace because bgInUnitTest mechanism makes it predictable without it
+	ut setup # normWhitespace
 	ut filter 'pts-[0-9]+###pts-<redacted>'
 	shopt -s extdebug
 	ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'

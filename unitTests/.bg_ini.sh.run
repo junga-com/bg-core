@@ -28,7 +28,6 @@ iniParamGet $iniFile . foo <defValue>
 iniParamSet $iniFile . foo 5
 iniFile:
    [1]: foo=5
-   [2]: 
 
 ## bg_ini.sh:iniParamSet:0 finished
 ###############################################################################################################################
@@ -1220,17 +1219,14 @@ p1=one
 p2=one two
 honey=
 
-
 [ sect1 ]
 p1==4
 p2=j/l
-
 
 [ sect:1 ]
 p1=1
 p2=2
 honey=3
-
 
 ## bg_ini.sh:setIniParam: finished
 ###############################################################################################################################
@@ -1528,15 +1524,15 @@ value read from [readDataTest]p1       = 'c'c'
 unquoted      value written and reread = 'c'c'
 single quoted value written and reread = 'cc''
 double quoted value written and reread = 'c'c'
-read from [readDataTest]'test'Name'      (expect 'hello') as = 'badValue'
-written and read back from [writeParamNameTest]test'Name' as = 'badValue'
-read from [test'Name]p1        (expect 'howdy') as = 'badValue'
-written and read back from [NewSection'Name]foo as = 'badValue'
+read from [readDataTest]'test'Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test'Name' as = 'hello'
+read from [test'Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection'Name]foo as = 'howdy'
 PASS    : char ''' can be used in unquoted value
 INVALID : char ''' can NOT be used in single quoted value
 PASS    : char ''' can be used in double quoted value
-INVALID : char ''' can NOT be used in parameter name
-INVALID : char ''' can NOT be used in section name
+PASS    : char ''' can be used in parameter name
+PASS    : char ''' can be used in section name
 
 ## bg_ini.sh:ini_validChars:singleQuote finished
 ###############################################################################################################################
@@ -1562,15 +1558,15 @@ value read from [readDataTest]p1       = 'c"c'
 unquoted      value written and reread = 'c"c'
 single quoted value written and reread = 'c"c'
 double quoted value written and reread = 'cc"'
-read from [readDataTest]'test"Name'      (expect 'hello') as = 'badValue'
-written and read back from [writeParamNameTest]test"Name' as = 'badValue'
-read from [test"Name]p1        (expect 'howdy') as = 'badValue'
-written and read back from [NewSection"Name]foo as = 'badValue'
+read from [readDataTest]'test"Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test"Name' as = 'hello'
+read from [test"Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection"Name]foo as = 'howdy'
 PASS    : char '"' can be used in unquoted value
 PASS    : char '"' can be used in single quoted value
 INVALID : char '"' can NOT be used in double quoted value
-INVALID : char '"' can NOT be used in parameter name
-INVALID : char '"' can NOT be used in section name
+PASS    : char '"' can be used in parameter name
+PASS    : char '"' can be used in section name
 
 ## bg_ini.sh:ini_validChars:doubleQuote finished
 ###############################################################################################################################
@@ -1661,27 +1657,18 @@ PASS    : char ':' can be used in section name
 ##----------
 ## test
 value read from [readDataTest]p1       = 'c\c'
-stderr> gawk: warning: escape sequence `\c' treated as plain `c'
-unquoted      value written and reread = 'cc'
-stderr> gawk: warning: escape sequence `\c' treated as plain `c'
-single quoted value written and reread = 'cc'
-stderr> gawk: warning: escape sequence `\c' treated as plain `c'
-double quoted value written and reread = 'cc'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
-read from [readDataTest]'test\Name'      (expect 'hello') as = 'badValue'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
+unquoted      value written and reread = 'c\c'
+single quoted value written and reread = 'c\c'
+double quoted value written and reread = 'c\c'
+read from [readDataTest]'test\Name'      (expect 'hello') as = 'hello'
 written and read back from [writeParamNameTest]test\Name' as = 'hello'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
-read from [test\Name]p1        (expect 'howdy') as = 'badValue'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
-stderr> gawk: warning: escape sequence `\N' treated as plain `N'
+read from [test\Name]p1        (expect 'howdy') as = 'howdy'
 written and read back from [NewSection\Name]foo as = 'howdy'
-INVALID : char '\' can NOT be used in unquoted value
-INVALID : char '\' can NOT be used in single quoted value
-INVALID : char '\' can NOT be used in double quoted value
-INVALID : char '\' can NOT be used in parameter name
-INVALID : char '\' can NOT be used in section name
+PASS    : char '\' can be used in unquoted value
+PASS    : char '\' can be used in single quoted value
+PASS    : char '\' can be used in double quoted value
+PASS    : char '\' can be used in parameter name
+PASS    : char '\' can be used in section name
 
 ## bg_ini.sh:ini_validChars:backslash finished
 ###############################################################################################################################
@@ -2081,15 +2068,15 @@ value read from [readDataTest]p1       = 'c'
 unquoted      value written and reread = 'c#c'
 single quoted value written and reread = 'c#c'
 double quoted value written and reread = 'c#c'
-read from [readDataTest]'test#Name'      (expect 'hello') as = 'badValue'
-written and read back from [writeParamNameTest]test#Name' as = 'badValue'
-read from [test#Name]p1        (expect 'howdy') as = 'badValue'
-written and read back from [NewSection#Name]foo as = 'badValue'
+read from [readDataTest]'test#Name'      (expect 'hello') as = 'hello'
+written and read back from [writeParamNameTest]test#Name' as = 'hello'
+read from [test#Name]p1        (expect 'howdy') as = 'howdy'
+written and read back from [NewSection#Name]foo as = 'howdy'
 INVALID : char '#' can NOT be used in unquoted value
 PASS    : char '#' can be used in single quoted value
 PASS    : char '#' can be used in double quoted value
-INVALID : char '#' can NOT be used in parameter name
-INVALID : char '#' can NOT be used in section name
+PASS    : char '#' can be used in parameter name
+PASS    : char '#' can be used in section name
 
 ## bg_ini.sh:ini_validChars:hash finished
 ###############################################################################################################################

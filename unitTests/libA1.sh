@@ -8,9 +8,8 @@ function a1()
 		;;
 
 		a1DBG)
-			builtin trap 'bgStackFreeze --all "" "$BASH_COMMAND" "$LINENO"
+			builtin trap 'builtin trap "" DEBUG; bgStackFreeze --all "" "$BASH_COMMAND" "$LINENO"
 				bgStackPrint $stackPrintOpts
-				builtin trap "" DEBUG
 			' DEBUG
 			: noop next cmd
 			# bgStackFreeze --all "" "similulatedCmd sc1 sc2" "15"

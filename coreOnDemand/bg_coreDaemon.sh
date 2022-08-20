@@ -357,7 +357,7 @@ function daemonCntrIsEnabled()
 # enable the daemon to automatically start on boot.
 # The auto mechanism has two states. Whether it is installed using sysv,upstart, or systemd and whether
 # the installed mechanism is configured to automatically start.
-# Enable/Diable only refers to the second state. Enabling a daemon that is not installed with any mechaism will assertError because
+# Enable/Diable only refers to the second state. Enabling a daemon that is not installed with any mechanism will assertError because
 # this function can not achieve the goal of making it start on boot.
 # Params:
 #     <daemonName> : specifies the name of the daemon. Must be unique in /var/run/<daemonName>
@@ -380,7 +380,7 @@ function daemonCntrEnable()
 # disable the daemon from automatically starting on boot
 # The auto mechanism has two states. Whether it is installed using sysv,upstart, or systemd and whether
 # the installed mechanism is configured to automatically start.
-# Enable/Diable only refers to the second state. Disabling a daemon that is not installed with any mechaism is not an error becasue
+# Enable/Diable only refers to the second state. Disabling a daemon that is not installed with any mechanism is not an error becasue
 # by definition, it will not start on boot
 # Params:
 #     <daemonName> : specifies the name of the daemon. Must be unique in /var/run/<daemonName>

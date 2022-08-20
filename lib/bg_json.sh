@@ -247,6 +247,8 @@ function Object::toJSON()
 	# use getIndexes to get the memberNames. Its tempting to try to use "${!this[@]}" and "${!_this[@]}" but its too complicated to
 	# repeat all the edge cases and getAttributes is pretty well optimized so that when possible it just returns those constructs
 	local -a memberNames; $_this.getIndexes $myMode -A memberNames
+	[ ${#memberNames[@]} -gt 0 ] && readarray -t memberNames < <(printf "%s\n" "${memberNames[@]}"  | LC_ALL=C sort -u)
+
 	local totalMemberCount="${#memberNames[@]}"
 	local writtenCount="$totalMemberCount"
 	local sep=","

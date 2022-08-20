@@ -5,6 +5,7 @@
 
 ##----------
 ## setup
+##     | ut filter '(gawk: fatal: cannot open file ... <redacted>
 ##     | cmd> makeTestData
 ##     | cmd> export bgVinstalledManifest="$utDataFolder/manifest"
 ##     | cmd> cat "$bgVinstalledManifest"
@@ -62,7 +63,7 @@ long form = type1|/tmp/tmp.<redacted>/type1.myData|/tmp/tmp.<redacted>/type1.awk
 # expect an exception because the specified schema file does not exit
 cmd> awkDataID="$utDataFolder/type2.schema"
 cmd> awk -v testData="$awkDataID" '@include "bg_awkDataSchema.awk"; BEGIN {print("long form = " awkData_parseID(testData))}'
-stderr> gawk: fatal: cannot open file `/tmp/tmp.<redacted>/type2.schema' for reading (No such file or directory)
+stderr> gawk: fatal: cannot open file ... <redacted>
 stderr> awk assert error () : Neither the awk schema file nor the awkDataID specify the awkFile path. awkDataID=||/tmp/tmp.<redacted>/type2.schema
 stderr>    inputFile=  : BEGIN
 stderr>    input line= 'N/A'

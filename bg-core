@@ -86,7 +86,7 @@ function oob_printBashCompletion()
 		cuiWin:1)
 			echo "<winName>"
 			local cuiWinCntrFilePrefix="/tmp/bgtrace."
-			for i in $(fsExpandFiles -e ${cuiWinCntrFilePrefix}*.cntr); do
+			for i in $(fsExpandFiles ${cuiWinCntrFilePrefix}*.cntr); do
 				i="${i%.cntr}"; i="${i#$cuiWinCntrFilePrefix}";
 				echo "$i"
 			done
@@ -235,7 +235,7 @@ case ${command:-show} in
 		import bg_cuiWin.sh  ;$L1;$L2
 		cuiWinCntr     "${passThruOpts[@]}" "$@"
 		;;
-	show)          echo "coming soon..."  ;;
+	show)          echo "coming soon... (or is it?)"  ;;
 	*)  echo "error: unknown command '$command'. "
 		echo "   See man $(basename $0)"
 		;;

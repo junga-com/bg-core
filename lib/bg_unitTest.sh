@@ -275,6 +275,13 @@ assertNotEmpty bgUnitTestScript
 # exiting the function prematurely (with exit; or assert*) will produce output in the testcase's stdout stream which will be compared
 # to the 'plato' output. If its identical, then the testcase passes and if not it fails.
 #
+# ut filter "<matchRegEx>###<replaceExpression>"
+# Add a filter to the test case. <matchRegEx> will be applied to the output and each found occurence will be replaced with
+# <replaceExpression>. <replaceExpression> can contain \<n> tokens where <n> is the number of a capture expression in <matchRegEx>
+# For Example...
+#    ut filter 'heap_([^_]*)_([^_ ]*)###heap_\1_<redacted>'
+# would cause 'heap_Ar_87ABC' in the output to be replaced with 'heap_Ar_<redacted>'
+#
 # Internal Cmds:
 # ut onStart
 # Called before the first line of the test function is executed.
@@ -530,6 +537,8 @@ function _ut_flushLineInfo()
 # the source lineno so we use that to identify the line to print and suppress printing the same line multiple times in a row.
 function _ut_debugTrap()
 {
+	###!!IMPORTANT: From bash 5.1 on, if anything called by the DEBUG trap creates a subshell (while extdebug is on) it will infinitley loop
+	# This function can not create any subshells!!
 	#bgtrace "_ut_debugTrap: $bgBASH_debugTrapFUNCNAME | $BASH_COMMAND"
 
 	# we are only interested in DEBUG traps for the target ut_ function but its not possible to turn it on only for it so filter out
@@ -683,6 +692,9 @@ function utfRunner_execute()
 			echo "Command not found. cmdline='$*'" >&2
 			exit 127
 		}
+
+		export pvFixedIndents=3
+		export bgInUnitTest="1"
 
 		# require an extra config to keep tracing on for tests because they can have many exceptions printing stack traces
 		# when ran directly, bgTracingTestRunner is set to on so this only affects running from bg-dev tests ...

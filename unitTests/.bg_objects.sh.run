@@ -76,7 +76,7 @@ _rsvMemberName='foo'
 _chainedObjOrMember='.foo'
 _memberOp=''
 _argsV[]
-      [0]='p1'
+   [0]='p1'
 _hierarchLevel='0'
 _memberExpression='.foo p1'
 _rsvOID='myoid'
@@ -107,7 +107,7 @@ _rsvMemberName='foo'
 _chainedObjOrMember='.bar.foo'
 _memberOp=''
 _argsV[]
-      [0]='p1'
+   [0]='p1'
 _hierarchLevel='0'
 _memberExpression='.bar.foo p1'
 _rsvOID='heap_A_<redacted>'
@@ -198,7 +198,7 @@ _rsvMemberName='foo'
 _chainedObjOrMember=''
 _memberOp='.unset'
 _argsV[]
-      [0]='p1'
+   [0]='p1'
 _hierarchLevel='0'
 _memberExpression='.unset p1'
 _rsvOID='myoid'
@@ -229,7 +229,7 @@ _rsvMemberName=''
 _chainedObjOrMember='.foo'
 _memberOp='.unset'
 _argsV[]
-      [0]='p1'
+   [0]='p1'
 _hierarchLevel='0'
 _memberExpression='.foo.unset p1'
 _rsvOID='myoid'
@@ -320,7 +320,7 @@ _rsvMemberName='foo'
 _chainedObjOrMember=''
 _memberOp='=new'
 _argsV[]
-      [0]='p1'
+   [0]='p1'
 _hierarchLevel='0'
 _memberExpression='=new p1'
 _rsvOID='myoid'
@@ -351,7 +351,7 @@ _rsvMemberName=''
 _chainedObjOrMember='.foo'
 _memberOp='=new'
 _argsV[]
-      [0]='p1'
+   [0]='p1'
 _hierarchLevel='0'
 _memberExpression='.foo=new p1'
 _rsvOID='myoid'
@@ -442,7 +442,7 @@ _rsvMemberName='foo'
 _chainedObjOrMember=''
 _memberOp='='
 _argsV[]
-      [0]=' p1'
+   [0]=' p1'
 _hierarchLevel='0'
 _memberExpression='= p1'
 _rsvOID='myoid'
@@ -473,7 +473,7 @@ _rsvMemberName=''
 _chainedObjOrMember=''
 _memberOp='='
 _argsV[]
-      [0]='p1'
+   [0]='p1'
 _hierarchLevel='0'
 _memberExpression='=p1'
 _rsvOID='myoid'
@@ -504,7 +504,7 @@ _rsvMemberName=''
 _chainedObjOrMember='.foo'
 _memberOp='='
 _argsV[]
-      [0]=' p1'
+   [0]=' p1'
 _hierarchLevel='0'
 _memberExpression='.foo= p1'
 _rsvOID='myoid'
@@ -535,7 +535,7 @@ _rsvMemberName='foo'
 _chainedObjOrMember='.foo'
 _memberOp='='
 _argsV[]
-      [0]='p1'
+   [0]='p1'
 _hierarchLevel='0'
 _memberExpression='.foo=p1'
 _rsvOID='myoid'
@@ -566,7 +566,7 @@ _rsvMemberName='foo'
 _chainedObjOrMember=''
 _memberOp='::'
 _argsV[]
-      [0]='assign'
+   [0]='assign'
 _hierarchLevel='0'
 _memberExpression='::assign'
 _rsvOID='Object'
@@ -687,152 +687,152 @@ Object Class NullObject Stack Array Map
 #------------------ Object --------------------
 global array vars: Object Object_vmt
 Object[]
-      [baseClass     ]=''
-      [_CLASS        ]='Class'
-      [0             ]=' <objRef to 'Object'>'
-      [_Ref          ]=' <objRef to 'Object'>'
-      [classHierarchy]='Object'
-      [vmtCacheNum   ]=<redacted>
-      [methods       ]='Object::addMethod
-                       +Object::bgtrace
-                       +Object::clear
-                       +Object::clone
-                       +Object::eval
-                       +Object::fromDebControl
-                       +Object::fromFlatINI
-                       +Object::fromINI
-                       +Object::fromString
-                       +Object::get
-                       +Object::getAttributes
-                       +Object::getIndexes
-                       +Object::getMethods
-                       +Object::getSize
-                       +Object::getStaticMethods
-                       +Object::getValues
-                       +Object::hasMethod
-                       +Object::restoreFile
-                       +Object::saveFile
-                       +Object::set
-                       +Object::toDebControl
-                       +Object::toFlatINI
-                       +Object::toString'
-      [subClasses    ]='Class NullObject Stack Array Map'
-      [staticMethods ]='static::Object::assign'
-      [name          ]='Object'
-      [_OID          ]='Object'
+   [0             ]=' <objRef to 'Object'>'
+   [_CLASS        ]='Class'
+   [_OID          ]='Object'
+   [_Ref          ]=' <objRef to 'Object'>'
+   [baseClass     ]=''
+   [classHierarchy]='Object'
+   [methods       ]='Object::addMethod
+                    +Object::bgtrace
+                    +Object::clear
+                    +Object::clone
+                    +Object::eval
+                    +Object::fromDebControl
+                    +Object::fromFlatINI
+                    +Object::fromINI
+                    +Object::fromString
+                    +Object::get
+                    +Object::getAttributes
+                    +Object::getIndexes
+                    +Object::getMethods
+                    +Object::getSize
+                    +Object::getStaticMethods
+                    +Object::getValues
+                    +Object::hasMethod
+                    +Object::restoreFile
+                    +Object::saveFile
+                    +Object::set
+                    +Object::toDebControl
+                    +Object::toFlatINI
+                    +Object::toString'
+   [name          ]='Object'
+   [staticMethods ]='static::Object::assign'
+   [subClasses    ]='Class NullObject Stack Array Map'
+   [vmtCacheNum   ]=<redacted>
 #
 Object_vmt[]
-          [_method::fromFlatINI     ]='Object::fromFlatINI'
-          [_method::getValues       ]='Object::getValues'
-          [_method::hasMethod       ]='Object::hasMethod'
-          [_method::getAttributes   ]='Object::getAttributes'
-          [_method::toFlatINI       ]='Object::toFlatINI'
-          [_method::restoreFile     ]='Object::restoreFile'
-          [_method::getSize         ]='Object::getSize'
-          [_method::fromDebControl  ]='Object::fromDebControl'
-          [_method::getMethods      ]='Object::getMethods'
-          [_method::eval            ]='Object::eval'
-          [_method::fromINI         ]='Object::fromINI'
-          [_method::saveFile        ]='Object::saveFile'
-          [_method::getIndexes      ]='Object::getIndexes'
-          [_method::clone           ]='Object::clone'
-          [_method::toString        ]='Object::toString'
-          [_method::addMethod       ]='Object::addMethod'
-          [_method::toDebControl    ]='Object::toDebControl'
-          [_method::fromString      ]='Object::fromString'
-          [_method::set             ]='Object::set'
-          [_method::bgtrace         ]='Object::bgtrace'
-          [_static::assign          ]='static::Object::assign'
-          [_method::get             ]='Object::get'
-          [_method::clear           ]='Object::clear'
-          [_method::getStaticMethods]='Object::getStaticMethods'
+   [_method::addMethod       ]='Object::addMethod'
+   [_method::bgtrace         ]='Object::bgtrace'
+   [_method::clear           ]='Object::clear'
+   [_method::clone           ]='Object::clone'
+   [_method::eval            ]='Object::eval'
+   [_method::fromDebControl  ]='Object::fromDebControl'
+   [_method::fromFlatINI     ]='Object::fromFlatINI'
+   [_method::fromINI         ]='Object::fromINI'
+   [_method::fromString      ]='Object::fromString'
+   [_method::get             ]='Object::get'
+   [_method::getAttributes   ]='Object::getAttributes'
+   [_method::getIndexes      ]='Object::getIndexes'
+   [_method::getMethods      ]='Object::getMethods'
+   [_method::getSize         ]='Object::getSize'
+   [_method::getStaticMethods]='Object::getStaticMethods'
+   [_method::getValues       ]='Object::getValues'
+   [_method::hasMethod       ]='Object::hasMethod'
+   [_method::restoreFile     ]='Object::restoreFile'
+   [_method::saveFile        ]='Object::saveFile'
+   [_method::set             ]='Object::set'
+   [_method::toDebControl    ]='Object::toDebControl'
+   [_method::toFlatINI       ]='Object::toFlatINI'
+   [_method::toString        ]='Object::toString'
+   [_static::assign          ]='static::Object::assign'
 
 #
 #
 #------------------ Class --------------------
 global array vars: Class Class_vmt
 Class[]
-     [baseClass        ]='Object'
-     [_CLASS           ]='Class'
-     [0                ]=' <objRef to 'Class'>'
-     [_Ref             ]=' <objRef to 'Class'>'
-     [pendingClassCtors]=''
-     [classHierarchy   ]='Object Class'
-     [vmtCacheNum      ]=<redacted>
-     [methods          ]='Class::__construct
-                         +Class::getClassMethods
-                         +Class::getClassStaticMethods
-                         +Class::isDerivedFrom
-                         +Class::reloadMethods'
-     [staticMethods    ]='static::Class::assertClassExists
-                         +static::Class::setClass'
-     [name             ]='Class'
-     [_OID             ]='Class'
+   [0                ]=' <objRef to 'Class'>'
+   [_CLASS           ]='Class'
+   [_OID             ]='Class'
+   [_Ref             ]=' <objRef to 'Class'>'
+   [baseClass        ]='Object'
+   [classHierarchy   ]='Object Class'
+   [methods          ]='Class::__construct
+                       +Class::getClassMethods
+                       +Class::getClassStaticMethods
+                       +Class::isDerivedFrom
+                       +Class::reloadMethods'
+   [name             ]='Class'
+   [pendingClassCtors]=''
+   [staticMethods    ]='static::Class::assertClassExists
+                       +static::Class::setClass'
+   [vmtCacheNum      ]=<redacted>
 #
 Class_vmt[]
-         [_method::fromFlatINI        ]='Object::fromFlatINI'
-         [_method::getValues          ]='Object::getValues'
-         [_method::getAttributes      ]='Object::getAttributes'
-         [_method::hasMethod          ]='Object::hasMethod'
-         [_method::toFlatINI          ]='Object::toFlatINI'
-         [_static::setClass           ]='static::Class::setClass'
-         [_method::restoreFile        ]='Object::restoreFile'
-         [_method::getClassMethods    ]='Class::getClassMethods'
-         [_method::getSize            ]='Object::getSize'
-         [_method::__construct        ]='Class::__construct'
-         [_method::fromDebControl     ]='Object::fromDebControl'
-         [_method::eval               ]='Object::eval'
-         [_method::getMethods         ]='Object::getMethods'
-         [_method::fromINI            ]='Object::fromINI'
-         [_method::saveFile           ]='Object::saveFile'
-         [_method::getIndexes         ]='Object::getIndexes'
-         [_method::clone              ]='Object::clone'
-         [_method::addMethod          ]='Object::addMethod'
-         [_method::toString           ]='Object::toString'
-         [_method::toDebControl       ]='Object::toDebControl'
-         [_static::assertClassExists  ]='static::Class::assertClassExists'
-         [_method::fromString         ]='Object::fromString'
-         [_method::bgtrace            ]='Object::bgtrace'
-         [_method::set                ]='Object::set'
-         [_method::get                ]='Object::get'
-         [_static::assign             ]='static::Object::assign'
-         [_method::getClassStaticMethods]='Class::getClassStaticMethods'
-         [_method::reloadMethods      ]='Class::reloadMethods'
-         [_method::isDerivedFrom      ]='Class::isDerivedFrom'
-         [_method::clear              ]='Object::clear'
-         [_method::getStaticMethods   ]='Object::getStaticMethods'
+   [_method::__construct        ]='Class::__construct'
+   [_method::addMethod          ]='Object::addMethod'
+   [_method::bgtrace            ]='Object::bgtrace'
+   [_method::clear              ]='Object::clear'
+   [_method::clone              ]='Object::clone'
+   [_method::eval               ]='Object::eval'
+   [_method::fromDebControl     ]='Object::fromDebControl'
+   [_method::fromFlatINI        ]='Object::fromFlatINI'
+   [_method::fromINI            ]='Object::fromINI'
+   [_method::fromString         ]='Object::fromString'
+   [_method::get                ]='Object::get'
+   [_method::getAttributes      ]='Object::getAttributes'
+   [_method::getClassMethods    ]='Class::getClassMethods'
+   [_method::getClassStaticMethods]='Class::getClassStaticMethods'
+   [_method::getIndexes         ]='Object::getIndexes'
+   [_method::getMethods         ]='Object::getMethods'
+   [_method::getSize            ]='Object::getSize'
+   [_method::getStaticMethods   ]='Object::getStaticMethods'
+   [_method::getValues          ]='Object::getValues'
+   [_method::hasMethod          ]='Object::hasMethod'
+   [_method::isDerivedFrom      ]='Class::isDerivedFrom'
+   [_method::reloadMethods      ]='Class::reloadMethods'
+   [_method::restoreFile        ]='Object::restoreFile'
+   [_method::saveFile           ]='Object::saveFile'
+   [_method::set                ]='Object::set'
+   [_method::toDebControl       ]='Object::toDebControl'
+   [_method::toFlatINI          ]='Object::toFlatINI'
+   [_method::toString           ]='Object::toString'
+   [_static::assertClassExists  ]='static::Class::assertClassExists'
+   [_static::assign             ]='static::Object::assign'
+   [_static::setClass           ]='static::Class::setClass'
 
 #
 #
 #------------------ NullObject --------------------
 global array vars: NullObject NullObjectInstance
 NullObject[]
-          [baseClass     ]='Object'
-          [_CLASS        ]='Class'
-          [0             ]=' <objRef to 'NullObject'>'
-          [_Ref          ]=' <objRef to 'NullObject'>'
-          [classHierarchy]='Object NullObject'
-          [name          ]='NullObject'
-          [_OID          ]='NullObject'
+   [0             ]=' <objRef to 'NullObject'>'
+   [_CLASS        ]='Class'
+   [_OID          ]='NullObject'
+   [_Ref          ]=' <objRef to 'NullObject'>'
+   [baseClass     ]='Object'
+   [classHierarchy]='Object NullObject'
+   [name          ]='NullObject'
 #
 NullObject_vmt[]
 NullObjectInstance[]
-                  [_CLASS]='NullObject'
-                  [_Ref  ]='assertError Null Object reference called <NULL>'
-                  [0     ]='assertError Null Object reference called <NULL>'
-                  [_OID  ]='NullObjectInstance'
+   [0     ]='assertError Null Object reference called <NULL>'
+   [_CLASS]='NullObject'
+   [_OID  ]='NullObjectInstance'
+   [_Ref  ]='assertError Null Object reference called <NULL>'
 #
 #
 #------------------ Stack --------------------
 global array vars: Stack
 Stack[]
-     [baseClass     ]='Object'
-     [_CLASS        ]='Class'
-     [0             ]=' <objRef to 'Stack'>'
-     [_Ref          ]=' <objRef to 'Stack'>'
-     [classHierarchy]='Object Stack'
-     [name          ]='Stack'
-     [_OID          ]='Stack'
+   [0             ]=' <objRef to 'Stack'>'
+   [_CLASS        ]='Class'
+   [_OID          ]='Stack'
+   [_Ref          ]=' <objRef to 'Stack'>'
+   [baseClass     ]='Object'
+   [classHierarchy]='Object Stack'
+   [name          ]='Stack'
 #
 Stack_vmt[]
 
@@ -841,15 +841,15 @@ Stack_vmt[]
 #------------------ Array --------------------
 global array vars: Array
 Array[]
-     [baseClass     ]='Object'
-     [_CLASS        ]='Class'
-     [0             ]=' <objRef to 'Array'>'
-     [_Ref          ]=' <objRef to 'Array'>'
-     [oidAttributes ]='a'
-     [classHierarchy]='Object Array'
-     [defaultIndex  ]='off'
-     [name          ]='Array'
-     [_OID          ]='Array'
+   [0             ]=' <objRef to 'Array'>'
+   [_CLASS        ]='Class'
+   [_OID          ]='Array'
+   [_Ref          ]=' <objRef to 'Array'>'
+   [baseClass     ]='Object'
+   [classHierarchy]='Object Array'
+   [defaultIndex  ]='off'
+   [name          ]='Array'
+   [oidAttributes ]='a'
 #
 Array_vmt[]
 
@@ -858,14 +858,14 @@ Array_vmt[]
 #------------------ Map --------------------
 global array vars: Map
 Map[]
-   [baseClass     ]='Object'
-   [_CLASS        ]='Class'
    [0             ]=' <objRef to 'Map'>'
+   [_CLASS        ]='Class'
+   [_OID          ]='Map'
    [_Ref          ]=' <objRef to 'Map'>'
+   [baseClass     ]='Object'
    [classHierarchy]='Object Map'
    [defaultIndex  ]='off'
    [name          ]='Map'
-   [_OID          ]='Map'
 #
 Map_vmt[]
 
@@ -937,13 +937,13 @@ no
 ##----------
 ## test
 cmd> $Animal.getClassMethods
-speak feed pet
+feed pet speak
 cmd> $Animal.getClassMethods -i
-get speak hasMethod fromINI toJSON addMethod getAttributes toDebControl fromFlatINI restoreFile clear fromString bgtrace getStaticMethods fromDebControl toString set eval toFlatINI getValues getSize fromJSON getMethods saveFile feed getIndexes clone pet
+addMethod bgtrace clear clone eval feed fromDebControl fromFlatINI fromINI fromJSON fromString get getAttributes getIndexes getMethods getSize getStaticMethods getValues hasMethod pet restoreFile saveFile set speak toDebControl toFlatINI toJSON toString
 cmd> $Animal.getClassMethods -d$'\n'
-speak
 feed
 pet
+speak
 
 ## bg_objects.sh:getClassMethods: finished
 ###############################################################################################################################
@@ -967,15 +967,15 @@ global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet $petOIDVars
 pet[]
    [0       ]=' <objRef to 'pet'>'
+   [family  ]='unk'
    [legCount]='unk'
    [species ]='unk'
-   [family  ]='unk'
 [heap_A_<redacted>]='<supressing repeated array 'pet'>'
 heap_A_<redacted>_sys[]
-                    [_CLASS]='Animal'
-                    [0     ]=' <objRef to 'pet'>'
-                    [_Ref  ]=' <objRef to 'pet'>'
-                    [_OID  ]='<array reference to 'pet'>'
+   [0     ]=' <objRef to 'pet'>'
+   [_CLASS]='Animal'
+   [_OID  ]='<array reference to 'pet'>'
+   [_Ref  ]=' <objRef to 'pet'>'
 
 ##----------
 ## test
@@ -986,13 +986,13 @@ cmd> echo "vars for this object = ${pet2OIDVars}"
 vars for this object = pet2 pet2OID
 cmd> printfVars --noObjects $pet2OIDVars
 pet2[]
-    [_CLASS  ]='Animal'
-    [0       ]=' <objRef to 'pet2'>'
-    [_Ref    ]=' <objRef to 'pet2'>'
-    [legCount]='unk'
-    [species ]='unk'
-    [family  ]='unk'
-    [_OID    ]='pet2'
+   [0       ]=' <objRef to 'pet2'>'
+   [_CLASS  ]='Animal'
+   [_OID    ]='pet2'
+   [_Ref    ]=' <objRef to 'pet2'>'
+   [family  ]='unk'
+   [legCount]='unk'
+   [species ]='unk'
 pet2OID='pet2'
 
 ##----------
@@ -1004,16 +1004,16 @@ cmd> echo "global vars for this object = ${pet3OIDVars}"
 global vars for this object = heap_A_<redacted> heap_A_<redacted>_sys
 cmd> printfVars --noObjects pet3 $pet3OIDVars
 pet3[]
-    [0       ]=' <objRef to 'pet3'>'
-    [legCount]='unk'
-    [species ]='unk'
-    [family  ]='unk'
+   [0       ]=' <objRef to 'pet3'>'
+   [family  ]='unk'
+   [legCount]='unk'
+   [species ]='unk'
 [heap_A_<redacted>]='<supressing repeated array 'pet3'>'
 heap_A_<redacted>_sys[]
-                    [_CLASS]='Animal'
-                    [0     ]=' <objRef to 'pet3'>'
-                    [_Ref  ]=' <objRef to 'pet3'>'
-                    [_OID  ]='<array reference to 'pet3'>'
+   [0     ]=' <objRef to 'pet3'>'
+   [_CLASS]='Animal'
+   [_OID  ]='<array reference to 'pet3'>'
+   [_Ref  ]=' <objRef to 'pet3'>'
 
 ## bg_objects.sh:ConstructObject: finished
 ###############################################################################################################################
@@ -1061,9 +1061,9 @@ a1[]
 cmd> a1=(one two three)
 cmd> printfVars a1
 a1[]
-  [0]='one'
-  [1]='two'
-  [2]='three'
+   [0]='one'
+   [1]='two'
+   [2]='three'
 
 ##----------
 ## test
@@ -1098,9 +1098,9 @@ a1[]
 cmd> a1=([one]=1 [two]=2 [three]=3)
 cmd> printfVars a1
 a1[]
-  [two  ]='2'
-  [three]='3'
-  [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='2'
 
 ##----------
 ## test
@@ -1110,10 +1110,10 @@ heap_A_<redacted>
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
 heap_A_<redacted>_sys[]
-                    [_CLASS]='Map'
-                    [0     ]=' <objRef to 'heap_A_<redacted>'>'
-                    [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
-                    [_OID  ]='<array reference to 'heap_A_<redacted>'>'
+   [0     ]=' <objRef to 'heap_A_<redacted>'>'
+   [_CLASS]='Map'
+   [_OID  ]='<array reference to 'heap_A_<redacted>'>'
+   [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
 a2= <instance> of Map
@@ -1124,19 +1124,19 @@ three
 one
 cmd> printfVars a2
 a2= <instance> of Map
-  two  =2
-  three=3
   one  =1
+  three=3
+  two  =2
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
-                [two  ]='2'
-                [three]='3'
-                [one  ]='1'
+   [one  ]='1'
+   [three]='3'
+   [two  ]='2'
 heap_A_<redacted>_sys[]
-                    [_CLASS]='Map'
-                    [0     ]=' <objRef to 'heap_A_<redacted>'>'
-                    [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
-                    [_OID  ]='<array reference to 'heap_A_<redacted>'>'
+   [0     ]=' <objRef to 'heap_A_<redacted>'>'
+   [_CLASS]='Map'
+   [_OID  ]='<array reference to 'heap_A_<redacted>'>'
+   [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
 cmd> $a2.getSize
 3
 
@@ -1161,10 +1161,10 @@ cmd> $a1.getSize
 3
 cmd> printfVars a1
 a1= <instance> of Stack
-  length=3
-  e2    =three
   e0    =one
   e1    =two
+  e2    =three
+  length=3
 cmd> for ((i=0; i<$($a1.getSize); i++)); do $a1.peek $i; done
 three
 two
@@ -1188,10 +1188,10 @@ cmd> $a2.getSize
 3
 cmd> printfVars a2
 a2= <instance> of Stack
-  length=3
-  e2    =three
   e0    =one
   e1    =two
+  e2    =three
+  length=3
 cmd> for ((i=0; i<$($a2.getSize); i++)); do $a2.peek $i; done
 three
 two
@@ -1226,12 +1226,12 @@ cmd> local  datafile; ConstructObject DataFile datafile "$tmpFile"
 declare -n _someSysArray="heap_a_<redacted>"
 cmd> printfVars datafile
 datafile= <instance> of DataFile
-  filename=/tmp/bgmktemp.tmpFile.<redacted>
   data= <instance> of Array
     [0]=one fish
     [1]=two fish
     [2]=red fish
     [3]=blue fish
+  filename=/tmp/bgmktemp.tmpFile.<redacted>
 
 ## bg_objects.sh:nestedObjects: finished
 ###############################################################################################################################
@@ -1357,9 +1357,9 @@ heap_A_<redacted>
 cmd> local type; $obj.getOID type; printfVars type
 type='heap_A_<redacted>
 type[]
-    [foo  ]='5'
-    [0    ]=' <objRef to 'type'>'
-    [array][]
+   [0    ]=' <objRef to 'type'>'
+   [array][]
+   [foo  ]='5'
 cmd> $obj.foo.getOID
 [exitCode 1]
 cmd> $obj.array.getOID
@@ -1390,9 +1390,9 @@ cmd> $obj.getRef
 _bgclassCall heap_A_<redacted> Object 0 |
 cmd> local type; $obj.getRef type; printfVars --noObjects type
 type[]
-    [foo  ]='5'
-    [0    ]=' <objRef to 'type'>'
-    [array][]
+   [0    ]=' <objRef to 'type'>'
+   [array][]
+   [foo  ]='5'
 cmd> $obj.foo.getRef
 [exitCode 1]
 cmd> $obj.array.getRef
@@ -1419,8 +1419,8 @@ cmd> $obj.dontExist.getRef
 ##----------
 ## test
 cmd> $obj.toString
-foo=5
 array= <instance> of Array
+foo=5
 cmd> $obj.foo.toString
 5
 cmd> $obj.foo.toString --title
@@ -1495,7 +1495,6 @@ obj= <instance> of Object
 cmd> $obj.static.toString
 baseClass     =
 classHierarchy=Object
-vmtCacheNum   =<redacted>
 methods       =Object::addMethod
 + Object::bgtrace
 + Object::clear
@@ -1521,9 +1520,10 @@ methods       =Object::addMethod
 + Object::toFlatINI
 + Object::toJSON
 + Object::toString
+name          =Object
 staticMethods =static::Object::assign
 subClasses    =<redacted>
-name          =Object
+vmtCacheNum   =<redacted>
 
 ## bg_objects.sh:Object_staticCallSyntax: finished
 ###############################################################################################################################
@@ -1576,15 +1576,15 @@ obj= <instance> of Object
 cmd> $obj.num+=10
 cmd> $obj.str+=" world"
 cmd> $obj.toString
-str=hello world
 num=510
+str=hello world
 
 # expect equal to replace the previous value
 cmd> $obj.num=10
 cmd> $obj.str="goodbye"
 cmd> $obj.toString
-str=goodbye
 num=10
+str=goodbye
 
 ## bg_objects.sh:Object_equalsOp: finished
 ###############################################################################################################################
