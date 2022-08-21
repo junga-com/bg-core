@@ -394,7 +394,6 @@ function ut_ini_validChars()
 	var=""
 	getIniParam -R var "$iniFile" singleQuoteSection p1 badValue; echo "$var" >> "$iniFile.t2"
 	echo "single quoted value written and reread = '$var'"
-
 	# Can the character be used in a value string with double quotes
 	setIniParam -q2    "$iniFile" doubleQuoteSection p1 "c${testChar}c"
 	var=""

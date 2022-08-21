@@ -706,7 +706,7 @@ function utfRunner_execute()
 
 		ut onStart "$utID"
 
-		Try:
+		Try: #--traceCatch
 			$utFunc "${params[@]}"
 			ut onEnd
 		Catch: && {
@@ -721,11 +721,11 @@ function utfRunner_execute()
 		  0) : ;;
 		  1) ut onFinal "$utID" "OK"; result=0 ;; # test section exits prematurely
 		222) ut onFinal "$utID" "FAIL" ;;  # setup failure -- writing to stderr, cmd returns!=0, setup asserts or calls exit
-		  *) assertError "Unit test framework logic error. The testcase block ended with an unexpected exit code ($result)."
+		  *) assertError -v utID "Unit test framework logic error. The testcase block ended with an unexpected exit code ($result)."
 	esac
 
-	[ -s "$setupOut" ] && assertError -f setupOut "Unit test framework error. Content was left in the setupOut temp file after a testcase run"
-	[ -s "$errOut" ]   && assertError -f errOut   "Unit test framework error. Content was left in the errOut temp file after a testcase run"
+	[ -s "$setupOut" ] && assertError -v utID -f setupOut "Unit test framework error. Content was left in the setupOut temp file after a testcase run"
+	[ -s "$errOut" ]   && assertError -v utID -f errOut   "Unit test framework error. Content was left in the errOut temp file after a testcase run"
 
 	truncate -s0 "$setupOut"
 	truncate -s0 "$errOut"

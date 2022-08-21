@@ -112,13 +112,13 @@ function fsMakeTemp()
 	local keepFlag mode="create" suffix tmpdir="/tmp" passThruOpts willNotReleaseFlag fileNameVar callerStackFrame=1
 	while [ $# -gt 0 ]; do case $1 in
 		--bumpCallerStackFrame) ((callerStackFrame++)) ;;
-		-d|--directory) bgOptionGetOpt opt passThruOpts "$@" && shift ;;
-		-u|--dry-run)   bgOptionGetOpt opt passThruOpts "$@" && shift ;;
-		--suffix*)      bgOptionGetOpt val: suffix "$@" && shift ;;
-		-p*|--tmpdir*)  bgOptionGetOpt val: tmpdir "$@" && shift ;;
-		-k) keepFlag="-k" ;;
-		--release) mode="release" ;;
-		--releaseInternal) mode="releaseInternal" ;;
+		-d|--directory)            bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+		-u|--dry-run)              bgOptionGetOpt opt passThruOpts "$@" && shift ;;
+		--suffix*)                 bgOptionGetOpt val: suffix "$@" && shift ;;
+		-p*|--tmpdir*)             bgOptionGetOpt val: tmpdir "$@" && shift ;;
+		-k|--keep)                 keepFlag="-k" ;;
+		--release)                 mode="release" ;;
+		--releaseInternal)         mode="releaseInternal" ;;
 		--will-not-release|--auto) willNotReleaseFlag="--will-not-release" ;;
 		*)  bgOptionsEndLoop --firstParam fileNameVar "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done

@@ -9,28 +9,6 @@
 
 ##----------
 ## test
-cmd> $foo.toJSON
-{
-   "memberOne": " this and that",
-   "memberTwo": "14",
-   "numbers": {
-      "obj": {},
-      "one": "1",
-      "two": "2",
-      "zero": "0"
-   },
-   "pmemA": "hello",
-   "pmemB": "5",
-   "words": [
-      "zero",
-      "one",
-      "two",
-      {}
-   ]
-}
-
-##----------
-## test
 cmd> $foo.toJSON "$1"
 {
    "_CLASS": "TestClass",
@@ -72,28 +50,6 @@ cmd> $foo.toJSON "$1"
 ##----------
 ## setup
 ##     | cmd> local -n foo; ConstructObject TestClass foo
-
-##----------
-## test
-cmd> $foo.toJSON
-{
-   "memberOne": " this and that",
-   "memberTwo": "14",
-   "numbers": {
-      "obj": {},
-      "one": "1",
-      "two": "2",
-      "zero": "0"
-   },
-   "pmemA": "hello",
-   "pmemB": "5",
-   "words": [
-      "zero",
-      "one",
-      "two",
-      {}
-   ]
-}
 
 ##----------
 ## test

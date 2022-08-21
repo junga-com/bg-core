@@ -38,9 +38,6 @@ function ut_Object_toJSON()
 	local -n foo; ConstructObject TestClass foo
 
 	ut test
-	$foo.toJSON
-
-	ut test
 	$foo.toJSON "$1"
 }
 
