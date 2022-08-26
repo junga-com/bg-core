@@ -101,7 +101,7 @@ case $1 in
 	top_USR1_DBG)
 		banner scriptTop intr:USR1 DEBUGGER
 		builtin trap 'aNoopCommand' USR1
-		builtin trap 'echo "DBG: $BASH_COMMAND"; dbgLINENO="$LINENO"
+		builtin trap 'dbgLINENO="$LINENO"
 			if [[ "$BASH_COMMAND" =~ ^aNoopCommand ]]; then
 				builtin trap "" DEBUG
 				bgStackFreeze --all "" "$BASH_COMMAND" "$dbgLINENO"

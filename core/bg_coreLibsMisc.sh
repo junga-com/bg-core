@@ -3560,8 +3560,8 @@ function Try()
 
 		elif (( ${#BASH_SOURCE[@]} > '"$tryStateFuncDepth"' )); then
 			# in ubuntu 22.04 (bash5.1) returning 2 resulted in an infinite loop entering this DEBUG trap over and over.
-			setExitCode 2 # set exit code to simulate a return
 			#setExitCode 1 # set exit code to simulate a return
+			setExitCode 2 # set exit code to simulate a return
 
 		elif  [[ ! "$BASH_COMMAND" =~ ^Catch:?([[:space:]]|$) ]]; then
 			setExitCode 1 # set exit code to not run BASH_COMMAND, go to the next command
@@ -3600,7 +3600,7 @@ function Try()
 			exec {BASH_XTRACEFD}>>$_bgtraceFile
 			# note: that the first char of PS4 will be repeated to reflect the function depth
 			export PS4="+(${BASH_SOURCE##*/}:${LINENO}): ${FUNCNAME[0]:-main}() | "
-#			set -x
+			set -x
 		fi
 		builtin trap - SIGUSR2
 		shopt -s extdebug
