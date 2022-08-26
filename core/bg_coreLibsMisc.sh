@@ -2737,7 +2737,7 @@ function bgTrapStack()
 			if [ "$action" == "pop" ]; then
 				declare -ag $stackVar'=( "${'"$stackVar"'[@]:1}" )'
 				# 2020-10 for empty handler changed '-' to ''  (${handler:--} to ${handler})  b/c in test case, Catch was not clearing the DEBUG trap when it called this function
-				builtin trap "${handler}" "$sig"
+				builtin trap "${handler:--}" "$sig"
 			fi
 			returnValue -q "$handler" "$handlerVar"
 			;;
@@ -2751,7 +2751,7 @@ function bgTrapStack()
 			# we push in two steps because handler might have single quotes which would mess up  the array element parsing
 			declare -ag $stackVar'=( "" "${'"$stackVar"'[@]}" )'
 			printf -v $stackVar[0] "%s" "$handler"
-			builtin trap "${newHandler:--}" "$sig"
+			builtin trap "${newHandler:--}" "$sig" || bgtrace "!!!ERROR: bgTrapStack: #{BASH_SOURCE}($LINENO): builtin trap returned error code. "
 			;;
 	esac
 }
@@ -2761,7 +2761,7 @@ function bgTrapStack()
 # usage: bgTrapUtils ...
 # This libary provides two patterns for dealing with common trap use cases -- bgtrap and bgTrapStack. This function provides a place to
 # put lower level algorithms that manipulate the builtin trap function that may be used by either pattern or system code that
-# users neither pattern
+# uses neither pattern
 function bgTrapUtils()
 {
 	local setPID
@@ -3268,6 +3268,18 @@ function assertError()
 			local tryStatePID="${bgBASH_tryStackPID[@]:0:1}"
 			local throwingStatePID="$BASHPID"
 
+			local testUSR2
+			bgTrapUtils get SIGUSR2 testUSR2
+			[ "$testUSR2" ] ||  assertError --critical "
+				An assertError exception has been thrown that should be caught but the USR2 signal which is needed
+				by the Try/Catch mehanism is being ignored in the process in which the script is running. You can
+				try running this command in the terminal that you launched the script in...
+				    trap -p USR2
+				if it reports that the trap handler is the empty string, that is the cause. Run this command to fix
+				    trap - USR2
+				... and then rerun the original command.
+				"
+
 			if [ "$_ae_traceCatchFlag" ]; then
 				bgtrace "!!!throwing exception that will be caught"
 				[ "$throwingStatePID" != "$$" ] && bgtrace "   PID of throw ='$throwingStatePID'"
@@ -3560,8 +3572,8 @@ function Try()
 
 		elif (( ${#BASH_SOURCE[@]} > '"$tryStateFuncDepth"' )); then
 			# in ubuntu 22.04 (bash5.1) returning 2 resulted in an infinite loop entering this DEBUG trap over and over.
-			#setExitCode 1 # set exit code to simulate a return
 			setExitCode 2 # set exit code to simulate a return
+			#setExitCode 1 # set exit code to simulate a return
 
 		elif  [[ ! "$BASH_COMMAND" =~ ^Catch:?([[:space:]]|$) ]]; then
 			setExitCode 1 # set exit code to not run BASH_COMMAND, go to the next command

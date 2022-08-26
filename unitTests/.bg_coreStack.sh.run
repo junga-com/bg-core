@@ -1134,8 +1134,12 @@ bash(<redacted>)---bash(<redacted>)*
 ## test
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop intr:USR1..func
-==== BASE ====
-==== BASE ====
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+<tty>(0):               : bash(<PID>) : $ bgStackTest top_USR1_func
+bgStackTest():          : main        : kill -USR1 $BASHPID(USR1...)
+----- USR1-<redacted><PID> INTERUPT RECEIVED -------------------
+USR1-<redacted><PID><handler>(3): : USR1_HANDLER: oneDown
+=================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
 ## bg_coreStack.sh:bgStackFreeze:top_USR1_func finished
@@ -1156,11 +1160,11 @@ bash(<redacted>)---bash(<redacted>)*
 ## test
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop interuptUSR1FirstLine DEBUGGER
-=============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest top_USR1FirstLine_DBG
------ <UNK>-<UNK> INTERUPT RECEIVED -------------------
-<UNK>-<UNK><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
-================= bottom of stack invoked the stack trace ==========================
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+<tty>(0):                : bash(<PID>)  : $ bgStackTest top_USR1FirstLine_DBG
+----- <UNK>-<PID> INTERUPT RECEIVED -------------------
+<UNK>-<PID><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
+=================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
 ## bg_coreStack.sh:bgStackFreeze:top_USR1FirstLine_DBG finished
@@ -1173,20 +1177,19 @@ bash(<redacted>)---bash(<redacted>)*
 
 ##----------
 ## setup
-## | ut filter '[ \t]+### '
-## | ut filter 'pts-<redacted>[0-9]+###pts-<redacted><redacted>'
-## | cmd> shopt -s extdebug
-## | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+##     | ut filter 'pts-<redacted>[0-9]+###pts-<redacted><redacted>'
+##     | cmd> shopt -s extdebug
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
 
 ##----------
 ## test
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1
-=============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1
-bgStackTest(128): : $ bgStackTest: c3USR1
-libC3.sh(18): : c3USR1 : kill -USR1 $BASHPID(USR1...)
-================= bottom of stack invoked the stack trace ==========================
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+<tty>(0):         : bash(<PID>)  : $ bgStackTest func_USR1
+bgStackTest(130): : $ bgStackTest: c3USR1
+libC3.sh(18):     : c3USR1       : kill -USR1 $BASHPID(USR1...)
+=================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
 ## bg_coreStack.sh:bgStackFreeze:func_USR1 finished
@@ -1199,22 +1202,21 @@ bash(<redacted>)---bash(<redacted>)*
 
 ##----------
 ## setup
-## | ut filter '[ \t]+### '
-## | ut filter 'pts-<redacted>[0-9]+###pts-<redacted><redacted>'
-## | cmd> shopt -s extdebug
-## | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+##     | ut filter 'pts-<redacted>[0-9]+###pts-<redacted><redacted>'
+##     | cmd> shopt -s extdebug
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
 
 ##----------
 ## test
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1..func
-=============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1_func
-bgStackTest(131): : $ bgStackTest: c3USR1_func
-libC3.sh(24): : c3USR1_func : kill -USR1 $BASHPID(USR1...)
------ USR1-<redacted> INTERUPT RECEIVED -------------------
-USR1-<redacted><handler>(3): : USR1_HANDLER : oneDown
-================= bottom of stack invoked the stack trace ==========================
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+<tty>(0):               : bash(<PID>)  : $ bgStackTest func_USR1_func
+bgStackTest(133):       : $ bgStackTest: c3USR1_func
+libC3.sh(24):           : c3USR1_func  : kill -USR1 $BASHPID(USR1...)
+----- USR1-<redacted><PID> INTERUPT RECEIVED -------------------
+USR1-<redacted><PID><handler>(3): : USR1_HANDLER : oneDown
+=================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
 ## bg_coreStack.sh:bgStackFreeze:func_USR1_func finished
@@ -1227,21 +1229,20 @@ bash(<redacted>)---bash(<redacted>)*
 
 ##----------
 ## setup
-## | ut filter '[ \t]+### '
-## | ut filter 'pts-<redacted>[0-9]+###pts-<redacted><redacted>'
-## | cmd> shopt -s extdebug
-## | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
+##     | ut filter 'pts-<redacted>[0-9]+###pts-<redacted><redacted>'
+##     | cmd> shopt -s extdebug
+##     | ut filter '(pts|USR1|USR2|EXIT|ERR)-[0-9]*###\1-<redacted>'
 
 ##----------
 ## test
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func interuptUSR1FirstLine DEBUGGER
-=============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted><redacted>(0): : bash(<redacted>): $ bgStackTest func_USR1FirstLine_DBG
-bgStackTest(134): : $ bgStackTest: c3USR1FirstLine_DBG
------ <UNK>-<UNK> INTERUPT RECEIVED -------------------
-<UNK>-<UNK><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
-================= bottom of stack invoked the stack trace ==========================
+===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
+<tty>(0):                : bash(<PID>)  : $ bgStackTest func_USR1FirstLine_DBG
+bgStackTest(136):        : $ bgStackTest: c3USR1FirstLine_DBG
+----- <UNK>-<PID> INTERUPT RECEIVED -------------------
+<UNK>-<PID><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
+=================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
 ## bg_coreStack.sh:bgStackFreeze:func_USR1FirstLine_DBG finished
@@ -1262,7 +1263,7 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> case $1 in
 cmd> main) unitTests/bgStackTest f4 ;;
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted>(0): : bash(<redacted>): $ bgStackTest f4
+<tty>(0): : bash(<PID>) : $ bgStackTest f4
 bgStackTest(54): : $ bgStackTest: f4
 bgStackTest(38): : f4() : f3
 bgStackTest(37): : f3() : f2
@@ -1287,7 +1288,7 @@ bash(<redacted>)*
 ## test
 cmd> case $1 in
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted>(0): : bash(<redacted>): source unitTests/bgStackTest
+<tty>(0): : bash(<PID>): source unitTests/bgStackTest f4
 bgStackTest(54): : source : f4
 bgStackTest(38): : f4() : f3
 bgStackTest(37): : f3() : f2
@@ -1312,7 +1313,7 @@ bash(<redacted>)*
 ## test
 cmd> case $1 in
 =============== BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-pts-<redacted>(0): : bash(<redacted>): f4
+<tty>(0): : bash(<PID>): f4
 bgStackTest(38): : f4 : f3
 bgStackTest(37): : f3() : f2
 bgStackTest(36): : f2() : f1

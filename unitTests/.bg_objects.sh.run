@@ -972,17 +972,10 @@ pet[]
    [species ]='unk'
 [heap_A_<redacted>]='<supressing repeated array 'pet'>'
 heap_A_<redacted>_sys[]
-<<<<<<< HEAD
    [0     ]=' <objRef to 'pet'>'
    [_CLASS]='Animal'
    [_OID  ]='<array reference to 'pet'>'
    [_Ref  ]=' <objRef to 'pet'>'
-=======
-                    [_CLASS]='Animal'
-                    [0     ]=' <objRef to 'pet'>'
-                    [_Ref  ]=' <objRef to 'pet'>'
-                    [_OID  ]='<array reference to 'pet'>'
->>>>>>> 942f6a0b47f3f7ace121143d454cc4f79d6c945a
 
 ##----------
 ## test
@@ -1017,17 +1010,10 @@ pet3[]
    [species ]='unk'
 [heap_A_<redacted>]='<supressing repeated array 'pet3'>'
 heap_A_<redacted>_sys[]
-<<<<<<< HEAD
    [0     ]=' <objRef to 'pet3'>'
    [_CLASS]='Animal'
    [_OID  ]='<array reference to 'pet3'>'
    [_Ref  ]=' <objRef to 'pet3'>'
-=======
-                    [_CLASS]='Animal'
-                    [0     ]=' <objRef to 'pet3'>'
-                    [_Ref  ]=' <objRef to 'pet3'>'
-                    [_OID  ]='<array reference to 'pet3'>'
->>>>>>> 942f6a0b47f3f7ace121143d454cc4f79d6c945a
 
 ## bg_objects.sh:ConstructObject: finished
 ###############################################################################################################################
@@ -1124,17 +1110,10 @@ heap_A_<redacted>
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
 heap_A_<redacted>_sys[]
-<<<<<<< HEAD
    [0     ]=' <objRef to 'heap_A_<redacted>'>'
    [_CLASS]='Map'
    [_OID  ]='<array reference to 'heap_A_<redacted>'>'
    [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
-=======
-                    [_CLASS]='Map'
-                    [0     ]=' <objRef to 'heap_A_<redacted>'>'
-                    [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
-                    [_OID  ]='<array reference to 'heap_A_<redacted>'>'
->>>>>>> 942f6a0b47f3f7ace121143d454cc4f79d6c945a
 cmd> local -n a2OID; $a2.getOID a2OID
 cmd> printfVars a2
 a2= <instance> of Map
@@ -1150,7 +1129,6 @@ a2= <instance> of Map
   two  =2
 cmd> printfVars --noObjects "$($a2.getOID)"{,_sys}
 heap_A_<redacted>[]
-<<<<<<< HEAD
    [one  ]='1'
    [three]='3'
    [two  ]='2'
@@ -1159,16 +1137,6 @@ heap_A_<redacted>_sys[]
    [_CLASS]='Map'
    [_OID  ]='<array reference to 'heap_A_<redacted>'>'
    [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
-=======
-                [two  ]='2'
-                [three]='3'
-                [one  ]='1'
-heap_A_<redacted>_sys[]
-                    [_CLASS]='Map'
-                    [0     ]=' <objRef to 'heap_A_<redacted>'>'
-                    [_Ref  ]=' <objRef to 'heap_A_<redacted>'>'
-                    [_OID  ]='<array reference to 'heap_A_<redacted>'>'
->>>>>>> 942f6a0b47f3f7ace121143d454cc4f79d6c945a
 cmd> $a2.getSize
 3
 
@@ -1552,11 +1520,6 @@ methods       =Object::addMethod
 + Object::toFlatINI
 + Object::toJSON
 + Object::toString
-<<<<<<< HEAD
-=======
-staticMethods =static::Object::assign
-subClasses    =<redacted>
->>>>>>> 942f6a0b47f3f7ace121143d454cc4f79d6c945a
 name          =Object
 staticMethods =static::Object::assign
 subClasses    =<redacted>

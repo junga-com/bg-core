@@ -27,6 +27,9 @@ function _bg_subclassed_completionLoader() {
 	local cmdType="$(type -t "$cmd")"
 	if [[ "$cmd" =~ [.]ut$ ]]; then
 		isOneOfOurs="1"
+	# added this because sudo is read protected
+	elif ! which $cmd &>/dev/null || [ ! -r "$(which $cmd)" ]; then
+		isOneOfOurs=""
 	elif [ "$cmdType" == "file" ] && strings "$(which $cmd)" | grep -q invokeOutOfBandSystem &>/dev/null; then
 		isOneOfOurs="1"
 	elif [ "$cmdType" == "function" ] && type $cmd | grep -q -E "(invokeOutOfBandSystem|hbOOBCompGen)" &>/dev/null; then

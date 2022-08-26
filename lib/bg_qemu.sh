@@ -169,7 +169,11 @@ function qemu_umount()
 		}
 	' /tmp/bg-qemu.tmpMntData)
 
-	[ ! "$devicePathBase" ] && assertError -v mountPointBase -v devicePathBase -v vmDiskPath -v "term:-l$1" "no existing mount was found for this term."
+	if [ ! "$devicePathBase" ]; then
+		[ ! "$quietFlag" ]  && assertError -v mountPointBase -v devicePathBase -v vmDiskPath -v "term:-l$1" "no existing mount was found for this term."
+		return 1
+	fi
+
 
 	local hasErrors=""
 	local j=1
@@ -244,6 +248,10 @@ function qemu_newImage()
 		read -r fsType oldUUID < <(lsblk -fs -ln -o FSTYPE,UUID  "${nbdBase}p${j}")
 		case $fsType in
 			xfs) sudo xfs_admin -U "$newUUID" "${nbdBase}p${j}" >/dev/null || assertError ;;
+			ext4)
+				sudo e2fsck -fp "${nbdBase}p${j}" >/dev/null || assertError
+				sudo tune2fs -U "$newUUID" "${nbdBase}p${j}" >/dev/null || assertError
+				;;
 			*) assertError -v baseImagePath -v fsType "This disk image uses a file system format that is not yet supported. To support it, modify the case statement at '$BASH_SOURCE:$LINENO' to include the command(s) to create and set a new" ;;
 		esac
 
@@ -257,14 +265,35 @@ function qemu_newImage()
 		[ -d $mountPoint/etc/ ] && setReturnValue "$retVar" "$mountPoint"
 
 		# change the UUID in the fstab and boot files
-		local filename filesToChange
+		local filesToChange
 		readarray -t filesToChange < <(sudo grep -rl "$oldUUID"  $mountPoint/{boot,etc})
 		[ ${#filesToChange[@]} -gt 0 ] && sudo sed -i 's/'"$oldUUID"'/'"$newUUID"'/g' "${filesToChange[@]}"
+		cat - <<-EOS | bgtee $mountPoint/bgUUIDLog >/dev/null
+			oldUUID="$oldUUID"
+			newUUID="$newUUID"
+		EOS
 		((j++))
 	done
+
+	# special case for ubuntu(jammy) /dev/nbd0p15 is a VFAT partition with EFI/
+	if [ -e "${nbdBase}p15" ]; then
+		local mountPoint="$mountPointBase-p15"
+		fsTouch -d -p "$mountPoint/"
+		bgsudo mount "${nbdBase}p15" "$mountPoint" || assertError -v baseImagePath -v newImagePath -v device:-l"${nbdBase}p15" -v mountPoint "could not mount partition's file system"
+		local filesToChange
+		readarray -t filesToChange < <(sudo grep -rl "$oldUUID"  $mountPoint/)
+		[ ${#filesToChange[@]} -gt 0 ] && sudo sed -i 's/'"$oldUUID"'/'"$newUUID"'/g' "${filesToChange[@]}"
+		cat - <<-EOS | bgtee $mountPoint/bgUUIDLog >/dev/null
+			oldUUID="$oldUUID"
+			newUUID="$newUUID"
+		EOS
+		bgsudo umount "$mountPoint"
+		rmdir "$mountPoint"
+	fi
 }
 
-# usage: vmDisk_makeFreshVMChanges <vmRoot>
+
+# usage: vmDisk_makeFreshVMChanges <vmDistro> <vmName> <vmRoot> <sandboxPath>
 # This makes changes to the mounted root filesystem of a VM disk image so that it works with the 'bg-dev tests FreshVMs ...' sub
 # system. Note that these changes favor ease of use over security and therefore they are not suitable for using on persistent
 # VMs. It is assumed that the resulting disks are deleted and recreated often.
@@ -279,19 +308,51 @@ function qemu_newImage()
 #
 function vmDisk_makeFreshVMChanges()
 {
-	local vmName="$1"; assertNotEmpty "vmName"
-	local vmRoot="$2"; assertNotEmpty "vmRoot"
-	local bgVinstalledSandbox="$3"; assertNotEmpty bgVinstalledSandbox
+	local vmDistro="$1";            assertNotEmpty "vmDistro"
+	local vmName="$2";              assertNotEmpty "vmName"
+	local vmRoot="$3";              assertNotEmpty "vmRoot"
+	local bgVinstalledSandbox="$4"; assertNotEmpty bgVinstalledSandbox
 
-	vmDisk_addCurrentUserToVM    "$vmRoot"
+	# note that this function uses "${vmRoot:--}/..." in paths that we are changing so that if by any means, vmRoot is empty, the
+	# paths will be invalid (beginning with -/...) instead of referring to the host's system paths.
+
+	vmDisk_addCurrentUserToVM    "${vmRoot:--}"
 
 	# set the hostname
 	echo "$vmName"             | bgtee    "${vmRoot:--}/etc/hostname" >/dev/null
 	echo "10.0.2.2    devhost" | bgtee -a "${vmRoot:--}/etc/hosts" >/dev/null
 
+	# ubunutu (jammy) has no default network config because it expects cloud-init to do it so we add one
+	if [ "$vmDistro" == "ubuntu" ]; then
+		cat - <<-EOS | bgtee "${vmRoot:--}/etc/systemd/network/ens3.network" >/dev/null
+		[Match]
+		Name=ens3
+
+		[Link]
+		RequiredForOnline=yes
+
+		[Network]
+		DHCP=ipv4
+		DNS=8.8.8.8
+		EOS
+	fi
+
+	# if the image does not have host sshd keys copy a set that we keep around for this purpose
+	if ! ls "${vmRoot:--}/etc/ssh/ssh_host_"* &>/dev/null; then
+		bgsudo cp -a /home/$USER/.bg/cache/bg-dev_vmImages/sshHostKeys/ssh_host* "${vmRoot:--}/etc/ssh/"
+	fi
+
 	# setup our sandbox to be mounted on guest. (we use nfs instead of p9 because centos does not support 9p)
 	fsTouch  -d -u "$USER" -g "$USER"  "$vmRoot/$bgVinstalledSandbox"
-	echo '10.0.2.2:'"$bgVinstalledSandbox"' '"$bgVinstalledSandbox"' nfs  defaults,user,exec 0 0' | bgtee -a "${vmRoot:--}/etc/fstab" >/dev/null
+	case $vmDistro in
+		centos*|redhat*|fedora*)
+			echo '10.0.2.2:'"$bgVinstalledSandbox"' '"$bgVinstalledSandbox"' nfs  defaults,user,exec 0 0' | bgtee -a "${vmRoot:--}/etc/fstab" >/dev/null
+			;;
+		ubuntu*|debian*)
+			echo 'sandboxShare    /home/bobg/github/bg-CreateCommonSandbox 9p  trans=virtio,version=9p2000.L,user,exec 0 0' | bgtee -a "${vmRoot:--}/etc/fstab" >/dev/null
+			;;
+		*) assertError -v vmDistro "unknown vmDistro while adding sandbox mount to guest's fstab"
+	esac
 
 	# add the 'ap' alias to $USER's .bashrc to make it easier to start tests
 	cat - <<-EOS | bgtee -a "${vmRoot:--}/home/$USER/.bashrc" >/dev/null
@@ -363,7 +424,7 @@ function vmDisk_addFreshVMReadySignal()
 	cat - <<-EOS | bgtee "${vmRoot:--}/etc/systemd/system/signalReadyToDevhost.service" >/dev/null
 		[Unit]
 		Description=Signal the devhost that we are ready by deleting a file in the $bgVinstalledSandbox
-		After=getty.target network-online.target remote-fs.target
+		After=getty.target network-online.target remote-fs.target sshd.service
 
 		[Service]
 		Type=simple
