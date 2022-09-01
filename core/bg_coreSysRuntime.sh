@@ -196,6 +196,7 @@ function bgGetDataFolder()
 
 # scripts that are a part of a package typically set the packageName var at the top.
 # set the default dataFolder to the top level project the running script belongs to
+packageName="${packageName:-$projectName}"
 if [ "$packageName" ]; then
 	dataFolder="$(bgGetDataFolder $packageName)"
 	confFile="/etc/$packageName"

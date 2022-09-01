@@ -2,15 +2,30 @@
 
 | :warning: WARNING          |
 |:---------------------------|
-| This library is in a pre-release state. The readme file is full of mini tutorials that demonstrate most of the features. If you try any out, I would love to here about your experience.
-I have only tested on Ubuntu 20.04 but it should work in other distributions and versions without major change.
-I am not building the packages for this library yet. To test it, clone bg-core and bg-dev into a new folder (for example ~/bg-sandbox/) and virtually install with the bg-debugCntr command like...
- ~/$ `mkdir bg-sandbox; cd bg-sandbox`
- ~/bg-sandbox$ `git clone git@github.com:junga-com/bg-dev.git`
- ~/bg-sandbox$ `git clone git@github.com:junga-com/bg-core.git`
- ~/bg-sandbox$ `source ~/bg-sandbox/bg-dev/bg-debugCntr; bg-debugCntr vinstall ~/bg-sandbox/; bg-debugCntr trace on:`
+| This library is in a pre-release state. The readme file is full of mini tutorials that demonstrate most of the features. If you try any out, I would love to here about your experience.<br/><br/>circa 2022-09 all test cases are passing in the environments listed using FreshVMs and virtually installing the projects. It will build into a deb and rpm package but I am not yet testing the installation via packages yet but plan to soon.|
 
+## Tested Environments
+I have tested this library on
+ * Ubuntu 20.04 (focal)
+ * Ubuntu 22.04 (jammy)
+ * Centos Stream 9.
 
+It should work in other distributions and versions without major change.
+
+## Installing
+I will start uploading deb and rpm packages soon (circa 2022-09). If there is a package for the OS you use, downloading and installing it is probably the easiest way to try out this library.
+
+Alternatively, you can follow these steps to clone the required projects and 'virtually' install them which allows only the terminal where you run the commands to act as if the projects where
+installed on your host.
+```bash
+  ~/github$ git clone https://github.com/junga-com/bg-coreSandbox.git
+  ~/github$ cd bg-coreSandbox
+  ~/github/bg-coreSandbox$ git submodule init
+  ~/github/bg-coreSandbox$ git submodule update
+  ~/github/bg-coreSandbox$ source bg-dev/bg-debugCntr
+```
+
+## Overview
 
 This is a library for writing secure bash scripts. It provides many features that make it easier to write and maintain good scripts that participates in the operating system's host environment.
 
