@@ -805,7 +805,35 @@ function bgStackFrameGet() {
 	return 0
 }
 
-
+function bgStackToJSON()
+{
+	# $$
+	# $BASHPID
+	# tty
+	local CR="\n"
+	local RS=","
+	local indent=""
+	local i j ignoreFramesCount
+	printf "${indent}[${CR}"
+	indent="${indent}   "
+	for ((i=${#bgSTK_cmdFile[@]}-1; i>=${ignoreFramesCount:-0}; i--)); do
+		((i==0)) &&  RS=""
+		printf "${indent}{${CR}"
+		indent="${indent}   "
+		local FS=","
+		for name in caller cmdName cmdLine cmdFile cmdLineNo cmdArgc cmdLoc cmdSrc frmSummary; do
+			[ "frmSummary" == "$name" ] && FS=""
+			local ref="bgSTK_${name}[$i]"
+			local value="${!ref}"
+			jsonEscape "value"
+			printf "${indent}"'"%s": "%s"'"${FS}${CR}"  "${name}" "${value}"
+		done
+		indent="${indent%   }"
+		printf "${indent}}${RS}${CR}"
+	done
+	indent="${indent%   }"
+	printf "${indent}]${CR}"
+}
 
 
 # usage: bgStackMarshal <mFile>

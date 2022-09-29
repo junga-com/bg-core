@@ -3549,7 +3549,7 @@ function Try()
 	while true; do case $1 in
 		--traceCatch)   traceCatchFlag="--traceCatchFlag" ;;
 		--decFuncDepth) funcDepthOffset=2 ;;
-		 *)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
 	# these globals are used to pass the error to the Catch block. Clear them on Try: so that there is no chance of leaking the last
@@ -4833,4 +4833,47 @@ function DeclarePlugin() # ondemandStub
 	((myreccount++>10)) && assertError
 	import bg_plugins.sh  ;$L1;$L2
 	DeclarePlugin "$@"
+}
+
+
+#######################################################################################################################################
+### From bg_json.sh
+
+# usage: jsonEscape <varname1> [...<varnameN>}
+function jsonEscape()
+{
+	while [ $# -gt 0 ]; do
+		[ ! "$1" ] && { shift; continue; }
+		local _je_value="${!1}"
+		_je_value="${_je_value//$'\\'/\\\\}" # reverse solidus
+		_je_value="${_je_value//$'"'/\\\"}"  # quotation mark
+		_je_value="${_je_value//$'/'/\\/}"   # solidus
+		_je_value="${_je_value//$'\b'/\\b}"  # backspace
+		_je_value="${_je_value//$'\f'/\\f}"  # formfeed
+		_je_value="${_je_value//$'\n'/\\n}"  # linefeed
+		_je_value="${_je_value//$'\r'/\\r}"  # carriage return
+		_je_value="${_je_value//$'\t'/\\t}"  # horizontal tab
+		printf -v $1 "%s" "$_je_value"
+		shift
+	done
+}
+
+
+# usage: jsonUnescape <varname1> [...<varnameN>}
+function jsonUnescape()
+{
+	while [ $# -gt 0 ]; do
+		[ ! "$1" ] && { shift; continue; }
+		local _je_value="${!1}"
+		_je_value="${_je_value//\\\"/$'"'}"  # quotation mark
+		_je_value="${_je_value//\\\//$'/'}"   # solidus
+		_je_value="${_je_value//\\b/$'\b'}"  # backspace
+		_je_value="${_je_value//\\f/$'\f'}"  # formfeed
+		_je_value="${_je_value//\\n/$'\n'}"  # linefeed
+		_je_value="${_je_value//\\r/$'\r'}"  # carriage return
+		_je_value="${_je_value//\\t/$'\t'}"  # horizontal tab
+		_je_value="${_je_value//\\\\/$'\\'}" # reverse solidus
+		printf -v $1 "%s" "$_je_value"
+		shift
+	done
 }

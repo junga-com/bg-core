@@ -1,43 +1,8 @@
 #!/bin/bash
 
-# usage: jsonEscape <varname1> [...<varnameN>}
-function jsonEscape()
-{
-	while [ $# -gt 0 ]; do
-		[ ! "$1" ] && { shift; continue; }
-		local _je_value="${!1}"
-		_je_value="${_je_value//$'\\'/\\\\}" # reverse solidus
-		_je_value="${_je_value//$'"'/\\\"}"  # quotation mark
-		_je_value="${_je_value//$'/'/\\/}"   # solidus
-		_je_value="${_je_value//$'\b'/\\b}"  # backspace
-		_je_value="${_je_value//$'\f'/\\f}"  # formfeed
-		_je_value="${_je_value//$'\n'/\\n}"  # linefeed
-		_je_value="${_je_value//$'\r'/\\r}"  # carriage return
-		_je_value="${_je_value//$'\t'/\\t}"  # horizontal tab
-		printf -v $1 "%s" "$_je_value"
-		shift
-	done
-}
+# moved to bg_coreLibMisc.sh: function jsonEscape()
+# moved to bg_coreLibMisc.sh: function jsonUnescape()
 
-
-# usage: jsonUnescape <varname1> [...<varnameN>}
-function jsonUnescape()
-{
-	while [ $# -gt 0 ]; do
-		[ ! "$1" ] && { shift; continue; }
-		local _je_value="${!1}"
-		_je_value="${_je_value//\\\"/$'"'}"  # quotation mark
-		_je_value="${_je_value//\\\//$'/'}"   # solidus
-		_je_value="${_je_value//\\b/$'\b'}"  # backspace
-		_je_value="${_je_value//\\f/$'\f'}"  # formfeed
-		_je_value="${_je_value//\\n/$'\n'}"  # linefeed
-		_je_value="${_je_value//\\r/$'\r'}"  # carriage return
-		_je_value="${_je_value//\\t/$'\t'}"  # horizontal tab
-		_je_value="${_je_value//\\\\/$'\\'}" # reverse solidus
-		printf -v $1 "%s" "$_je_value"
-		shift
-	done
-}
 
 # usage: jsonAwk [-T <topVarName>] [-C <countToRead>] [<script> [<file1>...<fileN>]]
 # parses the json formatted input. By default it prints a line with (<jpath> <val>) for each primitive value

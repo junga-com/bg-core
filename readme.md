@@ -75,8 +75,7 @@ This is a list of some noteable discrete features...
 
 ## Script Modularity
 
-To build good scripts you need a good way to package reusable components.  Scripts that source /usr/lib/bg_core.sh can include library
-scripts easily. A library script is any bash script that contains functions.
+To build good scripts you need a good way to package reusable components.  Scripts that source /usr/lib/bg_core.sh can include library scripts easily. A library script is any bash script that contains functions.
 
 ```bash
 $ cat - >/tmp/mylib.sh
@@ -95,8 +94,7 @@ $ cat - >/tmp/test3.sh
 #!/usr/bin/env bash
 source /usr/lib/bg_core.sh
 
-import bg_ini.sh  ;$L1
-import mylib.sh   ;$L1
+import mylib.sh   ;$L1;$L2
 
 myCoolFunction  "hello. we are running on" "$(iniParamGet /etc/os-release . ID "<unknownDistro>")"
 
@@ -107,13 +105,13 @@ $ chmod a+x /tmp/test3.sh
 $ /tmp/test3.sh
 p1 is 'hello. we are running on' and p2 is 'ubuntu'
 ```
-This import syntax is a wrapper over the bash `source bg_ini.sh` command that makes it easier and convenient to use.
+This import syntax is a wrapper over the bash `source` builtin that makes it easier and convenient to use.
 
 It adds idempotency which means you can call it more than once with no ill effect so that you do not have to be concerned if something else in the script has already sourced the library.
 
 It adds a secure search path so that you can import the name of the library script without being concerned with where the library is. A library script can be included in a package that can be installed as needed.
 
-The ` ;$L1` part of the syntax is an an idiomatic thing. Bash is not a modern language but its ubiquitous. Sometimes we need to adopt some idiom that might not be clear in itself but its simple and just works. To work efficiently, the import statement needs us to follow that syntax. IDE's can help make it easy to know what idioms are available and to follow them.
+The ` ;$L1;$L2` part of the syntax is an an idiomatic thing. Bash is not a modern language but its ubiquitous. Sometimes we need to adopt some idiom that might not be clear in itself but its simple and just works. To work efficiently, the import statement needs us to follow that syntax. IDE's can help make it easy to know what idioms are available and to follow them.
 
 See:
 * man(3) import
@@ -127,7 +125,7 @@ Unit tests scripts are simple bash scripts that follow a minimal pattern.
 ```bash
 $ cat - >/tmp/test4.sh.ut
 #!/usr/bin/env bg-utRunner
-import mylib.sh ;$L1
+import mylib.sh ;$L1;$L2
 
 declare -A ut_myCoolFunction=(
    ["testA"]="$(cmdline  0 "this is something else")"
@@ -181,11 +179,11 @@ A testcase can be invoked in the debugger like this.
 ```bash
 $ /tmp/test4.sh.ut debug myCoolFunction:test42
 ```
-A new terminal will open running a debugger stopped on the line after the bgtraceBreak. The default UI is a terminal window running a debugger written in BASH so the requirements are minimal.
+By default, if the terminal environment has the DISPLAY var set, a new terminal window will open running a debugger stopped on the line after the bgtraceBreak. If DISPLAY is not set, it will use the page feature of the terminal to switch to and from the debugger UI. You can specify the debugger destination explicitly with the `bg-debugCntr debugger ...` command. That command also controls whether the debugger will be invoked if you enter cntr-c or if the script encounters an uncaught exception.
 
-You can also configure the terminal to connect to a stand alone JS GUI debugger or an Atom IDE debugger. The debugger protocol is documented so other IDEs can be supported.
+You can also configure the debugger to connect to an Atom IDE debugger. If you use a different IDEs it should be pretty straight forward to add support for debugging from that environment.
 
-Any script that sources /usr/lib/bg_core.sh can be ran in the debugger. There are a number of ways to invoke the debugger such as inserting a bgtraceBreak call at the place in your script that you want to examine.
+Any script that sources /usr/lib/bg_core.sh can be ran in the debugger. There are a number of ways to invoke the debugger such as inserting a bgtraceBreak call at the place in your script that you want to examine. When bg-debugCntr is sourced you can use `bgdb <script> <arguments...>`. bgdb works with foreign scripts that do not source bg_core.sh (at least for simple scripts).
 
 The debugger is part of a larger system of development that includes a tracing system and virtual in-place installation of project source folders.
 
@@ -232,9 +230,7 @@ See:
 
 ## Error Handling
 
-Good software of any kind needs to be robust and transparent so if it does not succeed, it provides information about why and how to proceed.
-
-Scripts that source /usr/lib/bg_core.sh can use a family of assert* functions to make sure the script fails well when a error is encountered.
+Good software of any kind needs to be robust and transparent when it it encounters a problem. Scripts that source /usr/lib/bg_core.sh can use a family of assert* functions to make sure the script fails well when a error is encountered.
 
 ```bash
 $ cat - >/tmp/test5.sh
@@ -261,7 +257,7 @@ error: bar: ls "$p1" --FOO 2>$assertOut || assertError
     : ls: unrecognized option '--FOO'
     : Try 'ls --help' for more information.
 ```
-Because bgtrace is off, this is the message a normal user would see when encountering an exception in a script. Notice how the default error report shows us the source line of the command that failed and even the values of the variables used in that line. This gives the user some information that might help them work around the problem. assertError can be passed many options to affect how the error is displayed and with what context.
+Because bgtrace is off, this is the message a normal user would see when encountering an un-caught exception in a script. Notice how the default error report shows us the source line of the command that failed and even the values of the variables used in that line. This gives the user some information that might help them work around the problem. assertError can be passed many options to affect how the error is displayed and with what context.
 
 Lets run it again with bgtrace enabled to get a full stack trace. This is what the developer typically sees when an exception is encountered while testing the script.
 ```bash
@@ -321,7 +317,7 @@ catch_stkArray[]
               [4]=' test5.sh:(7):              : ls "$p1" --FOO 2>$assertOut || assertError'
 
 ```
-Now the script continues to completion instead of ending prematurely. We printed out all the catch_* variables so that you can see the context the Catch block has at its disposal to determine what happened and decide how to proceed. In a real script it might use that information to quietly handle the exception or it might use it to display a better error message and then exit.
+Now the script continues to completion instead of ending prematurely. We printed out all the catch_* variables so that you can see the context the Catch block has at its disposal to determine what happened and to decide how to proceed. A real script might do some cleanup and rethrow the exception or log the error and proceed.
 
 See
 * man(1) bg-debugCntr
@@ -399,7 +395,7 @@ Every language has a function call protocol that defines the mechanism that pass
 
 A convention has formed around the syntax of passing arguments to commands. Arguments can be optional or positional. Optional arguments can be specified on the command line in different ways -- short and long options, with and without an argument, options and their arguments can sometimes be combined into one token or can be specified in multiple tokens.
 
-Supporting this syntax convention completely has been so hard that it is common that simple or quickly written scripts do not making commands less uniform. The bgOpt* family of functions makes it so that the easiest way to add support for an option will fully support the conventions.
+Supporting this syntax convention completely has been so hard that it is common that simple or quickly written scripts do not attempt to fully support it. This makes commands less uniform. The bgOpt* family of functions makes it so that the easiest way to add support for an option will fully support the convention fully.
 
 Check out this example script.
 ```
@@ -497,11 +493,11 @@ The loop of this daemon wakes up every 5 seconds to do something. It could alter
 Devops and sysops coding involves a lot of configuration file manipulation. The bg_ini.sh library provides commands to read and write to different kinds of configuration files (not just just ini formatted files) while the bg_template library provides a way to manage
 and expand a library of template files.
 
-**Reading and writing config file settings**
+#### Reading and writing config file settings
 
 ```bash
 $ bg-debugCntr vinstall sourceCore  
-$ import bg_ini.sh ;$L1
+$ import bg_ini.sh ;$L1;$L2
 $
 $ iniParamSet /tmp/data9 . name bobg
 $ iniParamSet /tmp/data9 home state "Ca"
@@ -515,8 +511,8 @@ state=Ca
 [ work ]
 state=NY
 $
-$ iniParamGet /tmp/data9 home city
-AnyTown
+$ iniParamGet /tmp/data9 home state
+Ca
 $ iniParamGet /tmp/data9 webserver template
 
 $ # there is no webserver template setting. We can provide a default
@@ -528,27 +524,31 @@ yourTemplate
 ```
 There are many features of the ini* and config* functions from bg_ini.sh so this example only illustrates a few. When these functions make a change to files, they preserve the existing order and comments where ever possible. They try to make the change as close as possible to how a human would make the change, preserving work done by other humans to organize and comment the file.
 
-Note that the [webserver]template setting inside /tmp/data9 did not initially exist. A common idiom is that when making a script we decide that it needs some information like a file path. We dont want to hard code it but we also want the script to work in a reasonable way with zero configuration. So we can retrieve the value from a config file and provide a reasonable default value. If the file does not exist or the setting is missing, the default value is returned but the host admin or end user can configure the file to change the script's behavior. The script author can mention the setting in the comments of the script that will become the man page.
+Note that the [webserver]template setting inside /tmp/data9 did not initially exist. A common idiom is that when making a script we decide that it needs some information like a file path. We dont want to hard code it but we also want the script to work in a reasonable way with zero configuration. So we can retrieve the value from a config file and provide a reasonable default value. If the config file does not exist or the setting is missing, the default value is returned but the host admin or end user can configure the file to change the script's behavior. The script author can mention the setting in the comments of the script that will become the man page.
 
-**Domain Configuration**
+#### Domain Configuration
 
 The `domDataConfig ...` function from bg_domData.sh library is similar to the iniParam function but uses a concept of a virtual config file for the operating domain. We do not pass the configuration filename to the function call since it uses the well known global file.  That file is 'virtual' because it is actually the combination of multiple files that produce the end result.  This makes it so that a domain admin can change the default value for a set of hosts and a local host admin could override that default.  The most specific value will be used. When changing a value, the default is to change it only on the host but if the user has sufficient privilege, they can specify that it be changed at a different scope level.
 
 
-**Templates**
+#### Templates
 
-There are many different template languages but what separates the template system in bg_core is that it is native to the OS environment. There has to be a context of variables whose values  the template is expanded with and typically creating and populating that context is easy in the language runtime that the template system is native to but not so much in other runtime environments. Because `environment` variables are common to the OS execution environment it is universal.
+There are many different template languages but what separates the template system in bg_core is that it is native to the OS environment. These templates are expanded against the bash shell variables which include the OS ENVIROMENT variables.
+
 ```bash
-$ import bg_template.sh ;$L1
+$ bg-debugCntr vinstall sourceCore  
+$ import bg_template.sh ;$L1;$L2
 $ templateExpandStr "Hello %USER%. My favorite color is %color:blue%"
 Hello bobg. My favorite color is blue
 $ color=red
 $ templateExpandStr "Hello %USER%. My favorite color is %color:blue%"
 Hello bobg. My favorite color is red
 ```
-Here for brevity I expanded a string literal template but I could have done the same by putting the content in a file. The extended template parser supports directives for flow control
+Here for brevity I expanded a string literal template but I could have done the same by putting the content in a file.
 
-This package supports a mechanism for system templates. System templates require privilege to install on a host -- either by installing a package that provides template assets or by a sysadmin using privilege to copy or create one in the /etc/bgtemplates/ folder. The findTemplate function will only return system templates so that the caller can trust that any fund template comes from a privileged source.  
+The template functions use a notion of 'system templates'. System templates are specified by their simple filename without a path. System templates require privilege to install on a host -- either by installing a package that provides template assets or by a sysadmin using privilege to copy or create one in the /etc/bgtemplates/ folder. The findTemplate function will only return system templates so that the caller can trust that any found template comes from a privileged source. As always, during developement of a package security is reduced so that templates can be developed in-place in a virtually installed package.
+
+The security around system templates is important because templates can be used to configure daemons and other system processes that could be compromised if untrusted content made its way into the configuration.  
 
 ## Object Oriented Bash
 
@@ -560,7 +560,7 @@ The reason for the bg_objects.sh library is to alleviate this data structure sho
 $ cat - >/tmp/test7.sh
 #!/usr/bin/env bash
 source /usr/lib/bg_core.sh
-import bg_objects.sh ;$L1
+import bg_objects.sh ;$L1;$L2
 
 DeclareClass MyData
 function MyData::__construct() {
@@ -608,30 +608,51 @@ d1 : MyData
 $
 ```
 
-The most important thing is that we can not easily create bash arrays within arrays.
+The most important thing is that we can now easily create bash arrays within arrays.
+
+Initially I considered the object syntax a novelty because the object syntax was so much slower that native bash syntax that all but the most carefully crafted scripts that used it heavily would be uncomfortably slow. However, with the introduction of the bgCore bash loadable builtin, the object syntax is in the same magnitude of performance as native bash function calls.
+
+The bg-dev project uses bash object syntax extensively to create a hierarchy of project types.
 
 See
 * man(7) bg_objects.sh
 * man(3) DeclareClass
 * man(3) ConstructObject
-
-
+* project bg-core-bash-builtins
 
 
 ## Plugins
 
-The plugin system formalizes the process of building packages that have features that can be extended by arbitrary other packages. A pluginType is a particular type of bash library script named like `<MyNewPluingTypeName>.PluginType` and follows the protocol described in `man(3) DeclarePluginType`. The features in that package can then query the host for available plugins of that type and load and invoke them.
+The plugin system formalizes the process of building features in packages that can be extended by other packages.
 
-Other packages can include a plugins of that type by creating a library written in bash or another language named like `<myPluginName>.<MyNewPluingTypeName>` of that new type to extend the base functionality in various ways.
+A pluginType is a particular type library file named like `<MyNewPluingTypeName>.PluginType` which follows the protocol described in `man(3) DeclarePluginType`. It is convenient to write these in bash but the protocol allows them to be written in any language including complied languages.
 
-The bg-core package introduces several plugin types to provide core functionality for distributed system administration with central command and control.
+Features in that package that provides <MyNewPluingTypeName>.PluginType can then query the host for available plugins of the <MyNewPluingTypeName> type and invoke them.
+
+Another package can then include a plugin of that <MyNewPluingTypeName> type by creating a library written in bash or another language named like `<myPluginName>.<MyNewPluingTypeName>`. Now when that package is installed, <myPluginName> will be available to the features written in the first library.
+
+Boy, that a mouth full. I think an example will make it more clear.
+
+The bg-core package includes the Collect.PluginType library which introduces the 'Collect' plugin type. The bg-collectCntr command is a 'feature' that will list all the available Collect plugins installed on the host and allows running now or enabling them to be ran on a schedule.
+
+The purpose of Collect plugins is to gather information about the host that will be collected into a central administration system.
+
+The bg-core library provides osBase.Collect and a few other Collect plugins that collect information that is universal to any linux host.
+
+Other packages can provide a Collect plugin that gathers the information specific to its provisioning and configuration so that it will be visible to the central administration system in use.
+
+The bg-collectCntr is a feature in bg-core that can be extended by packages providing Collect plugins to collect information specific to them.
+
+## Distributed System Administration
+
+In the Plugins section I use bg-core's Collect plugin type as an example of how plugins work. That plugin type is one of several that provide secure distributed command and control of a set of hosts in a domain.
 
 * RBACPermission  : a way to configure sudo to provide RBAC access control for linux commands
 * Collect : Collect plugins retrieve some information about the host and put it in a shared repository for domain administration
 * Standards : Standards plugins check some aspect of the host configuration state to see if it complies with a standard.
 * Config : Config plugins provide some discrete unit of configuration that can be turned on or off
 
-## RBACPermission Plugins
+#### RBACPermission Plugins
 
 When an RBACPermission Plugin is activated on a host, it makes it so that a user that is in the group with the same name of the plugin can use sudo to execute the commands named in the plugin.
 
@@ -654,15 +675,27 @@ $ bg-rbacPermissionCntr report
 Name                 Enabled    
 upgradeSoftware      activated  
 ```
-This is particularly powerful when a central user directory is used to administer users and group membership. If a user is put in the `upgradeSoftware` group, they would be able to run `sudo apt upgrade` on any host where this plugin is activated. The plugin actually introduces a family of group names like `upgradeSoftware-<hostGroup>` where <hostGroup> is either a specific hostname or a tagname that is included in the /etc/tags file on one or more hosts. This allows us to grant this permission to a single host or an group of hosts.
+This is particularly powerful when a central user directory is used to administer users and group membership. If a user is put in the `upgradeSoftware` group, they would be able to run `sudo apt upgrade` on any host where this plugin is activated. The plugin actually introduces a family of group names like `upgradeSoftware-<hostGroup>` where `<hostGroup>` is either a specific hostname or a tagname that is included in the /etc/tags file on one or more hosts. This allows us to grant this permission to a single host or an group of hosts.
 
-## Access Control
+Privilege is required to change the RBACPermission plugins or to change the hostname or the /etc/tags file so unprivileged users are bound by this system.
 
-The RBACPermission plugin is part of a comprehesive access control system for linux administration. bgsudo is another component. Inside a script you can use bgsudo on a particular command. It is a wrapper over sudo which adds the capability to pass it a list of resources that will be accessed for writing (-w), reading (-r) or creating/deleting (-c) and it results in the command being executed in the least privileged way that allows the specified access. If the user already has the required permissions, it runs the command without sudo. If the user has already been escalated to root (by running the script with sudo, for example) but the loggged in user has the required permission, it uses sudo -u<loguser> to de-escalate privilege back from root to the <loguser>.
+#### Access Control
 
+The RBACPermission plugin is part of a comprehensive access control system for linux administration. bgsudo and oob_getRequiredUserAndGroup are other parts of that system.
 
+Inside a script you can use bgsudo on a particular command. It is a wrapper over sudo which adds the capability to decide what privilege is required to run the command and use `sudo -u<user>` to run the command with least privileges possible.
 
-## Collect Plugins
+At the top level script you can define a function oob_getRequiredUserAndGroup() which will cause the entire script to be re-invoked if necessary with `sudo -u<user>` to make sure its running at the intended privilege level.
+
+These two mechanisms both result in the script being able to execute privileged commands but they do it in ways that are profoundly different in terms of how you administer the rights of users.
+
+The bgsudo method results in a script that has no privilege but is only for convenience because the user executing it must be authorized to use sudo for the privileged actions that the script performs. That means that the user could accomplish a similar outcome by running the same commands (or slightly modified commands) as the script would have ran.
+
+The oob_getRequiredUserAndGroup() method, on the other hand, authorizes the script to do things that the user executing it would not otherwise be able to do. Say a script named 'foo' modifies a system file. If a user has sudo privilege to run 'foo' as root or another privileged user, they are able to perform the action that 'foo' performs but they must use 'foo' to do it because if they try to execute the same commands that 'foo' does, they will find that they do not have the required privilege to modify that system file.
+
+A software package can provide commands using the oob_getRequiredUserAndGroup() method and RBACPermission plugins that allow those commands to be run with privilege. Then a central user administration system such as an LDAP server can assign fine grained permissions to users.
+
+#### Collect Plugins
 
 ```bash
 $ cat plugins/osBase.Collect
@@ -706,12 +739,14 @@ hardware             off         1day         <notYetRan>  ''
 network              off         3/10min      <notYetRan>  ''          
 osBase               activated   4/10min      success      'over 2 minutes ago'
 ```
-Each time a collect plugin runs it copies any of the configuration that it is responsible for into a designated folder hierarchy. That folder would typically be on a mounted shared drive for the domain location that the host is in. The domData system provides a distributed shared folder that can be used for this purpose.
+Each time a collect plugin runs it copies any of the configuration that it is responsible for into a designated folder hierarchy. That folder would typically be on a mounted shared drive from the domain in which that the host participates. The domData system provides distributed shared folders that can be used for this purpose.
 
 The purpose of collect plugins is to collect up-to-date information about the hosts in a domain without having to grant permission to a remote user to access the host with enough privilege to copy the information.
 
+This is an important distinction with other remote administration system because the remote authority is able to turn on and off any installed Collect plugins even though that remote authority does not have sufficient privilege to access the information being collected. Often if an authority has permission to access privileged information on a host it would also have permission to perform arbitrary other actions which could be exploited by an attacker.
 
-## Declarative Configuration Part 1 -- Creqs
+
+#### Declarative Configuration Part 1 -- Creqs
 
 When a human makes a configuration change to a host, they look to see what the current configuration state is and then make only the changes required to get to where they want it to be. Declarative configuration makes our automation configuration scripts work a little bit more like that. Instead of a configuration script containing the steps to get from A to B, it contains more of a description of B so that whether we start at A or B or a different, unanticipated starting point, the script with result in just the steps needed to get to B.
 
@@ -719,7 +754,7 @@ When I maintained a server farm for an enterprise cloud company I learned that s
 
 The creq system automates the process of checking to make sure that the action is needed before performing it. Creq stands for 'configuration required'. A creq class is similar to a command or function name. It takes command line arguments just like a command and the creq class combined with its arguments is called a creq statement.
 
-bg-creqApply is an external command that lets you run a creq statement on its own, executing the apply operation. The creq statement in the following commands is `cr_fileExists /tmp/foo`
+bg-creqApply is an external command that lets you run a creq statement on its own, executing the apply operation only if it is required. The creq statement in the following command is `cr_fileExists /tmp/foo`
 ```bash
 $ bg-creqApply -v cr_fileExists /tmp/foo
 APPLIED : fileExists /tmp/foo
@@ -728,7 +763,7 @@ PASSED  : fileExists /tmp/foo
 ```  
 The first time we invoked the statement, it saw that /tmp/foo did not exist, so it created it. the second time the same command ran, it saw that it already existed so it did nothing.
 
-The bg-core package comes with lots of creq classes to make statements with. They all start with cr_ by convention so you can find them by looking up their man pages with `man cr_<tab><tab>`. The manpage will tell you what argument the creq class expects.
+The bg-core package comes with lots of creq classes to make statements with. They all start with cr_ by convention so you can find them by looking up their man pages with `man cr_<tab><tab>`. The manpage will tell you what arguments the creq class expects.
 
 You can also make your own creq classes. An external command, created in any language can be a creq class by complying with the protocol described in man(5) creqClassProtocal. Its also really easy to create one in a bash script.
 
@@ -736,7 +771,7 @@ You can also make your own creq classes. An external command, created in any lan
 $ cat - >/tmp/test9.sh
 #!/usr/bin/env bash
 source /usr/lib/bg_core.sh
-import bg_creqs.sh ;$L1
+import bg_creqs.sh ;$L1;$L2
 
 DeclareCreqClass cr_myConfFile
 function cr_myConfFile::check() { [ -e "/tmp/myConfig.conf" ]; }
@@ -758,7 +793,8 @@ You can also access the check operation of a creq statement directly with the bg
 The reason that this simple idea is so powerful is that often, performing the earlier steps in a configuration algorithm would mess up the target state if it is already in a later, possibly customized state of configuration. This allows writing the algorithm with the quality of idempotency which means you can call it multiple times without adverse affect.
 
 
-## State Database
+#### State Database
+
 A host computer's state is made up of base state from the operating system and additional state from all the applications installed on the host.  We can think of the host as an object instance of a computer class. The provisioning and configuration data can be thought of as state variables of the computer.
 
 The problem is that the provisioning and configuration data is spread out over non-uniform commands and files.
@@ -770,12 +806,7 @@ The native configuration files and commands remain the system of record for the 
 (Tutorial to come.... write a plugin for the ip data and then query it. show other data in the schema)
 
 
-
-
-
-
-
-## Declarative Configuration Part 2 -- Standards and Config Plugins
+#### Declarative Configuration Part 2 -- Standards and Config Plugins
 
 You can write scripts that invoke individual creq statements like we saw in the Part 1 of Declarative Configuration section but you can also create groups of creq statements that work in a larger system to perform system administration.
 
@@ -783,11 +814,11 @@ A group of creq statements is called a creq profile and there are two types -- S
 
 In a creq profile, we use the generic `creq` runner command which does not specify whether the statement will run in check or apply mode.
 
-Since they are plugins, you can provide Standards and Config scripts in packages that can be installed to add capabilities to the hosts. Running a Standards plugin produces a report about what on the host complies with the standard and what does not.  When a host admin activates a Standards plugin it will run on a schedule report it using the same shared folder system used by the Collect plugin system.
+Since they are plugins, you can provide Standards and Config creq profiles in packages that can be installed to add capabilities to the hosts. Running a Standards plugin produces a report about what on the host complies with the standard and what does not.  When a host admin activates a Standards plugin it will run on a schedule and report the host's compliance using the same shared folder system used by the Collect plugin system.
 
 Config plugins can be used just like Standards but can additionally be ran in apply mode to affect a change in the host configuration to make it comply.
 
-Standards, Config, and RBACPermission plugins are the heart of a system of distributed system administration that provides central command and control without requiring that any remote user have unrestricted privilege on a host. This is an important new firewall that limits risk in an organization by allowing compartmentalization to an extent not achieved by other means.
+Standards, Config, Collect and RBACPermission plugins along with AwkData sources are the heart of a system of distributed system administration that provides central command and control without requiring that any remote user have unrestricted privilege on a host. This is an important new firewall that limits risk in an organization by allowing compartmentalization to an extent not achieved by other means.
 
 ## Commandline User Interface
 TODO: write this section on bg_cui.sh and bg_cuiWin.sh
@@ -806,52 +837,69 @@ Note that typically, bg-dev projects place all bash library scripts in the <proj
 
 The root level contains any command files that will be installed on the target system.
 
-The root level of this project also contains one script library ( bg_core.sh ) which is the entry point for sourcing any libraries in the bg-core package or any package the conform to its protocols. bg_core.sh is sourced from its well known /usr/lib/bg_core.sh location. All other libraries are sourced via the import <libFile> ;$L1;$L2 syntax. The only responsibility of bg_core.sh is to setup the host security environment and sourcing the bg_coreImport.sh library which introduces the import system and imports the unconditional core libraries.
+The root level of this project also contains one script library ( bg_core.sh ) which is the entry point for sourcing any libraries in the bg-core package or any package that conform to its protocols. bg_core.sh is sourced from its well known /usr/lib/bg_core.sh location. All other libraries are sourced via the `import <libFile> ;$L1;$L2` syntax.
 
-### core/
+The only responsibility of bg_core.sh is to setup the host security environment and sourcing the bg_coreImport.sh library which introduces the import system and imports the unconditional core libraries of the bg-core project.
+
+#### core/
 
 The core/ subfolder contains the core libraries that are imported unconditionally when a script sources /usr/lib/bg_core.sh.
 
 You never have to import these libraries. All functions defined in any file in this folder will be available to use in a script after sourcing /usr/lib/bg_core.sh
 
-### coreOnDemand/
+In addition to being located in the core/ folder, these libraries also typically start with bg_core*.
+
+Of notable mention is the bg_coreLibsMisc.sh bash library. The idea is that sometimes there are functions that logically belong to another library in terms of its functionality but only only a few functions from that functional library need to be available all the time without importing the whole library. The 'core' functions in a functional library can be included in bg_coreLibsMisc.sh while the other other related but less 'core' functions can reside in the functional library where they are only available if that library is imported.
+
+#### coreOnDemand/
 
 The coreOnDemand/ subfolder contains libraries that are not imported initially when a script sources /usr/lib/bg_core.sh but will be automatically imported if certain features are used by the script. For example, if the script calls the daemonDeclare function to become a daemon script, the bg_coreDaemon.sh library will be imported and its features enabled.
 
-You never have to import these libraries but some functions defined in these files will only be available after the entrypoint function for a certain feature is called.
+You never have to import these libraries but some functions defined in these files will only be available after an entrypoint function typically located in the bg_coreLibsMisc.sh library is called.
 
-### lib/
+Often the entrypoint function in bg_coreLibsMisc.sh will be a stub function that only imports the library and call itself again. When the library is imported it will overwrite the stub with the real implementation so that subsequent calls will call the real implementation directly.  
 
-The lib/ subfolder contains libraries that are available for a script to use if they import them.
+#### lib/
+
+The lib/ subfolder is a standard folder for any bg-dev pacakgeProject.
 
 Your script needs to import one of these libraries in order to use its features.
 
-### unitTests/
+#### unitTests/
 
-The unitTests/ folder contains unit test scripts containing testcases that can be executed directly for testing or via `bg-dev test` as part of the package SDLC. Unit tests are not including in the package this project produces.
+The unitTests/ subfolder is a standard folder for any bg-dev pacakgeProject. It contains unit test scripts containing testcases that can be executed directly for development work or via `bg-dev test` as part of the package's SDLC.
+
+Unit tests are not included in the deb or rpm package this project produces.
 
 See man(1) bg-dev-tests
 
-### data/
+#### data/
 
-The data/ folder contains file assets that will be copied to the target system when the package is installed. On debian systems these files will be in /usr/share/bg-core/. Scripts use the $pkgDataFolder variable to refer to this folder which may be in a different location on other OS.
+The data/ subfolder is a standard folder for any bg-dev pacakgeProject. It contains file assets that will be copied to the target system when the package is installed. On debian systems these files will be in /usr/share/bg-core/. Scripts use the $pkgDataFolder variable to refer to this folder which may be in a different location on other OS.
 
-### templates/
+#### templates/
 
-Files in this folder will be considered template files regardless of their extension. You can use the `bg-core templates ...` command to manage templates on a host from this and other pacakges. Templates can be overridden by a host administrator.
+The templates/ subfolder is a standard folder for any bg-dev pacakgeProject. Files in this folder will be considered template files regardless of their extension.
 
-### plugins/
+Template functions from bg_templates.sh will find these templates when just their names (no path) are used.  
 
-Plugins are libraries that extend some PluginType mechanism. bg-core provides some general plugins for the pluginTypes that it introduces. Other packages can provide additional plugins of these types. The host admin can decide which to activate.
+You can use the `bg-core templates ...` command to manage templates on a host from this and other packages. Templates can be overridden by a host administrator but requires privilege on the host to do so, therefore templates can be trusted to contain approved content.
 
-### doc/
+#### plugins/
+
+The plugins/ subfolder is a standard folder for any bg-dev pacakgeProject. bg-core introduces several plugin types which are typically placed in the lib/ folder. It also provides a number of instances of those plugin types that reside in this folder.
+
+
+#### doc/
 
 The doc/ folder contains the changelog and copywrite files for the project and miscellaneous documentation such as diagrams.
 
-### man?/
+#### man[0-7]/
 
-The man[0-7]/ folders contain manually written man pages. Most man pages are written as comment blocks in the source code and generated into manpages when the package is built but some man pages do not fit that pattern well and are written manually.
+The man[0-7]/ subfolders are standard folders for any bg-dev pacakgeProject. They contain manually written man pages.
 
-### .bglocal/
+Most man pages are written as comment blocks in the source code and generated into manpages when the package is built but some man pages do not fit that pattern well and can be written manually.
 
-The .bglocal/ folder is a local cache folder for things that do not get committed to git. For example, a staging folder to build deb and rpm packages and the funcman generated documentation build.
+#### .bglocal/
+
+The .bglocal/ hidden subfolder is a standard folder for any bg-dev project. It is a local cache folder for things that do not get committed to git. For example, a staging folder to build deb and rpm packages and the funcman generated documentation build.
