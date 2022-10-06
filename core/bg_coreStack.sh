@@ -143,12 +143,13 @@ function bgStackFreeze()
 	# TODO: BASH5.0: BASH_ARGV0 is a new variable. should we do something with it?
 
 	### copy the builtin bash stack array vars. The only modification is that we optionally remove on or more frames from the bottom
-	declare -ga bgFUNCNAME=("${FUNCNAME[@]:$ignoreFrames}")
-	declare -ga bgBASH_SOURCE=("${BASH_SOURCE[@]:$ignoreFrames}")
-	declare -ga bgBASH_LINENO=("${BASH_LINENO[@]:$ignoreFrames}")
-	declare -ga bgBASH_ARGC=("${BASH_ARGC[@]:$ignoreFrames}")
+	declare -ga bgFUNCNAME bgBASH_SOURCE bgBASH_LINENO bgBASH_ARGC bgBASH_ARGV
+	bgFUNCNAME=("${FUNCNAME[@]:$ignoreFrames}")
+	bgBASH_SOURCE=("${BASH_SOURCE[@]:$ignoreFrames}")
+	bgBASH_LINENO=("${BASH_LINENO[@]:$ignoreFrames}")
+	bgBASH_ARGC=("${BASH_ARGC[@]:$ignoreFrames}")
 	local i offset; for ((i=0; i<ignoreFrames; i++)) do ((offset+=${BASH_ARGC[i]:-0})); done
-	declare -ga bgBASH_ARGV=("${BASH_ARGV[@]:$offset}")
+	bgBASH_ARGV=("${BASH_ARGV[@]:$offset}")
 	# from now on, we work with the copies. We dont change the original copies at all
 
 	### add new synth vars
@@ -156,14 +157,16 @@ function bgStackFreeze()
 	local stackSize="${#bgFUNCNAME[@]}"
 
 	# these are mostly the corresponding builtin var but later we will fixup the non-bash-function boundaries
-	declare -ga bgSTK_cmdName=("${bgFUNCNAME[@]}")
-	declare -ga bgSTK_cmdLineNo=("${bgBASH_LINENO[@]}")
-	declare -ga bgSTK_argc=("${bgBASH_ARGC[@]}")
-	declare -ga bgSTK_argv=("${bgBASH_ARGV[@]}")
+	declare -ga bgSTK_cmdName bgSTK_cmdLineNo bgSTK_argc bgSTK_argv
+	bgSTK_cmdName=("${bgFUNCNAME[@]}")
+	bgSTK_cmdLineNo=("${bgBASH_LINENO[@]}")
+	bgSTK_argc=("${bgBASH_ARGC[@]}")
+	bgSTK_argv=("${bgBASH_ARGV[@]}")
 
 	# these two are mostly the corresponding builtin var but shifted down one to separate the notion of caller and simpleCmd
-	declare -ga bgSTK_caller=( "${bgFUNCNAME[@]:1}"    "")
-	declare -ga bgSTK_cmdFile=("${bgBASH_SOURCE[@]:1}" "")
+	declare -ga bgSTK_caller bgSTK_cmdFile
+	bgSTK_caller=( "${bgFUNCNAME[@]:1}"    "")
+	bgSTK_cmdFile=("${bgBASH_SOURCE[@]:1}" "")
 
 	# decorate bash functions in bgSTK_caller by appending () to distinguish from other types of commands
 	# at this point, all the entries in bgSTK_caller are from BASH so all except the top one must be bash functions.
@@ -172,7 +175,8 @@ function bgStackFreeze()
 		bgSTK_caller[i]="${bgSTK_caller[i]}()"
 	done
 
-	declare -ga bgSTK_frmCtx=()
+	declare -ga bgSTK_frmCtx
+	bgSTK_frmCtx=()
 	for ((i=0; i<$stackSize; i++)); do
 		bgSTK_frmCtx[i]="script"
 	done
@@ -226,8 +230,9 @@ function bgStackFreeze()
 	esac
 
 	# compose bgSTK_cmdLine by appending the args to bgSTK_cmdName
-	declare -ga bgSTK_cmdLine=()
-	declare -ga bgSTK_argOff=()
+	declare -ga bgSTK_cmdLine bgSTK_argOff
+	bgSTK_cmdLine=()
+	bgSTK_argOff=()
 	if shopt -q extdebug; then
 		local i j argcOffset=0
 		for ((i=0; i<$stackSize; i++)); do
@@ -393,7 +398,8 @@ function bgStackFreeze()
 
 
 	### render the bgSTK_cmdLoc tokens
-	declare -ga bgSTK_cmdLoc=()
+	declare -ga bgSTK_cmdLoc
+	bgSTK_cmdLoc=()
 	local i; for ((i=0; i<${#bgSTK_cmdFile[@]}; i++)); do
 
 		# when our debugger inserts a breakpoint dynamically, BASH sees it as that script replacing the function so the source file
