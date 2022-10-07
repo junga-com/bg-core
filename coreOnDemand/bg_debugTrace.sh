@@ -553,6 +553,7 @@ function bgtraceBreak()
 #   <file> : the file to write the XTrace log to. default is the _bgtraceFile destination
 function bgtraceXTrace()
 {
+	[ "off" ] && set +x # turn off early to avoid tracing this function
 	local file="$_bgtraceFile"
 	while [ $# -gt 0 ]; do case $1 in
 		-f*|--file*) bgOptionGetOpt val: file "$@" && shift ;;
@@ -658,4 +659,33 @@ function bgtimerTrace()
 	bgtraceIsActive || return 0
 
 	bgtimerPrint "$@" >> "$_bgtraceFile"
+}
+
+
+##################################################################################################################
+### bglog -- bglog is meant to be a permanent (leave in the code) alternative to bgtrace
+# The main difference is that each bglog call is passed a <tag> that can be turned on/off to give the user fine grained control
+
+# TODO: integrated bglog with bg-debugCntr and make a production standing for bg-debugCntr to control log channels
+#       1) search code for "bglog <tag> ..." to build a list of all tags (installation should build a file similar to manifest)
+#          bg-debugCntr will do it on the fly. in dev mode, if bglog gets a tag that does not already exist in _bglogData, it triggers a rebuild
+#       2) make lazy restore the list of tags into the _bglogData assoc array
+#       3) change bglogOn to use specs that match the existing keys of _bglogData
+
+declare -gA _bglogData
+
+function bglogOn()
+{
+	while [ $# -gt 0 ]; do
+		_bglogData[$1]="on"
+		shift
+	done
+}
+
+# usage: bglog <tag> <msg> ...
+function bglog()
+{
+	[ "${_bglogData[$1]}" ] || return 0
+	local tag="$1"; shift
+	printf "%s: %s\n" "$tag" "$*" >> "$_bgtraceFile"
 }
