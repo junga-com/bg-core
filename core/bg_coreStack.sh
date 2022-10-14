@@ -168,11 +168,19 @@ function bgStackFreeze()
 	bgSTK_caller=( "${bgFUNCNAME[@]:1}"    "")
 	bgSTK_cmdFile=("${bgBASH_SOURCE[@]:1}" "")
 
+	local i; for i in "${!bgSTK_cmdFile[@]}"; do
+		[[ "${bgSTK_cmdFile[i]}" != /* ]] && bgSTK_cmdFile[i]="${PWD}/${bgSTK_cmdFile[i]}"
+	done
+
 	# decorate bash functions in bgSTK_caller by appending () to distinguish from other types of commands
 	# at this point, all the entries in bgSTK_caller are from BASH so all except the top one must be bash functions.
 	# we shifted bgSTK_caller down one so the top entry is at $stackSize-2.
 	for ((i=0; i<$stackSize-2; i++)); do
-		bgSTK_caller[i]="${bgSTK_caller[i]}()"
+		if [ "${bgSTK_caller[$i]}" == "main" ]; then
+			bgSTK_caller[i]="${bgSTK_caller[i]}($$)"
+		else
+			bgSTK_caller[i]="${bgSTK_caller[i]}()"
+		fi
 	done
 
 	declare -ga bgSTK_frmCtx
@@ -190,7 +198,7 @@ function bgStackFreeze()
 		# typical case. running a script as an external command in a new bash session. The container process that invoked the script
 		main)
 			# replace 'main' with the name of the script. Its in two places bgSTK_cmdName[$stackSize-1], and bgSTK_caller[$stackSize-2]
-			bgSTK_cmdName[$stackSize-1]="\$ ${0##*/}"
+			bgSTK_cmdName[$stackSize-1]="\$ ${0##*/}($$)"
 			((stackSize>1)) &&  bgSTK_caller[$stackSize-2]="${bgSTK_cmdName[$stackSize-1]}"
 
 			local ppid ttyName; read -r ppid ttyName <<<"$(ps -o ppid=,tty= --pid $$)"
@@ -333,6 +341,7 @@ function bgStackFreeze()
 		#            LINENO will only be available if trap is DEBUG (and maybe ERR?)
 		local ruptdCaller="${bgFUNCNAME[$origIdx]}"
 		local ruptdCmdFile="${bgBASH_SOURCE[$origIdx]}"
+		[[ "${ruptdCmdFile}" != /* ]] && ruptdCmdFile="${PWD}/${ruptdCmdFile}"
 		local ruptdCmdName="${lastCmd%% *}(${signal}...)"
 		local ruptdLineNo="${intrLineNo:-$(declare -F $ruptdCaller | awk '{print $2}')}"
 		local ruptdCmdLine="${lastCmd}(${signal}...)"
@@ -353,12 +362,15 @@ function bgStackFreeze()
 	# The <interruptedSimpleCmd> and <interuptedLineNo> parameters are passed in only when we are called from the DEBUG trap where
 	# those values are known
 	if [ "$interruptedSimpleCmd" ]; then
-		bgSTK_caller=(     "${bgFUNCNAME[0]}()"           "${bgSTK_caller[@]}"    )
+		# local tcaller="${bgFUNCNAME[0]}()"
+		# [ "${bgFUNCNAME[0]}" == "main" ] && tcaller="${bgFUNCNAME[0]}($$)"
+		bgSTK_caller=(     "${bgFUNCNAME[0]}($BASHPID)"   "${bgSTK_caller[@]}"    )
 		bgSTK_cmdName=(    "${interruptedSimpleCmd%% *}"  "${bgSTK_cmdName[@]}"   )
 		bgSTK_cmdLineNo=(  "$interuptedLineNo"            "${bgSTK_cmdLineNo[@]}" )
 		bgSTK_argc=(       "0"                            "${bgSTK_argc[@]}"      )
 		bgSTK_cmdLine=(    "$interruptedSimpleCmd"        "${bgSTK_cmdLine[@]}"   )
 		bgSTK_cmdFile=(    "${bgBASH_SOURCE[0]}"          "${bgSTK_cmdFile[@]}"   )
+		[[ "${bgSTK_cmdFile[0]}" != /* ]] && bgSTK_cmdFile[0]="${PWD}/${bgSTK_cmdFile[0]}"
 		bgSTK_frmCtx=(     "debugNext"                    "${bgSTK_frmCtx[@]}"    )
 		((stackSize++))
 
@@ -885,7 +897,7 @@ function bgStackUnMarshal()
 
 
 
-# usage: bgGetPSTree [<retVar>]
+# usage: bgGetPSTree [<pid> [<retVar>]]
 # This does not operate on the frozen stack vars but is related to the stack because it is interesting to know what subshells exist
 # when the frame is created. A each subshell has its own stack that can diverge from its parent.
 # Params:
@@ -905,7 +917,7 @@ function bgGetPSTree()
 
 	[ "$label" ] && printf "%s: " "$label"
 	if which pstree &>/dev/null; then
-		local pstout=$(pstree -pl "${passThruOpts[@]}" "$thePID")
+		local pstout; read -r pstout < <(pstree -pl "${passThruOpts[@]}" "$thePID")
 		if [[ "$pstout" =~ (-*pstree[(][0-9]*[)])$ ]]; then
 			pstout="${pstout/%${BASH_REMATCH[1]}/*}"
 		fi

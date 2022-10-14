@@ -435,14 +435,17 @@ function stringSplitIntoBashTokens()
 	# using history to parse tokens is thanks to Koichi Murase (see help-bash@gnu.org archives 8/5/22 16:28)
 	local -n arrayRet="$1"; shift
 	local input="$*"
-	history -s "$input"
-	local word i=0
+
 	arrayRet=()
-	while word=$(history -p '!:'$i 2>/dev/null); do
-		arrayRet+=("$word")
-		((i++))
-	done
-	history -d 1
+	if [ "$input" ]; then
+		history -s "$input"
+		local word i=0
+		while word=$(history -p '!:'$i 2>/dev/null); do
+			arrayRet+=("$word")
+			((i++))
+		done
+		history -d 1
+	fi
 }
 
 

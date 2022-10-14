@@ -379,12 +379,13 @@ function static::Plugin::_dumpAttributes()
 
 	local pkg scrap pluginKey pluginPath
 	local -n plugin
+	local -n mutableCols
 	while read -r pkg scrap pluginKey pluginPath; do
 		Try:
 			unset -n plugin; local -n plugin; $Plugin::get $manifestOpt --pkgName=$pkg -R plugin "$pluginKey"
 			echo "$pkg" "$pluginKey" "pluginKey" "$pluginKey"
 			local attribNames=(); $plugin.getAttributes -A attribNames
-			local -n mutableCols; $plugin.static.mutableCols.getOID mutableCols
+			unset -n mutableCols; local -n mutableCols; $plugin.static.mutableCols.getOID mutableCols
 			local attrib; for attrib in "${attribNames[@]}"; do
 				if [ ! "${mutableCols[$attrib]+exists}" ]; then
 					local value="${plugin[$attrib]}"

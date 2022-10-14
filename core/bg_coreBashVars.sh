@@ -18,6 +18,19 @@
 #     varToggleRef: ref version of toggle the value of a variable between two constants
 
 
+# usage: varContextToJSON <stackDepthFromTop> <retVar>
+function varContextToJSON()
+{
+	local stackDepthFromTop="${1:-0}"
+	local retVar="$2"
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		bgCore "dbgVars" "$retVar" "$stackDepthFromTop"
+	else
+		returnValue "<cant get scoped vars because bgCore builtin is not available>" "$retVar"
+	fi
+}
+
+
 
 
 # usage: newHeapVar [-aAilrtux] [-t|--template=<templateStr>] <retVar> [<initData1>..<initDataN>]
