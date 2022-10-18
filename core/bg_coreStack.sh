@@ -177,7 +177,7 @@ function bgStackFreeze()
 	# we shifted bgSTK_caller down one so the top entry is at $stackSize-2.
 	for ((i=0; i<$stackSize-2; i++)); do
 		if [ "${bgSTK_caller[$i]}" == "main" ]; then
-			bgSTK_caller[i]="${bgSTK_caller[i]}($$)"
+			bgSTK_caller[i]="${bgSTK_caller[i]}(${redactedPIDs:-$$})"
 		else
 			bgSTK_caller[i]="${bgSTK_caller[i]}()"
 		fi
@@ -198,7 +198,7 @@ function bgStackFreeze()
 		# typical case. running a script as an external command in a new bash session. The container process that invoked the script
 		main)
 			# replace 'main' with the name of the script. Its in two places bgSTK_cmdName[$stackSize-1], and bgSTK_caller[$stackSize-2]
-			bgSTK_cmdName[$stackSize-1]="\$ ${0##*/}($$)"
+			bgSTK_cmdName[$stackSize-1]="\$ ${0##*/}(${redactedPIDs:-$$})"
 			((stackSize>1)) &&  bgSTK_caller[$stackSize-2]="${bgSTK_cmdName[$stackSize-1]}"
 
 			local ppid ttyName; read -r ppid ttyName <<<"$(ps -o ppid=,tty= --pid $$)"
@@ -362,9 +362,7 @@ function bgStackFreeze()
 	# The <interruptedSimpleCmd> and <interuptedLineNo> parameters are passed in only when we are called from the DEBUG trap where
 	# those values are known
 	if [ "$interruptedSimpleCmd" ]; then
-		# local tcaller="${bgFUNCNAME[0]}()"
-		# [ "${bgFUNCNAME[0]}" == "main" ] && tcaller="${bgFUNCNAME[0]}($$)"
-		bgSTK_caller=(     "${bgFUNCNAME[0]}($BASHPID)"   "${bgSTK_caller[@]}"    )
+		bgSTK_caller=(     "${bgFUNCNAME[0]}(${redactedPIDs:-$BASHPID})"   "${bgSTK_caller[@]}"    )
 		bgSTK_cmdName=(    "${interruptedSimpleCmd%% *}"  "${bgSTK_cmdName[@]}"   )
 		bgSTK_cmdLineNo=(  "$interuptedLineNo"            "${bgSTK_cmdLineNo[@]}" )
 		bgSTK_argc=(       "0"                            "${bgSTK_argc[@]}"      )

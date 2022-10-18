@@ -373,6 +373,7 @@ function ut_Object_toString() {
 	$obj.dontExist.toString --title
 	$obj.dontExist.toString
 	$obj[dontExist].toString
+bgtraceBreak
 	$obj.::dontExist.toString
 	$obj.Object::dontExist.toString
 }

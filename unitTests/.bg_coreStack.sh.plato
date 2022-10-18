@@ -984,9 +984,9 @@ cmd> for ((i=0; i<5; i++)); do echo "   [$i] ${bgSTK_frmSummary[$i]}"; done
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0): : bash(<PID>): $ bgStackTest top
+<tty>(0): : bash(<PID>): $ bgStackTest(<PID>) top
 =================  bottom of stack invoked the stack trace  ==========================
-bash(<redacted>)*
+bash(<redacted>)---bash(<redacted>)*
 
 ## bg_coreStack.sh:bgStackFreeze:top finished
 ###############################################################################################################################
@@ -1007,8 +1007,8 @@ bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop DEBUGGER
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):        : bash(<PID>): $ bgStackTest top_DBG
-bgStackTest(69): : main()     : aNoopCommand
+<tty>(0):        : bash(<PID>): $ bgStackTest(<PID>) top_DBG
+bgStackTest(69): : main(<PID>): aNoopCommand
 =================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1031,12 +1031,12 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func -- call bgStackFreeze explicitly before calling bgStackPrint
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):        : bash(<PID>)  : $ bgStackTest func_ExplicitFreeze
-bgStackTest(73): : $ bgStackTest: c3
-libC3.sh(12):    : c3()         : b2 b2_p1 b2_p2 b2_p3
-libB2.sh(18):    : b2()         : a1 b2_p1 b2_p2 b2_p3 a1_arg1
+<tty>(0):        : bash(<PID>)         : $ bgStackTest(<PID>) func_ExplicitFreeze
+bgStackTest(73): : $ bgStackTest(<PID>): c3
+libC3.sh(12):    : c3()                : b2 b2_p1 b2_p2 b2_p3
+libB2.sh(18):    : b2()                : a1 b2_p1 b2_p2 b2_p3 a1_arg1
 =================  bottom of stack invoked the stack trace  ==========================
-bash(<redacted>)*
+bash(<redacted>)---bash(<redacted>)*
 [exitCode 1]
 
 ## bg_coreStack.sh:bgStackFreeze:func_ExplicitFreeze finished
@@ -1058,12 +1058,12 @@ bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func -- call bgStackPrint relying on implicit freeze
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):        : bash(<PID>)  : $ bgStackTest func_NoFreeze
-bgStackTest(76): : $ bgStackTest: c3 a1NoFreeze
-libC3.sh(12):    : c3()         : b2 a1NoFreeze b2_p1 b2_p2 b2_p3
-libB2.sh(18):    : b2()         : a1 a1NoFreeze b2_p1 b2_p2 b2_p3 a1_arg1
+<tty>(0):        : bash(<PID>)         : $ bgStackTest(<PID>) func_NoFreeze
+bgStackTest(76): : $ bgStackTest(<PID>): c3 a1NoFreeze
+libC3.sh(12):    : c3()                : b2 a1NoFreeze b2_p1 b2_p2 b2_p3
+libB2.sh(18):    : b2()                : a1 a1NoFreeze b2_p1 b2_p2 b2_p3 a1_arg1
 =================  bottom of stack invoked the stack trace  ==========================
-bash(<redacted>)*
+bash(<redacted>)---bash(<redacted>)*
 
 ## bg_coreStack.sh:bgStackFreeze:func_NoFreeze finished
 ###############################################################################################################################
@@ -1084,11 +1084,11 @@ bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func DEBUGGER
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):        : bash(<PID>)  : $ bgStackTest func_DBG
-bgStackTest(79): : $ bgStackTest: c3 a1DBG
-libC3.sh(12):    : c3()         : b2 a1DBG b2_p1 b2_p2 b2_p3
-libB2.sh(18):    : b2()         : a1 a1DBG b2_p1 b2_p2 b2_p3 a1_arg1
-libA1.sh(14):    : a1()         : : noop next cmd
+<tty>(0):        : bash(<PID>)         : $ bgStackTest(<PID>) func_DBG
+bgStackTest(79): : $ bgStackTest(<PID>): c3 a1DBG
+libC3.sh(12):    : c3()                : b2 a1DBG b2_p1 b2_p2 b2_p3
+libB2.sh(18):    : b2()                : a1 a1DBG b2_p1 b2_p2 b2_p3 a1_arg1
+libA1.sh(14):    : a1(<PID>)           : : noop next cmd
 =================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1111,7 +1111,7 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop intr:USR1
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):      : bash(<PID>): $ bgStackTest top_USR1
+<tty>(0):      : bash(<PID>): $ bgStackTest(<PID>) top_USR1
 bgStackTest(): : main       : kill -USR1 $BASHPID(USR1...)
 =================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
@@ -1135,7 +1135,7 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop intr:USR1..func
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):               : bash(<PID>) : $ bgStackTest top_USR1_func
+<tty>(0):               : bash(<PID>) : $ bgStackTest(<PID>) top_USR1_func
 bgStackTest():          : main        : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted><PID> INTERUPT RECEIVED -------------------
 USR1-<redacted><PID><handler>(3): : USR1_HANDLER: oneDown
@@ -1161,7 +1161,7 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop interuptUSR1FirstLine DEBUGGER
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):                : bash(<PID>)  : $ bgStackTest top_USR1FirstLine_DBG
+<tty>(0):                : bash(<PID>)  : $ bgStackTest(<PID>) top_USR1FirstLine_DBG
 ----- <UNK>-<PID> INTERUPT RECEIVED -------------------
 <UNK>-<PID><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
 =================  bottom of stack invoked the stack trace  ==========================
@@ -1186,9 +1186,9 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):         : bash(<PID>)  : $ bgStackTest func_USR1
-bgStackTest(130): : $ bgStackTest: c3USR1
-libC3.sh(18):     : c3USR1       : kill -USR1 $BASHPID(USR1...)
+<tty>(0):         : bash(<PID>)         : $ bgStackTest(<PID>) func_USR1
+bgStackTest(130): : $ bgStackTest(<PID>): c3USR1
+libC3.sh(18):     : c3USR1              : kill -USR1 $BASHPID(USR1...)
 =================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1211,11 +1211,11 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func intr:USR1..func
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):               : bash(<PID>)  : $ bgStackTest func_USR1_func
-bgStackTest(133):       : $ bgStackTest: c3USR1_func
-libC3.sh(24):           : c3USR1_func  : kill -USR1 $BASHPID(USR1...)
+<tty>(0):               : bash(<PID>)         : $ bgStackTest(<PID>) func_USR1_func
+bgStackTest(133):       : $ bgStackTest(<PID>): c3USR1_func
+libC3.sh(24):           : c3USR1_func         : kill -USR1 $BASHPID(USR1...)
 ----- USR1-<redacted><PID> INTERUPT RECEIVED -------------------
-USR1-<redacted><PID><handler>(3): : USR1_HANDLER : oneDown
+USR1-<redacted><PID><handler>(3): : USR1_HANDLER        : oneDown
 =================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 
@@ -1238,10 +1238,10 @@ bash(<redacted>)---bash(<redacted>)*
 cmd> unitTests/bgStackTest "$1"
 ## expect stack summary = scriptTop..func interuptUSR1FirstLine DEBUGGER
 ===============  BASH call stack trace P:<redacted>/<redacted> TTY:<redacted> =====================
-<tty>(0):                : bash(<PID>)  : $ bgStackTest func_USR1FirstLine_DBG
-bgStackTest(136):        : $ bgStackTest: c3USR1FirstLine_DBG
+<tty>(0):                : bash(<PID>)         : $ bgStackTest(<PID>) func_USR1FirstLine_DBG
+bgStackTest(136):        : $ bgStackTest(<PID>): c3USR1FirstLine_DBG
 ----- <UNK>-<PID> INTERUPT RECEIVED -------------------
-<UNK>-<PID><handler>(1): : <UNK>_HANDLER: kill -USR1 $BASHPID
+<UNK>-<PID><handler>(1): : <UNK>_HANDLER       : kill -USR1 $BASHPID
 =================  bottom of stack invoked the stack trace  ==========================
 bash(<redacted>)---bash(<redacted>)*
 

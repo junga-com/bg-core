@@ -221,10 +221,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertError'
-   catch_errorFn='$ bg-dev'
+   catch_errorFn='$ bg-dev(<PID>)'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: $ bg-dev: eval 'function f1() { assertError '"$1"'; }'
+                          +error: $ bg-dev(<PID>): eval 'function f1() { assertError '"$1"'; }'
                           +    1'
 ## bg_coreAssertError.sh:frameOffsetOption:40 finished
 ###############################################################################################################################
@@ -427,10 +427,10 @@ cmd> f4
 cmd> f4
 ** Exception thrown by testcase **
    catch_errorClass='assertF1'
-   catch_errorFn='$ bg-dev'
+   catch_errorFn='$ bg-dev(<PID>)'
    catch_errorCode='36'
    catch_errorDescription='
-                          +error: $ bg-dev: eval 'function assertF1() { assertError '"$1"'; }'
+                          +error: $ bg-dev(<PID>): eval 'function assertF1() { assertError '"$1"'; }'
                           +    1'
 ## bg_coreAssertError.sh:errorClassFeature:40 finished
 ###############################################################################################################################
