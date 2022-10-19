@@ -318,7 +318,7 @@ function bgStackFreeze()
 
 		# we detected that this is the last frame before a trap handler started executing.
 		# insert one new frame ('ruptd') (aka 'interupted') to represent the line of code that the trap interupted.
-		# unlike with the DEBUG trap (which is handled by passeing params to this function), BASH_COMMAND is the last completed
+		# unlike with the DEBUG trap (which is handled by passing params to this function), BASH_COMMAND is the last completed
 		# command that ran before the trap handler started run. i.e. its the last cmd instead of the next cmd.
 		# Above insertIdx: everything is normal
 		# Below insertIdx: the first frame needs to be fixed because it had been attributed to being called from the frame above it
@@ -832,8 +832,8 @@ function bgStackToJSON()
 	local i j ignoreFramesCount
 	printf "${indent}[${CR}"
 	indent="${indent}   "
-	for ((i=${#bgSTK_cmdFile[@]}-1; i>=${ignoreFramesCount:-0}; i--)); do
-		((i==0)) &&  RS=""
+	for ((i=${ignoreFramesCount:-0}; i<${#bgSTK_cmdFile[@]}; i++)); do
+		((i==${#bgSTK_cmdFile[@]}-1)) &&  RS=""
 		printf "${indent}{${CR}"
 		indent="${indent}   "
 		local FS=","

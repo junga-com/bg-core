@@ -2479,6 +2479,7 @@ function bgtrap()
 	while [ $# -gt 0 ]; do
 		local signal="$1"; shift
 
+		# CRITICALTODO: i recently realized that trap should not be in a $() because some sigs might not inherit. see 'bgTrapUtils getAll'
 		# retrieve any previous trap handler that has been set
 		local previousScript;
 		previousScript="$(builtin trap -p "$signal" 2>$assertOut)" || assertError -v signal -f assertOut "'$signal' is not a valid trap signal"
@@ -2793,35 +2794,36 @@ function bgTrapUtils()
 				-n|--numberedLines) numLinesFlag="-n" ;;
 				*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 			done
+			local -n retAssoc="$1"
 
-			local trapString="$(builtin trap -p)"
-			local -A _tu_trapHandlers
-			local _tu_signal _tu_handler sep line inTrap lineno
+			local tmpFile; bgmktemp "tmpFile"
+			builtin trap -p > "$tmpFile"
+			local trapString="$(cat "$tmpFile")"
+			bgmktemp --release "tmpFile"
+
+			local -A _tu_trapDict
+			local _tu_trapNum=0 _tu_signal _tu_trapHandlers _tu_sep line inTrap lineno linenoStr
 			while IFS="" read -r line; do
-				if [ ! "$inTrap" ] && [[ "$line" =~ ^(trap[[:space:]][[:space:]]*--[[:space:]][[:space:]]*\') ]]; then
-					inTrap="1"
+				if [[ "$line" == "trap -- '"* ]]; then
+					((_tu_trapNum++))
 					line="${line#*\'}"
-					lineno=1
+					lineno=0
+					_tu_sep=""
 				fi
+				((lineno++))
+				[ "$numLinesFlag" ] && printf -v linenoStr "%4s: " "$lineno"
 
-				if [ "$inTrap" ] && [[ "$line" =~ (^|[^\'])\'[[:space:]][[:space:]]*([A-Z0-9]*)$ ]]; then
-					inTrap=""
-					_tu_signal="${BASH_REMATCH[2]}"
-					line="${line%\'*}"
-					printf -v _tu_handler "%s%s%s" "$_tu_handler" "$sep" "${numLinesFlag:+$((lineno++)): }$line"
-					_tu_handler="${_tu_handler//"'\''"/\'}"
-					_tu_trapHandlers[${_tu_signal:-exmpty}]="$_tu_handler"
-					_tu_signal=""
-					_tu_handler=""
-					sep=""
-				fi
+				stringTrim -i line
 
-				if [ "$inTrap" ]; then
-					printf -v _tu_handler "%s%s%s" "$_tu_handler" "$sep" "${numLinesFlag:+$((lineno++)): }$line"
-					sep=$'\n'
-				fi
+				printf -v _tu_trapHandlers[$_tu_trapNum] "%s%s%s" "${_tu_trapHandlers[$_tu_trapNum]}" "$_tu_sep" "${linenoStr}$line"
+				_tu_sep=$'\n'
 			done  <<<"$trapString"
-			returnValue --retArray _tu_trapHandlers "$1"
+
+			local i; for i in "${!_tu_trapHandlers[@]}"; do
+				local sig="${_tu_trapHandlers[i]##* }"
+				sig="${sig%\'}"
+				retAssoc[$sig]="${_tu_trapHandlers[i]%\' *}"
+			done
 			;;
 
 		# this is used by the bgStack code so it can quickly lookup [<trap>:<lineno>] for any trap and lineno

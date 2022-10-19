@@ -770,6 +770,24 @@ function arrayToBashTokens()
 	done
 }
 
+# usage: arrayToJSON <inVar> <outVar>
+# Sets <outVar> with the json text that represents the value of <inVar>. The json text will be one json value which will be one of
+# these...
+#     "<string>"
+#     [el1,el2,...]
+#     {"n1":"v1","n2":"v2,..."}
+# Params:
+#    <inVar>   : is the name of the variable whose value will be represented in json text
+#                <inVar> can be any type of variable but is typically a numeric or assoc array
+#    <outVar>  : the variable name to set with the json text
+function arrayToJSON()
+{
+	if  [ "$bgCoreBuiltinIsInstalled" ]; then
+		builtin bgCore $FUNCNAME "$@"
+		return
+	fi
+	assertError "this function does not yet have a bash implementation"
+}
 
 # usage: arrayFromBashTokens <varName>
 # modifies each element in the array to undo what arrayToBashTokens did and return it to normal strings that could be empty and
