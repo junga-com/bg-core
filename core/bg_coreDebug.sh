@@ -88,22 +88,25 @@ else
 	# where its kind of hidden from sight.
 
 	# install a cntr-c signal handler to invoke the debugger.
-	[ ! "$bgDebuggerInhibitCntrC" ] && [ "$bgDevModeUnsecureAllowed" ] && [ "$bgLibExecMode" == "script" ] && bgtrap -n debugger '
-		if debuggerIsInBreak; then
-			# if we are already stopped in the debugger, interpret cntr-c normally and end the script
-			bgtrace "cntr-c caught in bgtrace mode. Already stopped in debugger so interrupting script."
-			builtin trap - SIGINT
-			kill -SIGINT $BASHPID
-		else
-			bgtrace "cntr-c caught in bgtrace mode. Invoking the debugger. Hitting cntr-c again will stop the script"
-			bgtraceBreak || {
-				bgtrace "Invoking the debugger failed. Stopping the script with a unhandled cntr-c"
+	function _debugInstallCntrHandler()
+	{
+		[ ! "$bgDebuggerInhibitCntrC" ] && [ "$bgDevModeUnsecureAllowed" ] && [ "$bgLibExecMode" == "script" ] && bgtrap -n debugger '
+			if debuggerIsInBreak; then
+				# if we are already stopped in the debugger, interpret cntr-c normally and end the script
+				bgtrace "cntr-c caught in bgtrace mode. Already stopped in debugger so interrupting script."
 				builtin trap - SIGINT
 				kill -SIGINT $BASHPID
-			}
-		fi
-	' SIGINT
-
+			else
+				bgtrace "cntr-c caught in bgtrace mode. Invoking the debugger. Hitting cntr-c again will stop the script"
+				bgtraceBreak || {
+					bgtrace "Invoking the debugger failed. Stopping the script with a unhandled cntr-c"
+					builtin trap - SIGINT
+					kill -SIGINT $BASHPID
+				}
+			fi
+		' SIGINT
+	}
+	_debugInstallCntrHandler
 
 	##################################################################################################################
 	### recognize debugger environment var maintianed by bg-debugCntr to activate the debugger when a script runs

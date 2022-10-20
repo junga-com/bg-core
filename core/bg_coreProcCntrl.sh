@@ -354,11 +354,16 @@ function procIsRunning()
 
 # usage: bgSleep <timeout>
 # like sleep but is interruptable
+# if this BASHPID receives a SIGINT while
 function bgsleep() { bgSleep "$@"; }
 function bgSleep()
 {
+	bgTrapStack push SIGINT ':'
 	sleep "$@" &
 	wait $!
+	local result="$?"
+	bgTrapStack pop SIGINT
+	return "$result"
 }
 
 

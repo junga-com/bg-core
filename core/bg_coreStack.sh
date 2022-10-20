@@ -7,7 +7,7 @@
 #    * frames do not stand alone -- some attributes of the current frame are in the +1 frame above it
 #    * when a trap handler is running, at that boundary, the +1 frame does not contain the right info for that frame
 #    * the top frame is incomplete because logically it should describe the thing that invoked the script but does not.
-#    * in a DEBUG trap, the interupted line is not represented
+#    * in a DEBUG trap, the interrupted line is not represented
 #
 # Another issue that this library addresses is that the native stack continues to vary as functions are executed to examine it.
 #
@@ -16,7 +16,7 @@
 #     * new bgSTK_* variables are derived from the native variables
 #     * missing trap handler frames are detected and inserted into the new variables.
 #     * the top frame in the new vars is fixed up so that it represents and describes how the script was executed
-#     * if the DEBUG trap is running, a bottom frame is added to the new vars to represent the interupted script line.
+#     * if the DEBUG trap is running, a bottom frame is added to the new vars to represent the interrupted script line.
 #     * each frame of the new vars stand alone so you do not need to reference adjacent frames to get info about that frame.
 #
 # bgStackFreeze is executed by assertError and the debugger DEBUG trap handler at their starts. Then bgStack* commands can be used
@@ -45,7 +45,7 @@
 
 
 
-# usage: bgStackFreeze <ignoreFrames> [<interruptedSimpleCmd> <interuptedLineNo>]
+# usage: bgStackFreeze <ignoreFrames> [<interruptedSimpleCmd> <interruptedLineNo>]
 # makes a copy of the BASH stack array variables (prepended with 'bg') so that other functions can operate on the copy without it
 # changing as the real vars would as other functions are being pushed onto and popped off of the native bash stack. assertError
 # freezes the stack at the top of its execution and the debugger freezes the stack just before entering the degger UI.
@@ -81,7 +81,7 @@
 #    3) In a DEBUG trap, the simple command that will run next is added to the bottom of the stack. Unlike all the native stack
 #       frames this simple cmd does not have to be a bash function. Adding this frame is useful for the debugger but also when an
 #       exception is thrown inside a DEBUG trap so that the stack makes sense.
-#    4) non-DEBUG traps are detected and a frame is inserted to represent the interupted code and to resolve the misleading
+#    4) non-DEBUG traps are detected and a frame is inserted to represent the interrupted code and to resolve the misleading
 #       discontinuity in the native stack. In the native stack, we have to match up the BASH_SOURCE from one frame with the
 #       BASH_LINENO of an adjacent frame but when a trap handler invokes a bash funcction, the two adjacent frames do not correspond
 #
@@ -112,9 +112,9 @@
 #    <ignoreFrames> : the number of stack frames to ignore on the bottom of the stack. The default is 1 which would ignore the
 #                     call to this function so that the caller will be the bottom frame in the frozen stack.
 #   <interruptedSimpleCmd> : when a DEBUG trap handler freezes the stack, it can pass the BASH_COMMAND and LINENO to add a stack
-#                     frame to represent the simple command being interupted.
-#   <interuptedLineNo> : if <interruptedSimpleCmd> is specified, this must be also. Note that in a DEBUG trap handler, LINENO starts
-#                     out to be the interupted line number but it will continue to increment with each line of the trap handler so
+#                     frame to represent the simple command being interrupted.
+#   <interruptedLineNo> : if <interruptedSimpleCmd> is specified, this must be also. Note that in a DEBUG trap handler, LINENO starts
+#                     out to be the interrupted line number but it will continue to increment with each line of the trap handler so
 #                     the handler must copy LINENO is its first line, before any carrage return in the handler string.
 function bgStackFreeze()
 {
@@ -138,7 +138,7 @@ function bgStackFreeze()
 
 	local ignoreFrames="${1:-1}"; (( ignoreFrames=((ignoreFrames<(${#FUNCNAME[@]})) ? (ignoreFrames) : (${#FUNCNAME[@]}-1)) ))
 	local interruptedSimpleCmd="$2"
-	local interuptedLineNo="$3"
+	local interruptedLineNo="$3"
 
 	# TODO: BASH5.0: BASH_ARGV0 is a new variable. should we do something with it?
 
@@ -171,6 +171,8 @@ function bgStackFreeze()
 	local i; for i in "${!bgSTK_cmdFile[@]}"; do
 		[[ "${bgSTK_cmdFile[i]}" != /* ]] && bgSTK_cmdFile[i]="${PWD}/${bgSTK_cmdFile[i]}"
 	done
+
+	local sigSrcTempDir="/tmp/bgDbgSigHandlerSrc"
 
 	# decorate bash functions in bgSTK_caller by appending () to distinguish from other types of commands
 	# at this point, all the entries in bgSTK_caller are from BASH so all except the top one must be bash functions.
@@ -259,7 +261,7 @@ function bgStackFreeze()
 		done
 	fi
 
-	# This visualization represets inserting a frame at depth==6 to represent the line of code that a trap interupted.
+	# This visualization represets inserting a frame at depth==6 to represent the line of code that a trap interrupted.
 	# a-f are normal script frames.
 	# INT is the inserted frame.
 	# g-h are the function stack of the intr handler. If the handler is not in a function call 'f' would be the bottom frame.
@@ -278,6 +280,7 @@ function bgStackFreeze()
 	# g 1 7          INT 2 7                    # we add a line to reprent where in 'f' is executing. We have limitted info.
 	# h 0 8          g   1 8                    # 'g' is the function that the trap handler is executing
 	#                h   0
+
 
 	### add frames for any trap handlers that we can detect are on the stack
 	#     1) BGTRAPEntry/BGTRAPExit maintains a stack (bgBASH_trapStkFrm_*) of trap handlers that are executing
@@ -317,7 +320,7 @@ function bgStackFreeze()
 		fi
 
 		# we detected that this is the last frame before a trap handler started executing.
-		# insert one new frame ('ruptd') (aka 'interupted') to represent the line of code that the trap interupted.
+		# insert one new frame ('ruptd') (aka 'interrupted') to represent the line of code that the trap interrupted.
 		# unlike with the DEBUG trap (which is handled by passing params to this function), BASH_COMMAND is the last completed
 		# command that ran before the trap handler started run. i.e. its the last cmd instead of the next cmd.
 		# Above insertIdx: everything is normal
@@ -331,7 +334,11 @@ function bgStackFreeze()
 		# falsely attributed to the frame above it before now.
 		if [ ${insertIdx:-0} -gt 0 ]; then
 			bgSTK_caller[$insertIdx-1]="${signal}_HANDLER"
-			bgSTK_cmdFile[$insertIdx-1]="${signal}-${redactedPIDs:-$trapPID}<handler>"
+			[ ! -d "$sigSrcTempDir" ] && mkdir "$sigSrcTempDir"
+			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${BASHPID}'_handler.sh"' EXIT
+			bgSTK_cmdFile[$insertIdx-1]="${sigSrcTempDir}/${signal}_${BASHPID}_handler.sh"
+			varExists "bgTraps" ; { declare -gA bgTraps; bgTrapUtils getAll bgTraps; }
+			echo "${bgTraps[$signal]:-Signal handler for $signal was not found}" > "${bgSTK_cmdFile[$insertIdx-1]}"
 		fi
 
 		# create our new frame data from these two sources
@@ -358,13 +365,14 @@ function bgStackFreeze()
 	done
 
 
-	### add a frame at the bottom for the command interupted by the DEBUG or ERR trap if called for
-	# The <interruptedSimpleCmd> and <interuptedLineNo> parameters are passed in only when we are called from the DEBUG trap where
+
+	### add a frame at the bottom for the command interrupted by the DEBUG or ERR trap if called for
+	# The <interruptedSimpleCmd> and <interruptedLineNo> parameters are passed in only when we are called from the DEBUG trap where
 	# those values are known
 	if [ "$interruptedSimpleCmd" ]; then
 		bgSTK_caller=(     "${bgFUNCNAME[0]}(${redactedPIDs:-$BASHPID})"   "${bgSTK_caller[@]}"    )
 		bgSTK_cmdName=(    "${interruptedSimpleCmd%% *}"  "${bgSTK_cmdName[@]}"   )
-		bgSTK_cmdLineNo=(  "$interuptedLineNo"            "${bgSTK_cmdLineNo[@]}" )
+		bgSTK_cmdLineNo=(  "$interruptedLineNo"           "${bgSTK_cmdLineNo[@]}" )
 		bgSTK_argc=(       "0"                            "${bgSTK_argc[@]}"      )
 		bgSTK_cmdLine=(    "$interruptedSimpleCmd"        "${bgSTK_cmdLine[@]}"   )
 		bgSTK_cmdFile=(    "${bgBASH_SOURCE[0]}"          "${bgSTK_cmdFile[@]}"   )
@@ -372,8 +380,10 @@ function bgStackFreeze()
 		bgSTK_frmCtx=(     "debugNext"                    "${bgSTK_frmCtx[@]}"    )
 		((stackSize++))
 
+		unset bgDebuggerFirstTrapLineDetected
+
 		# detect cases where the DEBUG trap is interupting the top level lines of an interupt handler (not in a function it calls)
-		# in this case, the new frame we just added represents the first frame of a trap non-DEBUG handler that we are stepping through
+		# in this case, the new frame we just added represents the first frame of a non-DEBUG trap handler that we are stepping through
 		# we need to fixup the frame to indicate that the caller is discontinuous from the frame before it.
 
 		# this case is when the interupt handler is running betwen calls to BGTRAPEntry/BGTRAPExit.
@@ -383,25 +393,76 @@ function bgStackFreeze()
 			local signal="${BASH_REMATCH[1]}"
 			local trapPID="${BASH_REMATCH[2]}"
 			bgSTK_caller[0]="${signal}_HANDLER"
-			bgSTK_cmdFile[0]="${signal}-${redactedPIDs:-$trapPID}<handler>"
+
+			[ ! -d "$sigSrcTempDir" ] && mkdir "$sigSrcTempDir"
+			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${BASHPID}'_handler.sh"' EXIT
+			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${BASHPID}_handler.sh"
+			varExists "bgTraps" ; { declare -gA bgTraps; bgTrapUtils getAll bgTraps; }
+			echo "${bgTraps[$signal]:-Signal handler for $signal was not found}" > "${bgSTK_cmdFile[0]}"
+
 
 		# NOTE: When the debug trap fires before the first line the first line of a trap, BASH_COMMAND is the set for the other trap
 		# and not the DEBUG trap.
 		# this is the case of the first step into a handler when it is about to call the BGTRAPEntry function. The next step will
 		# result in BGTRAPEntry setting the bgBASH_trapStkFrm_* mechanism, but until then, we need to manually detect this case
+		# 2022-10 bobg: i dont think this block ever kicks in because of a 'bug' in bash where it does not update BASH_COMMAND
+		#               for the first line of the handler. this is a POSIX committe cluster fuck
 		elif [[ "$interruptedSimpleCmd" =~ ^BGTRAPEntry  ]]; then
 			local signal="${bgSTK_argv[bgSTK_argc[0]-2]}"
 			local trapPID="${bgSTK_argv[bgSTK_argc[0]-1]}"
 			bgSTK_caller[0]="${signal}_HANDLER"
-			bgSTK_cmdFile[0]="${signal}-${redactedPIDs:-$trapPID}<handler>"
+
+			[ ! -d "$sigSrcTempDir" ] && mkdir "$sigSrcTempDir"
+			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${BASHPID}'_handler.sh"' EXIT
+			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${BASHPID}_handler.sh"
+			varExists "bgTraps" ; { declare -gA bgTraps; bgTrapUtils getAll bgTraps; }
+			echo "${bgTraps[$signal]:-Signal handler for $signal was not found}" > "${bgSTK_cmdFile[0]}"
 
 		# we assume that if lineno is 1, its the start of an interupt handler. Unfortunately, because BASH_COMMAND is not set to the
 		# next command in this rare case, we know nothing about the interupt that is starting.
-		elif (( interuptedLineNo == 1 )); then
+		elif (( interruptedLineNo == 1 )); then
 			local signal="<UNK>"
 			local trapPID="<UNK>"
 			bgSTK_caller[0]="${signal}_HANDLER"
-			bgSTK_cmdFile[0]="${signal}-${redactedPIDs:-$trapPID}<handler>"
+
+			declare -g bgDebuggerFirstTrapLineDetected="1"
+
+			[ ! -d "$sigSrcTempDir" ] && mkdir "$sigSrcTempDir"
+			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${BASHPID}'_handler.sh"' EXIT
+			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${BASHPID}_handler.sh"
+			varExists "bgTraps" ; { declare -gA bgTraps; bgTrapUtils getAll bgTraps; }
+
+			if [ "$bgDebuggerStepIntoPlumbing" ]; then
+				dedent "We are stopped at the first line of a yet unknown signal handler.
+					Bash has a 'bug' in updating BASH_COMMAND for the first line of the handler.
+					This situation typically resolves after issuing a step over command at this point.
+					The first line of a trap handler is typically the BGTRAPEntry call managed by the
+					'bgtrap' version of 'trap'
+
+				" > "${bgSTK_cmdFile[0]}"
+				for signal in "${!bgTraps[@]}"; do
+					printf "\n%s\n%s\n" "$signal" "${bgTraps[$signal]}" >> "${bgSTK_cmdFile[0]}"
+				done
+			else
+				dedent "
+
+					A trap has interrupted the script.
+					    stepOver : will step over the signal handler script
+					    stepIn   : will step into the signal handler script
+
+					Note that bgDebuggerStepIntoPlumbing is off which is why you get this choice.
+
+					Note that we can not determine yet which signal interuptted the script because
+					of a bash 'bug' in updating BASH_COMMAND for the first line of a handler.
+					This situation typically resolves when you step into the signal handler.
+
+
+					CURRENT INSTALLED SIGNAL HANDLERS:
+				" > "${bgSTK_cmdFile[0]}"
+				for signal in "${!bgTraps[@]}"; do
+					printf "\n%s\n%s\n" "$signal" "${bgTraps[$signal]}" | gawk 'NR>2 {printf "   "} {print $0}' >> "${bgSTK_cmdFile[0]}"
+				done
+			fi
 		fi
 	fi
 
@@ -416,7 +477,8 @@ function bgStackFreeze()
 		# bash associates with the function will be the debugger script library instead of the original script that the function
 		# came from. This tranaslates the cmdFile and cmdLineNo after the BP back to the originals that refer to the source file.
 		declare -gA bgBASH_debugBPInfo
-		local bpInfo="${bgBASH_debugBPInfo["${bgSTK_cmdName[i]// /}"]}"
+		local bpID="${bgSTK_cmdName[i]// /}"
+		local bpInfo="${bgBASH_debugBPInfo["${bpID:---}"]}"
 		if [ "$bpInfo" ]; then
 			local origLineNo newLineNo origFile; read -r origLineNo newLineNo origFile <<<"$bpInfo"
 			bgSTK_cmdFile[i]="$origFile"
@@ -425,6 +487,7 @@ function bgStackFreeze()
 
 		bgSTK_cmdLoc[i]="${bgSTK_cmdFile[i]##*/}(${bgSTK_cmdLineNo[i]}):"
 	done
+
 
 	# these are optional attributes filled in by other functions
 	declare -ga bgSTK_frmSummary=()
@@ -823,9 +886,6 @@ function bgStackFrameGet() {
 
 function bgStackToJSON()
 {
-	# $$
-	# $BASHPID
-	# tty
 	local CR="\n"
 	local RS=","
 	local indent=""

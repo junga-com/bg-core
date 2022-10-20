@@ -887,6 +887,7 @@ function bgsudo()
 	fi
 
 	# set up the SIGINT trap and a file to receive stderr
+	# CRITICALTODO: this should use the bgTrapStack API instead. easy but cant tet the change now...
 	local tmpErrOutFile="$(mktemp)" bgsudoCanceled=""
 	bgtrap -n bgsudo 'bgsudoCanceled="1"' SIGINT
 
@@ -1539,20 +1540,25 @@ function bgtraceTurnOn()
 ### From bg_debugger.sh
 
 # usage: debuggerIsActive
-# returns 0(true) if the debugger has been turned on in this script. It is used to tell if debuggerOn/Off needs to be called.
-# The definition of being turned on means that a terminal has be set for the use of the debugger. It does not mean that
-# the script is currently stopped in the debugger or the the DEBUG trap is currently set
+# returns 0(true) if the debugger has been turned on in this script and is still connected.
+# returns 1 or greater (false) eiterh the debugger has not been turned on or its been disconnected
+# This should start reporting true after a sucessful call to debuggerOn (which may be called from the first bgtraceBreak encountered)
+# and it should continue reporting true until either one of this events ocur
+#    1) debuggerOff is called
+#    2) the front end driver sees its connection to the front end is closed. (i.e. the cuiWin or Atom editor is closed)
 # See Also:
-#    debuggerIsActive   : is there a debugger open for this script (regardless of whether the script is in a break or running)
+#    debuggerIsActive   : is there a debugger connected to this script (regardless of whether the script is in a break or running)
 #    debuggerIsInBreak  : is the script currently stopped in the debugger.
 function debuggerIsActive()
 {
-	# TODO: thise should ask the driver
 	[ "$bgDevModeUnsecureAllowed" ] || return 35
-	[ "$bgdbtty" ] && [ -t "$bgdbttyFD" ] && return 0
-	[ "$bgdbCntrFile" ] && [ -p  "$bgdbCntrFile"  ] && return 0
-	[ "$bgPipeToAtom" ] && return 0
-	return 1
+
+	# check that debuggerOn has loaded a driver
+	type -t _dbgDrv_isConnected &> /dev/null || return 1
+
+	# ask the driver if its connected
+	_dbgDrv_isConnected
+	return $?
 }
 
 # usage: debuggerIsInBreak
@@ -2172,7 +2178,7 @@ function BGTRAPEntry()
 
 	local intrrupttedFuncDepth=$(( ${#BASH_SOURCE[@]}-1 ))
 
-	#bgtrace "BGTRAPEntry: $pidOfSetTrap $signal interuptedFrame:lineno=$4|$intrrupttedLineno exitCode=$5|$intrrupttedExitCode cmd=$intrrupttedCmd"
+	#bgtrace "BGTRAPEntry: $pidOfSetTrap $signal interruptedFrame:lineno=$4|$intrrupttedLineno exitCode=$5|$intrrupttedExitCode cmd=$intrrupttedCmd"
 
 	bgBASH_trapStkFrm_signal=(    "$signal"                "${bgBASH_trapStkFrm_signal[@]}"    )
 	bgBASH_trapStkFrm_lastCMD=(   "$intrrupttedCmd"        "${bgBASH_trapStkFrm_lastCMD[@]}"   )
@@ -2241,11 +2247,11 @@ function BGTRAPExit()
 # where its not misleading without the additional information but some stack frames may indicate that there is ambiguity about what
 # exactly is running at that frame.
 #
-# The BGTRAPEntry function sets its signal name and interupted FUNCNAME stack level in the global stack state which is so far, the
+# The BGTRAPEntry function sets its signal name and interrupted FUNCNAME stack level in the global stack state which is so far, the
 # only way the bgStack can know that information at some times.
 #
-# Information Available in a Trap Handler About the Interupted Code:
-# When a trap handler is signaled, we would like to know about where it interupted the script to construct an accurate stack for error
+# Information Available in a Trap Handler About the interrupted Code:
+# When a trap handler is signaled, we would like to know about where it interrupted the script to construct an accurate stack for error
 # handling and debugging. The handler function typically does not care about it but for good development tools we need to know.
 #     FUNCNAME[0],BASH_SOURCE[0],etc... : the last bash stack represents the function or script ('main', or 'source') that is being
 #            ran at the time of the trap but as the trap handler calls function, the indexes change and its no longer easy to determine
@@ -2253,10 +2259,10 @@ function BGTRAPExit()
 #            started running.
 #     LINENO : DEBUG (and ERR?) Trap handlers can copy $((LINENO-1)) in its first line which will indicate the line number within the interrupted
 #            function or script that will be executed next. However for all other traps, LINENO is reset to '1' upon entering the trap
-#            handler so it contains no information about the interupted function.
+#            handler so it contains no information about the interrupted function.
 #     BASH_COMMAND: bash does not update BASH_COMMAND during a DEBUG Trap and it points to the command that will be executed next in
-#            the interupted function or script. In other trap handlers, BASH_COMMAND has the peculular behavior that only on the first
-#            simple command of the trap, BASH_COMMAND command is not updated so it points to the previous command in the interupted
+#            the interrupted function or script. In other trap handlers, BASH_COMMAND has the peculular behavior that only on the first
+#            simple command of the trap, BASH_COMMAND command is not updated so it points to the previous command in the interrupted
 #            function that was executed. On the second and subsequent simple commands in the handler, it behaives normally.
 #
 # Relation to Builtin Trap:
@@ -2757,7 +2763,7 @@ function bgTrapStack()
 	esac
 }
 
-# usage: bgTrapUtils getAll [<retArray>]
+# usage: bgTrapUtils getAll <assocArrayRetVar>
 # usage: bgTrapUtils [--pid=<setPID>] get <signal> [<retString>]
 # usage: bgTrapUtils ...
 # This libary provides two patterns for dealing with common trap use cases -- bgtrap and bgTrapStack. This function provides a place to
@@ -2796,10 +2802,10 @@ function bgTrapUtils()
 			done
 			local -n retAssoc="$1"
 
-			local tmpFile; bgmktemp "tmpFile"
+			local tmpFile="$(mktemp)"
 			builtin trap -p > "$tmpFile"
 			local trapString="$(cat "$tmpFile")"
-			bgmktemp --release "tmpFile"
+			rm -f "$tmpFile"
 
 			local -A _tu_trapDict
 			local _tu_trapNum=0 _tu_signal _tu_trapHandlers _tu_sep line inTrap lineno linenoStr

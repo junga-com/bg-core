@@ -45,7 +45,7 @@ function fsIsEmpty()
 	[ ! -e "$fileOrFolder" ] || [ "$(find "$fileOrFolder" -maxdepth 0 -empty)" ]
 }
 
-# usage: fsMakeTemp [-d] [-u] [-k] [--will-not-release] <fileNameVar> [<nameTemplate>]
+# usage: fsMakeTemp [-d] [-u] [-k] [--auto|--will-not-release] <fileNameVar> [<nameTemplate>]
 # usage: fsMakeTemp --release <fileNameVar>
 # This is a wrapper over mktemp that provided additional features
 #      * Atomatic Remove of Temp Files.
@@ -100,7 +100,7 @@ function fsIsEmpty()
 #   --release : remove the tempfile and trap. default is that a trap is set to remove the file but
 #         if its called with this and the same <fileNameVar> it will perform the cleanup before EXIT
 #         and remove the trap. If -k was specified in the original call, --release will be ignored.
-#  --will-not-release|--auto : this informs the function that is is expected that the code will rely on the
+#  --auto|--will-not-release : this informs the function that is is expected that the code will rely on the
 #         exit trap to remove the file instead of calling --release. Without this, the exit trap will
 #         print a warning about the code not calling --release
 # See Also:
@@ -109,7 +109,7 @@ function fsIsEmpty()
 function bgmktemp() { fsMakeTemp --bumpCallerStackFrame "$@"; }
 function fsMakeTemp()
 {
-	local keepFlag mode="create" suffix tmpdir="/tmp" passThruOpts willNotReleaseFlag fileNameVar callerStackFrame=1
+	local keepFlag mode="create" suffix tmpdir="/tmp" passThruOpts willNotReleaseFlag fileNameVar callerStackFrame=1 noStkQryFlag
 	while [ $# -gt 0 ]; do case $1 in
 		--bumpCallerStackFrame) ((callerStackFrame++)) ;;
 		-d|--directory)            bgOptionGetOpt opt passThruOpts "$@" && shift ;;
@@ -120,6 +120,7 @@ function fsMakeTemp()
 		--release)                 mode="release" ;;
 		--releaseInternal)         mode="releaseInternal" ;;
 		--will-not-release|--auto) willNotReleaseFlag="--will-not-release" ;;
+		--no-stack-query)          noStkQryFlag="--no-stack-query" ;;
 		*)  bgOptionsEndLoop --firstParam fileNameVar "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 	local templateValue="${1:-bgmktemp.${fileNameVar}.XXXXXXXXXX}"
@@ -130,7 +131,7 @@ function fsMakeTemp()
 	if [ "$mode" == "create" ]; then
 		local fileNameValue="$(command mktemp "${passThruOpts[@]}" $templateValue)"
 		local caller trapHandler
-		if [ "$keepFlag" ] || [ "${BGMKTEMP_TRACE_FILE+exists}" ] || [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; then
+		if [ ! "$noStkQryFlag" ] && { [ "$keepFlag" ] || [ "${BGMKTEMP_TRACE_FILE+exists}" ] || [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; }; then
 			local -A stackFrame=(); bgStackFrameGet "${callerStackFrame:-1}" stackFrame
 			caller="${stackFrame[frmSummary]}"
 			trapHandler='

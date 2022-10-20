@@ -485,6 +485,8 @@ function Object::bgtrace()
 #                          it sees fit. A debugger UI can use this when it dynamically inserts bgtraceBreak commands in the code to
 #                          implement various types of breakPoints.
 # Options:
+#    --inAtomGdb         : attach to gdb and stop at this point. Initially this is only supportted when using the atom front end
+#                          debugger driver.
 #    --skipCount=<n>     : don't break until <n> times the code passes it.
 #    --logicalStart+<n>  : this adjusts where the debugger should stop in the script. By default it will stop at the line of code
 #                          immediately following the bgtraceBreak call. However, if bgtraceBreak is called in another library function
@@ -504,8 +506,9 @@ function bgtraceBreak()
 	# protect against infinite recursion if a user puts a breakpoint in a function that this function indirectly uses
 	[ "$bgtraceBreakRecursionTest" ] && return; local bgtraceBreakRecursionTest="1"
 
-	local logicalFrameStart=1 breakContext defaultDbgID skipCount
+	local logicalFrameStart=1 breakContext defaultDbgID skipCount inAtomGdbFlag
 	while [ $# -gt 0 ]; do case $1 in
+		--inAtomGdb)     inAtomGdbFlag="--inAtomGdb" ;;
 		--plumbing)      bgDebuggerStepIntoPlumbing="1" ;;
 		--skipCount*)    bgOptionGetOpt val: skipCount "$@" && shift ;;
 		--defaultDbgID*) bgOptionGetOpt val: defaultDbgID "$@" && shift ;;
@@ -541,6 +544,9 @@ function bgtraceBreak()
 	# logicalFrameStart mechanism.
 	if debuggerIsActive; then
 		_debugSetTrap --logicalStart+${logicalFrameStart:-1} stepOver
+	elif [ "$inAtomGdbFlag" ]; then
+		debuggerOn ${defaultDbgID:+--driver="$defaultDbgID"} resume
+		debuggerAttachToGdb
 	else
 		debuggerOn --logicalStart+${logicalFrameStart:-1} ${defaultDbgID:+--driver="$defaultDbgID"} stepOver
 	fi

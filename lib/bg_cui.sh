@@ -856,6 +856,7 @@ function cuiPromptForPassword()
 
 	cuiHasControllingTerminal || assertError "can not interact with the User because there is no controlling terminal"
 
+	# CRITICALTODO: this should use the bgTrapStack API instead. easy but cant tet the change now...
 	bgtrap 'stty echo; assertError "password prompt canceled by user"' SIGINT
 
 	local done
