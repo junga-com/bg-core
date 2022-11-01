@@ -360,9 +360,11 @@ function bgSleep()
 {
 	bgTrapStack push SIGINT ':'
 	sleep "$@" &
-	wait $!
+	local pid="$!"
+	wait $pid
 	local result="$?"
 	bgTrapStack pop SIGINT
+	[ $result -ne 0 ] && kill $pid
 	return "$result"
 }
 

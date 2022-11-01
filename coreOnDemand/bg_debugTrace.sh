@@ -485,8 +485,12 @@ function Object::bgtrace()
 #                          it sees fit. A debugger UI can use this when it dynamically inserts bgtraceBreak commands in the code to
 #                          implement various types of breakPoints.
 # Options:
-#    --inAtomGdb         : attach to gdb and stop at this point. Initially this is only supportted when using the atom front end
-#                          debugger driver.
+#    --inBashSource      : attach to gdb to $BASHPID to step through bash code. Initially this is only supportted when using the
+#                          atom front end debugger driver. Also, to be useful, the bash executable that the script is running in
+#                          should have debugging symbols available in a way that gdb can find them. Typically that means building
+#                          from the bash source with 'make CFLAGS="-g -O0" clean all'.
+#                          'bg-debugCntr vinstall devBash <pathToAlternateBash>' can be used to use the alternate bash in a vinstalled
+#                          environment.
 #    --skipCount=<n>     : don't break until <n> times the code passes it.
 #    --logicalStart+<n>  : this adjusts where the debugger should stop in the script. By default it will stop at the line of code
 #                          immediately following the bgtraceBreak call. However, if bgtraceBreak is called in another library function
@@ -506,9 +510,9 @@ function bgtraceBreak()
 	# protect against infinite recursion if a user puts a breakpoint in a function that this function indirectly uses
 	[ "$bgtraceBreakRecursionTest" ] && return; local bgtraceBreakRecursionTest="1"
 
-	local logicalFrameStart=1 breakContext defaultDbgID skipCount inAtomGdbFlag
+	local logicalFrameStart=1 breakContext defaultDbgID skipCount inBashSourceFlag
 	while [ $# -gt 0 ]; do case $1 in
-		--inAtomGdb)     inAtomGdbFlag="--inAtomGdb" ;;
+		--inBashSource)     inBashSourceFlag="--inBashSource" ;;
 		--plumbing)      bgDebuggerStepIntoPlumbing="1" ;;
 		--skipCount*)    bgOptionGetOpt val: skipCount "$@" && shift ;;
 		--defaultDbgID*) bgOptionGetOpt val: defaultDbgID "$@" && shift ;;
@@ -544,7 +548,7 @@ function bgtraceBreak()
 	# logicalFrameStart mechanism.
 	if debuggerIsActive; then
 		_debugSetTrap --logicalStart+${logicalFrameStart:-1} stepOver
-	elif [ "$inAtomGdbFlag" ]; then
+	elif [ "$inBashSourceFlag" ]; then
 		debuggerOn ${defaultDbgID:+--driver="$defaultDbgID"} resume
 		debuggerAttachToGdb
 	else
