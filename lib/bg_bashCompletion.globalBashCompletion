@@ -161,6 +161,10 @@ declare -gA _bgbcData
 #    invoke any compopt to affect the current completion. These changes are not permanent and only effect
 #    the current completion run.
 #
+# .SH $(_command_offset <pos>) Directive:
+#    _command_offset i sa function provided by the bash_completion project which restarts the completion taking the <pos> word
+#    as the start of the command. This is used by things like sudo that prefix another command.
+#
 # .SH $(<bashFunction>) Directives:
 #    if <bashFunction> is a sourced function, it is invoked, adding the results as suggestions.
 #    See bash_completion project for many useful functions that are available in many distros.
@@ -312,7 +316,7 @@ function __bgbc-complete-viaCmdDelegation()
 		return
 	fi
 
-	# nosort is introdeced in bash 4.4 (Ubuntu 18.04). We make it the default. \$(sort) directive undoes it
+	# nosort is introduced in bash 4.4 (Ubuntu 18.04). We make it the default. \$(sort) directive undoes it
 	# in 4.3 and prior, commentsSortPrefix makes comments appear (almost) first
 	compopt -o nosort 2>/dev/null || commentsSortPrefix="AA"
 	_bgbcData[sortState]="nosort"
@@ -482,6 +486,14 @@ function __bgbc-complete-viaCmdDelegation()
 						compopt $directiveArgs
 						;;
 
+					# $(_command_offset <pos>) Directive:
+					_command_offset)
+						__bgbc_trace -v "running '_command_offset $directiveArgs'"
+						_command_offset $directiveArgs
+						;;
+
+
+
 					# $(<sourcedFunction>) run <sourcedFunction> to populate COMPREPLY
 					# note that most completion functions do not require any arguments. We do not
 					# support passing any arguments because we are not sure if there will be any sourced
@@ -571,7 +583,7 @@ function __bgbc-complete-viaCmdDelegation()
 	_bgbcData[lastbcID]="$bcID"
 	_bgbcData[lastCur]="${words[$cword]}"
 	IFS=$'\b' eval '_bgbcData[lastCOMPREPLY]="${COMPREPLY[*]}"'
-_bgtrace "settinging cache = '${_bgbcData[lastCOMPREPLY]}'"
+	#_bgtrace "settinging cache = '${_bgbcData[lastCOMPREPLY]}'"
 
 	__bgbc_trace --timer "invoked '$cmd -hbOOBCompGen "$cmdPos" <COMPLINE>' produced '$cmdReturnedSuggestionCount' suggestions, '${#COMPREPLY[@]}' after processing and filtering with cur='$cur' "
 }
