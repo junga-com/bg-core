@@ -485,12 +485,26 @@ function Object::bgtrace()
 #                          it sees fit. A debugger UI can use this when it dynamically inserts bgtraceBreak commands in the code to
 #                          implement various types of breakPoints.
 # Options:
-#    --inBashSource      : attach to gdb to $BASHPID to step through bash code. Initially this is only supportted when using the
-#                          atom front end debugger driver. Also, to be useful, the bash executable that the script is running in
-#                          should have debugging symbols available in a way that gdb can find them. Typically that means building
-#                          from the bash source with 'make CFLAGS="-g -O0" clean all'.
-#                          'bg-debugCntr vinstall devBash <pathToAlternateBash>' can be used to use the alternate bash in a vinstalled
-#                          environment.
+#    --inBashSource      : attach to gdb to $BASHPID to step through bash code. After gdb is attached, it will continue to run until
+#                          the C function that invoked the bgtraceBreak bash cmd is at the bottom (aka newest) of the stack. The user
+#                          can then step out of that function and into the execution of the following bash cmd which will be the
+#                          script line following the call to bgtraceBreak. The bash script debugger will also be invoked if it is
+#                          not already and it will stop in the DEBUG trap that precedes that next bash cmd so the gdb debug session
+#                          could step into the running of the DEBUG trap that is part of the bash script debugger.
+#                          Note: Initially (circa 2022-10) this is only supportted when using the atom front end debugger driver.
+#                          To be useful, the bash executable that the script is running in should have debugging symbols available
+#                          in a way that gdb can find them. Typically that means building from the bash source with
+#                          'make CFLAGS="-g -O0" clean all'. You can clone and build the bash source anywhere on your host since
+#                          the debug symbols will contain the absolute path to the source files it built from.
+#                          Once you have a suitable bash executable file, 'bg-debugCntr vinstall devBash <pathToAlternateBash>' can
+#                          be used to run the alternate bash in that vinstalled environment and all subsequent bash invocations from
+#                          that terminal.
+#    --inBashSourceNoStep: similar to --inBashSource except that it leaves gdb stopped at the earliest location after attaching.
+#                          In practice, only try this if --inBashSource is having problems.
+#                          Whereas --inBashSource will try to leave the user stopped at the last moment before this call to
+#                          bgtraceBreak returns, this command will stop somewhere deep in the implementation of this command right
+#                          after it request the gdb debugger to attach. This can be 10's to 100's of C functions deep that the user
+#                          will have to step out through until getting to the point after this bgtraceBreak.
 #    --skipCount=<n>     : don't break until <n> times the code passes it.
 #    --logicalStart+<n>  : this adjusts where the debugger should stop in the script. By default it will stop at the line of code
 #                          immediately following the bgtraceBreak call. However, if bgtraceBreak is called in another library function
@@ -512,7 +526,8 @@ function bgtraceBreak()
 
 	local logicalFrameStart=1 breakContext defaultDbgID skipCount inBashSourceFlag
 	while [ $# -gt 0 ]; do case $1 in
-		--inBashSource)     inBashSourceFlag="--inBashSource" ;;
+		--inBashSource)        inBashSourceFlag="--inBashSource" ;;
+		--inBashSourceNoStep)  inBashSourceFlag="--inBashSourceNoStep" ;;
 		--plumbing)      bgDebuggerStepIntoPlumbing="1" ;;
 		--skipCount*)    bgOptionGetOpt val: skipCount "$@" && shift ;;
 		--defaultDbgID*) bgOptionGetOpt val: defaultDbgID "$@" && shift ;;
@@ -548,11 +563,19 @@ function bgtraceBreak()
 	# logicalFrameStart mechanism.
 	if debuggerIsActive; then
 		_debugSetTrap --logicalStart+${logicalFrameStart:-1} stepOver
-	elif [ "$inBashSourceFlag" ]; then
-		debuggerOn ${defaultDbgID:+--driver="$defaultDbgID"} resume
-		debuggerAttachToGdb
 	else
 		debuggerOn --logicalStart+${logicalFrameStart:-1} ${defaultDbgID:+--driver="$defaultDbgID"} stepOver
+	fi
+
+	if [ "$inBashSourceFlag" == "--inBashSource" ]; then
+		# the -1 in the following locationSpec makes it so that after the step to this locationSpec, the last frame on the stack
+		# will be the one that is augmented with the 'bgtraceBreak --inBashSource' shell cmd. They will then need to step out of
+		# that function to get to the line after the one that invoked 'bgtraceBreak --inBashSource', but it seems worth it to
+		# have the reference to better understand where the code is stopped at.
+		# At some point we may augment other frames so that the user will understand where they are at without the -1
+		debuggerAttachToGdb "frmShFunc:-1 bgtraceBreak"
+	elif [ "$inBashSourceFlag" == "--inBashSourceNoStep" ]; then
+		debuggerAttachToGdb
 	fi
 }
 
