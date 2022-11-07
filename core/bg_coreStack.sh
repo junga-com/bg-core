@@ -897,6 +897,7 @@ function bgStackToJSON()
 		printf "${indent}{${CR}"
 		indent="${indent}   "
 		local FS=","
+		printf "${indent}"'"%s": "%s"'"${FS}${CR}"  "level" "$(( i - ${ignoreFramesCount:-0} ))"
 		for name in caller cmdName cmdLine cmdFile cmdLineNo cmdArgc cmdLoc cmdSrc frmSummary; do
 			[ "frmSummary" == "$name" ] && FS=""
 			local ref="bgSTK_${name}[$i]"
