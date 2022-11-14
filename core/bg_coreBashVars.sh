@@ -18,13 +18,22 @@
 #     varToggleRef: ref version of toggle the value of a variable between two constants
 
 
-# usage: varContextToJSON <stackDepthFromTop> <retVar>
+# usage: varContextToJSON <stackLevelRelativeToFrozen> <retVar>
+# This is used by the debugger to get the variables that are accessible from the target frame. Initially there is only a bgCore
+# builtin implementation because its not possible to do it well from bash. We can support a less capable bash implementation.
 function varContextToJSON()
 {
-	local stackDepthFromTop="${1:-0}"
+	local stackLevelRelativeToFrozen="${1:-0}"
 	local retVar="$2"
+
+	# the frmNum is relative to the frozen stack but if there is no froozen stack make it relative to the caller of this function
+	local logicalStkSize="$((${#bgFUNCNAME[@]}))"
+	[ ${logicalStkSize:-0} -eq 0 ] && logicalStkSize="$((${#FUNCNAME[@]}-1))"
+
+	local levelFromTop=$(( ${logicalStkSize:-0} - ${stackLevelRelativeToFrozen:-0} -1 ))
+
 	if  [ "$bgCoreBuiltinIsInstalled" ]; then
-		bgCore "dbgVars" "$retVar" "$stackDepthFromTop"
+		bgCore "dbgVars" "$retVar" "$levelFromTop"
 	else
 		returnValue "<cant get scoped vars because bgCore builtin is not available>" "$retVar"
 	fi
