@@ -2828,7 +2828,7 @@ function bgTrapUtils()
 			local i; for i in "${!_tu_trapHandlers[@]}"; do
 				local sig="${_tu_trapHandlers[i]##* }"
 				sig="${sig%\'}"
-				retAssoc[$sig]="${_tu_trapHandlers[i]%\' *}"
+				retAssoc[${sig:-'<empty>'}]="${_tu_trapHandlers[i]%\' *}"
 			done
 			;;
 
@@ -3334,7 +3334,7 @@ function assertError()
 			builtin trap '' ERR
 
 			# the goal is that we want the tryStatePID process to wake up an receive the SIGUSR2 signal.
-			# If we are a synchronous child subshell of the tryStatePID, then we, and any subshells inbetween us that tryStatePID
+			# If we are a synchronous child subshell of the tryStatePID, then we, and any subshells inbetween us and tryStatePID
 			# must end before it will wake up. We can simply exit but we need to send the intermediate processes a SIGINT.
 			# Since bash processes signals inbetween the simple commands that it runs, when we send the signals to our parents
 			# they will be queued until we exit which should cause a chain reaction of each parent waking and ending up to the tryStatePID

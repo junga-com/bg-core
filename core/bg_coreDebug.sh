@@ -82,6 +82,8 @@ if ! bgtraceIsActive; then
 	function bgtimerTrace()      { :; }
 	function bgtimerLapTrace()   { :; }
 	function debuggerTriggerIfNeeded()   { :; }
+	function bglogOn()           { :; }
+	function bglog()             { :; }
 else
 	# this case is logically part of the bg_debugTrace.sh library but it is global init code that is important and have to happen
 	# after the functions in bg_debugTrace.sh are available so if we put this in that library, we would have to put it at the end
