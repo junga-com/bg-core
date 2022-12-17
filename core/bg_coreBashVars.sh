@@ -25,6 +25,7 @@ function varContextToJSON()
 {
 	local stackLevelRelativeToFrozen="${1:-0}"
 	local retVar="$2"
+	shift 2;
 
 	# the frmNum is relative to the frozen stack but if there is no froozen stack make it relative to the caller of this function
 	local logicalStkSize="$((${#bgFUNCNAME[@]}))"

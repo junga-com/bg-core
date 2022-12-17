@@ -15,7 +15,15 @@
 # When a domData is installed on a host this information may come from it. The findInPaths function is the core of this mechanism
 # that allows the information that a package's code has access to to come from any of these sources and provide an algorithm for
 # overriding or combining the information.
-
+#
+# System Manifest:
+# The bg-core package introduces a manifest mechanism used by packages that comply with the bg-core style. Typically those are
+# pacakges that are created and maintained with the tools found in the bg-dev package. See man(3) manifestGet for more details.
+#
+# The manifest is part of the chain of compliance implemented by the bg-core ecosystem.
+#
+# See Also:
+#    man(3) manifestGet
 
 # usage: findInPaths [<options>] <fileSpec> [-r <relativePaths>] <searchPaths1> [...[-r <relativePaths>] <searchPathsN>]
 # Find all files matching <fileSpec> in the specified search paths. The order of search paths is significant
@@ -194,9 +202,17 @@ function bgGetDataFolder()
 }
 
 
-# scripts that are a part of a package typically set the packageName var at the top.
-# set the default dataFolder to the top level project the running script belongs to
-packageName="${packageName:-$projectName}"
+# historically, scripts in the bg-core ecosystem set packageName (or older still, projectName) before sourcing bg_core.sh which
+# indirectly sources this file and runs this code block. The templates for new bash command scripts would include that line so
+# any script created that way would follow that convention. Circa 2022-11, this code changed to look up the script in the manifest
+# and set packageName from that. Setting packageName in the scripts is now obsolete, but will do no harm -- they are just ignored.
+# Eventually, packageName will be set early in bg_core.sh (or its builtin equivalent) and it will become part of the secure env
+# TODO: after manifestGetPkgForPath can handle looking up install/remove deb pkg hook scripts, remove this check for ! $bgRunningInInstall
+if [ ! "$bgRunningInInstall" ]; then
+	manifestGetPkgForPath "packageName" "$0"
+	# packageName="${packageName:-$projectName}"
+fi
+
 if [ "$packageName" ]; then
 	dataFolder="$(bgGetDataFolder $packageName)"
 	confFile="/etc/$packageName"

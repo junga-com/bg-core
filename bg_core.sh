@@ -1,4 +1,9 @@
 
+# TODO: make a builtin that replaces this whole file, when present. Make it so that we can easily patch BASH to make a version that
+#       enforces that this code runs in every new BASH process. Consider, as a step, patching BASH to run that new builtin when
+#       'source /usr/lib/bg_core.sh' is executed. That intermediate step would mean that scripts still have to opt in by sourcing
+#       bg_core.sh but it would be secure and fast when they do.
+
 # guard against multiple sourcing since this is the only file that does not get sourced with import
 if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_coreImport.sh"]}" ]; then
 
@@ -297,8 +302,12 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 		fi
 
 		# when invoked by the package installation/removal hooks, the packageName is passed as $2
-		# TODO: maybe scripts should pass packageName also instead of setting it. Or, can we detect package name here?
-		[[ "$1" =~ ^--(pre|post)(inst|rm)$ ]] && packageName="$2"
+		# TODO: remove this block after the packageName code in bg_coreSysRuntime is shown to handle install scripts (since they have the same name for each package)
+		if [[ "$1" =~ ^--(pre|post)(inst|rm)$ ]]; then
+			packageName="$2"
+			# this is probably temporary. its used so that   the packageName code in bg_coreSysRuntime respects the packageName set here
+			declare -grx bgRunningInInstall="$1"
+		fi
 
 
 		# we have to load bg_coreImport.sh before 'import bg_coreImport.sh ;$L1;$L2' is available but we can predefine its

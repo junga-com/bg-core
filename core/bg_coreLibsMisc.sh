@@ -54,16 +54,17 @@ fi
 # the awkData system knows about the manifest file.
 #
 # Manifest File Format:
-# The manifest file complies with man(5) bgawkDataFileFormat.
+# The manifest file complies with man(5) bgawkDataFileFormat without a header.
 # ### Columns
-#    * pkg       : the package name that installs the asset on the host
-#    * assetType : the type of asset. By convention '.' separates logical parts of the type. e.g. lib.script.bash is a library asset
+#    * pkg       : $1 -- the package name that installs the asset on the host
+#    * assetType : $2 --the type of asset. By convention '.' separates logical parts of the type. e.g. lib.script.bash is a library asset
 #                  which is a script (as opposed to a binary) and written in the bash language. The first part is the primary type
 #                  of the asset and then subsequent parts qualify it into sub types.
-#    * assetName : the name of the asset is typically unique within its assetType within the domain of packages but dependign on
+#    * assetName : $3 -- the name of the asset is typically unique within its assetType within the domain of packages but dependign on
 #                  the asset type, it does not necessarily need to to be.
-#    * path      : the installed path of the asset. assets are typically files but can be folders in some cases. The path must be
+#    * path      : $4 -- the installed path of the asset. assets are typically files but can be folders in some cases. The path must be
 #                  unique within all packages in a repository.
+#    * cryptoHash: $5 -- (not yet implemented)
 #
 # Compliant Packages:
 # If a package installs its manifest in /var/lib/bg-core/<packagename>/hostmanifest, the next time manifestUpdateInstalledManifest
@@ -80,7 +81,8 @@ fi
 #    -p|--pkg|--pkgName=<pkgMatch>   : specify a regex(gawk) to match the pkg field. '.*' is the default
 #    -o|--output=<outStr>  : specify what is returned for each matching asset record. default is '$0'. This can use the the terms
 #                            $1,$2,$3,$4 to refer to the columns of the manifest file respectively. $0 is all colums.
-#    --manifest=<file>     : override the path of the manifest file to use. This string is prepended with 'print ' and executed in awk.
+#                            This string is prepended with 'print ' and executed in awk.
+#    --manifest=<file>     : override the path of the manifest file to use.
 function manifestGet()
 {
 	if  [ "$bgCoreBuiltinIsInstalled" ]; then
@@ -108,11 +110,56 @@ function manifestGet()
 }
 
 # usage: manifestAwk [<awkOptions>] <awkScript>
-# This runs gawk to scan the manifest file without having to know where the manifest file is
+# This runs gawk to scan the manifest file without having to specify the path where the system manifest file is
 function manifestAwk() {
 	local manifestFile; manifestGetHostManifest manifestFile
 	[ -e "$manifestFile" ] && gawk --sandbox "$@" $manifestFile
 }
+
+# usage: manifestGetPkgForPath <pkgNameRetVar> <assetPath>
+function manifestGetPkgForPath()
+{
+	# # TODO: write a bgCore builtin for manifestGetPkgForPath
+	# if  [ "$bgCoreBuiltinIsInstalled" ]; then
+	# 	builtin bgCore $FUNCNAME "$@"
+	# 	return
+	# fi
+
+	local manifestFile; manifestGetHostManifest manifestFile
+	[ -e "$manifestFile" ] || assertError "
+		Could not locate system manifest file.
+		   In production mode it must be '$manifestInstalledPath'.
+		   In development mode it may be '\$bgVinstalledSandbox/.bglocal/hostmanifest'.
+		See man bg_coreSysRuntime.sh
+	"
+
+	local assetPath="$2"
+
+	# TODO: normalize the assetPaths ($4) when creating the vinstalled manifest file so dont have to normalize $4 in the script below
+	local resultsFromMan;
+	read -r "resultsFromMan" < <(gawk --sandbox -v assetPath="$assetPath" '
+		gensub(/\/\.\//,"/", "g", $4)==assetPath {print $1}
+	' $manifestFile)
+
+	# if its not in the manifest, it must have been 'installed' (or just created) by a local user. If its located in a system folder
+	# that user must have used priviledge to do so so we call the package "localAdminPkg". The localadmin user can also install resources
+	# in /usr/share/localAdminPkg/ or /usr/lib/node_modules/localAdminPkg/ to be accessed by such scripts. If its not in a system
+	# path then its a user's unpriviledged script that is not really installed on the host so call it "userPkg"
+	if [ ! "$resultsFromMan" ]; then
+		if [[  "$assetPath" == "/usr/"* ]]; then
+			resultsFromMan="localAdminPkg"
+		else
+			resultsFromMan="userPkg"
+		fi
+	fi
+
+	if [ "$1" ]; then
+		printf -v "$1" "%s" "$resultsFromMan"
+	else
+		printf "%s\n" "$resultsFromMan"
+	fi
+}
+
 
 declare -gx manifestInstalledPath="/var/lib/bg-core/manifest"
 declare -gx pluginManifestInstalledPath="/var/lib/bg-core/pluginManifest"
