@@ -193,9 +193,10 @@ function fsMakeTemp()
 				fi
 			fi
 
-			if [ ! "$assertError_EndingScript" ] && [ "$mode" == "releaseInternal" ] && [ ! "$willNotReleaseFlag" ] && { [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; } && [ "$bgBASH_tryStackAction" != "exitOneShell" ]; then
-				(assertError --continue -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script." &>>$_bgtraceFile)
-			fi
+			# 2023-01 commented this out because when I get a real error, these errors get in the way
+			# if [ ! "$assertError_EndingScript" ] && [ "$mode" == "releaseInternal" ] && [ ! "$willNotReleaseFlag" ] && { [ "$BGMKTEMP_ERROR_UNRELEASED+exists" ] || bgtraceIsActive; } && [ "$bgBASH_tryStackAction" != "exitOneShell" ]; then
+			# 	(assertError --continue -v fileNameValue -v trapHandler "a temp file created with bgmktemp was not released before the end of the script." &>>$_bgtraceFile)
+			# fi
 		fi
 	fi
 }

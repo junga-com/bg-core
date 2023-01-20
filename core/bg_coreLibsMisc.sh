@@ -175,7 +175,7 @@ function manifestGetHostManifest() {
 	fi
 }
 
-# usage: manifestGetHostPluginManifest
+# usage: manifestGetHostPluginManifest [<retVar>]
 # returns the file path to the prevailing host plugin manifest file. In production this would be "$pluginManifestInstalledPath"
 # but vinstalling a sandbox overrides it
 function manifestGetHostPluginManifest() {
@@ -2986,6 +2986,12 @@ function command_not_found_handle()
 	fi
 	echo "$msg" >&2
 	type -t bgtrace &>/dev/null && bgtrace "$msg"
+
+	# if this pid is configured to use the subshell to catch errors, let the script and other subshells continue
+	local tryStateAction="${bgBASH_tryStackAction[@]:0:1}"
+	if [ "$tryStateAction" == "exitOneShell" ]; then
+		builtin exit 127
+	fi
 
 	# special case running in the terminal.
 	# we dont use bgexit because we dont want to kill any siblings the user has running the background

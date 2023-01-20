@@ -3,6 +3,26 @@ import bg_config.sh  ;$L1;$L2
 
 #function bgtrap() moved to bg_libCore.sh
 
+# usage: bgSubShellInit [--name=<arg0Name>] [--catchErrors]
+#
+function bgSubShellInit()
+{
+	local arg0Name catchErrorsFlag
+	while [ $# -gt 0 ]; do case $1 in
+		--name*)  bgOptionGetOpt val: arg0Name "$@" && shift ;;
+		--catchErrors) catchErrorsFlag="--catchErrorsFlag" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	if [ "$catchErrorsFlag" ]; then
+		TryInSubshell
+	fi
+
+	BASH_ARGV0="$arg0Name"
+	echo -n "${BASH_ARGV0}" >/proc/$BASHPID/comm
+}
+
+
 # usage: bgwaitAll [-P] <pidMapVar>    <succeedCountVar> <errorCountVar> <resultsByNameVar> <namesByResultsVar> <summaryStrVar>
 # This is similar to the wait bash builtin function except you pass in the name of an associative array (pidMap>
 # that has the structure pidMap[procName]=procPID and it optionally returns a number of variables that report

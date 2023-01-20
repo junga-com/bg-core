@@ -598,6 +598,7 @@ templateMagicEscToken="|#0.0.7#|"
 #    -f|--file=<srcTemplate> : use the content contained in <file> as the template content to expand. templateFind will be used to
 #           get the absolute path
 #    -d|--destination=<dstFilename> : send the output to this destination. '-', '--' and '' will cause it to be written to stdout
+#    -p|--mkdir  : create the folder path of <dstFilename> if needed
 #    -o|--objCtx=<objectScope> : when a template variable begins with a $, it is interpreted as an object reference. The <objectScope> will be
 #           prepended to the template variable so that the members of the <objectScope> object will be the global scope of template vars
 #           The default is "" so that the callers bash variables are queried for individual objects.

@@ -333,7 +333,7 @@ function static::Plugin::loadAllOfType()
 	done < <(manifestGet $manifestOpt  plugin "$pluginType:.*")
 }
 
-# usage: $Plugin::addNewAsset <subType> <newAssetName>
+# usage: $Plugin::addNewAsset <newAssetName>
 # This is invoked by the "bg-dev asset plugin.<pluginType> <newAssetName>" command to add a new asset to the current project folder
 # of this plugin type.  This default implementation assumes that there is a system template named newAsset.plugin.<pluginType> which it
 # expands to make a new asset file at <projectRoot>/plugins/<newAssetName>.<pluginType>.  A particular <pluginType> may override
@@ -341,20 +341,16 @@ function static::Plugin::loadAllOfType()
 # is recommended so that the asset is seen right away without the user having to do a vinstall
 function static::Plugin::addNewAsset()
 {
-	local subType="$1"; shift
 	local newAssetName="$1"; shift; assertNotEmpty newAssetName
-
-	[ "$subType" == "--" ] && subType=""
-	[ "$subType" ] && subType=".$subType"
 
 	local destFile="./plugins/$newAssetName.${static[name]}"
 	[ -e "$destFile" ] && assertError "An asset already exists at '$destFile'"
 
 	import bg_template.sh  ;$L1;$L2
-	local templateFile; templateFind -R templateFile "newAsset.plugin.${static[name]}$subType"
-	[ ! "$templateFile" ] && assertError -v templateName:"-lnewAsset.plugin.${static[name]}$subType" -v subType -v "plugintype:-l${static[name]}" "The template to create a new plugin asset of this type was not found on this host."
+	local templateFile; templateFind -R templateFile "newAsset.plugin.${static[name]}"
+	[ ! "$templateFile" ] && assertError -v templateName:"-lnewAsset.plugin.${static[name]}" -v "plugintype:-l${static[name]}" "The template to create a new plugin asset of this type was not found on this host."
 
-	templateExpand "$templateFile" "$destFile"
+	templateExpand -p "$templateFile" "$destFile"
 	echo "A new asset has been added at '$destFile' with default values. Edit that file to customize it."
 
 	! type -t static::PackageAsset::addAssetToManifest &>/dev/null && { import PackageAsset.PluginType ;$L1;$L2; }
@@ -412,7 +408,15 @@ function static::Plugin::_dumpAttributes()
 # Some (most) plugins will not have values for every attribute column and those fields will be empty ('--').
 function static::Plugin::_assembleAttributesForAwktable()
 {
-	gawk '
+	local pkgName
+	while [ $# -gt 0 ]; do case $1 in
+		-p*|--pkg*|--pkgName*) bgOptionGetOpt val: pkgName "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
+	local pluginManifest; manifestGetHostPluginManifest "pluginManifest"
+
+	gawk -v pkgName="$pkgName" -v pluginManifest="$pluginManifest" '
 		@include "bg_core.awk"
 		function addCol(col) {
 			if (!(col in attribs)) {
@@ -467,23 +471,90 @@ function static::Plugin::_assembleAttributesForAwktable()
 			}
 		}
 		END {
+			arrayCreate(outCols);
+			outColsCount=0;
+			if (pkgName) {
+				arrayCreate(oldCols)
+				keyColIndex=""
+				pkgNameIndex=""
+				# read the column names header line
+				if ((getline < pluginManifest)>0) for (i=1; i<=NF; i++) {
+					oldCols[i]=$i;
+					if ($i == "pluginKey")
+						keyColIndex = i;
+					if ($i == "package")
+						pkgNameIndex = i;
+				}
+
+				# read and ignore the deps line
+				getline < pluginManifest
+
+				# read each data row line
+				while ( (getline < pluginManifest) > 0) {
+					if ($pkgNameIndex != pkgName) {
+						pluginKey=$keyColIndex;
+						addRow(pluginKey);
+						for (i=1; i<=NF; i++) {
+							# add the column to the output only if a non-empty value will be in the output
+							if ($i != "--")
+								addCol(oldCols[i]);
+							values[pluginKey,oldCols[i]] = ($i=="--")?"":$i;
+						}
+					}
+				}
+
+				arrayCreate(oldColsSet);
+				arrayCreate(columnsSet);
+				for (c in oldCols)
+					oldColsSet[oldCols[c]]="";
+				for (c in columns)
+					columnsSet[columns[c]]="";
+
+				for (c in oldCols) {
+					if (oldCols[c] in columnsSet)
+						outCols[outColsCount++] = oldCols[c];
+					# else
+					# 	bgtrace("being removed?  : "oldCols[c])
+				}
+				for (c in columns) {
+					if (!(columns[c] in oldColsSet)) {
+						outCols[outColsCount++] = columns[c];
+						# bgtrace("new column? : "columns[c])
+					}
+				}
+
+			} else {
+				outColsCount = length(columns);
+				for (c=1; c<=outColsCount; c++)
+					outCols[c] = columns[c];
+			}
+
+			# store each composed row in an array so that we can sort on the whole line
+			arrayCreate(lines);
+			for (i in rows) {
+				line="";
+				sep="";
+				for (j in outCols) {
+					line = sprintf("%s%s%s", line, sep, norm(values[rows[i],outCols[j]]));
+					sep=" "
+				}
+				lines[i] = line;
+			}
+
 			# print the header
-			for (j in columns)
-				printf("%s ", columns[j])
+			for (j in outCols)
+				printf("%s ", outCols[j])
 			printf("\n\n")
 
-			# print each row
-			for (i in rows) {
-				for (j in columns)
-					printf("%s ", norm(values[rows[i],columns[j]]))
-				printf("\n")
-			}
+			n = asort(lines);
+			for (i=1; i<=n; i++)
+				printf("%s\n", lines[i])
 		}
-	'
+	' || assertError
 }
 
 
-# usage: $Plugin::buildAwkDataTable [--manifest=<file>]
+# usage: $Plugin::buildAwkDataTable [--manifest=<file>] [-p|--pkg|--pkgName=<pkgName>]
 # This builds an awkData style table of all installed plugins and the union of attribute names that they contain as columns
 # Mutable attributes (aka columns) and attributes that start with '_' are not included.
 # The output is sent to stdout.  The set of plugins is the entire set contained in a manifest file.  By default it uses the global
@@ -494,13 +565,14 @@ function static::Plugin::_assembleAttributesForAwktable()
 #    --manifest=<file> : override the prevailing default host manifest (either production or vinstalled) with a specific file.
 function static::Plugin::buildAwkDataTable()
 {
-	local manifestOpt
+	local manifestOpt pkgNameOpt
 	while [ $# -gt 0 ]; do case $1 in
-		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
+		--manifest*)              bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
+		-p*|--pkg*|--pkgNameOpt*) bgOptionGetOpt opt: pkgNameOpt "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	static::Plugin::_dumpAttributes $manifestOpt | static::Plugin::_assembleAttributesForAwktable | column -t -e
+	static::Plugin::_dumpAttributes $manifestOpt $pkgNameOpt "$@" | static::Plugin::_assembleAttributesForAwktable $pkgNameOpt | column -t -e
 }
 
 

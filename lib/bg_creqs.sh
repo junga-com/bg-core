@@ -508,7 +508,13 @@ function creq()
 
 
 	# run the statement with the cmd we just determined
-	local resultMsg="$((TryInSubshell; objectMethod="newStyle" $creqClass "$@") 3>&1 >$stdoutFile 2>$stderrFile)"
+	local resultMsg="$(
+		bgSubShellInit --name="creqOuter" --catchErrors;
+		(
+			bgSubShellInit --name="creqInner" --catchErrors;
+			objectMethod="newStyle" $creqClass "$@"
+		) 3>&1 >$stdoutFile 2>$stderrFile
+	)"
 
 	# parse the stdout msg:  <resultState> <msg text...>
 	local resultState="${resultMsg%%[ $'\n\t']*}"

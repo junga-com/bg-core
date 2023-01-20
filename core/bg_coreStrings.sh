@@ -1981,7 +1981,6 @@ function pathGetCommon()
 
 
 # usage: pathGetCanonStr -e <path>  [<retVar>]
-# usage: canoPath="$(pathGetCanonStr "path")"
 # return the canonical version of <path> without requiring that any part of it exists.
 #
 # Note that starting in Ubuntu 16.04, the realpath core gnu util is much more capable including

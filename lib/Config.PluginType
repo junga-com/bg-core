@@ -537,7 +537,7 @@ function Config::check()
 {
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
 	configSet "ConfigType:${this[configType]}" lastRunTime "$EPOCHSECONDS"
-	$_this.invoke "cmd_preCheck"
+	$_this.invoke -q "cmd_preCheck"
 	Try:
 		import bg_creqs.sh  ;$L1;$L2
 		import bg_creqsLibrary.sh  ;$L1;$L2
@@ -575,7 +575,7 @@ function Config::apply()
 {
 	$_this.setAttribute lastRunTime "$EPOCHSECONDS"
 	configSet "ConfigType:${this[configType]}" lastRunTime "$EPOCHSECONDS"
-	$_this.invoke "cmd_preCheck"
+	$_this.invoke -q "cmd_preCheck"
 	Try:
 		import bg_creqs.sh  ;$L1;$L2
 		import bg_creqsLibrary.sh  ;$L1;$L2
