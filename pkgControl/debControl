@@ -7,7 +7,7 @@ Vcs-git: git@github.com/junga-com/bg-core
 
 Package: bg-core
 Architecture: all
-Depends: coreutils (>=1), grep (>=2),  bash (>=3), gawk, sed (>=4), git, ipcalc, host, binutils
+Depends: coreutils (>=1), grep (>=2),  bash (>=3), gawk, sed (>=4), git, ipcalc, binutils
 Description: Configuration management and sysadmin tools for linux hosts
  bg-core provides an environment maintaining the configuration of linux servers
  and workstations. It introduces a notion of plugins that can be delivered in
