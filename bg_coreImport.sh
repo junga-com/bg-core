@@ -152,7 +152,7 @@ function _postImportProcessing() {
 
 	L1=""
 	[ ${#_importInProgressStack[@]} -eq 0 ] && L2=""
-	#echo "(post) L1='$L1' L2='$L2'" >>"/tmp/bgtrace.out"
+	#echo "(post) L1='$L1' L2='$L2'" >>"$HOME/.bgtrace.out"
 
 	bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 	return $result
@@ -230,10 +230,10 @@ function import()
 
 	if [ "$foundScriptPath" ]; then
 		[ ! -f "$foundScriptPath" ] && assertError  -v scriptName -v foundScriptPath "manifest is out of data. <foundScriptPath> does not exist"
-		: echo "import found in manifest" >> "/tmp/bgtrace.out"
+		# echo "import found in manifest" >> "$HOME/.bgtrace.out"
 	else
 		# SECURITY: TODO: refuse to load libraries that are not in the manifest if in productionMode
-		[ "$devOnly" ] || echo "import searching paths '$scriptName'" >> "/tmp/bgtrace.out"
+		# [ "$devOnly" ] || echo "import searching paths '$scriptName'" >> "$HOME/.bgtrace.out"
 		# SECURITY: each place that sources a script library needs to enforce that only system paths -- not vinstalled paths are
 		# searched in non-development mode
 		if [ "$bgSourceOnlyUnchangable" ]; then
@@ -284,7 +284,7 @@ function import()
 
 		L1="source $foundScriptPath"
 		L2="_postImportProcessing"
-		#echo "(import) L1='$L1'" >>"/tmp/bgtrace.out"
+		#echo "(import) L1='$L1'" >>"$HOME/.bgtrace.out"
 		_importInProgressStack=("${stopOnErrorFlag:+-e|}$scriptName" "${_importInProgressStack[@]}")
 
 		# if we are reloading a lib that had already been sourced, then inc _importedLibrariesBumpAdj
@@ -296,7 +296,7 @@ function import()
 		[ "${_importedLibraries[lib:$scriptName]}" ] && ((_importedLibrariesBumpAdj++))
 		_importedLibraries[lib:$scriptName]=$foundScriptPath
 		[ "$stopOnErrorFlag" ] && set -e +E
-		#echo "DOING import return '$foundScriptPath'" >>"/tmp/bgtrace.out"
+		#echo "DOING import return '$foundScriptPath'" >>"$HOME/.bgtrace.out"
 		# (needs debugging b4 we uncomment - code was left set so debugger never stopped) bgDebuggerPlumbingCode=("${bgDebuggerPlumbingCode[@]:1}")
 		return 0
 	fi

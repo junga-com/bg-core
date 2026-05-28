@@ -9,8 +9,13 @@
 # https://www.debian.org/doc/debian-policy/ch-maintainerscripts.html
 # https://wiki.debian.org/MaintainerScripts
 
+onPkgTrace="1"
 
-onPkgTrace=""
+function bgInstTrace()
+{
+	[ "$onPkgTrace" ] || return 0
+	( mkdir -p /var/log/bg-core && printf '%s\n' "$*" >> /var/log/bg-core/bgtrace.out ) 2>/dev/null || true
+}
 
 # The package will not yet be unpacked, so the preinst script cannot rely on any files included in its package. Only essential
 # packages and pre-dependencies (Pre-Depends) may be assumed to be available. Pre-dependencies will have been configured at least
@@ -18,7 +23,7 @@ onPkgTrace=""
 # of the pre-dependency was completely configured and has not been removed since then.
 function onPreinst()
 {
-	[ "$onPkgTrace" ] && echo "$packageName - $FUNCNAME $*" >> "/tmp/bgtrace.out"
+	bgInstTrace "$packageName - $FUNCNAME $*"
 	local action="$1";  shift  # install|upgrade|abort-upgrade
 	if [ "$action" != "abort-upgrade" ]; then
 		local oldVersion="$1"; shift
@@ -37,7 +42,7 @@ function onPreinst()
 # circular dependencies involved, all package dependencies will be configured.
 function onPostinst()
 {
-	[ "$onPkgTrace" ] && echo "$packageName - $FUNCNAME $*" >> "/tmp/bgtrace.out"
+	bgInstTrace "$packageName - $FUNCNAME $*"
 	local action="$1"; shift    # configure|abort-upgrade|abort-remove|abort-deconfigure
 
 	if [ "$action" == "configure" ]; then
@@ -67,7 +72,7 @@ function onPostinst()
 # partial upgrade.
 function onPrerm()
 {
-	[ "$onPkgTrace" ] && echo "$packageName - $FUNCNAME $*" >> "/tmp/bgtrace.out"
+	bgInstTrace "$packageName - $FUNCNAME $*"
 	local action="$1"; shift   # remove|upgrade|deconfigure|failed-upgrade
 
 	local file
@@ -79,7 +84,7 @@ function onPrerm()
 
 function onPostrm()
 {
-	[ "$onPkgTrace" ] && echo "$packageName - $FUNCNAME $*" >> "/tmp/bgtrace.out"
+	bgInstTrace "$packageName - $FUNCNAME $*"
 	local action="$1"; shift    # remove|purge|upgrade|disappear |failed-upgrade |abort-install|abort-upgrade
 	case $action in
 		# The postrm script is called after the package’s files have been removed or replaced. The package whose postrm is being

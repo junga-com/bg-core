@@ -317,7 +317,7 @@ function manifestIsAssetName()
 }
 
 # usage: manifestIsPath <term>
-# returns true(0) or false(1) to reflect if <term> exists in the assetName column of the manifest file
+# returns true(0) or false(1) to reflect if <term> exists in the filename column of the manifest file
 function manifestIsPath()
 {
 	local manifestFile; manifestGetHostManifest manifestFile

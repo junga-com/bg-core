@@ -83,10 +83,10 @@ function bgtraceTurnOff()
 #           anywhere
 #    off  : set the state to off so that bgtrace functions do not send their output anywhere
 #    on[:[<filename>]] : configure to send bgtrace output to <filename>. If the : is included, the default
-#           <filename> is /tmp/bgtrace.out but if not, the default is /dev/tty
+#           <filename> is $HOME/.bgtrace.out but if not, the default is /dev/tty
 #    file:<filename> : synonom for on:<filename>
 #    <filename> : synonom for on:<filename>
-# BGENV: bgTracingOn : controls bgtrace statements. empty string means tracing is off. file:<path> writes traces to <path>. file: or on: writes to default path /tmp/bgtrace.out. anything else mean stderr
+# BGENV: bgTracingOn : controls bgtrace statements. empty string means tracing is off. file:<path> writes traces to <path>. file: or on: writes to default path $HOME/.bgtrace.out. anything else mean stderr
 # Options:
 #     -n : ifNotOnFlag. If tracing is already on, it will leave it going to the current destination file. If not, it will set it to the new, specified tracing file
 # See Also:
@@ -128,13 +128,13 @@ function bgtraceCntr()
 			on:win*|win*)
 				local win=${bgTracingOn#on:}
 				[ "$win" == "win" ] && win="out"
-				_bgtraceFile="/tmp/bgtrace.$win"
-				if [ ! -e "/tmp/bgtrace.$win.cntr" ]; then
+				_bgtraceFile="$HOME/.bgtrace.$win"
+				if [ ! -e "$HOME/.bgtrace.$win.cntr" ]; then
 					touch "$_bgtraceFile" || _assertError "file '$_bgtraceFile' can not be used as a trace file because it is not writable"
 					type -t cuiWinCntr>/dev/null || import bg_cuiWin.sh ;$L1;$L2
 					cuiWinCntr "$win" open >/dev/null || assertError -v win "failed to open cuiWin '$win'"
 					cuiWinCntr "$win" tailFile "$_bgtraceFile" || assertError -v win -v _bgtraceFile "failed to tail '$_bgtraceFile' in cuiWin '$win'"
-					if [ ! -e "/tmp/bgtrace.$win.cntr" ]; then
+					if [ ! -e "$HOME/.bgtrace.$win.cntr" ]; then
 						echo "warning: the bgtrace viewer win '$win' could not be openned. bgtrace is being directed to '$_bgtraceFile'" >&2
 					fi
 				fi
@@ -142,7 +142,7 @@ function bgtraceCntr()
 			on:*|file:*|*)
 				_bgtraceFile=${bgTracingOn#file:}
 				_bgtraceFile=${_bgtraceFile#on:}
-				_bgtraceFile=${_bgtraceFile:-/tmp/bgtrace.out}
+				[ "$_bgtraceFile" ] || _bgtraceSetDefaultDestination
 				;;
 		esac
 		# 2022-08 bobg: in 5.1 if anything executed by a DEBUG trap creates a subshell (as the following block does), it will re-enter
@@ -150,27 +150,12 @@ function bgtraceCntr()
 		if [ ! "$bgBASH_debugTrapExitCode" ] && [ "$_bgtraceFile" != "/dev/null" ]; then
 			eval unalias bgtrace 2>/dev/null
 
-			if [ -w "$_bgtraceFile" ] && ! (echo -n >> "$_bgtraceFile") &>/dev/null; then
+			if ! _bgtracePrepareFile "$_bgtraceFile"; then
 				# turn tracing off
-				local fileOwner="$(stat -c"%U" "$_bgtraceFile")"
 				bgTracingOnState=""
 				bgTracingOn=""
 				_bgtraceFile="/dev/null"
 				eval alias bgtrace='#'
-
-				assertError -v _bgtraceFile -v USER -v fileOwner "
-					The _bgtraceFile can not be written to because it is in the /tmp filesystem and owned by a different user.
-					There was a kernel change circa 4.19 which made this the default behavior to make it harder to leak information
-					from programs by hijacking tmp files.
-
-					If you are working on a single user workstation it is relatively safe to disable that new feature with this command.
-					    sudo sysctl fs.protected_regular=0
-
-					An alternative to disabling the feature is to change the location of this terminal's trace file.
-					    bg-debugCntr trace on:<pathToFile>
-
-					Here is the information on the trace file and users
-				"
 			fi
 		fi
 		bgTracingOnState="$bgTracingOn"
@@ -178,6 +163,56 @@ function bgtraceCntr()
 	return $result
 }
 
+function _bgtraceSetDefaultDestination() {
+	_bgtraceChownToSudoUser=""
+	# if the real user is running a script sith sudo
+	# Note sudo sanitizes the environment by default so we only get here if sodu is configured for development
+	if [ "$SUDO_USER" ] && [ "${SUDO_UID:-0}" != 0 ]; then
+		local sudoHome
+		IFS=: read -r _ _ _ _ _ sudoHome _ < <(getent passwd "$SUDO_USER" 2>/dev/null)
+		if [ "$sudoHome" ]; then
+			_bgtraceFile="$sudoHome/.bgtrace.out"
+			_bgtraceChownToSudoUser=1
+		else
+			_bgtraceFile="/var/log/bg-core/bgtrace.out"
+		fi
+
+	# the real user is root so use the globale bg-core location
+	elif [ "$EUID" -eq 0 ]; then
+		_bgtraceFile="/var/log/bg-core/bgtrace.out"
+
+	# running as the real user. IF HOME does not exist its a system user (sort of).
+	# We cant assume any permission so use a /tmp file unique to this user
+	else
+		if [ "$HOME" ]; then
+			_bgtraceFile="$HOME/.bgtrace.out"
+		else
+			_bgtraceFile="/tmp/bgtrace.out.${EUID}"
+		fi
+	fi
+}
+
+
+function _bgtracePrepareFile() {
+	local file="$1"
+	case "$file" in
+		/dev/tty|/dev/stderr|/dev/stdout|/dev/null) return 0 ;;
+	esac
+
+	local dir="${file%/*}"
+	[ "$dir" == "$file" ] && dir="."
+
+	{ mkdir -p "$dir" && : >> "$file"; } 2>/dev/null || {
+		unset _bgtraceChownToSudoUser
+		return 1
+	}
+
+	if [ "$_bgtraceChownToSudoUser" ]; then
+		chown "$SUDO_UID:${SUDO_GID:-$SUDO_UID}" "$file" 2>/dev/null || true
+	fi
+	unset _bgtraceChownToSudoUser
+	return 0
+}
 
 
 ##################################################################################################################
@@ -194,7 +229,7 @@ function bgtraceCntr()
 # It sends its output to the destination specified in the bgTracingOn env variable
 # The user can turn these traces on /off and direct them to a file or stderr with the command
 #       bg-debugCntr trace on|off|on[:<filename>]
-# The default filename (e.g 'on:') is /tmp/bgtrace.out On a multi user server, there could be conflict
+# The default filename (e.g 'on:') is $HOME/.bgtrace.out On a multi user server, there could be conflict
 # about who owns that file but typically tracing/debugging is not done on multiuser servers.
 # bgtrace statements could be left in the scripts if desired. It will always be called but if bgtrace is off,
 # it will do nothing. However, its command line will always be processed which is no big deal if its a simple

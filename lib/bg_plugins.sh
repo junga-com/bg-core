@@ -100,7 +100,7 @@ function DeclarePluginType()
 		mutableCols[$attribName]="1"
 	done
 
-	$Plugin::register "PluginType:$pluginType" "$static"
+	$Plugin::registerType "PluginType:$pluginType" "$static"
 	static[package]="$packageName"
 	true
 }
@@ -111,11 +111,17 @@ function static::Plugin::__construct()
 {
 	# create a Map member var to keep track of loaded pllugins
 	$static[loadedPlugins]=new Map
+	$static[loadedTypes]=new Map
 }
 
 function static::Plugin::register()
 {
 	loadedPlugins[$1]="$2"
+}
+
+function static::Plugin::registerType()
+{
+	loadedTypes[$1]="$2"
 }
 
 # usage: $Plugin::list [<outputOptions>] [--short] [<pluginNameSpec>]
@@ -144,10 +150,11 @@ function static::Plugin::register()
 #   "bg-awkData manifest assetType:plugin" # assetName is of the form <pluginType>:<pluginName>
 function static::Plugin::list()
 {
-	local retOpts shortFlag manifestOpt pkgNameOpt
+	local retOpts shortFlag manifestOpt pkgNameOpt includeTypes
 	while [ $# -gt 0 ]; do case $1 in
 		--short) shortFlag="--short" ;;
 		--full)  shortFlag="" ;;
+		--includeTypes)  includeTypes="--includeTypes" ;;
 		-p*|--pkg*|--pkgName*)   bgOptionGetOpt opt: pkgNameOpt "$@" && shift ;;
 		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
 		*) bgOptions_DoOutputVarOpts retOpts "$@" && shift ;;&
@@ -160,8 +167,10 @@ function static::Plugin::list()
 	local -a plugins=()
 	local pkg scrap pluginID pluginPath
 	while read -r pkg scrap pluginID pluginPath; do
-		[ "$shortFlag" ] && pluginID="${pluginID#*:}"
-		plugins+=($pluginID)
+		if [ "$includeTypes" ] || [[ ! "$pluginID" =~ ^PluginType: ]]; then
+			[ "$shortFlag" ] && pluginID="${pluginID#*:}"
+			plugins+=($pluginID)
+		fi
 	done < <(manifestGet $manifestOpt $pkgNameOpt "plugin" "$pluginNameSpec")
 
 	outputValue -1 "${retOpts[@]}" "${plugins[@]}"
@@ -254,13 +263,14 @@ function static::Plugin::get()
 		assertNotEmpty pluginID "invalid parameters. should be either '<pluginType>:<pluginID>' '<pluginType> <pluginID>'"
 	fi
 	local pluginKey="$pluginType:$pluginID"
+	[ "$pluginType" != "PluginType" ] || assertError "use getType to load PluginType not get"
 
 	# <retVar> can be passed in the -R option or as the last parameter
 	[ ! "$retVar" ] && retVar="$1"
 
 	if [ ! "${loadedPlugins[$pluginKey]+exists}" ]; then
 		# ensure that this plugin's pluginType is loaded first
-		[ "$pluginType" != "PluginType" ] && static::Plugin::get -q $manifestOpt "PluginType:$pluginType"
+		static::Plugin::getType -q $manifestOpt "PluginType:$pluginType"
 
 		# get the filename that implements this plugin from the manifest
 		local _pg_pkg _pg_scrap _pg_filename
@@ -284,12 +294,93 @@ function static::Plugin::get()
 	fi
 }
 
+# usage: $Plugin::getType [-R <retVar>] PluginType:<pluginType>
+#        $Plugin::getType [-R <retVar>] [PluginType] <pluginType>
+# static Plugin method to get a pluginType given its type name
+#
+# This returns quickly without doing anything if the plugin is already loaded. If it is not already loaded, it will attempt to load
+# it by using the host manifest to find a library asset with the assetType "pluginType" and assetName "<pluginType>".
+# If the --pkgName= option is specified, only plugins provided by that package will be considered.
+# It should be noted that you can load a plugin that is not registered in the host manifest by sourcing the library that contains
+# it explicitly and then calling $Plugin::get but that would not be secure on a production machine and such code should not be
+# accepted into a trusted repository.
+# Options:
+#    -q|--quiet) : load the plugin without returning a reference to it. Sometimes you just want to make sure the plugin is loaded.
+#    --pkgName=<pkg> : normally <pluginKey>s (<pluginType> + <pluginID>) are unique on a host. If that is not the case, this option
+#                  can be used to choose which package provided the desired plugin.
+#    --manifest=<file> : load the plugin referenced in the specified manifest file. By default, the host's global manifest file or
+#                  the virtually installed sandbox's manifest file is used based on the environment.
+#    -R <retVar> : <retVar> is the variable that will receive the loaded plugin. If it is an uninitialized -n (reference) variable,
+#                  it will be set to point to the plugin's Object OID associaive array. Otherwise, it will be set with the Object's
+#                  <objRef> string representation which acts like a pointer to the associative arrary. If this option is not specified
+#                  the string <objRef> is printed to stdout. See man(3) returnObject
+# Params:
+#    <pluginType>  : the name of the plugin type to be returned.
+# See Also:
+#    man(3) returnObject
+function static::Plugin::getType()
+{
+	local retVar quietFlag pkgNameOpt manifestOpt
+	while [ $# -gt 0 ]; do case $1 in
+		-q|--quiet)   quietFlag="-q" ;;
+		-p*|--pkg*|--pkgName*)   bgOptionGetOpt opt: pkgNameOpt "$@" && shift ;;
+		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
+		-R*)          bgOptionGetOpt val: retVar "$@" && shift ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+	if [[ "$1" =~ : ]]; then
+		local pluginType="${1%%:*}"
+		local pluginID="${1#*:}"; shift
+		[ "$pluginType" == "PluginType" ] || assertError "static::Plugin::getType called with a pluginKey that is not a PluginType "
+	else
+		[ "$1" == "PluginType" ] && shift
+		local pluginID="$1"; shift
+		assertNotEmpty pluginID "invalid parameters. should be either '<pluginType>:<pluginID>' '<pluginType> <pluginID>'"
+	fi
+	local pluginKey="PluginType:$pluginID"
+
+	# <retVar> can be passed in the -R option or as the last parameter
+	[ ! "$retVar" ] && retVar="$1"
+
+	if [ ! "${loadedTypes[$pluginKey]+exists}" ]; then
+		# TODO: if we every support subclassing PluginTypes, walk the super classes here to load them
+
+		# get the filename that implements this plugin from the manifest
+		local _pg_pkg _pg_scrap _pg_filename
+		read -r _pg_pkg _pg_scrap _pg_scrap _pg_filename < <(manifestGet $manifestOpt $pkgNameOpt PluginType "PluginType:$pluginID")
+		assertNotEmpty _pg_filename "could not find assetType:PluginType, assetName:'PluginType:$pluginID' in host manifest"
+
+		# override the 'context global' packageName var for and DeclarePlugin calls made when sourcing the plugin library. There
+		# may be multiple plugins Declared in the library, not just the one we are explicitly 'getting'
+		local packageName="$_pg_pkg"
+
+		_pluginLoadContainingLibrary "$pluginKey" "$_pg_filename"
+
+		local -n _pg_plugin; GetOID "${loadedTypes[$pluginKey]}" _pg_plugin || assertError
+		[ "${_pg_plugin[package]}" == "$_pg_pkg" ] || assertLogicError
+	fi
+
+	if [ "$quietFlag" ]; then
+		return 0
+	else
+		returnObject "${loadedTypes[$pluginKey]}" "$retVar"
+	fi
+}
+
 
 # usage: _pluginLoadContainingLibrary <pluginKey> <libraryFilename>
 # This is an internal helper function to load a plugin library file with the purpose of loading the specified <pluginKey>
 # The <libraryFilename> can be a bash script or some opaque executable that implements the plugin libary protocol.
+# Options:
+#    --bestEffort : Do a best effort load. Ignore any that cant be loaded
 function _pluginLoadContainingLibrary()
 {
+	local bestEffort
+	while [ $# -gt 0 ]; do case $1 in
+		--bestEffort) bestEffort="--bestEffort" ;;
+		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+	done
+
 	local _pl_pluginKey="$1";       shift
 	local _pl_libraryFilename="$1"; shift; assertNotEmpty _pl_libraryFilename
 
@@ -302,22 +393,31 @@ function _pluginLoadContainingLibrary()
 		# The executable should respond to the 'getAttributes' command by returning its attributes in the deb control file syntax
 		DeclarePlugin "$pluginType" "$pluginID" "$($_pl_libraryFilename getAttributes)"
 	else
+		[  "$bestEffort" ] && return 0
 		assertError -v libraryFilename:_pl_libraryFilename "could not load plugin library file '$_pl_libraryFilename' because it is not a bash script and not an executable"
 	fi
 
-	[ ! "$_pl_pluginKey" ] || [ "${loadedPlugins[$_pl_pluginKey]+exists}" ] || assertError "failed to load plugin '$_pl_pluginKey' contained in file '$_pl_libraryFilename'"
+	if [ "$_pl_pluginKey" ]; then
+		if [[ "$_pl_pluginKey" == PluginType:* ]]; then
+			[ ! "$_pl_pluginKey" ] || [ "${loadedTypes[$_pl_pluginKey]+exists}" ] || assertError "failed to load pluginType '$_pl_pluginKey' contained in file '$_pl_libraryFilename'"
+		else
+			[ ! "$_pl_pluginKey" ] || [ "${loadedPlugins[$_pl_pluginKey]+exists}" ] || assertError "failed to load plugin '$_pl_pluginKey' contained in file '$_pl_libraryFilename'"
+		fi
+	fi
 }
 
 
 # usage: $Plugin::loadAllOfType <pluginType>
 # static Plugin method to load all the installed plugins of the given type.
 # Options:
+#    --bestEffort : Do a best effort load. Ignore any that cant be loaded
 #    --manifest=<file> : load the plugins listed in this alternate manifest file.  By default, the host's global manifest file or
 #                  the virtually installed sandbox's manifest file is used based on the environment.
 function static::Plugin::loadAllOfType()
 {
-	local manifestOpt
+	local manifestOpt bestEffort
 	while [ $# -gt 0 ]; do case $1 in
+		--bestEffort) bestEffort="--bestEffort" ;;
 		--manifest*)  bgOptionGetOpt opt: manifestOpt "$@" && shift ;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
@@ -325,11 +425,11 @@ function static::Plugin::loadAllOfType()
 	local pluginType="${1:-${static[name]}}"; shift; assertNotEmpty pluginType
 
 	# ensure that this  pluginType is loaded first
-	[ "$pluginType" != "PluginType" ] && static::Plugin::get -q "PluginType:$pluginType"
+	[ "$pluginType" != "PluginType" ] && static::Plugin::getType -q "PluginType:$pluginType"
 
 	local  _pg_pkg _pg_type _pg_name _pg_filename;
 	while read -r _pg_pkg _pg_type _pg_name _pg_filename; do
-		_pluginLoadContainingLibrary "$_pg_name" "$_pg_filename"
+		_pluginLoadContainingLibrary $bestEffort "$_pg_name" "$_pg_filename"
 	done < <(manifestGet $manifestOpt  plugin "$pluginType:.*")
 }
 
@@ -378,10 +478,12 @@ function static::Plugin::_dumpAttributes()
 	local -n mutableCols
 	while read -r pkg scrap pluginKey pluginPath; do
 		Try:
+			[[ "$pluginKey" == PluginType:* ]] && continue
 			unset -n plugin; local -n plugin; $Plugin::get $manifestOpt --pkgName=$pkg -R plugin "$pluginKey"
 			echo "$pkg" "$pluginKey" "pluginKey" "$pluginKey"
 			local attribNames=(); $plugin.getAttributes -A attribNames
 			unset -n mutableCols; local -n mutableCols; $plugin.static.mutableCols.getOID mutableCols
+			varIsAMapArray mutableCols || assertError -v pluginKey -v pluginPath "Bad Plugin definition. mutableCols is not an object"
 			local attrib; for attrib in "${attribNames[@]}"; do
 				if [ ! "${mutableCols[$attrib]+exists}" ]; then
 					local value="${plugin[$attrib]}"

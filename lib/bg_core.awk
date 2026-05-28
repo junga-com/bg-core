@@ -409,13 +409,27 @@ function arrayJoini(array,sep) {
 #################################################################################################################################
 ### Debug functions
 
+# /tmp on modern linux will fail to write if the user is not the owner even when -w permission check is true.
+# this actually tests to see if writing a empty string results in an arror while suppressing the error message.
+function canWrite(file,    rc, cmd)
+{
+    cmd = "sh -c '>> \"" file "\"' 2>/dev/null"
+    rc = system(cmd)
+    return (rc == 0)
+}
+
 function bgtraceIsActive() {
 	if (! ENVIRON["bgTracingOn"])
 		return 0
-	else if (ENVIRON["bgTracingOn"]~"^(file|on):") {
+	else if (ENVIRON["bgTracingOn"] ~ /^(file|on):/) {
 		_bgtraceFile=ENVIRON["bgTracingOn"]; sub("^(file|on):","",_bgtraceFile);  sub("^win$","",_bgtraceFile)
 
-		_bgtraceFile=((_bgtraceFile)?_bgtraceFile:"/tmp/bgtrace.out")
+		_bgtraceFile=((_bgtraceFile)?_bgtraceFile:ENVIRON["HOME"]"/.bgtrace.out")
+		if (! canWrite(_bgtraceFile)) {
+			_bgtraceFile=""
+			return 0
+		}
+
 	} else
 		_bgtraceFile="/dev/stderr"
 	return 1
@@ -469,7 +483,7 @@ function warning(msg, verbose       ,i,_fnName, _fnLine, _fnLineTxt,  outStr) {
 BEGIN {
 	_INDESC="BEGIN"
 }
-{_INDESC=NR}
+{_INDESC=FNR}
 END {_INDESC="END"}
 
 function dumpPatsplit(parts,seps) {

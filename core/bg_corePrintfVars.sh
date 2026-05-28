@@ -40,7 +40,7 @@ function pvIsAnObjRef()
 {
 	type -t IsAnObjRef &>/dev/null && { IsAnObjRef "$@"; return $?; }
 	[ "$1"  == "_bgclassCall" ] && [ $# -eq 5 ] && [ "$5" == "|" ] && return 0;
-	[[ "$1" == _bgclassCall\ *\ *\ [01]\ '|'?([\ ]) ]] && return 0;
+	[[ "$1" == _bgclassCall\ *\ *\ [01]\ '|'?([\ ]) ]] && return 0; #' highlighting bug
 	return 1
 }
 
@@ -50,7 +50,7 @@ function pvIsAnObjRef()
 function pvCalcLocalIndent()
 {
 	local pv_cli_result=$(( (${pv_labelWidth:-0} > ${1:-0}) ? ${pv_labelWidth:-0} : ${1:-0}  ))
-	returnValue "$(( (pv_cli_result>30)?30 : (pv_cli_result<2)?2 : pv_cli_result ))" "$2"
+	returnValue "$(( (pv_cli_result > 30) ? 30 : (pv_cli_result<2)?2 : pv_cli_result ))" "$2"  #" highlighting bug
 }
 
 # usage: pvEndOneLineMode
@@ -59,7 +59,7 @@ function pvCalcLocalIndent()
 function pvEndOneLineMode()
 {
 	if [ "$pv_oneLineMode" ] || [ ! "$pv_atLineStart" ]; then
-		[ ! "$pv_atLineStart" ] && printf "\n"
+		[ ! "$pv_atLineStart" ] && printf "\n"  #" highlighting bug
 		pv_oneLineMode=""
 		pv_atLineStart="1"
 	fi
@@ -80,7 +80,7 @@ function pvPrName()
 		arrayIndex)         printf -- "${pv_prefix}[%-*s]="  "$((${2:-0}-2))" "$1" ;;
 		arrayStartRecursed) printf -- "${pv_prefix}[%-*s][]" "$((${2:-0}-2))" "$1" ;;
 	esac
-}
+} #" highlighting bug
 
 
 # usage: pvPrVal_single [<minFieldWidth> [<maxFieldWidth>]]
@@ -158,7 +158,7 @@ function pvPrAttribute()
 			;;
 		*) assertLogicError
 	esac
-}
+} #" highlighting bug
 
 # usage: pvPrArray <label> <arrayVar>
 # Global Vars:

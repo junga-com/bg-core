@@ -140,7 +140,7 @@
 # Calling a method defined in the super class from inside a method...
 #     $super.<methodName>                        eg. $super.resize
 # From inside a method, polymorphism can be overridden for efficiency...
-#     # if jyou know that <methodName> is not virtual in your class, it can be called directly from anoter method in the class as
+#     # if you know that <methodName> is not virtual in your class, it can be called directly from anoter method in the class as
 #     # efficiently as any function call.
 #     <className>::<methodName> [<p1> ... <p2>]
 #
@@ -1244,8 +1244,15 @@ function __resolveMemberChain()
 		fi
 	fi
 
-	### unless its 'static' remove the last term, leaving parts with just the chained parts that we need to traverse
-	[ ${#parts[@]} -gt 0 ] && [ "${parts[@]: -1}" != "static" ] && { _rsvMemberName="${parts[@]: -1}"; parts=("${parts[@]:0: ${#parts[@]}-1}"); }
+	### unless its 'static' or 'super' remove the last term, leaving parts with just the chained parts that we need to traverse
+	[ ${#parts[@]} -gt 0 ] \
+		&& [ "${parts[@]: -1}" != "static" ] \
+		&& [ "${parts[@]: -1}" != "super" ] \
+		&& {
+			_rsvMemberName="${parts[@]: -1}"
+			parts=("${parts[@]:0: ${#parts[@]}-1}")
+		}
+
 
 	# .foo can be a membervar or method but [foo] can only be a memberVar and .::foo can only be a method. .<class>::foo is also a method
 	local finalMemberValueSyntax;
@@ -1263,7 +1270,7 @@ function __resolveMemberChain()
 	local nextPart; for nextPart in "${parts[@]}"; do
 		#2022-03 bobg:  seeems not to be used. untested. #local nextPartSyntax="${_rsvMemberName:+dot}"; [[ "${_rsvMemberName}" =~ []]$ ]] && nextPartSyntax="memberVar"
 		nextPart="${nextPart%]}"
-		[ "$nextPart" ] || { _rsvMemberType="invalidExpression:empty member chain part. "; return 101; }
+		[ "$nextPart" ] || { _rsvMemberType="invalidExpression:empty member chain part. "; return 101; }		#"
 
 		unset -n _pthis; local -n _pthis="$_rsvOID"
 		local _oidType="${_pthis@a}"; _oidType="${_oidType//[^aA]}"
@@ -1273,6 +1280,12 @@ function __resolveMemberChain()
 		if  [ "$nextPart" == "static" ]; then
 			local -n _pThisSys; { [ "$_oidType" == A ] && [ "${_pthis[_CLASS]+exists}" ]; } && _pThisSys="$_rsvOID" || _pThisSys="${_rsvOID}_sys"
 			_rsvOID="${_pThisSys[_CLASS]}"
+			continue
+		fi
+
+		# super increments _hierarchLevel so that the method resolution will call the next overriden method (works for static and instance methods)
+		if [ "$nextPart" == "super" ]; then
+			(( _hierarchLevel++ ))
 			continue
 		fi
 
@@ -1554,10 +1567,19 @@ function _bgclassCall()
 			fi
 			assertNotEmpty _CLASS
 
-			unset -n static; local -n static="$_CLASS"
-			local -n _VMT="${_CLASS}_vmt"
+			# honour _hierarchLevel
+			local _staticLookupClass="$_CLASS"
+			local i
+			for ((i=0; i<${_hierarchLevel:-0}; i++)); do
+				local -n _lookupClass="$_staticLookupClass"
+				_staticLookupClass="${_lookupClass[baseClass]}"
+				unset -n _lookupClass
+				[ "$_staticLookupClass" ] || assertObjExpressionError "no static super class"
+			done
 
-			_classUpdateVMT "$_CLASS"
+			unset -n static; local -n static="$_CLASS"                  # state object
+			_classUpdateVMT "$_staticLookupClass"
+			local -n _VMT="${_staticLookupClass}_vmt"                   # lookup object
 
 			# this is a static call so unset the this pointer vars. Our state array is in 'static', not 'this'
 			unset -n this
@@ -2088,7 +2110,7 @@ function ParseObjExpr()
 #  <objOperator> = +=|=
 # See Also:
 #    ParseObjExpr
-#    _bgclassCall
+#    _bgclassCall #"
 function completeObjectSyntax()
 {
 	local cur="$1"

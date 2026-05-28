@@ -688,7 +688,9 @@ function utfRunner_execute()
 		# redefine the command_not_found_handle so that it does not kill the process group which would kill the unit test.
 		# alternatively, we could change the pgid here to make the testcase process it own group leader.
 		function command_not_found_handle() {
-			echo "Command not found. cmdline='$*'" >/tmp/bgtrace.out
+			if (echo -n >> "$HOME/.bgtrace.out") &>/dev/null; then
+				echo "Command not found. cmdline='$*'" >> $HOME/.bgtrace.out
+			fi
 			echo "Command not found. cmdline='$*'" >&2
 			exit 127
 		}

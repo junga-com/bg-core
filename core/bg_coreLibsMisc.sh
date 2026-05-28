@@ -35,7 +35,7 @@ function IsAnObjRef()
 	# consistent by supporting it here (even though it does not matter in this function)
 	# _bgclassCall <oid> <class> <superFlag> |
 	[ "$1"  == "_bgclassCall" ] && [ $# -eq 5 ] && [ "$5" == "|" ] && return 0;
-	[[ "$1" == _bgclassCall\ *\ *\ [01]\ '|'?([\ ]) ]] && return 0;
+	[[ "$1" == _bgclassCall\ *\ *\ [01]\ '|'?([\ ]) ]] && return 0; #' highlighting bug
 	return 1
 }
 fi
@@ -69,7 +69,7 @@ fi
 # Compliant Packages:
 # If a package installs its manifest in /var/lib/bg-core/<packagename>/hostmanifest, the next time manifestUpdateInstalledManifest
 # runs, it will combine that file into a combined /var/lib/bg-core/manifest file. Packages built with the bg-dev tool will
-# have this functionality and will call the manifestUpdateInstalledManifest function in the package's postinst script.
+# have this functionality and will call the manifestUpdateInstalledManifest function in the packages postinst script.
 #
 # Params:
 #    <assetTypeMatch> : a regex(gawk) expression to match the assetType field. Default is '' which matches nothing so this parameter must
@@ -110,13 +110,13 @@ function manifestGet()
 }
 
 # usage: manifestAwk [<awkOptions>] <awkScript>
-# This runs gawk to scan the manifest file without having to specify the path where the system manifest file is
+# This runs gawk to scan the manifest file without having to specify the path where the system manifest file is "
 function manifestAwk() {
 	local manifestFile; manifestGetHostManifest manifestFile
 	[ -e "$manifestFile" ] && gawk --sandbox "$@" $manifestFile
 }
 
-# usage: manifestGetPkgForPath <pkgNameRetVar> <assetPath>
+# usage: manifestGetPkgForPath <pkgNameRetVar> <assetPath> "
 function manifestGetPkgForPath()
 {
 	# # TODO: write a bgCore builtin for manifestGetPkgForPath
@@ -2911,7 +2911,7 @@ function bgTrapUtils()
 			returnValue --retArray _tu_trapHandlers "$1"
 			;;
 	esac
-}
+} #" highlighting bug
 
 
 #######################################################################################################################################
@@ -3652,7 +3652,7 @@ function Try()
 			bgBASH_tryStackWasThrown[0]="1" # the Catch function will check this to know the context its being called in
 			setExitCode 0 # run BASH_COMMAND and since we restore the DEBUG trap, the script will resume from there
 		fi
-	'
+	' #" highlighting bug
 
 	# push the tryState values needed by the Catch and assertError functions onto the 'try' block stack
 	# when code is running outside any Try block, the bgBASH_tryStack* is empty. Each Try pushes another entry onto the bgBASH_tryStack*
@@ -3683,7 +3683,7 @@ function Try()
 	'
 	[ "$traceCatchFlag" ] && bgtrace "!!! Try: installed SIGUSR2 in pid='$BASHPID'"
 	return 0
-}
+} #" highlighting bug
 
 # usage: TryInSubshell [<assertErrorExitCode>]
 # This implements a particular type of Try / Catch block where the caller wants to invoke code in a subshell using the subshell to
@@ -4309,6 +4309,7 @@ function fsTouch()
 			bgsudo "${sudoPrompt[@]}" --attr "$fileOrFolder" chmod $modeStr "$fileOrFolder" || assertError
 		fi
 	fi
+	#"
 }
 
 # usage: fsPolicyToPerms [-R <permVar>] <policy>
@@ -4429,7 +4430,7 @@ function fsPolicyToPerms()
 # a directory will be traversed so that its contents are also considered. The test expressions at the end of the commandline are
 # applied to the considered list so that any non-matching (and non-existing) entries are removed.
 #
-# The difference between recursive and non-recusrive mode has a profound impact on how the command is used. Resursive mode works
+# The difference between recursive and non-recursive mode has a profound impact on how the command is used. Resursive mode works
 # like an enhanced version of the gnu find utility and non-recursive mode works more like bash glob expansion. Often when recursive
 # mode is used, only a single directory path is specified in <fileSpecN>. When non-recursive mode is used, the <fileSpecN> produce
 # the entire list and <findTestExpression> is optionally used to filter the list down.
@@ -4483,6 +4484,8 @@ function fsPolicyToPerms()
 #                  refer to all files in the current directory. That will cause the expanded names to start with './' so that they
 #                  can not be mistaken for an option. The option '-B./' could be used to remove the ./ from the results if needed.
 # Options:
+# Debugging options:
+#    --bgtrace : prints the find cmd line to bgtrace destination
 # These options affect which file obects are in the outputted list
 #    -f : force. return at least one fs object which will be "/dev/null" if none other match
 #    -F : files only. match only file objects. Note: upper case F b/c -f is force.
@@ -4525,10 +4528,12 @@ function fsExpandFiles()
 
 	local outputOpts=()
 	local recursiveOpt=("-maxdepth" "0")
-	local forceFlag fsef_prefixToRemove fsef_outputVarName fTypeOpt=() findCmdLineCompat findOpts=() findPruneExpr=() excludePaths=()
+	local bgtraceFlag forceFlag fsef_prefixToRemove fsef_outputVarName fTypeOpt=() findCmdLineCompat findOpts=() findPruneExpr=() excludePaths=()
 	local _gitIgnorePath
 	local findStartingPoints=()
 	while [ $# -gt 0 ]; do case $1 in
+		--bgtrace) bgtraceFlag="--bgtrace" ;;
+
 		# If any options conflict arise, findCmdLineCompat==true means use the find meaning and findCmdLineCompat==false means use our meaning
 		--findCmdLineCompat) findCmdLineCompat="--findCmdLineCompat" ;;
 
@@ -4639,8 +4644,16 @@ function fsExpandFiles()
 		local _line; for _line in "${excludePaths[@]}"; do
 			local _type="both"
 			[[ "$_line" =~ /$ ]] && { _line="${_line%%/}"; _type="d"; }
-			local _expr="-name"; [[ "$_line" =~ / ]] && _expr="-path"
-			[[ "$_line" =~ ^/ ]] && _line="${commonPrefix}${_line##/}"
+
+			local _expr="-name"
+			[[ "$_line" =~ / ]] && _expr="-path"
+
+			if [[ "$_line" =~ ^/ ]]; then
+				_line="${commonPrefix}${_line##/}"
+			elif [[ "$_line" =~ / ]]; then
+				_line="${commonPrefix}${_line}"
+			fi
+
 			if [ "$_type" == "d" ]; then
 				_folderEntries+=( -o "$_expr" "$_line" )
 			else
@@ -4656,8 +4669,19 @@ function fsExpandFiles()
 	# the final findExpressions is composed.
 	#    recursiveOpt is a 'global option' that must come first. If the user specified -maxdepth or -mindepth recursiveOpt is cleared
 	#    fTypeOpt is ANDed with the rest of the expression.
-	findExpressions=("${recursiveOpt[@]}" "${findGlobalExpressions[@]}"  "${findPruneExpr[@]}" "${fTypeOpt[@]}" "${findExpressions[@]}")
+	local -a finalFindArgs=(
+		"${recursiveOpt[@]}"
+		"${findGlobalExpressions[@]}"
+		"${findPruneExpr[@]}"
+		\( "${fTypeOpt[@]}" "${findExpressions[@]}" -print0 \)
+	)
 
+	if [ "$bgtraceFlag" ]; then
+		bgtrace "fsExpandFiles/bgfind call:"
+		printf ' %q' "find" "${findOpts[@]}" "${findStartingPoints[@]}" "${finalFindArgs[@]}" >> $_bgtraceFile
+		#printf '   : %q\n' "find" "${findOpts[@]}" "${findStartingPoints[@]}" "${finalFindArgs[@]}" >> $_bgtraceFile
+		bgtrace
+	fi
 
 	# now invoke the find command
 	[ "$fsef_prefixToRemove" ] && fsef_prefixToRemove="#${fsef_prefixToRemove#'#'}"
@@ -4667,7 +4691,7 @@ function fsExpandFiles()
 		varOutput "${outputOpts[@]}" $_appendFlag "$_file"
 		_found="1"
 		_appendFlag="--append"
-	done < <(find "${findOpts[@]}" "${findStartingPoints[@]}" "${findExpressions[@]}" -print0 | tr "\0" "\b")
+	done < <(find "${findOpts[@]}" "${findStartingPoints[@]}" "${finalFindArgs[@]}" | tr "\0" "\b")
 
 	# if no matching pathes were found but forceFlag was specified, output /dev/null. -f is used when making a cmd line for utils
 	# (like awk) that read from stdin if no input files are specified.

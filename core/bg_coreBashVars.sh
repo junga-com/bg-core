@@ -251,7 +251,7 @@ function varGetAttributes()
 		_gaRetVar="${_gaRetVar#<nameref>}"
 	done
 	returnValue "$_gaRetValue" "$_gaRetVar"
-}
+} #"
 
 # usage: varIsA <type1> [.. <typeN>] <varName>
 # returns true(0) if the var specified on the cmd line exits as a variable with the specified attributes
@@ -584,6 +584,11 @@ function varOutput()
 		--retSet:*)
 			[ "$_sr_appendFlag" ] || { local -n _sr_varRefNR="$_sr_varRef"; _sr_varRefNR=(); }
 			local i; for i in "$@"; do
+				case "$i" in
+					*'['*|*']'*)
+						assertError -v i "Could not assign output array because the associative-array index contains bracket '[]' characters"
+						;;
+				esac
 				printf -v "$_sr_varRef[$i]" "%s" ""
 			done
 			;;

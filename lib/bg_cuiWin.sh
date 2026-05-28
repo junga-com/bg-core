@@ -1,7 +1,7 @@
 
 #import bg_????.sh ;$L1;$L2
 
-declare -g cuiWinCntrFilePrefix="/tmp/bgtrace."
+declare -g cuiWinCntrFilePrefix="$HOME/.bgtrace."
 
 # Library bg_cuiWin.sh
 #######################################################################################################################################

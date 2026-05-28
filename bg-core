@@ -85,7 +85,7 @@ function oob_printBashCompletion()
 
 		cuiWin:1)
 			echo "<winName>"
-			local cuiWinCntrFilePrefix="/tmp/bgtrace."
+			local cuiWinCntrFilePrefix="$HOME/.bgtrace."
 			for i in $(fsExpandFiles ${cuiWinCntrFilePrefix}*.cntr); do
 				i="${i%.cntr}"; i="${i#$cuiWinCntrFilePrefix}";
 				echo "$i"

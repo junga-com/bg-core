@@ -611,6 +611,7 @@ templateMagicEscToken="|#0.0.7#|"
 #    templateListVars
 #    templateExpandStr
 #    templateExpandExtended
+#    templateExpandFolder  : when the template is a whole folder not a single file
 function expandTemplate() { templateExpand "$@"; }
 function templateExpand()
 {

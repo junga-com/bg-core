@@ -144,7 +144,7 @@ debug   list    run
 $ /tmp/test4.sh.ut run myCoolFunction:test<tab><tab>
 >        test42   testA    
 $ /tmp/test4.sh.ut run myCoolFunction:test42
-***** bg-debugCntr: Tracing='/tmp/bgtrace.out'. Vinstall='ON:bg-core:'
+***** bg-debugCntr: Tracing='$HOME/.bgtrace.out'. Vinstall='ON:bg-core:'
 
 ###############################################################################################################################
 ## test4.sh:myCoolFunction:test42 start
@@ -192,11 +192,11 @@ The `bg-debugCntr` command from the bg-dev package is the interface to many debu
 ```bash
 $ source bg-debugCntr
 $ bg-debugCntr trace on:
-BGTracing status     : desination='/tmp/bgtrace.out' (bgTracingOn='on:')
+BGTracing status     : desination='$HOME/.bgtrace.out' (bgTracingOn='on:')
 ```
 in another terminal enter ...
 ```bash
-$ tail -f /tmp/bgtrace.out
+$ tail -f $HOME/.bgtrace.out
 ```
 
 now in the first terminal enter ...
@@ -209,7 +209,7 @@ $
 ```
 and observe in the second terminal window...
 ```bash
-$ tail -f /tmp/bgtrace.out
+$ tail -f $HOME/.bgtrace.out
 foo[]
    [shirt]='body'
    [shoe ]='foot'
@@ -377,7 +377,7 @@ $ /tmp/test6.sh --file=tags <tab><tab>
 $ /tmp/test6.sh --file=tags bobg <tab><tab>
 <species>  dog        cat        human      
 $ /tmp/test6.sh --file=tags bobg cat
-***** bg-debugCntr: Tracing='/tmp/bgtrace.out'. Vinstall='ON:bg-core:'
+***** bg-debugCntr: Tracing='$HOME/.bgtrace.out'. Vinstall='ON:bg-core:'
 ```
 
 By having the bash completion algorithm inside the script, it encourages its development and maintenance along with the script. I find that I build the command line syntax first for each new feature I write so that I can select files and other parameters from lists instead of finding the values and typing them in. BC becomes a sort of UI for the command line that gives the user lists of choices. Also, by providing the BC code inside the script, the functions that the script uses are available so that it can be very dynamic, filtering the list to exactly the values that are possible given the arguments already completed. Check out the bg-awkData command for a great example of that.

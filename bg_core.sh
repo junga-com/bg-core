@@ -92,8 +92,8 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 	# provide a stand-alone implemntation of bgtrace so that bootstrap code can be debugged
 	function earlyTrace()
 	{
-		if [ -w /tmp/bgtrace.out ]; then
-			echo "$*" >> /tmp/bgtrace.out
+		if (echo -n >> "$HOME/.bgtrace.out") &>/dev/null; then
+			echo "$*" >> $HOME/.bgtrace.out
 		fi
 	}
 
@@ -317,10 +317,6 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 		_importedLibraries[lib:bg_coreImport.sh]="$bg_coreImport_path"
 		unset bg_coreImport_path
 		source "${_importedLibraries[lib:bg_coreImport.sh]}"
-
-		# bgtrace "in common.sh"
-		# printfVars _bgtraceFile bgTracingOn bgTracingOnState  >>/tmp/bgtrace.out
-		# printfVars bgProductionMode bgSourceOnlyUnchangable bgDevModeUnsecureAllowed bgLibPath  >>/tmp/bgtrace.out
 	fi
 fi
 
