@@ -1396,3 +1396,5 @@ function cr_templateIsExpanded::apply() {
 		fsTouch "${fileOpts[@]}" "$destFile"
 	fi
 }
+
+# funcman bug workaround. without this comment it does not finish the last creq and starts eating the next file

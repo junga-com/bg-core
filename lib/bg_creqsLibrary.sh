@@ -1255,3 +1255,5 @@ function cr_isAGitFolder::apply() {
 		fi
 	)
 }
+
+# funcman bug workaround. without this comment it does not finish the last creq and starts eating the next file

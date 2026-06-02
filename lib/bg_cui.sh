@@ -95,6 +95,8 @@
 #    <cntr-x>     <alt-x>      <alt-X>
 #    <cntr-y>     <alt-y>      <alt-Y>
 #    <cntr-z>     <alt-z>      <alt-Z>
+
+# usage: cuiReadKey
 function cuiReadKey() { readKey "$@"; }
 function readKey()
 {
