@@ -1,0 +1,365 @@
+#!/bin/bash
+
+source /usr/lib/bg_core.sh
+import bg_cui.sh
+
+export _bgexit_utSpecial="1"
+
+################################################################################
+### Functions
+
+function oob_printBashCompletion()
+{
+	local -A clInput
+	bgBCParse -RclInput "[--trace] <testName>" "$@"; set -- "${posWords[@]:1}"
+
+	testCmds=()
+	while read -r fn; do
+		testCmds+=("${fn#test}")
+	done < <(compgen -A function test)
+
+	case $completingArgName in
+		'<testName>') echo "runAllTests runAllInCmdTests runAllInTerminalTests ${testCmds[@]}"
+	esac
+	exit
+}
+
+
+function trace() {
+	[ "$bgexitTraceFlag" ] || return 0
+	local name="$1"; shift
+	echo "${name}: $*" >&2
+}
+
+function tracePipe() {
+	local name="$1"; shift
+	local line; while read -r line; do
+		trace "$name" "${line}"
+	done
+}
+
+function dumpSigInfo() {
+	[ "$bgexitTraceFlag" ] || return 0
+	local name="$1"; shift
+	trace "$name" "PID = $BASHPID"
+	# trace "$name" "TRAP START:"
+	# builtin trap -p TERM &>/dev/null
+	# trace "$name" "TRAP END:"
+	local sigIgn="$(grep '^SigIgn:' /proc/$BASHPID/status)"
+	local sigCgt="$(grep '^SigCgt:' /proc/$BASHPID/status)"
+	local sigPnd="$(grep '^SigPnd:' /proc/$BASHPID/status)"
+	local shdPnd="$(grep '^ShdPnd:' /proc/$BASHPID/status)"
+	trace "$name" "$sigIgn, $sigCgt, $sigPnd, $shdPnd"
+
+	pstree -spl $BASHPID | tracePipe "$name"
+
+	local parents=()
+	getOurBashParentPIDs parents
+	trace "$name" "getOurBashParentPIDs: ${parents[*]}"
+
+	set -o | grep monitor | tracePipe "$name"
+	echo
+}
+
+function dumpPS() {
+	[ "$bgexitTraceFlag" ] || return 0
+	local name="$1"; shift
+	local pidList=()
+	printf -v pidList '%s,' "$@"
+	pidList="${pidList%,}"
+	ps -o pid,ppid,pgid,sid,stat,cmd -p "$pidList" | tracePipe "$name"
+}
+
+function installTrapDump() {
+	local name="$1"
+	trap "trapDump '$name' INT"  INT
+	trap "trapDump '$name' TERM" TERM
+}
+
+function trapDump() {
+	if 	[ "$bgexitTraceFlag" ]; then
+		echo "SIG CAUGHT $1:$2 \$\$=$$ BASHPID=$BASHPID" >&2
+	else
+		echo "SIG CAUGHT $1:$2" >&2
+	fi
+
+	if [[ $$ == "$BASHPID" && $- == *i* ]]; then
+		builtin trap - INT TERM
+		kill -s "$2" "$$"
+		return 128
+	fi
+
+	case "$2" in
+			INT)  exit 130 ;;
+			TERM) exit 143 ;;
+	esac
+	exit 2
+}
+
+function runAllInCmdTests()
+{
+	local testCmds=()
+	while read -r fn; do
+		testCmds+=("${fn#test}")
+	done < <(compgen -A function test)
+
+	local test; for test in "${testCmds[@]}"; do
+		echo
+		echo "===== $test ====="
+
+		bash -ic "
+			${0} ${test}
+		"
+		echo "rc=$?"
+	done
+}
+
+function runAllInTerminalTests()
+{
+	local testCmds=()
+	while read -r fn; do
+		testCmds+=("${fn#test}")
+	done < <(compgen -A function test)
+
+	local scriptPath="./unitTests/${0##*/}"
+
+	local test; for test in "${testCmds[@]}"; do
+		echo
+		echo "===== $test ====="
+
+		PS1='> ' PS2= bash --noprofile --norc -i <<-EOS 2>&1
+		source $scriptPath noop
+		echo BEFORE
+		test${test}
+		echo AFTER
+		exit 0
+		EOS
+		rc=$?
+
+		# bash -ic "
+		# 	echo BEFORE
+		# 	source ${0} noop
+		# 	test${test}
+		# 	echo AFTER
+		# "
+		# rc=$?
+		echo "rc=$rc"
+		[ "$rc" != "0" ] && echoBug "expected the bash to continue to print AFTER"
+	done
+}
+
+################################################################################
+### Test Cases
+
+
+function testTopScript1() { testTopScript 1; }
+
+function testTopScript() {
+	echo "START TopScript"
+	[[ "$1" == "1" || "$1" == "all" ]] && installTrapDump "TOP"
+	if [ "$bgexitTraceFlag" ]; then
+		dumpSigInfo TOP
+	fi
+
+	bgexit --complete
+	echoBug "top continued"
+}
+
+function echoBug() {
+	echo -e "${csiColorAttention}BUG: $*${csiNorm}"
+}
+
+function testSubshell1() { testSubshell 1; }
+function testSubshell2() { testSubshell 2; }
+function testSubshell3() { testSubshell 3; }
+function testSubshellAll() { testSubshell all; }
+
+function testSubshell() {
+	echo "START Subshell"
+	[[ "$1" == "1" || "$1" == "all" ]] && installTrapDump "TOP"
+	if [ "$bgexitTraceFlag" ]; then
+		dumpSigInfo TOP
+	fi
+
+	(
+		[ "$bgexitTraceFlag" ] && { trace "DBLFRK" "PID: short lived dblfrk = $BASHPID"; echo >&2; }
+		(
+			[[ "$1" == "2" || "$1" == "all" ]] && installTrapDump "OUTER"
+			[ "$bgexitTraceFlag" ] && dumpSigInfo OUTER
+
+			(
+				[[ "$1" == "3" || "$1" == "all" ]] && installTrapDump "INNER"
+				[ "$bgexitTraceFlag" ] && dumpSigInfo INNER
+
+				bgexit --complete
+				echoBug " inner shell continued"
+			)
+			if [ "$bgexitTraceFlag" ]; then
+				dumpSigInfo OUTER_AFTER
+			fi
+
+			echoBug "outer continued"
+		)
+	)
+}
+
+
+function testPipe1() { testPipe 1; }
+function testPipe2() { testPipe 2; }
+function testPipeAll() { testPipe all; }
+
+function testPipe() {
+	echo "START Pipe"
+	[[ "$1" == "1" || "$1" == "all" ]] && installTrapDump "TOP"
+	if [ "$bgexitTraceFlag" ]; then
+		dumpSigInfo TOP
+	fi
+
+	(
+		[[ "$1" == "2" || "$1" == "all" ]] && installTrapDump "INPIPE"
+		if [ "$bgexitTraceFlag" ]; then
+			dumpSigInfo INNER
+		fi
+
+		bgexit --complete
+		echoBug "inner shell continued"
+	) | grep "FFFFOOOO....."
+	echoBug "outer continued"
+}
+
+function testDetachedSubshell1() { testDetachedSubshell 1; }
+function testDetachedSubshell2() { testDetachedSubshell 2; }
+function testDetachedSubshell3() { testDetachedSubshell 3; }
+function testDetachedSubshell4() { testDetachedSubshell 4; }
+function testDetachedSubshellAll() { testDetachedSubshell all; }
+
+function testDetachedSubshell() {
+	echo "START DetachedSubshell"
+	[[ "$1" == "1" || "$1" == "all" ]] && installTrapDump "TOP"
+	if [ "$bgexitTraceFlag" ]; then
+		dumpSigInfo TOP
+	fi
+
+	(
+		[[ "$1" == "2" || "$1" == "all" ]] && installTrapDump "DBLFRK"
+		if [ "$bgexitTraceFlag" ]; then
+			trace "DBLFRK" "PID: short lived dblfrk = $BASHPID"
+			echo
+		fi
+		(
+			[[ "$1" == "3" || "$1" == "all" ]] && installTrapDump "OUTER"
+			if [ "$bgexitTraceFlag" ]; then
+				dumpSigInfo OUTER
+			fi
+
+			(
+				[[ "$1" == "4" || "$1" == "all" ]] && installTrapDump "INNER"
+				if [ "$bgexitTraceFlag" ]; then
+					dumpSigInfo INNER
+				fi
+
+				bgexit --complete
+				echoBug "inner shell continued"
+			)
+			if [ "$bgexitTraceFlag" ]; then
+				dumpSigInfo OUTER_AFTER
+			fi
+
+			echoBug "outer continued"
+		)&
+	)
+	echo "TOP is expected to continue"
+	sleep 1
+}
+
+function testCmdSubst1() { testCmdSubst 1; }
+
+function testCmdSubst() {
+	echo "START CmdSubst"
+	[[ "$1" == "1" || "$1" == "all" ]] && installTrapDump "TOP"
+	if [ "$bgexitTraceFlag" ]; then
+		dumpSigInfo TOP
+	fi
+	x="$(
+		bgexit --complete;
+		echoBug "inner continued"
+	)"
+	echoBug "outer continued"
+}
+
+
+################################################################################
+### Main
+
+
+testCmds=()
+while read -r fn; do
+	testCmds+=("${fn#test}")
+done < <(compgen -A function test)
+
+
+bgexitTraceFlag=""
+oob_invokeOutOfBandSystem "$@"
+while [ $# -gt 0 ]; do case $1 in
+	--trace) bgexitTraceFlag="--trace" ;;
+	*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
+done
+
+cmd="$1"; shift
+
+case ${cmd:-help} in
+	noop)
+		;;
+
+	runAllTests)
+		runAllInCmdTests
+		runAllInTerminalTests
+		exit
+		;;
+
+	runAllInCmdTests)
+		runAllInCmdTests
+		exit
+		;;
+
+	runAllInTerminalTests)
+		runAllInTerminalTests
+		exit
+		;;
+
+	help)
+		cat <<-EOS
+			These test need to be invoked individually in the right terminal envirnoment
+			so they can not be made into a ut_* unittest.
+			Steps:
+			  1) First run each in turn in a terminal window.
+			  (if you dont see a line with "BUG..." the test passed)
+			  2) test sourcing into the terminal
+			  2.1) invoke a second bash (in case a test fails and exits the interactive terminal bash)
+			  2.2) vinstall the code you are testing if needed
+			  3.3) source bgexitTest.sh
+			  3.4) run each test* function in turn. run echo \$\$ after each to check that the terminal did not exit
+		EOS
+		echo
+		echo "terminal cmds"
+		for cmd in "${testCmds[@]}"; do
+			echo "    ${0##*/} $cmd"
+		done
+
+		echo
+		echo "sourced functions"
+		echo "    source ${0##*/}"
+
+		for cmd in "${testCmds[@]}"; do
+			echo "    test$cmd"
+		done
+		;;
+	*)
+		fnName="test${cmd}"
+		if [ "$(type -t $fnName)" == "function" ]; then
+			$fnName "$@"
+		else
+			assertError -v testCmds "test case not found '$fnName'"
+		fi
+		;;
+esac

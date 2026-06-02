@@ -2068,26 +2068,198 @@ function getTerminalPID()
 	returnValue "$_resultValue" "$1"
 }
 
+# return a list of PIDs that make up the logical bash script we are running in.
+# It includes $BASHPID which is the pid excecuting this function if its not $$.
+# It then adds parent PIDs while the parent is not $$ and it is a bash cmd.
+# Case 1:
+#    normal bash script code where $$ is the top of the chain. stops at $$
+# Case 2:
+#    a subshell was launched and reparented for example ((code...)&). In this
+#    example the outer subshell creates the inner but does not wait for it to end
+#    so the outer ends quickly before the inner subshell. When the parent of the
+#    inner disapears linux makes its parent the subreaper which is typically the
+#    systemd --user process or global systemd(1)
+function getOurBashParentPIDs()
+{
+	local _scriptName="${0##*/}"
+	local _parentChain=()
+	local _pid="$BASHPID"
+	local _ppid _cmd; read -r _ppid _cmd < <(ps  --pid $_pid -o ppid=,comm=)
+	while [ "$_pid" ] && [ "$_pid" != "$$" ] && [[ "$_cmd" == bash || ( ${#_cmd} -ge 10 && "$_scriptName" == "$_cmd"* ) ]]; do
+		_parentChain+=("$_pid")
+		_pid="$_ppid"
+		read -r _ppid _cmd < <(ps  --pid $_pid -o ppid=,comm=)
+	done
+	returnValue --retArray "_parentChain" "$1"
+}
+
+
+# usage: runningInTerminal
+# inTerminal (interactive shell) vs inCmd (non-interactive shell)
+# This tells us if the current bash shell is interactive. This is typical for code
+# sourced into a terminal shell, such as bg-debugCntr or bash completion. Non-interactive
+# shells are typical scripts launched by shebang, "bash <script>", or "bash -c <code>".
+# Return Value:
+#   0 (true) : yes, we are code sourced into an interactive (aka terminal) shell
+#   1 (false): no, we are running like a typical script
+function runningInTerminal() {
+	[[ $- == *i* ]]
+}
+
+# usage: runningInSubshell
+# This tells us if the current bash process is different from $$.
+# In bash, $$ remains the original shell pid across subshells, while BASHPID is the
+# actual current bash process. This is useful for deciding whether exit can close the
+# original terminal shell when runningInTerminal is true.
+# Return Value:
+#   0 (true) : yes, our pid is not $$
+#   1 (false): no, we are running at the top level (we are $$)
+function runningInSubshell() {
+	[[ "$BASHPID" != "$$" ]]
+}
+
+# usage: runningInSubshellDetached
+# This tells us if we are still a child of $$ or if we are running in the background.
+# This does not tell us if our script is running in the background "> myScript&"
+# It tells us that some bash code did something like ((<code>)&). The outer shell
+# ends right away and the inner shell continues on its own. It gets reparented and
+# $$ is no longer in its parent chain
+# Return Value:
+#   0 (true) : yes, we have been detached from the original $$
+#   1 (false): no, we are still running under $$
+function runningInSubshellDetached() {
+	# If we are not in a bash subshell, we can not be detached from $$.
+	[[ "${BASHPID:-$$}" == "$$" ]] && return 1
+
+	local _parentChainReachesDollarDollar
+	local _pid="${BASHPID:-0}"
+	while [ "$_pid" ] && [ "$_pid" != "0" ] && [ "$_pid" != "1" ]; do
+		if [ "$_pid" -eq "$$" ]; then
+			_parentChainReachesDollarDollar="1"
+			break
+		fi
+
+		local _ppid="$(ps --pid "$_pid" -o ppid= 2>/dev/null)"
+		_ppid="${_ppid//[[:space:]]/}"
+		[ ! "$_ppid" ] && break
+
+		_pid="$_ppid"
+	done
+
+	[[ ! "$_parentChainReachesDollarDollar" ]]
+}
+
 # usage: whereAmIRunning [<retVar>]
+# This returns a string enum for combinations of  runningInTerminal,runningInSubshell,runningInSubshellDetached
 # Return Values:
-#    'inTerminal'   : this code is running inside a function sourced into a terminal's bash instance. If you run exit from here,
-#                     you will close the user's terminal window. Note that this literally means that the parant of BASHPID is not
-#                     a bash process. When bash is running inside some other process
-#    'inTopScript'  : in the pid of the script that was launched
-#    'inSubshell'   : in a subshell pid under the script (or detached if the top script ended)
+#    'inTerminal'                 : this code is running in the user's interactive terminal bash process itself. If you run exit
+#                                   from here, you will close the user's terminal window. This is the only case where exit is unsafe.
+#    'inTerminalSubshell'         : this code is running in a subshell that originated from interactive terminal code and whose
+#                                   parent chain still reaches the terminal bash process. Calling exit is safe because it exits only
+#                                   this subshell.
+#    'inTerminalSubshellDetached' : this code is running in a subshell that originated from interactive terminal code but has been
+#                                   reparented so its parent chain no longer reaches the terminal bash process. Calling exit is safe
+#                                   because it exits only this detached shell.
+#    'inCmd'                      : this code is running in the main pid of a non-interactive script launched as "bash script" or
+#                                   from a shebang. Calling exit is safe and exits the script.
+#    'inCmdSubshell'              : this code is running in a subshell under a non-interactive script. Calling exit is safe and exits
+#                                   only this subshell.
+#    'inCmdSubshellDetached'      : this code is running in a subshell under a non-interactive script but its been detached from $$
+#                                   and is running in the background
+# 2026-05 Worked this out while debugging bgCore builtins and vinstall assertErrors that behaved badly. This seems complete.
+#         A key insight was that when bg-debugCntr does ((source bg_core.sh; ... )&) the subshell no longer has $$ as a parent
 function whereAmIRunning()
 {
 	local _whereAmIRunningValue
-	local terminalBash; getTerminalPID terminalBash
-	if [[ $- == *i* ]] || [ ${BASHPID:-0} -eq ${terminalBash:-0} ]; then
-		_whereAmIRunningValue="inTerminal"
-	elif [ ${BASHPID:-0} -eq $$ ]; then
-		_whereAmIRunningValue="inTopScript"
+
+	if runningInTerminal; then
+		if ! runningInSubshell; then
+			_whereAmIRunningValue="inTerminal"
+		elif ! runningInSubshellDetached; then
+			_whereAmIRunningValue="inTerminalSubshell"
+		else
+			_whereAmIRunningValue="inTerminalSubshellDetached"
+		fi
 	else
-		local _whereAmIRunningValue="inSubshell"
+		if ! runningInSubshell; then
+			_whereAmIRunningValue="inCmd"
+		elif ! runningInSubshellDetached; then
+			_whereAmIRunningValue="inCmdSubshell"
+		else
+			_whereAmIRunningValue="inCmdSubshellDetached"
+		fi
 	fi
+
 	returnValue "$_whereAmIRunningValue" "$1"
 }
+
+# usage: _addChildren <pid> <varNameToAddChildrenTo>
+# Add the children of <pid> to the <varNameToAddChildrenTo> associative array
+# Params:
+#    <pid>   : the pid to query children of
+#    <varNameToAddChildrenTo> : the name of a associative array var in the callers
+#             scope that will be populated with the child pids as var[$child]="$child"
+function _addChildren()
+{
+	local _pid="$1" ; shift
+	local -n _pidMap="$1"
+	local _child _tmpShell
+	for _child in $(echo $BASHPID; pgrep -P "$_pid" 2>/dev/null); do
+		if [ ! "$_tmpShell" ]; then
+			_tmpShell="$_child"
+		elif [  "$_child" != "$_tmpShell" ] && [ ! "${_pidMap[$_child]+x}" ]; then
+			_pidMap[$_child]="$_child"
+			_addChildren "$_child" "${!_pidMap}"
+		fi
+	done
+}
+
+
+# usage: addChildAndCousins <pidListVarName>
+# Will expand <pidListVarName> to include all decendants of any pid already in the list
+# Params:
+#    <pidListVarName> : the name of an array var in the callers scope that holds a list of pids
+#                       on return the array will include the original pids and and descendants
+function addChildAndCousins()
+{
+	local -n _pidList="$1"
+	local -A pidMap=()
+	local _pid
+
+	# find descendants (some of these may be duplicates of the original pids)
+	for _pid in "${_pidList[@]}"; do
+		_addChildren "$_pid" "pidMap"
+	done
+
+	# remove any children that were already in _pidList (to prevent duplicates)
+	for _pid in "${_pidList[@]}"; do
+		unset "pidMap[$_pid]"
+	done
+
+	# add the descendants to the original
+	_pidList+=("${pidMap[@]}")
+}
+
+
+
+# 2022-03 bobg: refactored bgexit function completely. The previous version was working reasonably well for a long time but while
+#               fixing command_not_found_handle, I began to understand 'kill -TERM -$$' better. I think this new version is
+#               more accurate and much easier to understand.
+# 2022-08 bobg: the inTerminal detection did not handle the case of multiple nested interactive bashs like when a developer
+#               runs 'bash' to get a prestine shell to do a test in.
+#               I modifed whereAmIRunning to do better but this function still needs work. see TODO below
+# 2026-05 bobg: Refactored. I am confident that the helper functions and cases in this function are correct but there is a core
+#               bash problem that I can not work around without cooperation from the call sites.
+#               BASH QUIRK: when a subshell send a any signal that would normall end a process to its subshell parents the default
+#               bash signal handlers ignore the signal. If the subshell sets a SIGTERM handler that exits it works.
+# TODO: the signature of bgExit needs to change to reflect two additional things to kill
+#          1) background/siblings -- what if we are the backgroud. be more pgrpid aware in these calculations
+#          2) parent pid up to the first interactive bash or the last one in this continuous chain.
+#       note: that we should understand better the SIGTERM and SIGINT when sent to the whole pgrpid. maybe SIGINT blindly to the
+#             whole pgrpid will work because interactive shells dont end with SIGINT
+#       note: the inTerminal detection is probably fine now but the --complete is probably not b/c we need to walk up the parents
+#             (and siblings) to decide what to kill
+
 
 # usage: bgexit --complete [<exitCode>]
 # This is a wraper over the builtin exit function to exit the current process. It has several advantages over the builtin in scripts.
@@ -2098,7 +2270,7 @@ function whereAmIRunning()
 #
 # It also implements a new --complete option that will exit the script completely. Completely means two things...
 #    1) even when its called in a subshell, the whole script will end. e.g. foo=$(...; exit) would continue on the next line.
-#    2) end child and sibling processes. The entire process group (pgid) of the script be be sent SIGTERM
+#    2) end child and sibling processes. The entire process group (pgid) of the script will be sent SIGTERM
 #
 # It also implements a new --msg=<msg> option which is particularly handy in combination with the --complete option. It turns it
 # into a lightweight assert.
@@ -2124,72 +2296,152 @@ function bgexit()
 			;;
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
-	local exitCode="$1"
+	local exitCode="${1:-0}"
 
-	# 2022-03 bobg: refactored this function completely. The previous version was working reasonably well for a long time but while
-	#               fixing command_not_found_handle, I begun to understand 'kill -TERM -$$' better. I think this new version is
-	#               more accurate and much easier to understand.
-	# 2022-08 bobg: the inTerminal detection did not handle the case of multiple nested interactive bashs like when a developer
-	#               runs 'bash' to get a prestine shell to do a test in.
-	#               I modifed whereAmIRunning to do better but this function still needs work. see TODO below
-	# TODO: the signature of bgExit needs to change to reflect two additional things to kill
-	#          1) background/siblings -- what if we are the backgroud. be more pgrpid aware in these calculations
-	#          2) parent pid up to the first interactive bash or the last one in this continuous chain.
-	#       note: that we should understand better the SIGTERM and SIGINT when sent to the whole pgrpid. maybe SIGINT blindly to the
-	#             whole pgrpid will work because interactive shells dont end with SIGINT
-	#       note: the inTerminal detection is probably fine now but the --complete is probably not b/c we need to walk up the parents
-	#             (and siblings) to decide what to kill
+	# BASH BUG/QUIRK fix: Strange bash behavior.
+	# This seems to be specific only to Detached Subshells both InCmd and InTerminal but it does not fix anything
+	# to avoid it in other cases. Comment it and run  unitTests/bgexit.utSpecial to see what breaks
+	#    Before adding 'builtin trap -p TERM' this shell did not have TERM in  SigCgt but after
+	#    it does. The parent shell in the test did not have TERM in SigCgt in either case. TERM was
+	#    not in any shell's SigIgn
+	#    for an unknown reason, without 'builtin trap -p TERM' the parent would not end even though
+	#    not being in either SigIgn nor SigCgt should result in th ekernel's default action terminating it.
+	# testcases: (all inTerminal) DetachedSubshell, DetachedSubshell1, DetachedSubshell2, DetachedSubshell3,
+	builtin trap -p TERM &>/dev/null
 
-	# TODO: consider merging this whereAmIRunning logic with the code in bg_importCntr.sh(lines ~300 to ~400)
+	# I searched for .bgExit and nothing is using it.
+	#[ "$assertOut" ] && touch "${assertOut}.bgExit"
+
 	local whereAmIRunning; whereAmIRunning "whereAmIRunning"
+	local situation="$whereAmIRunning:${exitCompletelyFlag:---oneShell}"
 
-	case $whereAmIRunning:${exitCompletelyFlag:---oneShell} in
+	# TESTING: unitTests/bgexit.utSpecial is a special unit test that you can run.
+	#    unitTests/bgexit.utSpecial > unitTests/bgexit.run
+	#    meld unitTests/bgexit.{plato,run}
+	[ "$_bgexit_utSpecial" ] && echo "bgexit running in '$situation'" >&2
+
+
+	# whereAmIRunning values:
+	# 	inTerminal
+	# 	inTerminalSubshell
+	# 	inTerminalSubshellDetached
+	# 	inCmd
+	# 	inCmdSubshell
+	# 	inCmdSubshellDetached
+
+
+	case $situation in
 		inTerminal:*)
-			# in the terminal, exit will close the users terminal window so we dont want to do that. We must be running in a
-			# sourced function (like bg-debugCntr or when the user 'source /usr/lib/bg_core.sh' to be able to run functions from
-			# the terminal cmdline).
-			# sending SIGINT to the terminal is similar to the user pressing cntr-c so what ever function is being ran, will stop
-			# as if return was executed
-			# TODO: what about spawned children in the --complete case?
-			touch "${assertOut}.bgExit"
+			# - exit will close the users terminal so send -SIGINT instead but dont expect it to stop the rest of the script
+			# - in this case $BASHPID==$$ and $$ may have unrelated children so --complete and --oneShell is the same
+			bgtrace "bgexit:$situation: kill -SIGINT '$BASHPID' # (BASHPID)"
 			kill -SIGINT "$BASHPID"
 			;;
-		*:--complete)
-			# regardless of whether we are in the inTopScript or inSubshell (inTerminal case is already handled above) we have to
-			# kill the whole process group to get ourselves and any children or siblings.
-			# We also want to set the exitCode so we add a handler to the SIGTERM trap (this only matters for inTopScript since
-			# everthing is ending so only the thing that will see an exit code is the parent of the whole script)
-			# I considered excluding $BASHPID from the pids we send SIGTERM to so that we could 'exit $exitCode' but there seems
-			# to be no automic way to do that so if children are being created radidly sending to the pgid (which must include )
-			# seems to be the only way to be sure to get them all.
-			bgtrap -n bgexit "exit $exitCode" SIGTERM
-			# the process group is not always $$. e.g. when launching a script with 'bgdb' (from bg-debugCntr)
-			# Note that I tested the case where the pgrpid pid is dead and it seem to work fine.
-			local pgrpid="$(ps --pid $$ -o pgid=)"; pgrpid="${pgrpid# }"
-			kill -TERM -$pgrpid 2>/dev/null
-			bgtrace "logic error: bgexit --complete: whereAmIRunning='$whereAmIRunning' \$\$='$$' BASHPID='$BASHPID' pgrpid='$pgrpid' sent 'kill -TERM $pgrpid' but this line after it should not have been reached"
-			builtin exit $exitCode # this is a reasonable fall back in case the kill -TERM did not work for any reason
+
+		inTerminalSubshell:--complete)
+			# sending SIGINT to the interactive/terminal shell's pgrpid is the only thing that stops the
+			# source function running in the terminal
+			local pgrpid="$(ps --pid $BASHPID -o pgid=)"; pgrpid="${pgrpid# }"
+			bgtrace "bgexit:$situation: kill -SIGINT  '-$pgrpid' (-pgrpid)"
+			kill -SIGINT -$pgrpid 2>/dev/null
+
+			# # SIGTERM up to but not including $$ which is the users terminal
+			# local ourBashPids=(); getOurBashParentPIDs ourBashPids
+			# addChildAndCousins "ourBashPids"
+			# if ((${#ourBashPids[@]})); then
+			# 	bgtrace "bgexit:$situation: kill -SIGTERM ${ourBashPids[@]}"
+			# 	kill -SIGTERM "${ourBashPids[@]}" 2>/dev/null
+			# fi
 			;;
+
+		inTerminalSubshellDetached:--complete|inCmdSubshellDetached:--complete)
+			# detached subshells are reparented to the supreaper (systemd) process
+			# SIGTERM up to and including the last "bash"
+			# since we are detached, we dont want to try to stop any function that might be running
+			# directly in the terminal
+			local ourBashPids=(); getOurBashParentPIDs ourBashPids
+			addChildAndCousins "ourBashPids"
+			bgtrace "bgexit:$situation: kill -SIGTERM '${ourBashPids[@]}' # ourBashPids[@]"
+			kill -SIGTERM "${ourBashPids[@]}" 2>/dev/null
+			;;
+
+		inCmd:--complete)
+			# SIGTERM the process group -$$  (note negating $$ makes it a process group)
+			# We also want to set the exitCode but we cant "exit $code" and also SIGTERM the process group
+			# so we add a SIGTERM trap that sets the code
+			bgtrap -n bgexit "exit $exitCode" SIGTERM
+
+			# get pgrpid. It is typically $$ but it can be different. e.g. when launching a script with 'bgdb' (from bg-debugCntr)
+			local pgrpid="$(ps --pid $BASHPID -o pgid=)"; pgrpid="${pgrpid# }"
+
+			# the '-' tells kill to send to the whole process group and not just the pid 'pgrpid'
+			# In other cases SIGTERM is avoided because it prints 'Terminated' for any shell that's
+			# waiting on another subshell but at the top level there cant be any of those and unlike
+			bgtrace "bgexit:$situation: kill -SIGTERM '-$pgrpid' # -pgrpid"
+			kill -SIGTERM -$pgrpid 2>/dev/null
+			;;
+
+		inCmdSubshell:--complete)
+			# we can end the script in this case but we can not set the exit code. When we send SIGTERM to our process group
+			# it should not return. The $$ pid will exit with code 143 = 128 + signal_number unless it has an SIGTERM trap that changes it
+			# we can not set that trap from here.
+			local pgrpid="$(ps --pid $BASHPID -o pgid=)"; pgrpid="${pgrpid# }"
+
+			bgtrace "bgexit:$situation: kill -SIGINT -- '-$pgrpid' # -pgrpid"
+
+			# sending SIGINT instead of SIGTERM avoids 'Terminate' being written in many case but it breaks these testcases
+			# Pipe2, Subshell3.  Note that sending SIG TERM does not fix inTerminal Pipe2 and Subshell3
+			# (it only fixes Pipe2, Subshell3 when inCmd but not inTerminal)
+
+			# no 'Terminate' msg but Pipe2, Subshell3 testcase fail
+			#kill -SIGINT -- -$pgrpid 2>/dev/null
+
+			# Pipe2, Subshell3 testcase pass but prints 'Terminate' in a lot of cases
+			#kill -SIGTERM -- -$pgrpid 2>/dev/null
+
+			# this is a good compromise. It gets rid of a lot of 'Terminated' output and Pipe2, Subshell3 pass inCmd
+			# might be racy on whether 'Terminate' outputs
+			builtin trap 'kill -SIGTERM -- -'"$pgrpid"' 2>/dev/null' SIGINT
+			kill -SIGINT -- -$pgrpid 2>/dev/null
+
+			# # launch a new non-interactive bash that has a different pgrpid to send both SIGINT followed by SIGTERM
+			# # nice try but the kill -SIGINT does not work from a different pgrpid
+			# setsid   bash -c '
+			# 		kill -SIGINT  -- "-$1" 2>/dev/null
+			# 		kill -SIGTERM -- "-$1" 2>/dev/null
+			# ' _ "$pgrpid"
+			;;
+
 		*:--oneShell)
-			# regardless of whether we are in the inTopScript or inSubshell (inTerminal case is already handled above) we just want
-			# to end the one shell that we are in so that is what exit is made to do
+			# we already special cased the inTerminal case where exit would close the users terminal so its safe to simply
+			# call builtin exit here. If its in a subshell the script will continue and it not, the script will exit.
+			bgtrace "bgexit:$situation: builtin exit $exitCode"
 			builtin exit $exitCode
 			;;
-		*) assertError "Darn, I missed one case. This is a programming logic error. Someone needs to fix the code"
+
+		*)bgtrace "logic error: bgexit $exitCompletelyFlag: whereAmIRunning='$whereAmIRunning' \$\$='$$' BASHPID='$BASHPID' pgrpid='$pgrpid' sent 'kill -TERM $pgrpid' but this line after it should not have been reached"
+			bgtrace "Darn, I missed one case. This is a programming logic error. Someone needs to fix the code"
+			echo "Darn, I missed one case. This is a programming logic error. Someone needs to fix the code" >&2
+			builtin exit 42
 	esac
+
+	bgtrace "logic error: bgexit should not have gotten here case='$whereAmIRunning:${exitCompletelyFlag:---oneShell}' \$\$='$$' BASHPID='$BASHPID' pgrpid='$pgrpid' "
+	builtin exit $exitCode # since something went wrong call the builtin exit
 }
 
 
 # usage: bgread <pos1var> [...<posNvar>] <<<"<stringToParse>"
 # This is a wrapper over the 'builtin read' function that adds a few features
 #    * -r is the default. (do not allow backslashes to escape any characters)
-#    * you can pass the empty string "" as any <posNvar> to effectively through away the data in that position
+#    * you can pass the empty string "" or '_' as any <posNvar> to effectively throw away the data in that position
 function bgread()
 {
 	local _bgr_vars=("$@")
 	local _bgr_i _bgr_scrapIt
 	for _bgr_i in "${!_bgr_vars[@]}"; do
-		[ "${_bgr_vars[$_bgr_i]}" == "" ] && _bgr_vars[$_bgr_i]="_bgr_scrapIt"
+		if [ "${_bgr_vars[$_bgr_i]}" == "" ] || [ "${_bgr_vars[$_bgr_i]}" == "_" ]; then
+			_bgr_vars[$_bgr_i]="_bgr_scrapIt"
+		fi
 	done
 	builtin read -r "${_bgr_vars[@]}"
 }
@@ -2993,8 +3245,9 @@ function command_not_found_handle()
 		builtin exit 127
 	fi
 
+	# TODO: bgexit has been refactored since writing this code and is probably more correct than this
 	# special case running in the terminal.
-	# we dont use bgexit because we dont want to kill any siblings the user has running the background
+	# (update: bgexit now does not kill siblings when in terminal) we dont use bgexit because we dont want to kill any siblings the user has running the background
 	local terminalPID; type -t getTerminalPID &>/dev/null && getTerminalPID terminalPID
 	if [ "$terminalPID" ]; then
 		if [ $$ == ${terminalPID:-0} ]; then
@@ -3321,8 +3574,9 @@ function assertError()
 		abort|default)
 			declare -g assertError_EndingScript="1"
 			bgExit --complete ${_ae_exitCode:-36}
-			#bgkillTree --endScript --exitCode=${_ae_exitCode:-36} $$
-			echo "error: logic error. bgExit did not stop this line from executing"
+			bgtrace "ASSERT DEBUG: bgExit returned unexpectedly"
+			echo "error: AssertError: logic error. bgExit did not stop this line from executing"
+			echo "error: AssertError: logic error. bgExit did not stop this line from executing" >&2
 			;;
 
 		catch)
@@ -3447,8 +3701,8 @@ function Rethrow()
 		abort|default)
 			declare -g assertError_EndingScript="1"
 			bgExit --complete ${_ae_exitCode:-36}
-			#bgkillTree --endScript --exitCode=${_ae_exitCode:-36} $$
-			echo "error: logic error. bgExit did not stop this line from executing"
+			echo "error: Rethrow: logic error. bgExit did not stop this line from executing"
+			echo "error: Rethrow: logic error. bgExit did not stop this line from executing" >&2
 			;;
 
 		catch)

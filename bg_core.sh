@@ -97,6 +97,11 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 		fi
 	}
 
+	# if  [ "$bgCoreBuiltinIsInstalled" ]; then
+	# 	earlyTrace "BUILTINS: enabled"
+	# else
+	# 	earlyTrace "BUILTINS: not loaded"
+	# fi
 
 	# usage: setSecureEnv <varNameN> <value>
 	# this will create a readonly variable set to <value>. Its ok if the variable is readonly and already set to the right value or is

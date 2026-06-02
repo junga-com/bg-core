@@ -14,9 +14,11 @@
 #    man(3) _bgbc-complete-viaCmdDelegation
 
 function _bgbcTrace() {
-	banner="BGBC(bg-core): "
-	if (echo -n >> "$HOME/.bgtrace.out") &>/dev/null; then
-		echo "${banner}$*" >> $HOME/.bgtrace.out
+	if [ "$_bgbcTraceOn" ]; then
+		banner="BGBC(bg-core): "
+		if (echo -n >> "$HOME/.bgtrace.out") &>/dev/null; then
+			echo "${banner}$*" >> $HOME/.bgtrace.out
+		fi
 	fi
 }
 

@@ -1,0 +1,407 @@
+***** [33mbg-debugCntr[0m: Tracing='[33m/home/bobg/.bgtrace.out[0m'. Vinstall='[33mON:bg-core:[0m'
+
+===== CmdSubst =====
+START CmdSubst
+bgexit running in 'inCmdSubshell:--complete'
+
+rc=130
+
+===== CmdSubst1 =====
+START CmdSubst
+bgexit running in 'inCmdSubshell:--complete'
+SIG CAUGHT TOP:INT
+rc=130
+
+===== DetachedSubshell =====
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inCmdSubshellDetached:--complete'
+rc=0
+
+===== DetachedSubshell1 =====
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inCmdSubshellDetached:--complete'
+rc=0
+
+===== DetachedSubshell2 =====
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inCmdSubshellDetached:--complete'
+rc=0
+
+===== DetachedSubshell3 =====
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inCmdSubshellDetached:--complete'
+Terminated
+SIG CAUGHT OUTER:TERM
+rc=0
+
+===== DetachedSubshell4 =====
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inCmdSubshellDetached:--complete'
+SIG CAUGHT INNER:TERM
+rc=0
+
+===== DetachedSubshellAll =====
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inCmdSubshellDetached:--complete'
+SIG CAUGHT INNER:TERM
+SIG CAUGHT OUTER:TERM
+rc=0
+
+===== Pipe =====
+START Pipe
+bgexit running in 'inCmdSubshell:--complete'
+Terminated
+rc=143
+
+===== Pipe1 =====
+START Pipe
+bgexit running in 'inCmdSubshell:--complete'
+SIG CAUGHT TOP:INT
+rc=130
+
+===== Pipe2 =====
+START Pipe
+bgexit running in 'inCmdSubshell:--complete'
+SIG CAUGHT INPIPE:TERM
+Terminated
+rc=143
+
+===== PipeAll =====
+START Pipe
+bgexit running in 'inCmdSubshell:--complete'
+SIG CAUGHT INPIPE:TERM
+SIG CAUGHT TOP:INT
+rc=130
+
+===== Subshell =====
+START Subshell
+bgexit running in 'inCmdSubshell:--complete'
+Terminated
+Terminated
+rc=143
+
+===== Subshell1 =====
+START Subshell
+bgexit running in 'inCmdSubshell:--complete'
+SIG CAUGHT TOP:INT
+rc=130
+
+===== Subshell2 =====
+START Subshell
+bgexit running in 'inCmdSubshell:--complete'
+SIG CAUGHT OUTER:INT
+Terminated
+Terminated
+rc=143
+
+===== Subshell3 =====
+START Subshell
+bgexit running in 'inCmdSubshell:--complete'
+SIG CAUGHT INNER:TERM
+Terminated
+Terminated
+rc=143
+
+===== SubshellAll =====
+START Subshell
+bgexit running in 'inCmdSubshell:--complete'
+SIG CAUGHT INNER:TERM
+SIG CAUGHT OUTER:INT
+SIG CAUGHT TOP:INT
+rc=130
+
+===== TopScript =====
+START TopScript
+bgexit running in 'inCmd:--complete'
+rc=0
+
+===== TopScript1 =====
+START TopScript
+bgexit running in 'inCmd:--complete'
+SIG CAUGHT TOP:TERM
+rc=143
+
+===== CmdSubst =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testCmdSubst
+START CmdSubst
+bgexit running in 'inTerminalSubshell:--complete'
+
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== CmdSubst1 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testCmdSubst1
+START CmdSubst
+bgexit running in 'inTerminalSubshell:--complete'
+SIG CAUGHT TOP:INT
+
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== DetachedSubshell =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testDetachedSubshell
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inTerminalSubshellDetached:--complete'
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== DetachedSubshell1 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testDetachedSubshell1
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inTerminalSubshellDetached:--complete'
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== DetachedSubshell2 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testDetachedSubshell2
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inTerminalSubshellDetached:--complete'
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== DetachedSubshell3 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testDetachedSubshell3
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inTerminalSubshellDetached:--complete'
+Terminated
+SIG CAUGHT OUTER:TERM
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== DetachedSubshell4 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testDetachedSubshell4
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inTerminalSubshellDetached:--complete'
+SIG CAUGHT INNER:TERM
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== DetachedSubshellAll =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testDetachedSubshellAll
+START DetachedSubshell
+TOP is expected to continue
+bgexit running in 'inTerminalSubshellDetached:--complete'
+SIG CAUGHT INNER:TERM
+SIG CAUGHT OUTER:TERM
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== Pipe =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testPipe
+START Pipe
+bgexit running in 'inTerminalSubshell:--complete'
+
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== Pipe1 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testPipe1
+START Pipe
+bgexit running in 'inTerminalSubshell:--complete'
+SIG CAUGHT TOP:INT
+
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== Pipe2 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testPipe2
+START Pipe
+bgexit running in 'inTerminalSubshell:--complete'
+SIG CAUGHT INPIPE:INT
+BUG: outer continued
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== PipeAll =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testPipeAll
+START Pipe
+bgexit running in 'inTerminalSubshell:--complete'
+SIG CAUGHT INPIPE:INT
+BUG: outer continued
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== Subshell =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testSubshell
+START Subshell
+bgexit running in 'inTerminalSubshell:--complete'
+
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== Subshell1 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testSubshell1
+START Subshell
+bgexit running in 'inTerminalSubshell:--complete'
+SIG CAUGHT TOP:INT
+
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== Subshell2 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testSubshell2
+START Subshell
+bgexit running in 'inTerminalSubshell:--complete'
+SIG CAUGHT OUTER:INT
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== Subshell3 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testSubshell3
+START Subshell
+bgexit running in 'inTerminalSubshell:--complete'
+SIG CAUGHT INNER:INT
+BUG: outer continued
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== SubshellAll =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testSubshellAll
+START Subshell
+bgexit running in 'inTerminalSubshell:--complete'
+SIG CAUGHT INNER:INT
+BUG: outer continued
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== TopScript =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testTopScript
+START TopScript
+bgexit running in 'inTerminal:--complete'
+
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
+
+===== TopScript1 =====
+> source ./unitTests/bgexit.utSpecial noop
+> echo BEFORE
+BEFORE
+> testTopScript1
+START TopScript
+bgexit running in 'inTerminal:--complete'
+SIG CAUGHT TOP:INT
+
+> echo AFTER
+AFTER
+> exit 0
+exit
+rc=0
