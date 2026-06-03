@@ -156,7 +156,7 @@ cmd> templateExpand -f "$templateFile"
 ** Exception thrown by testcase **
    catch_errorClass='assertTemplateError'
    catch_errorFn='templateEvaluateVarToken'
-   catch_errorCode='36'
+   catch_errorCode
    catch_errorDescription='
                           +error: templateEvaluateVarToken: The required template variable 'name' does not exist
                           +    context='/tmp/bgmktemp.templateFile.<redacted>''
