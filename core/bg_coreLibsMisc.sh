@@ -3623,6 +3623,7 @@ function assertError()
 			declare -gx	catch_errorClass="$_ae_assertFunctionName"
 			declare -gx	catch_errorFn="$_ae_failingFunctionName"
 			declare -gx	catch_errorDescription="$(cat $assertOut.catchDescription)"
+			declare -gx	catch_errorBuiltinFlag="1"
 
 			## record the state in $assertOut.* files if catch that is receiving this exception is in a different subshell
 			if [ "$BASHPID" != "$tryStatePID"  ]; then
@@ -3867,12 +3868,13 @@ function Try()
 		*)  bgOptionsEndLoop "$@" && break; set -- "${bgOptionsExpandedOpts[@]}"; esac; shift;
 	done
 
-	# these globals are used to pass the error to the Catch block. Clear them on Try: so that there is no chance of leaking the last
-	# catch info through to another
+	# these globals are used to pass the error to the Catch block. Clear them on Try:
+	# so that there is no chance of leaking the last catch info through to another
 	catch_errorCode=""
 	catch_errorDescription=""
 	catch_errorClass=""
 	catch_errorFn=""
+	catch_errorBuiltinFlag=""
 
 	# collect the current state
 	local tryStatePID="$BASHPID"
@@ -3984,6 +3986,8 @@ function TryInSubshell()
 #                             that invoked the catch_errorFn but that can be changed by using the --frameOffset option.
 #    catch_psTree           : a string  containing the pstree output of the script at the point that the assert was raised. This
 #                             shows the state of subshells and spawn async commands.
+#    catch_errorBuiltinFlag : If the bgCore builtin is enabled it uses this to know that some shell code it call assertError
+#                             After detected it it clears it so that it wont be detected again
 # Exit Code:
 #    0: (true) error path. This means that this Catch: statement is catching an error.
 #    1: (false) normal path. This Catch: statement is not catching an exception.
@@ -4059,6 +4063,7 @@ function Catch()
 			declare -gx	catch_errorCode catch_errorClass catch_errorFn
 			read -r catch_errorCode catch_errorClass catch_errorFn <$assertOut.errorInfo
 			declare -gx	catch_errorDescription="$(cat $assertOut.catchDescription)"
+			declare -gx	catch_errorBuiltinFlag="1"
 
 			# TODO: install a DEBUG trap designed to trigger after the closing '}' of the catch block so that we can execute
 			#       cleanup such as bgStackFreezeDone

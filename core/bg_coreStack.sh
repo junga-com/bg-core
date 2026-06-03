@@ -335,8 +335,8 @@ function bgStackFreeze()
 		if [ ${insertIdx:-0} -gt 0 ]; then
 			bgSTK_caller[$insertIdx-1]="${signal}_HANDLER"
 			[ ! -d "$sigSrcTempDir" ] && mkdir "$sigSrcTempDir"
-			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${BASHPID}'_handler.sh"' EXIT
-			bgSTK_cmdFile[$insertIdx-1]="${sigSrcTempDir}/${signal}_${BASHPID}_handler.sh"
+			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${redactedPIDs:-BASHPID}'_handler.sh"' EXIT
+			bgSTK_cmdFile[$insertIdx-1]="${sigSrcTempDir}/${signal}_${redactedPIDs:-BASHPID}_handler.sh"
 			varExists "bgTraps" ; { declare -gA bgTraps; bgTrapUtils getAll bgTraps; }
 			echo "${bgTraps[$signal]:-Signal handler for $signal was not found}" > "${bgSTK_cmdFile[$insertIdx-1]}"
 		fi
@@ -395,8 +395,8 @@ function bgStackFreeze()
 			bgSTK_caller[0]="${signal}_HANDLER"
 
 			[ ! -d "$sigSrcTempDir" ] && mkdir "$sigSrcTempDir"
-			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${BASHPID}'_handler.sh"' EXIT
-			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${BASHPID}_handler.sh"
+			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${redactedPIDs:-BASHPID}'_handler.sh"' EXIT
+			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${redactedPIDs:-BASHPID}_handler.sh"
 			varExists "bgTraps" ; { declare -gA bgTraps; bgTrapUtils getAll bgTraps; }
 			echo "${bgTraps[$signal]:-Signal handler for $signal was not found}" > "${bgSTK_cmdFile[0]}"
 
@@ -413,8 +413,8 @@ function bgStackFreeze()
 			bgSTK_caller[0]="${signal}_HANDLER"
 
 			[ ! -d "$sigSrcTempDir" ] && mkdir "$sigSrcTempDir"
-			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${BASHPID}'_handler.sh"' EXIT
-			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${BASHPID}_handler.sh"
+			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${redactedPIDs:-BASHPID}'_handler.sh"' EXIT
+			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${redactedPIDs:-BASHPID}_handler.sh"
 			varExists "bgTraps" ; { declare -gA bgTraps; bgTrapUtils getAll bgTraps; }
 			echo "${bgTraps[$signal]:-Signal handler for $signal was not found}" > "${bgSTK_cmdFile[0]}"
 
@@ -428,8 +428,8 @@ function bgStackFreeze()
 			declare -g bgDebuggerFirstTrapLineDetected="1"
 
 			[ ! -d "$sigSrcTempDir" ] && mkdir "$sigSrcTempDir"
-			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${BASHPID}'_handler.sh"' EXIT
-			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${BASHPID}_handler.sh"
+			bgtrap -n "dbgTrapSrcFiles_${BASHPID}" 'rm -f "/tmp/bgDbg"*/*"_'${redactedPIDs:-BASHPID}'_handler.sh"' EXIT
+			bgSTK_cmdFile[0]="${sigSrcTempDir}/${signal}_${redactedPIDs:-BASHPID}_handler.sh"
 			varExists "bgTraps" ; { declare -gA bgTraps; bgTrapUtils getAll bgTraps; }
 
 			if [ "$bgDebuggerStepIntoPlumbing" ]; then
@@ -642,8 +642,12 @@ function bgStackPrint()
 			continue
 		fi
 
-		if [[ "${bgSTK_cmdFile[i]}" =~ \<handler\>$ ]]; then
-			echo "----- ${bgSTK_cmdFile[i]%<handler>} INTERUPT RECEIVED -------------------"
+		if [[ "${bgSTK_cmdFile[i]}" =~ _handler.sh$ ]]; then
+			local sig="${bgSTK_cmdFile[i]%%_*}"
+			sig="${sig##*/}"
+			local pid="${bgSTK_cmdFile[i]#*_}"
+			pid="${pid%_*}"
+			echo "----- sig($sig) pid($pid) INTERUPT RECEIVED -------------------"
 		fi
 		if [ "$onelineFlag" ]; then
 			echo "${bgSTK_frmSummary[i]/$'\n'*/ ...}"
