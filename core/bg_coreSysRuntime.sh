@@ -208,7 +208,7 @@ function bgGetDataFolder()
 # and set packageName from that. Setting packageName in the scripts is now obsolete, but will do no harm -- they are just ignored.
 # Eventually, packageName will be set early in bg_core.sh (or its builtin equivalent) and it will become part of the secure env
 # TODO: after manifestGetPkgForPath can handle looking up install/remove deb pkg hook scripts, remove this check for ! $bgRunningInInstall
-if [ ! "$bgRunningInInstall" ]; then
+if [ ! "$bgRunningInInstall" ] && [ "$bgLibExecMode" == "script" ]; then
 	manifestGetPkgForPath "packageName" "$0"
 	# packageName="${packageName:-$projectName}"
 fi

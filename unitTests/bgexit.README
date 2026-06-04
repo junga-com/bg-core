@@ -3,7 +3,7 @@ bgexit.utSpecial is very sensitive to the bash environment is I did not try to m
 For regression tests run...
 
 cd bg-core
-./unitTests/bgexit.utSpecial runAllTests &> ./unitTests/bgexit.run
+bgTracingBanner="" ./unitTests/bgexit.utSpecial runAllTests &> ./unitTests/bgexit.run
 
 Check git for changes from the last commited version.
 

@@ -249,6 +249,16 @@ function printfVars2(optionsAryOrStr, n1,v1, n2,v2, n3,v3, n4,v4, n5,v5         
 #################################################################################################################################
 ### Array functions
 
+# usage: arrayIsPacked(array)
+# returns true if this array is being used as a numeric indexed array with no extra entries
+function arrayIsPacked(array,        i, n) {
+	n = length(array)
+	for (i=1; i<=n; i++)
+		if (!(i in array))
+			return 0
+	return 1
+}
+
 # usage: arrayPush(array, element)
 # add <element> to the end of <array>
 function arrayPush(array, element) {
@@ -510,10 +520,16 @@ function appendStr(str,strToAdd,sep) {
 # convert the <array> into a string by concatenating its elements separated by the string <sep>
 function join(array,sep,           i,wsep,result) {
 	if (!sep) sep=","
-	wsep=""; result=""
-	for (i in array) {
-		result=result wsep array[i]
-		wsep=sep
+	result = ""
+	if (arrayIsPacked(array)) {
+		for (i=1; i<=length(array); i++)
+			result = result ((i>1) ? sep : "") array[i]
+	} else {
+		wsep=""; result=""
+		for (i in array) {
+			result=result wsep array[i]
+			wsep=sep
+		}
 	}
 	return result
 }
@@ -1331,11 +1347,8 @@ function pathGetCommon(p1, p2                                   ,t1,t2,out,finis
 # usage: pathGetCanonStr(path, useEnvFlag)
 # return the canonical version of <path> without requiring that any part of it exists.
 #
-# Note that starting in Ubuntu 16.04, the realpath core gnu util is much more capable including
-#       logical/physical symlink mode
-# Note that "readlink -f" does something similar but expands any symlinks in the path. It also requires
-# that all folders in the path must exist or it returns empty string. This function does not expand
-# symlinks so that the logical path names are preserved but does simplify the path to its canonical form
+# Note readlink/realpath (which came out after this function was written) are better alternatives
+#    realpath -m is the closest
 #
 # This is a pure string manipulation and does not reference the filesystem tree except for
 # the -e option to turn a relative path into a absolute path.
@@ -1345,12 +1358,12 @@ function pathGetCommon(p1, p2                                   ,t1,t2,out,finis
 #    <retVar> : return the result in this variable name. default is to write result to stdout
 # Options:
 #    -e : use the environment to make a relative path absolute. If the path does not start with /
-#         it will be prepended with either $home if it begins with ~ or $PWD. It does not matter
+#         it will be prepended with either $PWD or $home if it begins with ~/. It does not matter
 #         if the resulting path exists or not.
 # Output:
 #    if path is invalid the empty string will be returned and the exit code is 1
 #    otherwise the canonical version is returned on stdout and the exit code is 0
-#    if -e id specified the returned path will be absolute
+#    if -e is specified the returned path will be absolute
 #    The second param <retVar> is specified, it will be set with the value. otherwise the value
 #    is written to stdout
 # What it does:
@@ -1358,48 +1371,54 @@ function pathGetCommon(p1, p2                                   ,t1,t2,out,finis
 #    removes any trailing /
 #    process ../  by removing the previous part, handling adjacent ../../
 #        if the path begins with /../ it is an invalid path because there is no previous part to remove
-#        if the path begins with ../ it is relative to something this function can not know and any
-#            leading ../../... sequences will not be removed
+#        if the path begins with ../ it is relative to something this function can not know and is still
+#            considered invalid (to help prevent escaping from the folder its relative to)
 function pathGetCanonStr(path, useEnvFlag                                , parser, pathArray, origPath, out )
 {
 	origPath=path
 	arrayCreate(pathArray)
 
 	if (useEnvFlag) {
-		if (path ~ /^~/ ) path=ENVIRON["HOME"]"/"substr(path, 2)
+		# ~ -> HOME
+		if (path == "~")
+			path = ENVIRON["HOME"]
+		else if (path ~ /^~\//)
+			path = ENVIRON["HOME"] substr(path, 2)
+
+		# relative -> absolute
 		if (!path || path ~ /^[^/]/)
 			path=ENVIRON["PWD"]"/"path
-		fi
 	}
 
 	reParserCreateFromDelimList(parser, path, "/")
 	while ( reParserConsumeNext(parser) ) {
 		switch (parser["token"]) {
 			case "..":
-				if (length(pathArray)==0 || (length(pathArray)==1 && pathArray[0]=="")) {
+				if (length(pathArray)==0 || (length(pathArray)==1 && pathArray[1]=="")) {
 					warning("invalid path path="origPath)
 					return ""
 				}
-				delete pathArray[length(pathArray)-1]
+				arrayPop(pathArray)
 				break
 			case ".":
 				break
 			case "":
 				# if the first path is empty, it means its an absolute path starting with / but any other is a duplicate //
 				if (length(pathArray)==0)
-					pathArray[length(pathArray)]=parser["token"]
+					arrayPush(pathArray, "")
 				break
 			default:
-				pathArray[length(pathArray)]=parser["token"]
+				arrayPush(pathArray, parser["token"])
 		}
 	}
 
-	if ((length(pathArray)==1 && pathArray[0]==""))
+	if ((length(pathArray)==1 && pathArray[1]==""))
 		out="/"
 	else
 		out=join(pathArray,"/")
 	return out
 }
+
 
 
 # # usage: pathCompare [-e] <p1> <p2>

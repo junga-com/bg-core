@@ -27,14 +27,52 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 	fi
 
 	# Library bg_core.sh
-	# bg_core.sh is the entry point into the bg_* script system. Scripts should source this script in the typical way using its absolute
-	# path like...
+	# bg_core.sh is the entry point into the bg_* script system. Scripts should source this script
+	# using its absolute path like...
+	#
 	#     source /usr/lib/bg_core.sh
-	# After that, the facilities of the bg_* script environment are available and any other required libraries should use the import
-	# syntax instead of source. The import syntax implements idepontency and supports virtual install environments for development.
+	#
+	# After that, the facilities of the bg_* script environment are available and any other required
+	# libraries should use the import syntax instead of source. The import syntax implements idepontency
+	# and supports virtual install environments for development. In production this will refuse to source
+	# a file that is not in a system path or does not have secure permissions
+	#
 	#     import <libraryName> ;$L1;$L2
 	#
-	# This library provides two essential mechanisms. Adding any other mechanisms should be avoided.
+	# Security:
+	# Sourcing this file allows scripts to be written in a way that provides some security constrainsts
+	# on production machines. They are not necessarily secure but if they pass SDLC guidelines and are installed
+	# via the host's package management system certain security gaols can be met. An organization must build those
+	# assurances into its SDLC
+	#
+	# Variables Provided:
+	# After importing bg_core.sh a script can access these variables.
+	#
+	#
+	#    bgScriptName      : ${0##*/} but handles edge cases
+	#    bgScriptFolder    : ${0%/*} but handles edge cases 
+	#    bgLibExecCmd      : array : the cmdline line tokens invoked so that functions can access it
+	#                        bgLibExecCmd[0] == ($0)  (with leading path removed)
+	#                        bgLibExecCmd[1] == ($1)
+	#                        etc ...
+	#    bgLibExecSrc      : string : a string version of bgLibExecCmd. tokens with spaces will be single quoted
+	#    bgLibExecMode     : script|terminal : Is this code running as a normal script command or
+	#                        is it being sourced into an interactive terminal
+	#    bgScriptStartInEpocNanoSecs : The most precise time the script stared that the bash version provides
+	#    bgWS(ro)               : $' \t\n' : a string quaranteed to have the 3 characters space, tab, newline
+	#    bgHostProductionMode(ro) : production|development : is this host allowed to use development time features.
+	#                        This is read from /etc/bgHostProductionMode and will revert to development if that file
+	#                        is not secure. The idea is that if the user does not has permission to create and edit
+	#                        that file on a host, secure scripts wont allow their development time features to be used.
+	#    bgProductionMode(ro) : information about the priviledge level the script is running under
+	#                        production-rootEquiv  : managed environment ran as sudo to root user
+	#                        production-elevatated : managed environment ran as sudo to some other user (a system user typically)
+	#                        production-nonPriv    : managed environment ran as the logged in user
+	#                        development           : non-managed environment
+	#    bgDevModeUnsecureAllowed(ro) : bool : scripts can use this to protect their development time features so that they
+	#                        they wont work in a manged environment under the right conditions
+
+	# bg_core.sh provides two essential mechanisms.
 	#
 	# Bootstraping:
 	# This library is just a bootstrap to load the actual library starting at bg_coreImport.sh so that development of the rest of the
@@ -215,8 +253,20 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 		# and those are installed in system folder where non-root users can not modify them
 		setSecureEnv bgProductionMode        "production-nonPriv"
 
-		[ "$bgLibPath" ] && echo "** WARNING ** scripts in system paths can not use bg-debugCntr vinstalled projects" >&2
+		[ "$bgLibPath" ] && echo "** WARNING ** scripts in system paths can not use bg-debugCntr vinstalled projects. disabling" >&2
 		setSecureEnv bgLibPath ""
+		setSecureEnv bgVinstalledPaths ""
+		setSecureEnv bgInstalledPkgNames ""
+
+		# TODO:this needs to iterate bgVinstalledPaths (before the above line) and remove any paths
+		#  *starting* with it from all of these system paths that vinstall modifies
+		# PATH
+		# BASH_LOADABLES_PATH
+		# MANPATH
+		# AWKPATH
+		# PYTHONPATH
+		# NODE_PATH
+		# bgDataPath
 
 		# its ok to turn tracing on for system installed scripts but not the debugger
 		# declare -r bgTracingOn=""

@@ -133,13 +133,19 @@ function manifestGetPkgForPath()
 		See man bg_coreSysRuntime.sh
 	"
 
-	local assetPath="$2"
+	# readlink -m make the path absolute and canonical
+	local assetPath="$(readlink -m -- "$2")"
 
-	# TODO: normalize the assetPaths ($4) when creating the vinstalled manifest file so dont have to normalize $4 in the script below
 	local resultsFromMan;
 	read -r "resultsFromMan" < <(gawk --sandbox -v assetPath="$assetPath" '
 		gensub(/\/\.\//,"/", "g", $4)==assetPath {print $1}
 	' $manifestFile)
+
+	# when bg-debugCntr vinstall, there can be times when we run the installed version but the manifest
+	# was already updated to the vinstalled path. This works around that
+	if [ ! "$resultsFromMan" ] && [[ "$assetPath" == "/usr/bin/bg-dev" ]]; then
+		resultsFromMan="bg-dev"
+	fi
 
 	# if its not in the manifest, it must have been 'installed' (or just created) by a local user. If its located in a system folder
 	# that user must have used priviledge to do so so we call the package "localAdminPkg". The localadmin user can also install resources
@@ -3057,7 +3063,7 @@ function bgTrapStack()
 			# we push in two steps because handler might have single quotes which would mess up  the array element parsing
 			declare -ag $stackVar'=( "" "${'"$stackVar"'[@]}" )'
 			printf -v $stackVar[0] "%s" "$handler"
-			builtin trap "${newHandler:--}" "$sig" || bgtrace "!!!ERROR: bgTrapStack: #{BASH_SOURCE}($LINENO): builtin trap returned error code. "
+			builtin trap "${newHandler:--}" "$sig" || bgtrace "ERROR: bgTrapStack: #{BASH_SOURCE}($LINENO): builtin trap returned error code. "
 			;;
 	esac
 }
@@ -3218,7 +3224,7 @@ function command_not_found_handle()
 	# in addition to this recursion detection, I added protection against calling unknown cmds like type -t <cmd> && <cmd>. That is
 	# not full proof because <cmd> might call something that is unknown.
 	if [ "${command_not_found_handle}" == "1" ]; then
-		msg="!!!error!!!: command_not_found_handle: recursion detected. returning. cmdline='$cmdline'"
+		msg="***error***: command_not_found_handle: recursion detected. returning. cmdline='$cmdline'"
 		echo "$msg" >&2
 		type -t bgtrace &>/dev/null && bgtrace "$msg"
 		builtin exit 127
@@ -3596,7 +3602,7 @@ function assertError()
 				"
 
 			if [ "$_ae_traceCatchFlag" ]; then
-				bgtrace "!!!throwing exception that will be caught"
+				bgtrace "throwing exception that will be caught"
 				[ "$throwingStatePID" != "$$" ] && bgtrace "   PID of throw ='$throwingStatePID'"
 				[ "$throwingStatePID" != "tryStatePID" ] && bgtrace "   PID of catch ='$tryStatePID'"
 				bgtracePSTree
@@ -3650,13 +3656,13 @@ function assertError()
 			# Some bash commands are interuptable by SIGINT but if we are running a bash script, all the parents between us and
 			# tryStatePID must be bash subshells stopped on bash functions.
 			[ "$traceCatchFlag" ] && {
-				bgtrace "!!! unwind is sending kill -SIGUSR2 $tryStatePID  "
+				bgtrace "unwind is sending kill -SIGUSR2 $tryStatePID  "
 				bgDebuggerStepIntoPlumbing=1
 			}
 			kill -SIGUSR2 "$tryStatePID"     # this wont return if we are tryStatePID
 			(( ${#pidsToKill[@]} > 0 )) && kill -SIGINT "${pidsToKill[@]}"
 			[ "$tryStatePID" != "$throwingStatePID" ] && bgExit  ${_ae_exitCode:-36}
-			[ "$traceCatchFlag" ] && bgtrace "!!! assertError: this exception is being caught but assertError is ending normally. this is an error"
+			[ "$traceCatchFlag" ] && bgtrace "assertError: this exception is being caught but assertError is ending normally. this is an error"
 			;;
 
 		*)	echo "error: logic error. In assertError the action was computed to be '$tryStateAction' but should be one of catch,abort,continue,exitOneShell"
@@ -3756,7 +3762,7 @@ function Rethrow()
 			# Some bash commands are interuptable by SIGINT but if we are running a bash script, all the parents between us and
 			# tryStatePID must be bash subshells stopped on bash functions.
 			if [ "$traceCatchFlag" ]; then
-				bgtrace "!!!throwing exception that will be caught"
+				bgtrace "throwing exception that will be caught"
 				[ "$throwingStatePID" != "$$" ] && bgtrace "   PID of throw ='$throwingStatePID'"
 				[ "$throwingStatePID" != "tryStatePID" ] && bgtrace "   PID of catch ='$tryStatePID'"
 				bgtracePSTree
@@ -3766,7 +3772,7 @@ function Rethrow()
 			kill -SIGUSR2 "$tryStatePID"     # this wont return if we are tryStatePID
 			(( ${#pidsToKill[@]} > 0 )) && kill -SIGINT "${pidsToKill[@]}"
 			[ "$tryStatePID" != "$throwingStatePID" ] && bgExit  ${_ae_exitCode:-36}
-			[ "$traceCatchFlag" ] && bgtrace "!!! assertError: this exception is being caught but assertError is ending normally. this is an error"
+			[ "$traceCatchFlag" ] && bgtrace "assertError: this exception is being caught but assertError is ending normally. this is an error"
 			;;
 
 		*)	echo "error: logic error. In assertError the action was computed to be '$tryStateAction' but should be one of catch,abort,continue,exitOneShell"
@@ -3934,10 +3940,10 @@ function Try()
 		builtin trap - SIGUSR2
 		shopt -s extdebug
 		set +o errtrace # extdebug turns this on but unit tests need it off
-		'"${traceCatchFlag:+bgtrace !!! SIGUSR2 removed this SIGUSR2 trap. the next line should install and switch to the DEBUG trap }"'
+		'"${traceCatchFlag:+bgtrace SIGUSR2 removed this SIGUSR2 trap. the next line should install and switch to the DEBUG trap }"'
 		bgTrapStack push DEBUG '\''bgDebuggerGlobalDisable=; '"$debugTrapScript"''\''
 	'
-	[ "$traceCatchFlag" ] && bgtrace "!!! Try: installed SIGUSR2 in pid='$BASHPID'"
+	[ "$traceCatchFlag" ] && bgtrace "Try: installed SIGUSR2 in pid='$BASHPID'"
 	return 0
 } #" highlighting bug
 

@@ -371,6 +371,7 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 			unset _inint_i
 
 			declare -g scriptFolder="${0%/*}"
+			declare -g bgScriptFolder="${0%/*}"
 		fi
 		;;
 
@@ -384,6 +385,7 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 			declare -g bgLibExecCmd=("${0##*/}" "$@")
 			declare -g bgLibExecSrc; read -r bgLibExecSrc bgLibExecSrc < <(history 1)
 			declare -g scriptFolder="$PWD"
+			declare -g bgScriptFolder="$PWD"
 		fi
 		;;
 
@@ -398,6 +400,7 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 			declare -g bgLibExecCmd=("source:${scrdFile##*/}" "$@")
 			declare -g bgLibExecSrc; read -r bgLibExecSrc bgLibExecSrc < <(history 1)
 			declare -g scriptFolder="${scrdFile%/*}"
+			declare -g bgScriptFolder="${scrdFile%/*}"
 			unset scrdFile
 		fi
 		;;
@@ -411,11 +414,14 @@ case "$bgBASH_scriptType:$BASH_SUBSHELL" in
 			declare -g bgLibExecCmd=("source:${scrdFile##*/}" "$@")
 			declare -g bgLibExecSrc; read -r bgLibExecSrc bgLibExecSrc < <(history 1)
 			declare -g scriptFolder="${scrdFile%/*}"
+			declare -g bgScriptFolder="${scrdFile%/*}"
 			unset scrdFile
 		fi
 		;;
 
 esac
+
+declare -g bgScriptName="${bgLibExecCmd[0]}"
 
 
 #######################################################################################################################################
