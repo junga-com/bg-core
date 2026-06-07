@@ -453,7 +453,7 @@ function static::Plugin::addNewAsset()
 	templateExpand -p "$templateFile" "$destFile"
 	echo "A new asset has been added at '$destFile' with default values. Edit that file to customize it."
 
-	! type -t static::PackageAsset::addAssetToManifest &>/dev/null && { import PackageAsset.PluginType ;$L1;$L2; }
+	! type -t static::PackageAsset::addAssetToManifest &>/dev/null && { import PluginType.PackageAsset ;$L1;$L2; }
 	static::PackageAsset::addAssetToManifest "plugin" "$newAssetName" "$destFile"
 }
 

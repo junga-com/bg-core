@@ -430,7 +430,7 @@ function iniParamGet()
 	local ipg_paramName="$3";  assertNotEmpty ipg_paramName
 	local ipg_defaultValue="$4"
 
-	local -a ipg_iniFiles; fsExpandFiles -f -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
+	local -a ipg_iniFiles; fsExpandFiles -f -F -A ipg_iniFiles ${ipg_iniFileSpec//,/ }
 
 	local ipg_value ipg_foundInFile
 

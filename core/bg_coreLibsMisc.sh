@@ -45,7 +45,7 @@ fi
 #######################################################################################################################################
 ### From bg_manifest.sh
 
-# usage: manifestGet [-p|--pkg=<pkgMatch>] [-o|--output='$n'] <assetTypeMatch> <assetNameMatch>
+# usage: manifestGet [--manifest=<file>] [-p|--pkg=<pkgMatch>] [-o|--output='$n'] <assetTypeMatch> <assetNameMatch>
 # query the host manifest file for assets installed on the host from any pkg that participates in the bg-core asset management
 # system.
 #
@@ -4907,15 +4907,21 @@ function fsExpandFiles()
 	if [ ${#excludePaths[@]} -gt 0 ]; then
 		local _folderEntries=() _anyEntries=()
 		local _line; for _line in "${excludePaths[@]}"; do
+			# skip empties
+			[ "$_line" ] || continue
+
+			_line="${_line#/}"
+
+			# trailing slash means directory-only; check and remove
 			local _type="both"
 			[[ "$_line" =~ /$ ]] && { _line="${_line%%/}"; _type="d"; }
 
+			# if it contains a / use --path
 			local _expr="-name"
 			[[ "$_line" =~ / ]] && _expr="-path"
 
-			if [[ "$_line" =~ ^/ ]]; then
-				_line="${commonPrefix}${_line##/}"
-			elif [[ "$_line" =~ / ]]; then
+			# apply commonPrefix avoiding double //
+			if [[ "$_line" =~ / ]]; then
 				_line="${commonPrefix}${_line}"
 			fi
 
@@ -4942,9 +4948,9 @@ function fsExpandFiles()
 	)
 
 	if [ "$bgtraceFlag" ]; then
-		bgtrace "fsExpandFiles/bgfind call:"
-		printf ' %q' "find" "${findOpts[@]}" "${findStartingPoints[@]}" "${finalFindArgs[@]}" >> $_bgtraceFile
-		#printf '   : %q\n' "find" "${findOpts[@]}" "${findStartingPoints[@]}" "${finalFindArgs[@]}" >> $_bgtraceFile
+		bgtrace "bgfind cmdline=find" "${findOpts[@]}" "${findStartingPoints[@]}" "${finalFindArgs[@]}"
+		findCmdStr="$(printf ' %q' "find" "${findOpts[@]}" "${findStartingPoints[@]}" "${finalFindArgs[@]}")"
+		bgtrace "       escaped='$findCmdStr'"
 		bgtrace
 	fi
 
