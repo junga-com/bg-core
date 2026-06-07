@@ -137,85 +137,92 @@ function manifestUpdateInstalledManifest() {
 	local action="$1"
 	local pkgName="$2"
 
+	assertNotEmpty manifestInstalledPath "manifestUpdateInstalledManifest: call error. var manifestInstalledPath  should be set before calling. Typically this is called by bg_onPkgInstRm during package operations"
+
 	# make backups of the current manifest files for debugging by diffing to see what changed
 	[ -f "$manifestInstalledPath" ]       && cat "$manifestInstalledPath"       | fsPipeToFile "${manifestInstalledPath}.prev"
 	[ -f "$pluginManifestInstalledPath" ] && cat "$pluginManifestInstalledPath" | fsPipeToFile "${pluginManifestInstalledPath}.prev"
 
 	case ${action:-all} in
-		all)
-			local rebuildInstalled dirtyDeps
-			if fsGetNewerDeps --retArray=dirtyDeps "$manifestInstalledPath" /var/lib/bg-core/*/hostmanifest; then
-				cat $(fsExpandFiles -f /var/lib/bg-core/*/hostmanifest) | sort | fsPipeToFile "$manifestInstalledPath"
-			fi
+		# for now force a complete rebuild since its work is not worth saving and incremental packages add/rm had a bug
+		# update: the bug might have just been that bg-core-bashBuiltins did not have an onPostinst and buildPkg did not create one
+		#all)
+		*)
+			# local rebuildInstalled dirtyDeps
+			# if fsGetNewerDeps --retArray=dirtyDeps "$manifestInstalledPath" /var/lib/bg-core/*/hostmanifest; then
+			# 	cat $(fsExpandFiles -f /var/lib/bg-core/*/hostmanifest) | sort | fsPipeToFile "$manifestInstalledPath"
+			# fi
+			cat /var/lib/bg-core/*/hostmanifest 2>/dev/null | sort > "$manifestInstalledPath"
 
+			# rebuild the pluginManifest
 			import bg_plugins.sh  ;$L1;$L2
 			$Plugin::buildAwkDataTable --manifest="$manifestInstalledPath" | fsPipeToFile "$pluginManifestInstalledPath"
 			;;
 
-		remove)
-			assertNotEmpty pkgName
-			[ ! -f "$manifestInstalledPath" ] && [ ! -f "$pluginManifestInstalledPath" ] && return 0
-			bgawk -i  \
-			   -v pkgName="$pkgName" '
-				$1==pkgName {deleteLine()}
-			' $(fsExpandFiles "$manifestInstalledPath" "$pluginManifestInstalledPath")
-			;;
-
-		add)
-			assertNotEmpty pkgName
-			bgawk -i \
-			   -v pkgName="$pkgName" \ '
-				function insertNewPkgData(                     line) {
-					if (!didIt) {
-						didIt="1"
-						while ((getline line < ("/var/lib/bg-core/"pkgName"/hostmanifest")) >0) {
-							printf("%s\n", line)
-						}
-					}
-				}
-
-				# suppress printing of any pkgName data already in the file
-				$1==pkgName {deleteLine()}
-
-				# if we have not yet written the new data and we see a pkgName that sorts after it, its time to write the data
-				!didIt && ($1 > pkgName) {
-					insertNewPkgData()
-				}
-
-				END {
-					# if we did not find an insertion point while scanning the file, we write it at the end
-					if (!didIt)
-						insertNewPkgData()
-				}
-			' "$manifestInstalledPath"
-
-			import bg_plugins.sh  ;$L1;$L2
-			{
-				[ -f "$pluginManifestInstalledPath" ] && bgawk -n  \
-				   -v pkgName="$pkgName" \
-				   -v pluginManifestInstalledPath='$pluginManifestInstalledPath' '
-					@include "bg_core.awk"
-					NR==1 {
-						if ($1!="package")
-							assert("Bad format for plugin mnifest file at "pluginManifestInstalledPath". The first column needs to be package but it is '"$1"'")
-						for (i=1; i<=NF; i++)
-							cols[i]=$i
-						next
-					}
-					NR==2 {next;}
-
-					{
-						if ($1!=pkgName) {
-							for (i=1; i<=length(cols); i++)
-								printf("%s %s %s %s\n", $1, norm($2), cols[i], norm($i))
-						}
-					}
-				' "$pluginManifestInstalledPath"
-
-				static::Plugin::_dumpAttributes --manifest="$manifestInstalledPath" --pkgName="$pkgName"
-
-			} | static::Plugin::_assembleAttributesForAwktable | column -t -e | fsPipeToFile "$pluginManifestInstalledPath"
-			;;
+		# remove)
+		# 	assertNotEmpty pkgName
+		# 	[ ! -f "$manifestInstalledPath" ] && [ ! -f "$pluginManifestInstalledPath" ] && return 0
+		# 	bgawk -i  \
+		# 	   -v pkgName="$pkgName" '
+		# 		$1==pkgName {deleteLine()}
+		# 	' $(fsExpandFiles "$manifestInstalledPath" "$pluginManifestInstalledPath")
+		# 	;;
+		#
+		# add)
+		# 	assertNotEmpty pkgName
+		# 	bgawk -i \
+		# 	   -v pkgName="$pkgName" \ '
+		# 		function insertNewPkgData(                     line) {
+		# 			if (!didIt) {
+		# 				didIt="1"
+		# 				while ((getline line < ("/var/lib/bg-core/"pkgName"/hostmanifest")) >0) {
+		# 					printf("%s\n", line)
+		# 				}
+		# 			}
+		# 		}
+		#
+		# 		# suppress printing of any pkgName data already in the file
+		# 		$1==pkgName {deleteLine()}
+		#
+		# 		# if we have not yet written the new data and we see a pkgName that sorts after it, its time to write the data
+		# 		!didIt && ($1 > pkgName) {
+		# 			insertNewPkgData()
+		# 		}
+		#
+		# 		END {
+		# 			# if we did not find an insertion point while scanning the file, we write it at the end
+		# 			if (!didIt)
+		# 				insertNewPkgData()
+		# 		}
+		# 	' "$manifestInstalledPath"
+		#
+		# 	import bg_plugins.sh  ;$L1;$L2
+		# 	{
+		# 		[ -f "$pluginManifestInstalledPath" ] && bgawk -n  \
+		# 		   -v pkgName="$pkgName" \
+		# 		   -v pluginManifestInstalledPath='$pluginManifestInstalledPath' '
+		# 			@include "bg_core.awk"
+		# 			NR==1 {
+		# 				if ($1!="package")
+		# 					assert("Bad format for plugin mnifest file at "pluginManifestInstalledPath". The first column needs to be package but it is '"$1"'")
+		# 				for (i=1; i<=NF; i++)
+		# 					cols[i]=$i
+		# 				next
+		# 			}
+		# 			NR==2 {next;}
+		#
+		# 			{
+		# 				if ($1!=pkgName) {
+		# 					for (i=1; i<=length(cols); i++)
+		# 						printf("%s %s %s %s\n", $1, norm($2), cols[i], norm($i))
+		# 				}
+		# 			}
+		# 		' "$pluginManifestInstalledPath"
+		#
+		# 		static::Plugin::_dumpAttributes --manifest="$manifestInstalledPath" --pkgName="$pkgName"
+		#
+		# 	} | static::Plugin::_assembleAttributesForAwktable | column -t -e | fsPipeToFile "$pluginManifestInstalledPath"
+		# 	;;
 	esac
 	return 0
 }
