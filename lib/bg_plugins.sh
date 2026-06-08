@@ -473,6 +473,7 @@ function static::Plugin::_dumpAttributes()
 	done
 	local pluginKeySpec="$1"
 
+
 	local pkg scrap pluginKey pluginPath
 	local -n plugin
 	local -n mutableCols
@@ -499,6 +500,9 @@ function static::Plugin::_dumpAttributes()
 		}
 
 	done < <(manifestGet $manifestOpt $pkgNameOpt "plugin" "${pluginKeySpec:-.*}")
+
+	unset -n plugin 2>/dev/null || :
+	unset -n mutableCols 2>/dev/null || :
 }
 
 # usage: $Plugin::_assembleAttributesForAwktable [--pkgName=<pkgName>] [<pluginKeySpec>]

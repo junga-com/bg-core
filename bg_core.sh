@@ -50,7 +50,7 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 	#
 	#
 	#    bgScriptName      : ${0##*/} but handles edge cases
-	#    bgScriptFolder    : ${0%/*} but handles edge cases 
+	#    bgScriptFolder    : ${0%/*} but handles edge cases
 	#    bgLibExecCmd      : array : the cmdline line tokens invoked so that functions can access it
 	#                        bgLibExecCmd[0] == ($0)  (with leading path removed)
 	#                        bgLibExecCmd[1] == ($1)
@@ -375,4 +375,6 @@ if [[ ! "${_importedLibraries@a}" =~ A ]] || [ ! "${_importedLibraries["lib:bg_c
 	fi
 fi
 
-[[ "$1" =~ ^--(pre|post)(inst|rm)$ ]] && import bg_onPkgInstRm.sh "$@" ;$L1;$L2
+if [[ "$1" =~ ^--(pre|post)(inst|rm)$ ]]; then
+	import bg_onPkgInstRm.sh "$@" ;$L1;$L2
+fi

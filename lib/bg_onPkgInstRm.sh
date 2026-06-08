@@ -111,7 +111,6 @@ function onPostrm()
 
 	import bg_manifest.sh  ;$L1;$L2
 	manifestUpdateInstalledManifest  "${packageName:+remove}" "${packageName}"
-
 	return 0
 }
 
