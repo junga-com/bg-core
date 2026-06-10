@@ -572,7 +572,7 @@ function templateExpandStr()
 templateMagicEscToken="|#0.0.7#|"
 
 
-# usage: templateExpand [<options>] <srcTemplate> <dstFilename>|- [ <varName1>:<value1>..<varNameN>:<valueN>]
+# usage: templateExpand [<options>] <srcTemplate> -|<dstFilename> [ <varName1>:<value1>..<varNameN>:<valueN>]
 # usage: templateExpand [<options>] -s <stringContent> -d <dstFilename>  [ <varName1>:<value1>..<varNameN>:<valueN>]
 # usage: templateExpand [<options>] -f <srcTemplate> -d <dstFilename>  [ <varName1>:<value1>..<varNameN>:<valueN>] ]
 # Expands the <srcTemplate> and prints the results into <dstFilename> or to stdout

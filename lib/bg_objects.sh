@@ -2163,6 +2163,11 @@ function static::Object::assign()
 	assertError "not yet implemented"
 }
 
+function static::Object::isNull()
+{
+	[[ "${1}" =~ ^assertError ]] || [[ "${!1}" =~ ^assertError ]]
+}
+
 function Object::eval()
 {
 	local cmdLine="$1"; shift
