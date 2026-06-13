@@ -18,7 +18,7 @@
 #                    reading is always tolerant to whitespace around the <paramDelim>
 #    <sectPad>     : default is " ". padding to use around <sectName> when writing a section line
 #                    reading is always tolerant to whitespace around the <sectName>
-#    <quoteMode>=(|single|double|none) : default is "" (empty strin).  when writing a parameter line this determines if quotes will
+#    <quoteMode>=(|single|double|none) : default is "" (empty string).  when writing a parameter line this determines if quotes will
 #                    be written around the value and which kind. if the <value> being written contains a '#' and
 #                    <commentsStyle>=="EOL". quotes will be used even if this is set to "" (empty)
 #                    quotes are always recognized and removed when reading lines -- not just around the value, but anywhere.

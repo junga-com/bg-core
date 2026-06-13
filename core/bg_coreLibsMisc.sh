@@ -3979,7 +3979,7 @@ function TryInSubshell()
 #             stack frame will be popped and the exception will be re-thrown to the next higher level.
 #
 # The Error Path:
-# The <errorPathCode...> in the usage synteax will be executed only when an exception is caught by that Catch:
+# The <errorPathCode...> in the usage syntax will be executed only when an exception is caught by that Catch:
 # Inside this block some global variables starting with catch_* describe the state of the exception being caught.
 #    bgSTK_*                : these stack variables are set with the state of the stack at the point where assertError was called
 #                             "bgtraceStack" and  "bgStack*" functions operate on those variables
@@ -3992,8 +3992,8 @@ function TryInSubshell()
 #                             that invoked the catch_errorFn but that can be changed by using the --frameOffset option.
 #    catch_psTree           : a string  containing the pstree output of the script at the point that the assert was raised. This
 #                             shows the state of subshells and spawn async commands.
-#    catch_errorBuiltinFlag : If the bgCore builtin is enabled it uses this to know that some shell code it call assertError
-#                             After detected it it clears it so that it wont be detected again
+#    catch_errorBuiltinFlag : If the bgCore builtin is enabled it uses this to know that some shell code it executed called
+#                             assertError. After detected it clears it so that it wont be detected again
 # Exit Code:
 #    0: (true) error path. This means that this Catch: statement is catching an error.
 #    1: (false) normal path. This Catch: statement is not catching an exception.
